@@ -1,0 +1,855 @@
+{
+  "generated_at": "2026-06-19T18:32:11.075Z",
+  "records": [
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.1",
+      "section_title": "What This Is",
+      "ui_path": "shared",
+      "text": "2 Underwriting — What This Is\n\nUnderwriting is the activity of modeling expected cash flows over a property or project lifecycle and translating them into investment metrics — value, yield, coverage, return on cost, and timing. In Landscape it splits along whether the asset is already operating or is being built.\nOperating-asset underwriting\nProject NOI forward, capitalize at a market rate or discount the cash flows over a holding period, and derive value, levered and unlevered IRR, equity multiple, and DSCR.\nDevelopment underwriting\nBuild the cost stack (land + hard + soft + financing + contingency), model lease-up or sales absorption, project stabilized NOI and exit, and derive residual land value, return on cost, return on equity, and the gap between cost and exit value (the development premium).\nBoth modes share the same engine and the same period-by-period cash-flow construction. They differ in the inputs, the time-zero treatment (acquisition vs. ground-up), and the metrics that matter."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.2",
+      "section_title": "Core Inputs",
+      "ui_path": "shared",
+      "text": "2 Underwriting — Core Inputs\n\nOperating-asset path\nInput | Single-period | Multi-period\nIncome line items (rents, other income, vacancy / credit loss) | Required | Year-1 required; subsequent years modeled\nOperating expenses (line items or normalized aggregate) | Required | Year-1 required; subsequent years modeled\nNOI basis selection (F-12 Current / Market / Stabilized) | Required — drives which income and expense values feed the calc | Same\nCapitalization rate | Required | Used as terminal / exit rate\nDiscount rate | — | Required\nHolding period | — | Required (typically 5 / 7 / 10 years)\nReversion / sale | — | Terminal rate × terminal NOI, less selling costs\nGrowth | — | Per-line revenue, expense escalators, vacancy curve\nDebt structure | For levered yield | Required for levered IRR / DSCR\nDevelopment path\nInput | Required\nLand basis | Yes (or solved for as residual)\nHard cost budget | Yes\nSoft cost budget | Yes\nConstruction period and draw curve | Yes\nConstruction debt (rate, term, max LTC) | If levered\nLease-up or sales absorption schedule | Yes\nStabilized NOI or unit pricing | Yes\nExit cap or sale price | Yes\nPermanent financing assumptions | If holding past stabilization\nNote: NOI is never an input. You supply income line items, operating expenses, and the NOI basis; the platform computes NOI from them."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.3",
+      "section_title": "Core Outputs",
+      "ui_path": "shared",
+      "text": "2 Underwriting — Core Outputs\n\nEvery underwriting run produces: implied or projected value, levered and unlevered IRR, NPV, equity multiple, DSCR (with debt loaded), and a period-by-period cash flow schedule.\nOperating-asset additions\nYield-on-cost, cash-on-cash, and going-in vs. terminal cap.\nDevelopment additions\nReturn on cost, return on equity, residual land value, and development spread (built basis vs. exit value)."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.4",
+      "section_title": "How Landscape Supports It",
+      "ui_path": "shared",
+      "text": "2 Underwriting — How Landscape Supports It\n\nOperating side — three NOI bases\nF-12 Current — forward twelve months, projected from the current rent roll and the current operating-expense run-rate. The as-is, going-forward view.\nMarket — current rents adjusted to market levels, with normalized operating expenses. What the property would produce if leased and operated at market today.\nStabilized — the same construct as Market, applied specifically to properties in lease-up (new construction) or value-add / rehab. Reflects what the property will produce once it reaches stabilized occupancy and stabilized expenses after the improvement plan is complete.\nYou select which basis feeds the underwriting; the platform handles the underlying data plumbing.\nDevelopment side\nThe platform tracks the full cost stack — land, hard costs, soft costs, financing, and contingency — under the project’s container hierarchy (Area → Phase → Parcel for land development; Building → Floor → Unit for vertical). The absorption schedule (lease-up or sales) attaches to the project and feeds revenue timing. Construction-loan mechanics — draws, redraws, and conversion to permanent financing — are handled by the platform’s construction-loan engine.\nGranularity and persistence\nCash flows run monthly for multifamily and active development; annually otherwise. Every underwriting run is versioned. Reports and waterfall calculations read the latest version unless a specific version is pinned."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.5",
+      "section_title": "Variants and Edge Cases",
+      "ui_path": "shared",
+      "text": "2 Underwriting — Variants and Edge Cases\n\nSituation | How it is handled\nStabilized vs. as-is | A stabilized run minus lease-up cost and time-value drag yields the as-is value. Both tracked.\nBelow- or above-market rents | Modeled via the lease schedule, not as a manual adjustment.\nDistressed / negative NOI | Single-period yields nonsensical results; the system warns and routes you to multi-period.\nLand already owned | Residual land value becomes a check rather than an input; compare it to your existing basis.\nPhased / merchant build | Sales absorption replaces lease-up; the schedule tracks sellouts rather than rent-up.\nLevered vs. unlevered | Both run by default when debt is loaded, surfaced side-by-side.\nMid-construction acquisition | Hybrid path — land plus work-to-date as basis, completion as the remaining cost stack."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.6",
+      "section_title": "Running an Underwriting",
+      "ui_path": "shared",
+      "text": "2 Underwriting — Running an Underwriting\n\nThe analysis is identical underneath; how you start it depends on which interface you are in."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.6",
+      "section_title": "Running an Underwriting",
+      "ui_path": "chat",
+      "text": "2 Underwriting — Running an Underwriting\n\nDescribe the run to Landscaper in plain language. It assembles the inputs, runs the engine, and returns the result as an artifact you can refine.\nOperating-asset prompts\n“Underwrite this property using market rents and an 8 cap.”\n“DCF this asset over 10 years at a 7.5% discount, terminal 8.”\n“Compare the three NOI bases and show me the implied value under each.”\n“Stress-test cap-rate expansion to 9% and growth flat at 2%.”\nDevelopment prompts\n“Run the development underwriting on this site assuming $40k per lot land and a 7 cap exit.”\n“Solve for residual land value at a 15% return on cost.”\n“What’s the development spread if we hit $850 per square foot stabilized?”\n“Compare merchant-build sellout to hold-and-stabilize on this parcel.”"
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.6",
+      "section_title": "Running an Underwriting",
+      "ui_path": "classic",
+      "text": "2 Underwriting — Running an Underwriting\n\nOpen the project and work the tabs directly.\nOperating-asset path\nIn the Operations tab, choose the NOI basis (F-12 Current, Market, or Stabilized). Then open the Valuation folder and select the Income Approach tab. Choose Direct Cap or DCF, and enter the capitalization rate, discount rate, and holding period. The indicated value and cash flow populate in place.\nDevelopment path\nEnter the cost stack in the Budget tab and the lease-up or sales schedule in the absorption section. Open the Feasibility tab to solve residual land value and read return-on-cost / return-on-equity. Use the Capitalization folder to layer in debt, equity, and the waterfall."
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.7",
+      "section_title": "Where the Results Appear",
+      "ui_path": "chat",
+      "text": "2 Underwriting — Where the Results Appear\n\nOutput | Where it renders\nValue or residual-land-value summary | Chat reply plus the Underwriting artifact in the right panel\nCash flow schedule | Right artifacts panel, expandable table\nSensitivity grid | Right artifacts panel\nCost-stack waterfall (development) | Right artifacts panel\nSource-cell trace | Inline in chat, cross-linked to documents and prior asks\nEmbedded section in the deal report | Reports panel"
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.7",
+      "section_title": "Where the Results Appear",
+      "ui_path": "classic",
+      "text": "2 Underwriting — Where the Results Appear\n\nOutput | Where it renders\nIndicated value | Income Approach tab (Valuation folder)\nCash flow schedule | Income Approach / DCF view, in the tab\nResidual land value, return metrics | Feasibility tab\nCost-stack and draws (development) | Budget and Capitalization tabs\nAssembled report | Reports folder"
+    },
+    {
+      "chapter_id": "UW",
+      "chapter_number": "2",
+      "chapter_title": "Underwriting",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "UW.8",
+      "section_title": "Related Chapters",
+      "ui_path": "shared",
+      "text": "2 Underwriting — Related Chapters\n\nProperty & Portfolio Modeling (how the asset is structured), Comparable Sales (cap-rate and exit-price evidence), Capitalization (debt, equity, construction loans, and the waterfall that allocates the result), Sensitivity & Scenarios, Report Generation, and Location Briefs (cap-rate and market-rent evidence)."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.1",
+      "section_title": "What This Is",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — What This Is\n\nComparable sales estimates value by reference to recent transactions of similar properties, adjusted for the ways each sale differs from the subject. It is the most direct read on what the market will pay, and the primary evidence behind both a value conclusion and the capitalization and exit-rate assumptions used elsewhere in the analysis.\nThe activity is the same across property types — land, multifamily, office, retail, industrial. What changes is the unit of comparison (per acre or per lot for land; per unit or per square foot for improved property) and which differences matter enough to adjust for."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.2",
+      "section_title": "Core Inputs",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — Core Inputs\n\nInput | Role\nSubject characteristics | Size, location, property type, condition, and the attributes you will adjust against\nComparable sales | Sale price, sale date, size, location, property type, and terms for each comp\nUnit of comparison | Per unit / per square foot for improved; per acre / per lot for land\nAdjustment factors | Market conditions (time), location, physical differences, condition, and financing or conditions of sale\nNote: A sale becomes a comparable only after adjustment. The raw price is the starting point; the adjusted price is the evidence."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.3",
+      "section_title": "Core Outputs",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — Core Outputs\n\nAn adjusted value for each comparable, an indicated value range across the set, a reconciled point value, and the supporting per-unit and per-square-foot (or per-acre / per-lot) figures. These also feed cap-rate and exit-price evidence used in the income and underwriting work."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.4",
+      "section_title": "How Landscape Supports It",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — How Landscape Supports It\n\nOne comparables library, tagged by property type\nAll comparables live in a single library tagged by property type, rather than separate lists per asset class. When you pull comps for a subject, Landscape filters to the matching property type automatically, so a land subject draws land comps and a multifamily subject draws multifamily comps.\nAdjustment grid\nEach comparable is adjusted in a grid — market conditions, location, physical, condition, and terms — producing an adjusted unit value per comp. The grid is the workpaper behind the indicated range.\nMap\nComps render on a map alongside the subject, so proximity and submarket fit are visible at a glance and location adjustments are grounded in geography rather than guesswork."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.5",
+      "section_title": "Variants and Edge Cases",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — Variants and Edge Cases\n\nSituation | How it is handled\nThin market / few comps | Widen the date or distance window; the indicated range carries more weight on fewer, closer comps. Flag the limited evidence in the conclusion.\nLand vs. improved subject | Unit of comparison switches to per acre or per lot; physical adjustments shift to entitlements, topography, and access.\nDated sales | Apply a market-conditions (time) adjustment rather than discarding the comp.\nNon-arm’s-length or portfolio sale | Adjust for conditions of sale, or exclude with a note; do not let a distorted price set the range.\nMixed-quality set | Reconcile toward the most similar comps; the point value need not be the mean of the range."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.6",
+      "section_title": "Running a Comparable-Sales Analysis",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — Running a Comparable-Sales Analysis\n\nThe grid and the adjustments are the same underneath; how you assemble them depends on the interface."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.6",
+      "section_title": "Running a Comparable-Sales Analysis",
+      "ui_path": "chat",
+      "text": "3 Comparable Sales — Running a Comparable-Sales Analysis\n\nAsk Landscaper to pull and adjust comps; it returns the grid and map as artifacts you can refine.\n“Pull sale comps for this property within 5 miles, last 18 months.”\n“Adjust these comps for time at 4% annual and size against the subject.”\n“Show me the indicated value range per unit and reconcile to a point.”\n“Drop the portfolio sale and re-run the range.”"
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.6",
+      "section_title": "Running a Comparable-Sales Analysis",
+      "ui_path": "classic",
+      "text": "3 Comparable Sales — Running a Comparable-Sales Analysis\n\nOpen the project, go to the Valuation folder, and select the Sales Comparison tab. Add comparables to the grid (or pull from the library), enter adjustments in each factor column, and read the adjusted unit values and indicated range. The map alongside the grid plots the comps against the subject."
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.7",
+      "section_title": "Where the Results Appear",
+      "ui_path": "chat",
+      "text": "3 Comparable Sales — Where the Results Appear\n\nOutput | Where it renders\nAdjustment grid | Right artifacts panel, expandable table\nComps map | Right artifacts panel, interactive map\nIndicated range and reconciled value | Chat reply plus the grid artifact\nEmbedded section in the deal report | Reports panel"
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.7",
+      "section_title": "Where the Results Appear",
+      "ui_path": "classic",
+      "text": "3 Comparable Sales — Where the Results Appear\n\nOutput | Where it renders\nAdjustment grid and indicated range | Sales Comparison tab (Valuation folder)\nComps map | Map view alongside the Sales Comparison grid\nReconciled value into the conclusion | Reconciliation tab\nAssembled report | Reports folder"
+    },
+    {
+      "chapter_id": "CS",
+      "chapter_number": "3",
+      "chapter_title": "Comparable Sales",
+      "group": "Concepts (Unified UI v2)",
+      "section_id": "CS.8",
+      "section_title": "Related Chapters",
+      "ui_path": "shared",
+      "text": "3 Comparable Sales — Related Chapters\n\nUnderwriting (cap-rate and exit-price evidence flow from here), Capitalization, Report Generation, and Location Briefs (market evidence that supports comp selection and adjustment)."
+    },
+    {
+      "chapter_id": "1",
+      "chapter_number": "1",
+      "chapter_title": "Introduction",
+      "group": "Getting Started",
+      "section_id": "1.1",
+      "section_title": "What Landscape Is",
+      "ui_path": "shared",
+      "text": "1 Introduction — What Landscape Is\n\nLandscape is an AI-powered real estate analytics platform for land developers, appraisers, and commercial real estate professionals. It combines institutional-grade financial analysis with AI-native document extraction, market intelligence, and a conversational assistant called Landscaper.\nThe platform is designed around progressive complexity — simple inputs that can grow into detailed, defensible analysis. You can start a deal with a single sentence (\"I'm looking at a 96-unit apartment deal in Tempe\") and progressively add detail until you have a full valuation or underwriting package."
+    },
+    {
+      "chapter_id": "1",
+      "chapter_number": "1",
+      "chapter_title": "Introduction",
+      "group": "Getting Started",
+      "section_id": "1.2",
+      "section_title": "Two Ways to Get Started",
+      "ui_path": "shared",
+      "text": "1 Introduction — Two Ways to Get Started\n\nThere are two paths to start a project in Landscape. You can talk to Landscaper — describe your deal in plain English and let the AI build the project for you. Or you can click New Project from the Dashboard and fill out the creation form manually. Both paths end up in the same workspace; choose whichever fits your situation.\nRecommended: If you have an offering memorandum, rent roll, or any deal document, start with Landscaper. Upload the document and let Landscaper extract the key data points. You can always refine later."
+    },
+    {
+      "chapter_id": "2",
+      "chapter_number": "2",
+      "chapter_title": "Creating a Project",
+      "group": "Getting Started",
+      "section_id": "2.1",
+      "section_title": "Path A: Talk to Landscaper",
+      "ui_path": "shared",
+      "text": "2 Creating a Project — Path A: Talk to Landscaper\n\nOpen Landscaper from the top navigation and describe your deal. You can be as brief or detailed as you want.\nBrief: \"I'm looking at a 96-unit apartment deal in Tempe.\"\nDetailed: \"Let's start a new apartment underwriting. Located at 8700 E. Camelback Road in Scottsdale, AZ. 100 units averaging 1,050sf. Average rent $1,500/month. Assume 5% vacancy. Going in cap of 5% with 60% debt at SOFR+3%, 7 year term, 20yr am. GP puts in 10% of equity, 8% pref, 20/80 promote to a 12% hurdle, then 50/50.\"\nLandscaper will parse what you gave it, ask targeted questions about what's missing, and build toward a value conclusion — all within the conversation. You don't need to fill out any forms, pick any dropdowns, or know how Landscape organizes projects internally.\nWhat Landscaper asks depends on what you provide. If you gave it debt terms, it won't ask again. If you said \"market-level expenses,\" it'll propose specific numbers and ask you to confirm. If you mentioned a waterfall structure, it'll ask about GP fees and disposition costs.\nSmart Defaults: Landscaper won't ask about anything you already told it, anything it can look up (current SOFR rate, property tax rates), or what property type it is when you said \"apartment.\""
+    },
+    {
+      "chapter_id": "2",
+      "chapter_number": "2",
+      "chapter_title": "Creating a Project",
+      "group": "Getting Started",
+      "section_id": "2.2",
+      "section_title": "Path B: Create Manually",
+      "ui_path": "shared",
+      "text": "2 Creating a Project — Path B: Create Manually\n\nClick New Project from the Dashboard. Landscape asks three defining questions that shape your entire workspace, then drops you into the project tabs to enter data directly. This path is faster if you already know exactly what you're building and want to get straight to the input forms.\nThe New Project modal walks you through property type, analysis perspective, and analysis purpose."
+    },
+    {
+      "chapter_id": "2",
+      "chapter_number": "2",
+      "chapter_title": "Creating a Project",
+      "group": "Getting Started",
+      "section_id": "2.3",
+      "section_title": "The Three Defining Questions",
+      "ui_path": "shared",
+      "text": "2 Creating a Project — The Three Defining Questions\n\nWhether Landscaper infers them from your description or you pick them from a form, every project is defined by three choices:\nQuestion | Options | What It Controls\nWhat is it? (Property Type) | Land, Multifamily, Office, Retail, Industrial | Data fields, container labels, extraction templates\nHow are you looking at it? (Perspective) | Investment or Development | Financial model framework (NOI/cap rates vs. dev costs/absorption)\nWhy are you analyzing it? (Purpose) | Valuation or Underwriting | Workspace tabs (valuation approaches vs. returns/capital structure)\nThese choices control which workspace tabs appear. Valuation purpose gives you a focused workspace with the three approaches to value. Underwriting adds financial structuring tools (Capitalization, Returns). Development perspective adds the budget. All choices can be changed later without losing data."
+    },
+    {
+      "chapter_id": "2",
+      "chapter_number": "2",
+      "chapter_title": "Creating a Project",
+      "group": "Getting Started",
+      "section_id": "2.4",
+      "section_title": "Project Home Overview",
+      "ui_path": "shared",
+      "text": "2 Creating a Project — Project Home Overview\n\nOnce a project exists, you land in the project workspace. From here you have three ways to add data: upload documents (Landscaper extracts structured data automatically), talk to Landscaper (ask questions, provide assumptions, request analysis), or enter data manually into any tab. All three methods feed the same underlying project data — mix and match however you work best.\nThe project home page with folder-tab navigation and KPI summary cards.\nNothing is Permanent: Your Perspective and Purpose choices can be changed anytime in the project profile. Landscape adjusts the visible tabs instantly. No data is lost when you switch — switching from Underwriting to Valuation hides the Capitalization tab but doesn't delete your debt and equity assumptions. Switch back and they're still there."
+    },
+    {
+      "chapter_id": "3",
+      "chapter_number": "3",
+      "chapter_title": "Platform Overview",
+      "group": "Getting Started",
+      "section_id": "3.1",
+      "section_title": "Workspace Tabs",
+      "ui_path": "shared",
+      "text": "3 Platform Overview — Workspace Tabs\n\nThe project workspace uses an ARGUS-style folder tab layout. Eight top-level folders organize your project. The first two (Project, Property) and last three (Reports, Documents, Map) are always visible. The middle three change based on property category and analysis type.\nFor income properties (Multifamily, Office, Retail, Industrial, Hotel, Mixed Use), the middle folders are Operations, Valuation, and Capitalization. For land development, they become Development/Sales, Feasibility/Valuation, and Capitalization. Capitalization only appears for Underwriting projects — appraisals hide it.\nFolder | Income Property | Land Development | Notes\nProject | Always | Always | Project profile, map, financial summary, contacts\nProperty | Always | Always | Income: Location, Market, Details, Rent Roll, Renovation, Acquisition. Land: Market, Land Use, Parcels, Acquisition. Acquisition hidden for Valuation purpose.\nOperations | Always | — | Single P&L page, no sub-tabs\nDevelopment / Sales | — | Always | Sub-tabs: Budget, Sales\nValuation | Always | — | Sub-tabs: Sales Comparison, Cost Approach, Income Approach, Reconciliation\nFeasibility / Valuation | — | Always | Sub-tabs: Cash Flow, Returns, Sensitivity\nCapitalization | Underwriting only | Underwriting only | Sub-tabs: Debt, Equity. Hidden for Valuation purpose.\nReports | Always | Always | Collapsible report panels\nDocuments | Always | Always | Sub-tabs: Documents (DMS), Intelligence (Knowledge/RAG)\nMap | Always | Always | Unified spatial hub, no sub-tabs"
+    },
+    {
+      "chapter_id": "3",
+      "chapter_number": "3",
+      "chapter_title": "Platform Overview",
+      "group": "Getting Started",
+      "section_id": "3.2",
+      "section_title": "Three-Panel Layout",
+      "ui_path": "shared",
+      "text": "3 Platform Overview — Three-Panel Layout\n\nMost workspace pages follow a macro-to-micro layout: summary cards at the top showing KPIs and totals, detail tables in the middle with filterable data grids, and individual records accessible via modals or drawers for editing. This pattern keeps you oriented — you always know the big picture while drilling into specifics."
+    },
+    {
+      "chapter_id": "3",
+      "chapter_number": "3",
+      "chapter_title": "Platform Overview",
+      "group": "Getting Started",
+      "section_id": "3.3",
+      "section_title": "Property Types and Containers",
+      "ui_path": "shared",
+      "text": "3 Platform Overview — Property Types and Containers\n\nLandscape uses a universal container system that adapts its labels to your property type. The same hierarchical tree structure works across all property types — only the naming changes.\nProperty Type | Level 1 | Level 2 | Level 3\nLand Dev | Area | Phase | Parcel\nMultifamily | Building | Floor | Unit\nOffice | Building | Floor | Suite\nRetail | Building | Wing | Bay\nIndustrial | Building | Dock | Bay"
+    },
+    {
+      "chapter_id": "4",
+      "chapter_number": "4",
+      "chapter_title": "Introduction to Landscaper",
+      "group": "Landscaper AI",
+      "section_id": "4.1",
+      "section_title": "What Landscaper Is",
+      "ui_path": "shared",
+      "text": "4 Introduction to Landscaper — What Landscaper Is\n\nLandscaper is the AI assistant built into every Landscape workspace. It helps you pull key information from documents, track activity, answer questions about your project, and make changes to project data — all through natural conversation.\nKey Concept: Landscaper is a persistent assistant that lives alongside every project. It has deep knowledge of your project data, uploaded documents, and market context. It can both answer questions and take actions on your behalf — with your confirmation before any data changes."
+    },
+    {
+      "chapter_id": "4",
+      "chapter_number": "4",
+      "chapter_title": "Introduction to Landscaper",
+      "group": "Landscaper AI",
+      "section_id": "4.2",
+      "section_title": "Where You'll Find It",
+      "ui_path": "shared",
+      "text": "4 Introduction to Landscaper — Where You'll Find It\n\nLandscaper appears in three places: the project workspace (the panel sits next to your project data on every tab), the admin modal (a Landscaper tab for configuring extraction rules), and the new project flow (a dropzone that can prefill project fields from a document).\nLandscaper lives in a collapsible left panel, always available while you work."
+    },
+    {
+      "chapter_id": "4",
+      "chapter_number": "4",
+      "chapter_title": "Introduction to Landscaper",
+      "group": "Landscaper AI",
+      "section_id": "4.3",
+      "section_title": "Five Core Capabilities",
+      "ui_path": "shared",
+      "text": "4 Introduction to Landscaper — Five Core Capabilities\n\nLandscaper has over 200 registered tools organized around five core capabilities:\nCapability | Description | Example\nQuery | Ask questions about your project data | \"What is the average lot size in Area 2?\"\nExtract | Pull structured data from uploaded documents | \"Extract the rent roll from this PDF\"\nAnalyze | Run calculations and comparisons | \"Compare NOI across my three scenarios\"\nMutate | Make changes to project data with confirmation | \"Update the cap rate to 5.25%\"\nAdvise | Get recommendations based on market data | \"Does this vacancy rate seem reasonable?\""
+    },
+    {
+      "chapter_id": "4",
+      "chapter_number": "4",
+      "chapter_title": "Introduction to Landscaper",
+      "group": "Landscaper AI",
+      "section_id": "4.4",
+      "section_title": "Recommended Workflow",
+      "ui_path": "shared",
+      "text": "4 Introduction to Landscaper — Recommended Workflow\n\nThe most productive workflow with Landscaper follows a pattern: upload your documents first (offering memorandum, rent roll, T-12, appraisal), let Landscaper extract the data, review and approve the extractions in the Ingestion Workbench, then use the chat to ask questions, refine assumptions, and run analysis on the populated project.\nYou don't have to follow this order — you can enter data manually and use Landscaper purely for analysis. But starting with document ingestion means Landscaper has richer context for every subsequent conversation."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.0",
+      "section_title": "Overview",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — Overview\n\nThe Document Management System (DMS) is one of Landscape's most powerful differentiators. It's not just a file cabinet — it's the primary mechanism through which Landscaper learns about your deal. Every document you upload is a potential source of structured data, and every extraction you commit deepens Landscaper's understanding of your project.\nThe core philosophy: upload everything. Offering memorandums, rent rolls, T-12 operating statements, appraisals, old leases, broker emails, survey reports, environmental records, tax bills — all of it. You don't need to know in advance which documents will be useful. Landscape's AI extracts what it can from each one, and the document itself remains available for Landscaper to query at any time, even if extraction was partial.\nFilters, Not Folders: The DMS doesn't use folders. There's no hierarchy of directories to maintain. Instead, every document has a type, a status, and one or more tags — and you navigate your document library through filters. Search by type, filter by tag, narrow by date. The result is a library that stays organized without the overhead of deciding where things \"live.\" Any combination of filters gives you a clean, targeted view.\nThis chapter covers the full DMS workflow: navigating the library, uploading and profiling documents, how the AI extractor works, the Ingestion Workbench where you review and commit extracted data, and the administration tools that shape extraction behavior over time. For how committed data feeds Landscaper's persistent knowledge about your project, see the Platform Knowledge chapter."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.1",
+      "section_title": "Navigating the DMS",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — Navigating the DMS\n\nThe Documents tab is your full document library for the current project. By default it shows all documents sorted by most recently uploaded. The filter bar at the top lets you narrow by document type (Offering Memorandum, Rent Roll, T-12, Appraisal, Lease, and more), processing status (Pending, Extracted, Committed, Error), or any tags you've applied.\nThe DMS tab: filter bar at top, document list with type and status badges, right panel for document details.\nThe search box performs full-text search across document names, profile metadata, and — for documents that have been extracted — across the content of the documents themselves. This means you can search for a specific tenant name, address, or dollar figure and find the documents that contain it.\nClick any document row to open its detail panel on the right. The detail panel shows the document's profile fields, extraction status, version history, and a direct link to open the document itself. From here you can edit the profile, trigger re-extraction, or upload a new version.\nWhy No Folders?: Traditional file systems force you to decide where a document lives before you need it. A rent roll might live in \"Due Diligence\" or \"Property\" or \"Financials\" — and the wrong choice means you can't find it later. Tags let a document belong to multiple categories simultaneously, and filters let you query across any combination of them. The library stays clean without maintenance."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.2",
+      "section_title": "Uploading Documents",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — Uploading Documents\n\nDrag files into the upload zone on the Documents tab, or click the upload button to open a file picker. Multiple files can be uploaded at once. Supported formats and limits:\nFile Type | Max Size | Extraction Support\nPDF (native/text-based) | 32 MB | Full extraction — all fields\nPDF (scanned/image) | 32 MB | Alpha limitation: OCR not yet available; upload for storage and manual review\nWord (.doc, .docx) | 16 MB | Upload and storage; convert to PDF for extraction\nExcel (.xls, .xlsx) | 16 MB | Upload and storage; convert to PDF for extraction\nImages (.jpg, .png) | 8 MB | Basic extraction supported\nText (.txt, .csv) | 4 MB | Upload and storage\nAfter files are selected, Landscape presents an Intake Choice: send the document through Structured Ingestion (AI extraction + Workbench review) or store it in the DMS without extraction. Choose Structured Ingestion for any document that contains structured data you want in your project — rent rolls, financials, appraisals. Choose store-only for reference documents (maps, photos, correspondence) where there's nothing to extract.\nWhen in Doubt, Extract: If you're unsure whether a document has useful data, choose Structured Ingestion. The worst case is that extraction finds nothing, and you commit zero fields. The document is still stored and searchable. The cost of a failed extraction is a few seconds of your time. The cost of skipping extraction on a document that had useful data is that Landscaper doesn't know about it."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.3",
+      "section_title": "Document Profiles",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — Document Profiles\n\nEvery document in the DMS has a profile — a structured set of metadata fields that describe the document itself, separate from the data extracted from its contents. The profile answers: what is this document, when is it from, who produced it, and what is its current status in your workflow.\nProfile fields are defined by document type templates. Each template specifies which fields are required (must be filled before saving) and which are optional. Standard fields across all types include Document Name, Document Type, Document Date, and Status. Document types like Appraisal or Offering Memorandum add type-specific fields such as Effective Date, Appraiser Name, or Broker.\nWhy profiles matter for extraction: Landscaper uses the profile — especially the document type and date — to select the right extraction template and to weight confidence scores correctly. An Appraisal dated 2019 should not be treated the same as one dated 2024. Getting the profile right improves extraction accuracy and helps Landscaper give you better advice.\nCustom attributes extend profiles for your organization's specific needs. Administrators can create attributes of any data type (text, number, date, currency, dropdown, tags) and assign them to document type templates. All profile changes are logged to an audit trail for compliance."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.4",
+      "section_title": "Tags and Versions",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — Tags and Versions\n\nTags are free-form labels that you apply to documents for cross-cutting organization. A single document can carry multiple tags, and the filter bar lets you combine tags with type and status filters to build precise views of your library.\nCommon tagging patterns: by deal phase (\"Due Diligence\", \"Closing\", \"Post-Close\"), by source (\"Broker Provided\", \"Seller Provided\", \"Third Party\", \"Public Record\"), by review status (\"Needs Review\", \"Reviewed\", \"Flagged\"), or by subject (\"Unit Mix\", \"Capital Expenditures\", \"Market Data\"). There's no wrong approach — the goal is that any document is findable in under 10 seconds using filters.\nWhen a document is updated — a new rent roll from the seller, a revised appraisal — upload the new version from the document's detail panel rather than uploading a separate file. The DMS links the new file to the same document record and preserves the original as a prior version. Extraction data is tied to the specific version that produced it, so you always know which file each data point came from.\nDeleted documents are soft-deleted: hidden from the default view but retained in the database for audit purposes. If the document was processed through Structured Ingestion, deletion also cleans up associated staging records and removes the file from storage."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.5",
+      "section_title": "The AI Extractor",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — The AI Extractor\n\nWhen you choose Structured Ingestion, Landscape's AI extractor analyzes the document and attempts to identify and pull every structured data field it knows about for that document type. For a rent roll, that means unit numbers, unit types, square footage, lease dates, contract rents, and market rents. For a T-12, that means every line of income and expense, plus totals and per-unit figures.\nThe extractor produces a confidence score for each field based on how clearly the value appeared in the source document, how well it matched expected patterns, and whether it found corroborating evidence elsewhere in the document. High-confidence fields (clearly labeled, consistently formatted) are extracted cleanly. Low-confidence fields flag for your review.\nTwo distinct document types require different handling. Native PDFs — documents created digitally and exported as PDF — have a text layer that the extractor reads directly. These produce the best results. Scanned PDFs — physical documents photographed or photocopied into PDF — have no text layer; the extractor sees only an image.\nAlpha Limitation: Scanned PDFs: OCR (optical character recognition) preprocessing for scanned PDFs is not yet available in the alpha release. If you upload a scanned document and extraction returns empty or near-zero results, the document is likely scanned. Convert it to a searchable PDF using Adobe Acrobat, Google Drive, or a similar tool before re-uploading. The document is still stored and available for reference in the meantime.\nPartial extraction is still useful. If the extractor pulls 60% of the fields from a complex document, that's 60% you don't have to enter manually. The remaining fields either weren't present in the document, were in a format the extractor didn't recognize, or fell below the confidence threshold. The Ingestion Workbench shows you exactly what was and wasn't extracted so you can fill gaps manually."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.6",
+      "section_title": "The Ingestion Workbench",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — The Ingestion Workbench\n\nThe Ingestion Workbench is a split-panel interface that opens automatically after Structured Ingestion begins. The left panel is a Landscaper chat with ingestion-specific tools. The right panel is a field review table showing every field the extractor found, organized into tabs by category.\nThe Ingestion Workbench: Landscaper chat (left) and field review table (right). Fields populate in real time as extraction completes.\nEach field row shows the extracted value, a source snippet from the document (the exact text the extractor found it in), and a status badge. Fields are organized into tabs that vary by property type. For multifamily: Project, Property, Operations, Valuation, and All. For land development: Project, Planning, Budget, Valuation, and All. Each tab shows a badge with the count of fields it contains.\nStatus | Color | Meaning\nAccepted | Green | Value confirmed — will be written to your project on commit\nPending | Yellow | Extracted but not yet reviewed — will also commit unless you reject it\nConflict | Orange | Extracted value differs from data already in your project — requires your decision\nWaiting | Gray | Extraction still in progress for this field\nEmpty | Light Gray | No value extracted — field was not found or fell below confidence threshold\nTo accept a field, click the checkmark. To edit before accepting, click the value and type a correction, then accept. To reject a field (skip it entirely on commit), click the X. Conflicts require an explicit choice: accept the new extracted value, keep the existing project value, or edit to something different.\nThe Workbench Chat on the left gives you a Landscaper session with five ingestion-specific tools. Ask it to explain an extraction (\"Why did it extract $1,500 for average rent — I expected $1,650\"), ask it to approve all fields in a category, ask for a summary of what's been extracted so far, or ask it to flag anything that looks inconsistent. The chat has live visibility into the field review table state.\nWhen you're ready, click Commit. All Accepted and Pending fields are written to your project. Rejected fields are skipped. The Workbench closes, the DMS record is finalized, and the committed data becomes part of your project — visible in the relevant tabs and available to Landscaper for analysis and advice.\nThis is where \"upload everything\" pays off. A broker email that contained an off-market cap rate. A year-old appraisal with a rent schedule. A survey that confirmed the lot dimensions. Each committed extraction adds a data point that Landscaper can reference, cross-check, and reason about. Over time, the document library becomes a structured knowledge base about your deal, not just a pile of files.\nAbandoning a Session: Closing the Workbench via the X button or Cancel abandons the session. Staging rows are rejected, the uploaded file is deleted from storage, and the document record is soft-deleted. No partial data reaches your project. If you need to stop mid-review, commit what you've accepted so far — partial commits are fine — rather than abandoning."
+    },
+    {
+      "chapter_id": "5",
+      "chapter_number": "5",
+      "chapter_title": "Document Management & Intelligence",
+      "group": "Landscaper AI",
+      "section_id": "5.7",
+      "section_title": "Administration",
+      "ui_path": "shared",
+      "text": "5 Document Management & Intelligence — Administration\n\nTwo administration panels control how the DMS behaves for your organization: Document Templates and AI Extraction Mappings. Both are accessible via the Documents tab for users with administrator access.\nDocument Templates define the profile fields for each document type. Navigate to Documents > Document Templates to create or edit templates. For each template, you specify which attributes are required, which are optional, and the display order. Attributes are managed separately under Documents > Manage Attributes — each attribute has a display name, data type (text, number, date, boolean, currency, enum, lookup, tags, or JSON), and optional constraints for required or searchable behavior. For enum attributes, define the dropdown values in the Options field.\nAI Extraction Mappings control how the extractor maps what it finds in a document to database fields in your project. Navigate to System Administration > Landscaper to view and manage mappings. Each mapping ties a source label (the text pattern found in documents, with optional aliases) to a target database field, with a configured confidence level and active/inactive toggle.\nColumn | Description\nActive | Enable or disable this mapping — inactive mappings are ignored during extraction\nDoc Type | The document type this mapping applies to (OM, Rent Roll, T-12, Appraisal)\nPattern | The source label — what the extractor looks for in the document, plus any aliases\nTarget | The database table and field where the value is written, plus any transform rule\nConfidence | High, Medium, or Low — determines how the field is flagged in the Workbench\nActions | Edit or Delete (system mappings cannot be deleted)\nUse extraction mappings when a label in your documents has changed (e.g., \"Year Built\" became \"Construction Year\" in a new template you receive), when you want to map a field that isn't currently extracted, or when reviewing low-confidence mappings that are producing poor results. Toggle the Stats view to see how many times each mapping has triggered and its write success rate — the ratio of triggers to successful database writes."
+    },
+    {
+      "chapter_id": "6",
+      "chapter_number": "6",
+      "chapter_title": "Chat Interface",
+      "group": "Landscaper AI",
+      "section_id": "6.1",
+      "section_title": "The Chat Interface",
+      "ui_path": "shared",
+      "text": "6 Chat Interface — The Chat Interface\n\nThe Landscaper chat panel persists messages and returns assistant responses within the context of your current project and page. Chat history is preserved and reloads (last 100 messages) when you return to a project. The panel is page-aware — Landscaper knows which tab you're on and adjusts its responses accordingly."
+    },
+    {
+      "chapter_id": "6",
+      "chapter_number": "6",
+      "chapter_title": "Chat Interface",
+      "group": "Landscaper AI",
+      "section_id": "6.2",
+      "section_title": "Asking Questions About Your Project",
+      "ui_path": "shared",
+      "text": "6 Chat Interface — Asking Questions About Your Project\n\nYou can ask Landscaper about any data in your project. It has access to all project tables, financial calculations, container hierarchy, and uploaded documents. Questions can be broad (\"Give me a summary of this deal\") or specific (\"What's the per-unit operating expense in the T-12?\").\nLandscaper can also make changes to project data. When you say \"Set vacancy to 7%\" or \"Update the cap rate to 5.25%\", Landscaper proposes the mutation and waits for your confirmation before writing to the database. You always see exactly what will change before it happens."
+    },
+    {
+      "chapter_id": "6",
+      "chapter_number": "6",
+      "chapter_title": "Chat Interface",
+      "group": "Landscaper AI",
+      "section_id": "6.3",
+      "section_title": "Asking Questions About Documents",
+      "ui_path": "shared",
+      "text": "6 Chat Interface — Asking Questions About Documents\n\nLandscaper can answer questions about uploaded documents using RAG (retrieval-augmented generation). Ask \"What does the rent roll say about unit mix?\" or \"Summarize the key assumptions in this OM\" and Landscaper will search the document content and respond with cited answers."
+    },
+    {
+      "chapter_id": "6",
+      "chapter_number": "6",
+      "chapter_title": "Chat Interface",
+      "group": "Landscaper AI",
+      "section_id": "6.4",
+      "section_title": "Property-Type Expertise",
+      "ui_path": "shared",
+      "text": "6 Chat Interface — Property-Type Expertise\n\nLandscaper adapts its expertise to your property type. For multifamily projects, it understands rent rolls, unit mixes, NOI, and cap rates. For land development, it speaks in terms of lot yields, absorption schedules, development budgets, and residual land value. It uses the correct terminology and calculation methods for your deal type."
+    },
+    {
+      "chapter_id": "7",
+      "chapter_number": "7",
+      "chapter_title": "Assumption Validation",
+      "group": "Landscaper AI",
+      "section_id": "7.1",
+      "section_title": "How Landscaper Validates Assumptions",
+      "ui_path": "shared",
+      "text": "7 Assumption Validation — How Landscaper Validates Assumptions\n\nLandscaper continuously compares your project assumptions against market data, extracted document values, and internal consistency checks. When it detects a variance above a configurable threshold (default 0-50%), it surfaces an advice item in the right-side panel."
+    },
+    {
+      "chapter_id": "7",
+      "chapter_number": "7",
+      "chapter_title": "Assumption Validation",
+      "group": "Landscaper AI",
+      "section_id": "7.2",
+      "section_title": "The Advice Panel",
+      "ui_path": "shared",
+      "text": "7 Assumption Validation — The Advice Panel\n\nThe advice panel displays alongside the chat interface and lists variance items when available. Each item shows the field in question, the current value, the reference value (market data or document source), and the percentage variance. Items are ordered by severity."
+    },
+    {
+      "chapter_id": "7",
+      "chapter_number": "7",
+      "chapter_title": "Assumption Validation",
+      "group": "Landscaper AI",
+      "section_id": "7.3",
+      "section_title": "Acting on Advice",
+      "ui_path": "shared",
+      "text": "7 Assumption Validation — Acting on Advice\n\nYou can act on advice directly from the panel — click to navigate to the relevant field, or ask Landscaper in chat to explain the variance further. Landscaper can also update the value for you if you agree with the suggested adjustment. Advice items are informational, not mandatory — you may have good reasons to deviate from market."
+    },
+    {
+      "chapter_id": "8",
+      "chapter_number": "8",
+      "chapter_title": "Activity Feed",
+      "group": "Landscaper AI",
+      "section_id": "8.1",
+      "section_title": "What the Feed Shows",
+      "ui_path": "shared",
+      "text": "8 Activity Feed — What the Feed Shows\n\nThe activity feed highlights what Landscaper has found or changed in your project. Items include document extractions, data mutations, advice generated, and system events. The feed refreshes automatically every 60 seconds and shows unread counts."
+    },
+    {
+      "chapter_id": "8",
+      "chapter_number": "8",
+      "chapter_title": "Activity Feed",
+      "group": "Landscaper AI",
+      "section_id": "8.2",
+      "section_title": "Navigating from the Feed",
+      "ui_path": "shared",
+      "text": "8 Activity Feed — Navigating from the Feed\n\nClick any activity item to navigate to the related page and field. If a field is highlighted, Landscape scrolls to it and applies a visual highlight so you can verify the change in context. Clicking an item also marks it as read."
+    },
+    {
+      "chapter_id": "9",
+      "chapter_number": "9",
+      "chapter_title": "Property Setup",
+      "group": "Multifamily Workflows",
+      "section_id": "9.1",
+      "section_title": "Property Details",
+      "ui_path": "shared",
+      "text": "9 Property Setup — Property Details\n\nContent for \"Property Details\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to property details."
+    },
+    {
+      "chapter_id": "9",
+      "chapter_number": "9",
+      "chapter_title": "Property Setup",
+      "group": "Multifamily Workflows",
+      "section_id": "9.2",
+      "section_title": "Unit Mix Setup",
+      "ui_path": "shared",
+      "text": "9 Property Setup — Unit Mix Setup\n\nContent for \"Unit Mix Setup\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to unit mix setup.\nThe unit mix table defines your property's unit types and counts."
+    },
+    {
+      "chapter_id": "10",
+      "chapter_number": "10",
+      "chapter_title": "Rent Roll",
+      "group": "Multifamily Workflows",
+      "section_id": "10.1",
+      "section_title": "Unit-Level Lease Data",
+      "ui_path": "shared",
+      "text": "10 Rent Roll — Unit-Level Lease Data\n\nContent for \"Unit-Level Lease Data\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to unit-level lease data."
+    },
+    {
+      "chapter_id": "10",
+      "chapter_number": "10",
+      "chapter_title": "Rent Roll",
+      "group": "Multifamily Workflows",
+      "section_id": "10.2",
+      "section_title": "Rent Roll Extraction",
+      "ui_path": "shared",
+      "text": "10 Rent Roll — Rent Roll Extraction\n\nContent for \"Rent Roll Extraction\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to rent roll extraction."
+    },
+    {
+      "chapter_id": "11",
+      "chapter_number": "11",
+      "chapter_title": "Operations",
+      "group": "Multifamily Workflows",
+      "section_id": "11.1",
+      "section_title": "The Unified Operating Statement",
+      "ui_path": "shared",
+      "text": "11 Operations — The Unified Operating Statement\n\nThe Operations tab is the financial nerve center of a multifamily project. It presents a unified operating statement — a single grid that combines rental income, vacancy and loss deductions, and operating expenses into one continuous P&L view. Unlike traditional tools that scatter income and expense inputs across separate screens, Landscape keeps everything in one place so you can see the full picture from Gross Potential Rent down to Net Operating Income without switching tabs.\nThe Operations tab does not exist in isolation. Rental income and occupancy data flow into it from the Property tab's Rent Roll. This means the Rent Roll is the single source of truth for unit-level rents — the Operations tab displays that income as read-only, calculated from actual unit data. Operating expenses can be populated by document ingestion (from a T-12 or offering memorandum) or entered manually. All values ultimately feed downstream into the Income Approach on the Valuation tab."
+    },
+    {
+      "chapter_id": "11",
+      "chapter_number": "11",
+      "chapter_title": "Operations",
+      "group": "Multifamily Workflows",
+      "section_id": "11.2",
+      "section_title": "Three NOI Bases",
+      "ui_path": "shared",
+      "text": "11 Operations — Three NOI Bases\n\nLandscape calculates NOI across three distinct bases, each occupying its own column in the grid for side-by-side comparison without duplicating data entry:\nNOI Basis | Description\nF-12 Current | Trailing twelve months at current contract rents\nF-12 Market | Trailing twelve months re-stated at market rents\nStabilized | Projected stabilized performance at target occupancy"
+    },
+    {
+      "chapter_id": "11",
+      "chapter_number": "11",
+      "chapter_title": "Operations",
+      "group": "Multifamily Workflows",
+      "section_id": "11.3",
+      "section_title": "Operating Income",
+      "ui_path": "shared",
+      "text": "11 Operations — Operating Income\n\nThe top section displays rental income. These values are read-only on the Operations tab because they are calculated from the Rent Roll on the Property tab. You'll see a lock icon next to each rental income line item, indicating the value is sourced from unit-level data.\nGross Potential Rent (GPR) is the total rent the property would generate if every unit were leased at its current contract rent — calculated automatically by summing (monthly rent × 12) across all units. Loss to Lease shows the difference between market rent and contract rent for each occupied unit. Other Income covers non-rental items such as parking, laundry, pet fees, or utility reimbursements.\nEditing Income: To edit rental income figures, navigate to the Property tab's Rent Roll and update the unit-level rents there. Changes flow automatically into the Operations tab."
+    },
+    {
+      "chapter_id": "11",
+      "chapter_number": "11",
+      "chapter_title": "Operations",
+      "group": "Multifamily Workflows",
+      "section_id": "11.4",
+      "section_title": "Vacancy and Loss",
+      "ui_path": "shared",
+      "text": "11 Operations — Vacancy and Loss\n\nBelow Operating Income, the vacancy section shows all deductions from gross revenue. Landscape supports multiple vacancy and loss line items, each as a percentage of GPR: Physical Vacancy (unleased units — calculated automatically from occupancy data when a Rent Roll exists), Economic Vacancy (occupied-but-non-paying units), Concessions (rent discounts and free-rent periods), and Bad Debt / Collection Loss.\nWhen a Rent Roll is present, physical vacancy is calculated from actual unit occupancy data and displayed with a lock icon. Clicking the lock overrides the calculated value and lets you enter a manual vacancy percentage — useful when you believe the current vacancy snapshot is not representative of stabilized performance."
+    },
+    {
+      "chapter_id": "11",
+      "chapter_number": "11",
+      "chapter_title": "Operations",
+      "group": "Multifamily Workflows",
+      "section_id": "11.5",
+      "section_title": "Operating Expenses",
+      "ui_path": "shared",
+      "text": "11 Operations — Operating Expenses\n\nOperating expenses occupy the bottom portion of the grid, organized into parent categories (Taxes, Insurance, Utilities, Repairs & Maintenance, Management, Other) with child line items underneath. Category filter pills at the top let you isolate a single category for focused review.\nExpense values are entered in the $/Unit column. When you change a per-unit value, the Annual Total recalculates immediately ($/Unit × unit count). The $/SF column also updates in real time. You can drag expense line items between categories, add new items via the \"+\" button, or double-click any row's label to reassign its category from a dropdown.\nData Provenance Icons\nLandscape tracks where every value came from. Ingested values display a lock icon (source-backed), manually entered values display an input icon, and overridden extractions display an input icon that can revert to the original. This transparency helps distinguish between values extracted from documents and your own assumptions — critical for audit trails and USPAP compliance.\nIcon | State | Click Behavior\nLock | Ingested from document | Breaks document link, switches to manual entry\nInput | User-entered | No action (no extracted value to revert to)\nInput | User-modified (was extracted) | Reverts to original extracted value (confirms if >10% difference)\nWorking with Ingested Data\nAfter ingesting a T-12 or offering memorandum, review the Operations tab by scanning the lock icons to see which fields were populated. Verify key figures against the source document, override where needed by clicking the lock, add missing items, then check the NOI row at the bottom. Fields you have manually overridden will not be silently replaced if you ingest a second document — you'll be prompted to accept or reject each conflict."
+    },
+    {
+      "chapter_id": "12",
+      "chapter_number": "12",
+      "chapter_title": "Valuation",
+      "group": "Multifamily Workflows",
+      "section_id": "12.1",
+      "section_title": "Sales Comparison Approach",
+      "ui_path": "shared",
+      "text": "12 Valuation — Sales Comparison Approach\n\nContent for \"Sales Comparison Approach\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to sales comparison approach."
+    },
+    {
+      "chapter_id": "12",
+      "chapter_number": "12",
+      "chapter_title": "Valuation",
+      "group": "Multifamily Workflows",
+      "section_id": "12.2",
+      "section_title": "Cost Approach",
+      "ui_path": "shared",
+      "text": "12 Valuation — Cost Approach\n\nContent for \"Cost Approach\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to cost approach."
+    },
+    {
+      "chapter_id": "12",
+      "chapter_number": "12",
+      "chapter_title": "Valuation",
+      "group": "Multifamily Workflows",
+      "section_id": "12.3",
+      "section_title": "Income Approach",
+      "ui_path": "shared",
+      "text": "12 Valuation — Income Approach\n\nThe Income Approach derives value from the property's operating income using Direct Capitalization and Discounted Cash Flow (DCF) methods. The 3-column P&L reflects the three NOI bases (F-12 Current, F-12 Market, Stabilized) with visibility toggles. The value tiles — three Direct Cap tiles plus a DCF tile — each derive their NOI from the corresponding Operations tab column. Changes to operating assumptions are reflected in real time."
+    },
+    {
+      "chapter_id": "12",
+      "chapter_number": "12",
+      "chapter_title": "Valuation",
+      "group": "Multifamily Workflows",
+      "section_id": "12.4",
+      "section_title": "Reconciliation",
+      "ui_path": "shared",
+      "text": "12 Valuation — Reconciliation\n\nContent for \"Reconciliation\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to reconciliation.\nAlpha Note: The Reconciliation frontend is in development. The backend API for weight-based reconciliation with narrative versioning is complete."
+    },
+    {
+      "chapter_id": "13",
+      "chapter_number": "13",
+      "chapter_title": "Capitalization",
+      "group": "Multifamily Workflows",
+      "section_id": "13.1",
+      "section_title": "Equity Partners",
+      "ui_path": "shared",
+      "text": "13 Capitalization — Equity Partners\n\nContent for \"Equity Partners\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to equity partners."
+    },
+    {
+      "chapter_id": "13",
+      "chapter_number": "13",
+      "chapter_title": "Capitalization",
+      "group": "Multifamily Workflows",
+      "section_id": "13.2",
+      "section_title": "Debt Facilities",
+      "ui_path": "shared",
+      "text": "13 Capitalization — Debt Facilities\n\nContent for \"Debt Facilities\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to debt facilities."
+    },
+    {
+      "chapter_id": "13",
+      "chapter_number": "13",
+      "chapter_title": "Capitalization",
+      "group": "Multifamily Workflows",
+      "section_id": "13.3",
+      "section_title": "Waterfall",
+      "ui_path": "shared",
+      "text": "13 Capitalization — Waterfall\n\nContent for \"Waterfall\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to waterfall."
+    },
+    {
+      "chapter_id": "14",
+      "chapter_number": "14",
+      "chapter_title": "Project Setup",
+      "group": "Land Development Workflows",
+      "section_id": "14.1",
+      "section_title": "Land Use Taxonomy",
+      "ui_path": "shared",
+      "text": "14 Project Setup — Land Use Taxonomy\n\nEvery land development project in Landscape is organized by a three-level land use taxonomy: Family (e.g., Residential), Type (e.g., Single Family), and Product (e.g., 50' Lot). This taxonomy drives lot pricing, absorption schedules, and budget rollups across the project.\nLevel | Example | Purpose\nFamily | Residential | Top-level land use category\nType | Single Family | Sub-category within the family\nProduct | 50' Lot | Specific product with pricing and absorption"
+    },
+    {
+      "chapter_id": "14",
+      "chapter_number": "14",
+      "chapter_title": "Project Setup",
+      "group": "Land Development Workflows",
+      "section_id": "14.2",
+      "section_title": "Parcel Inventory",
+      "ui_path": "shared",
+      "text": "14 Project Setup — Parcel Inventory\n\nContent for \"Parcel Inventory\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to parcel inventory."
+    },
+    {
+      "chapter_id": "14",
+      "chapter_number": "14",
+      "chapter_title": "Project Setup",
+      "group": "Land Development Workflows",
+      "section_id": "14.3",
+      "section_title": "Planning Hierarchy",
+      "ui_path": "shared",
+      "text": "14 Project Setup — Planning Hierarchy\n\nContent for \"Planning Hierarchy\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to planning hierarchy."
+    },
+    {
+      "chapter_id": "15",
+      "chapter_number": "15",
+      "chapter_title": "Budget",
+      "group": "Land Development Workflows",
+      "section_id": "15.1",
+      "section_title": "Cost Categories",
+      "ui_path": "shared",
+      "text": "15 Budget — Cost Categories\n\nContent for \"Cost Categories\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to cost categories."
+    },
+    {
+      "chapter_id": "15",
+      "chapter_number": "15",
+      "chapter_title": "Budget",
+      "group": "Land Development Workflows",
+      "section_id": "15.2",
+      "section_title": "Line Items and Draw Schedule",
+      "ui_path": "shared",
+      "text": "15 Budget — Line Items and Draw Schedule\n\nContent for \"Line Items and Draw Schedule\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to line items and draw schedule."
+    },
+    {
+      "chapter_id": "15",
+      "chapter_number": "15",
+      "chapter_title": "Budget",
+      "group": "Land Development Workflows",
+      "section_id": "15.3",
+      "section_title": "Absorption Schedule",
+      "ui_path": "shared",
+      "text": "15 Budget — Absorption Schedule\n\nContent for \"Absorption Schedule\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to absorption schedule."
+    },
+    {
+      "chapter_id": "16",
+      "chapter_number": "16",
+      "chapter_title": "Feasibility",
+      "group": "Land Development Workflows",
+      "section_id": "16.1",
+      "section_title": "Residual Land Value",
+      "ui_path": "shared",
+      "text": "16 Feasibility — Residual Land Value\n\nContent for \"Residual Land Value\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to residual land value."
+    },
+    {
+      "chapter_id": "16",
+      "chapter_number": "16",
+      "chapter_title": "Feasibility",
+      "group": "Land Development Workflows",
+      "section_id": "16.2",
+      "section_title": "Cash Flow Projections",
+      "ui_path": "shared",
+      "text": "16 Feasibility — Cash Flow Projections\n\nContent for \"Cash Flow Projections\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to cash flow projections."
+    },
+    {
+      "chapter_id": "16",
+      "chapter_number": "16",
+      "chapter_title": "Feasibility",
+      "group": "Land Development Workflows",
+      "section_id": "16.3",
+      "section_title": "Return Metrics",
+      "ui_path": "shared",
+      "text": "16 Feasibility — Return Metrics\n\nContent for \"Return Metrics\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to return metrics."
+    },
+    {
+      "chapter_id": "17",
+      "chapter_number": "17",
+      "chapter_title": "Capitalization",
+      "group": "Land Development Workflows",
+      "section_id": "17.1",
+      "section_title": "Equity Partners",
+      "ui_path": "shared",
+      "text": "17 Capitalization — Equity Partners\n\nContent for \"Equity Partners\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to equity partners."
+    },
+    {
+      "chapter_id": "17",
+      "chapter_number": "17",
+      "chapter_title": "Capitalization",
+      "group": "Land Development Workflows",
+      "section_id": "17.2",
+      "section_title": "Construction Loan",
+      "ui_path": "shared",
+      "text": "17 Capitalization — Construction Loan\n\nContent for \"Construction Loan\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to construction loan."
+    },
+    {
+      "chapter_id": "17",
+      "chapter_number": "17",
+      "chapter_title": "Capitalization",
+      "group": "Land Development Workflows",
+      "section_id": "17.3",
+      "section_title": "Waterfall",
+      "ui_path": "shared",
+      "text": "17 Capitalization — Waterfall\n\nContent for \"Waterfall\" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to waterfall."
+    },
+    {
+      "chapter_id": "A",
+      "chapter_number": "A",
+      "chapter_title": "Landscaper Quick Reference",
+      "group": "Appendix",
+      "section_id": "A.1",
+      "section_title": "Common Commands",
+      "ui_path": "shared",
+      "text": "A Landscaper Quick Reference — Common Commands\n\nWhat You Want | What to Say\nGet a deal summary | \"Give me a summary of this deal\"\nUpdate a value | \"Set vacancy to 7%\" or \"Update the cap rate to 5.25%\"\nAsk about documents | \"What does the rent roll say about unit mix?\"\nRun a calculation | \"What's the DSCR at these debt terms?\"\nSensitivity analysis | \"Run a sensitivity on exit cap rate from 5% to 6%\"\nCross-check data | \"Any missing data I should check?\"\nSend feedback | Include \"#FB\" in any message (e.g., \"#FB the map is slow\")"
+    },
+    {
+      "chapter_id": "B",
+      "chapter_number": "B",
+      "chapter_title": "Document Type Reference",
+      "group": "Appendix",
+      "section_id": "B.1",
+      "section_title": "Supported Document Types",
+      "ui_path": "shared",
+      "text": "B Document Type Reference — Supported Document Types\n\nType | Code | Typical Content\nOffering Memorandum | OM | Property summary, financials, rent roll, market overview\nRent Roll | RENT_ROLL | Unit-level lease data: unit number, type, rent, status, dates\nT-12 Operating Statement | T12 | Trailing 12-month income and expense actuals\nAppraisal | APPRAISAL | Property valuation with three approaches to value\nSurvey | SURVEY | Land survey, boundary, easements, legal description\nEnvironmental | ENVIRONMENTAL | Phase I/II environmental site assessment\nTax Record | TAX | Property tax assessment, millage rates, payment history\nLease | LEASE | Individual lease agreement"
+    },
+    {
+      "chapter_id": "C",
+      "chapter_number": "C",
+      "chapter_title": "Field Status Reference",
+      "group": "Appendix",
+      "section_id": "C.1",
+      "section_title": "Ingestion Field Statuses",
+      "ui_path": "shared",
+      "text": "C Field Status Reference — Ingestion Field Statuses\n\nStatus | Color | Meaning | Action\nAccepted | Green | Value confirmed | Ready to commit\nPending | Yellow | Extracted, not reviewed | Click checkmark to accept\nConflict | Orange | Differs from existing data | Choose which value to keep\nWaiting | Gray | Extraction in progress | Wait for completion\nEmpty | Light Gray | Nothing extracted | Enter manually or skip"
+    },
+    {
+      "chapter_id": "C",
+      "chapter_number": "C",
+      "chapter_title": "Field Status Reference",
+      "group": "Appendix",
+      "section_id": "C.2",
+      "section_title": "Data Provenance Icons",
+      "ui_path": "shared",
+      "text": "C Field Status Reference — Data Provenance Icons\n\nIcon | State | Meaning | Click Behavior\nLock | Ingested | Value from uploaded document | Break link, switch to manual entry\nInput | User-entered | Manually entered by user | No action\nInput | User-modified | Was extracted, then overridden | Revert to original extraction"
+    },
+    {
+      "chapter_id": "D",
+      "chapter_number": "D",
+      "chapter_title": "Alpha Known Limitations",
+      "group": "Appendix",
+      "section_id": "D.1",
+      "section_title": "Current Limitations",
+      "ui_path": "shared",
+      "text": "D Alpha Known Limitations — Current Limitations\n\nArea | Limitation | Workaround\nScanned PDFs | OCR not implemented — extraction returns empty on scanned documents | Convert to searchable PDF using Adobe Acrobat before uploading\nReconciliation | Frontend is a placeholder — backend API is complete | Use Landscaper chat to set reconciliation weights\nReports | Hardcoded to a single project; no PDF generation | Export from individual tabs as needed\nWaterfall | Calculate endpoint returns 404 | Use the financial engine directly via Landscaper\nSource Page Numbers | Extraction pipeline does not track which page a value was found on | Reference the source document manually\nValue-Add Toggle | Post-reno columns in Operations hidden by default | Enable via project profile settings"
+    }
+  ]
+}
