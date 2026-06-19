@@ -10,7 +10,6 @@ import CategoryEditorRow from './custom/CategoryEditorRow';
 import GroupRow from './custom/GroupRow';
 
 import { useBudgetGrouping } from '@/hooks/useBudgetGrouping';
-import { useBudgetVariance, getCategoryVariance, type CategoryVariance } from '@/hooks/useBudgetVariance';
 import { useGridKeyboard, type GridCell } from './hooks/useGridKeyboard';
 import './BudgetDataGrid.css';
 
@@ -72,13 +71,6 @@ export default function BudgetDataGrid({
     flattenTree,
     expandAll,
   } = useBudgetGrouping(projectId);
-
-  // Fetch variance data (only when grouped and in Standard/Detail mode)
-  const { data: varianceData } = useBudgetVariance(
-    projectId,
-    0, // min_variance_pct = 0 to get all variances
-    isGrouped && (mode === 'standard' || mode === 'detail') // only fetch when needed
-  );
 
   // Transform data if grouping is enabled (memoized to prevent infinite loops)
   const displayData = useMemo(() => {
@@ -292,12 +284,6 @@ export default function BudgetDataGrid({
                 );
                 const isExpanded = expandedCategories.has(categoryKey);
 
-                // Get variance for this category
-                const categoryVariance = getCategoryVariance(
-                  groupedRow.category_id!,
-                  groupedRow.category_level!,
-                  varianceData?.variances
-                );
                 const handleGroupAdd = onRequestGroupAdd
                   ? () =>
                       onRequestGroupAdd({
@@ -320,7 +306,6 @@ export default function BudgetDataGrid({
                     isExpanded={isExpanded}
                     onToggle={() => toggleCategory(categoryKey)}
                     mode={mode}
-                    variance={categoryVariance}
                     onAddItem={handleGroupAdd}
                   />
                 );

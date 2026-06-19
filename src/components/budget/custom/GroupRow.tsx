@@ -8,7 +8,6 @@ import { SemanticButton } from '@/components/ui/landscape';
 import { formatMoney } from '@/utils/formatters/number';
 import { SemanticBadge } from '@/components/ui/landscape';
 import type { BudgetMode } from '../ModeSelector';
-import type { CategoryVariance } from '@/hooks/useBudgetVariance';
 
 interface GroupRowProps {
   categoryLevel: number;
@@ -21,7 +20,6 @@ interface GroupRowProps {
   isExpanded: boolean;
   onToggle: () => void;
   mode: BudgetMode;
-  variance?: CategoryVariance;
   onAddItem?: () => void;
 }
 
@@ -43,7 +41,6 @@ export default function GroupRow({
   isExpanded,
   onToggle,
   mode,
-  variance,
   onAddItem,
 }: GroupRowProps) {
   // Calculate indentation based on level (starting at 0px for L1)
@@ -59,58 +56,6 @@ export default function GroupRow({
   // We'll use a simple approach: show breadcrumb in first cell, subtotal in specific position
 
   const levelColor = LEVEL_COLORS[categoryLevel as keyof typeof LEVEL_COLORS] || 'var(--cui-secondary)';
-
-  // Format variance display
-  const formatVarianceDisplay = () => {
-    if (!variance || !variance.has_children) {
-      return {
-        text: 'N/A',
-        colorClass: 'text-muted',
-        title: variance ? 'No child categories to compare' : 'Variance data unavailable',
-      };
-    }
-
-    const amount = variance.variance_amount;
-    const pct = variance.variance_pct;
-
-    // Format amount
-    const formattedAmount = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(Math.abs(amount));
-
-    // Format percentage
-    const formattedPct = pct !== null ? `${Math.abs(pct).toFixed(1)}%` : '';
-
-    // Determine color and prefix
-    let colorClass = 'text-muted';
-    let prefix = '';
-
-    if (variance.is_reconciled) {
-      colorClass = 'text-success';
-      prefix = amount >= 0 ? '+' : '-';
-    } else if (amount > 0) {
-      colorClass = 'text-warning';
-      prefix = '+';
-    } else if (amount < 0) {
-      colorClass = 'text-danger';
-      prefix = '-';
-    }
-
-    const text = formattedPct
-      ? `${prefix}${formattedAmount} (${formattedPct})`
-      : `${prefix}${formattedAmount}`;
-
-    const title = variance.is_reconciled
-      ? `Reconciled: ${text}`
-      : `Variance: Parent ($${variance.parent_amount.toLocaleString()}) - Children ($${variance.children_amount.toLocaleString()}) = ${text}`;
-
-    return { text, colorClass, title };
-  };
-
-  const varianceDisplay = formatVarianceDisplay();
 
 
   return (
@@ -141,11 +86,7 @@ export default function GroupRow({
 
             {/* Breadcrumb - allows overflow into next column */}
             <span
-              title={
-                variance && variance.has_children
-                  ? `${categoryBreadcrumb}\n\n💡 This category has ${variance.child_categories.length} child categories.\nEditing items here may create variances.\nCurrent variance: ${variance.variance_amount > 0 ? '+' : ''}$${Math.abs(variance.variance_amount).toLocaleString()}`
-                  : categoryBreadcrumb
-              }
+              title={categoryBreadcrumb}
               style={{
                 whiteSpace: 'nowrap',
                 overflow: 'visible',
@@ -153,11 +94,6 @@ export default function GroupRow({
               }}
             >
               {categoryBreadcrumb}
-              {variance && variance.has_children && !variance.is_reconciled && (
-                <span className="ms-1" style={{ fontSize: '0.75rem' }} title="This category has children">
-                  📊
-                </span>
-              )}
             </span>
 
             {/* Descendant depth indicators - show one line per sub-level AFTER text */}
@@ -217,22 +153,6 @@ export default function GroupRow({
           {formatMoney(amountSubtotal)}
         </span>
       </td>
-
-      {/* Variance column (only shown in Standard and Detail modes) */}
-      {(mode === 'standard' || mode === 'detail') && (
-        <td className="text-end">
-          <span
-            className={`fw-semibold ls-cell-number ${
-              varianceDisplay.colorClass === 'text-success' ? 'ls-variance-positive' :
-              varianceDisplay.colorClass === 'text-danger' ? 'ls-variance-negative' :
-              'ls-variance-neutral'
-            }`}
-            title={varianceDisplay.title}
-          >
-            {varianceDisplay.text}
-          </span>
-        </td>
-      )}
 
       {/* Remaining empty columns: Start, Duration, Actions */}
       {mode === 'napkin' && (<><td></td><td></td><td></td></>)}
