@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilSearch, cilMenu, cilMoon, cilSun, cilAccountLogout } from '@coreui/icons';
 import { HelpIcon } from '@/components/icons/HelpIcon';
+import { UiModeSwitch } from '@/components/ui/UiModeSwitch';
 
 interface Thread {
   id: string;
@@ -502,6 +503,10 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Always-visible Chat / Classic selector (sits above the account footer
+            so it's reachable from the home screen, not only inside a project). */}
+        <UiModeSwitch collapsed={collapsed} recentProjectId={recentProjects[0]?.id} />
 
         {/* Footer */}
         <div className="sb-footer">
