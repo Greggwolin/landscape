@@ -126,6 +126,12 @@ jobs:
           # build only needs the var present (it's a runtime signing key, not
           # used at build time), so a placeholder is sufficient here.
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY || 'ci-build-time-placeholder' }}
+          # Likewise, src/lib/db.ts calls neon() at import, which throws if
+          # DATABASE_URL is unset — page-data collection hits API routes (e.g.
+          # /api/absorption) that import it. The dynamic routes aren't executed
+          # at build time, so a syntactically-valid placeholder keeps this job
+          # hermetic (no live Neon branch needed for lint/typecheck/build/unit).
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://user:pass@localhost:5432/land_v2' }}
 
       - name: Run unit tests
         # Jest unit tests only. The Playwright contrast e2e (test:contrast / the

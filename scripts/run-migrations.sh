@@ -26,7 +26,7 @@ else
     --project-id "$NEON_PROJECT_ID" \
     --branch "$BRANCH_NAME" \
     --role-name neondb_owner \
-    --database land_v2)
+    --database-name land_v2)
 fi
 
 # Check if migrations directory exists
