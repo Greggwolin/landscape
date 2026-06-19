@@ -41,7 +41,7 @@ runs:
           --project-id "${{ inputs.neon-project-id }}" \
           --branch "${{ inputs.branch-name }}" \
           --role-name "${{ inputs.role-name }}" \
-          --database "${{ inputs.database }}")"
+          --database-name "${{ inputs.database }}")"
         if [ -z "$DB_URL" ]; then
           echo "::error::Empty Neon connection string for branch '${{ inputs.branch-name }}' (database '${{ inputs.database }}'). Check NEON_API_KEY / project id / neonctl flags."
           exit 1

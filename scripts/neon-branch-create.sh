@@ -63,7 +63,7 @@ CONNECTION_STRING=$(neonctl connection-string \
   --project-id "$NEON_PROJECT" \
   --branch "$BRANCH_NAME" \
   --role-name neondb_owner \
-  --database land_v2 \
+  --database-name land_v2 \
   --pooled)
 
 # Output for GitHub Actions

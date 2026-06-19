@@ -91,7 +91,11 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
-    needs: [create-database, migrate-database]
+    # Hermetic: lint, typecheck, build, and jest unit tests need no live DB
+    # (the build only needs JWT_SIGNING_KEY present — see the Build step). This
+    # job intentionally has NO `needs:` on create-database/migrate-database so a
+    # Neon control-plane hiccup can't skip the entire frontend gate, mirroring
+    # the backend-tests job. DB-backed verification lives in migrate-database.
 
     steps:
       - name: Checkout code
@@ -105,13 +109,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
-
-      - name: Resolve DATABASE_URL
-        uses: ./.github/actions/resolve-neon-db-url
-        with:
-          branch-name: ${{ needs.create-database.outputs.branch_name }}
-          neon-api-key: ${{ secrets.NEON_API_KEY }}
-          neon-project-id: ${{ secrets.NEON_PROJECT_ID }}
 
       - name: Lint
         run: npm run lint
@@ -129,6 +126,12 @@ jobs:
           # build only needs the var present (it's a runtime signing key, not
           # used at build time), so a placeholder is sufficient here.
           JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY || 'ci-build-time-placeholder' }}
+          # Likewise, src/lib/db.ts calls neon() at import, which throws if
+          # DATABASE_URL is unset — page-data collection hits API routes (e.g.
+          # /api/absorption) that import it. The dynamic routes aren't executed
+          # at build time, so a syntactically-valid placeholder keeps this job
+          # hermetic (no live Neon branch needed for lint/typecheck/build/unit).
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://user:pass@localhost:5432/land_v2' }}
 
       - name: Run unit tests
         # Jest unit tests only. The Playwright contrast e2e (test:contrast / the
