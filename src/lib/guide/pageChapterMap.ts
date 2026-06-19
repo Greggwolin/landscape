@@ -18,14 +18,13 @@ export const PAGE_CHAPTER_MAP: Record<string, string> = {
   home: '1',
 
   // Property folder
-  property_location: '5',
-  property_market: '5',
-  'property_market-supply': '5',
-  'property_property-details': '9',
-  'property_rent-roll': '10',
-  property_acquisition: '13',
-  'property_land-use': '14',
-  property_parcels: '14',
+  // Location / Market / Acquisition have no dedicated guide chapter yet —
+  // they fall back to /guide (Introduction) rather than point at an
+  // off-topic chapter. Add mappings when those chapters are written.
+  'property_property-details': '9', // Property Setup
+  'property_rent-roll': '10', // Rent Roll
+  'property_land-use': '14', // Project Setup (land use taxonomy)
+  property_parcels: '14', // Project Setup (parcel inventory)
 
   // Operations
   operations: '11',
