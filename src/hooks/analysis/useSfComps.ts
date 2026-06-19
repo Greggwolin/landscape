@@ -1,4 +1,5 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 export type SfComp = {
   mlsId: string;
@@ -74,7 +75,8 @@ async function fetchSfComps(projectId: number, params?: SfCompsQuery): Promise<S
   const res = await fetch(url.toString(), {
     method: 'GET',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
     },
     cache: 'no-store'
   });

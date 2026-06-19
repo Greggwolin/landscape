@@ -237,9 +237,21 @@ export async function GET(req: NextRequest, context: Params) {
   const minYearBuilt = minYearParam ?? undefined;
 
   try {
-    // Fetch project to get location
+    // Fetch project to get location.
+    // /api/projects/[projectId] requires auth (requireProjectAccess), so forward
+    // the caller's Authorization/Cookie into this server-to-server fetch — otherwise
+    // it 401s and the card surfaces "Failed to fetch project details" (502) before
+    // Redfin is ever called.
     const projectUrl = new URL(`/api/projects/${projectId}`, req.url);
-    const projectResponse = await fetch(projectUrl.toString(), { cache: 'no-store' });
+    const projectFetchHeaders: Record<string, string> = {};
+    const incomingAuth = req.headers.get('authorization');
+    if (incomingAuth) projectFetchHeaders['Authorization'] = incomingAuth;
+    const incomingCookie = req.headers.get('cookie');
+    if (incomingCookie) projectFetchHeaders['Cookie'] = incomingCookie;
+    const projectResponse = await fetch(projectUrl.toString(), {
+      cache: 'no-store',
+      headers: projectFetchHeaders,
+    });
 
     if (projectResponse.status === 404) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
