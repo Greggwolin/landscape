@@ -40,6 +40,11 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
   const isLandscaperThinking = isProjectLandscaperThinking || isHelpLoading;
   const logoSrc = '/logo-invert.png';
 
+  // The User Guide opens in its own window/modal, so the global app nav
+  // (Dashboard, theme, settings, user menu) does not belong here. Render a
+  // minimal guide header: logo + "User Guide" label + the chat (Help) icon.
+  const isGuide = pathname?.startsWith('/guide');
+
   const navHoverHandlers = (isActive = false) => ({
     onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
       e.currentTarget.style.background = isActive
@@ -52,6 +57,66 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
         : 'transparent';
     },
   });
+
+  if (isGuide) {
+    return (
+      <header
+        className="sticky top-0 border-b"
+        style={{
+          background: 'var(--nav-bg)',
+          borderColor: 'var(--nav-border)',
+          color: 'var(--nav-text)',
+          zIndex: 50,
+        }}
+      >
+        <div
+          className="flex items-center justify-between"
+          style={{ height: '58px', padding: '0 var(--nav-padding)' }}
+        >
+          {/* Logo + guide label - Left */}
+          <div className="flex items-center gap-3">
+            <Image
+              src={logoSrc}
+              alt="Landscape"
+              width={176}
+              height={40}
+              priority
+              className="object-contain"
+              sizes="176px"
+              style={{ width: 'auto', height: 'auto' }}
+            />
+            <span
+              style={{
+                color: 'var(--nav-text)',
+                fontSize: '1rem',
+                fontWeight: 600,
+                borderLeft: '1px solid var(--nav-border)',
+                paddingLeft: '0.9rem',
+              }}
+            >
+              User Guide
+            </span>
+          </div>
+
+          {/* Chat (Help) icon - Right, the only control */}
+          <button
+            type="button"
+            onClick={toggleHelp}
+            className="rounded-full p-2 transition-colors"
+            style={{
+              color: 'var(--nav-text)',
+              backgroundColor: isHelpOpen ? 'var(--nav-active-bg)' : 'transparent',
+            }}
+            {...navHoverHandlers(isHelpOpen)}
+            aria-label="Ask the guide"
+            title="Ask the guide"
+          >
+            <HelpIcon aria-hidden="true" style={{ width: '33px', height: '33px' }} isThinking={isLandscaperThinking} />
+          </button>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>
