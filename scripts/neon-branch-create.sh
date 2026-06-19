@@ -40,12 +40,17 @@ if [ -n "$EXISTING_BRANCH" ]; then
   echo "Using existing branch..."
   BRANCH_ID=$EXISTING_BRANCH
 else
-  # Create new branch from production (Neon's default branch name)
-  echo "📝 Creating branch $BRANCH_NAME from production..."
+  # Create new branch from production's SCHEMA ONLY (no data copied).
+  # Privacy: preview environments must never carry real tester data (FB privacy
+  # follow-up). --schema-only replicates production's structure without rows;
+  # run-migrations.sh then applies the PR's migrations on top. Requires the
+  # project's legacy web-access roles to be cleared (done 2026-06-19).
+  echo "📝 Creating schema-only branch $BRANCH_NAME from production (no data)..."
   BRANCH_RESPONSE=$(neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$BRANCH_NAME" \
     --parent production \
+    --schema-only \
     --role-name neondb_owner \
     --output json)
 
