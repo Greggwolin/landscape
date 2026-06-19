@@ -10,7 +10,14 @@ export type GuideBlock =
   | { type: 'screenshot'; src: string; alt: string; caption: string }
   | { type: 'callout'; label: string; text: string }
   | { type: 'subsection'; number: string; title: string; blocks: GuideBlock[] }
-  | { type: 'table'; headers: string[]; rows: string[][] };
+  | { type: 'table'; headers: string[]; rows: string[][] }
+  /**
+   * Two-way navigation switch. Renders a Chat / Classic toggle so the same
+   * chapter can show how to accomplish a step in the chat-first UI versus the
+   * classic tabbed UI. Use ONLY for interface-specific navigation / how-to /
+   * where-it-renders content. Shared concept material stays in normal blocks.
+   */
+  | { type: 'uiswitch'; chat: GuideBlock[]; classic: GuideBlock[] };
 
 export interface GuideSection {
   /** Section ID used as anchor hash, e.g. "4.2" */
