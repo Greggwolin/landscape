@@ -263,7 +263,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         base_qs = Project.objects.select_related('created_by').annotate(
             mf_unit_count=mf_count_subquery
-        ).filter(is_active=True)
+        ).filter(is_active=True, deleted_at__isnull=True)  # FB-318: hide soft-deleted
 
         # Project kind discriminator (LF-USERDASH-0514 Phase 2).
         # The project list endpoint is for real estate projects. User "home"

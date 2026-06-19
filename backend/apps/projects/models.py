@@ -98,6 +98,10 @@ class Project(models.Model):
 
     # Status
     is_active = models.BooleanField(blank=True, null=True, default=True)
+    # FB-318 soft-delete: NULL = live; timestamp = soft-deleted (hidden from the
+    # project list, recoverable by clearing the column). Distinct from is_active
+    # (archive), so deleted and archived projects stay distinguishable.
+    deleted_at = models.DateTimeField(blank=True, null=True)
     schema_version = models.IntegerField(blank=True, null=True)
     last_calculated_at = models.DateTimeField(blank=True, null=True)
 
