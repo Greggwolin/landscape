@@ -1106,11 +1106,11 @@ export const guideChapters: GuideChapter[] = [
 
 /** All unique group labels in display order */
 export const guideGroups: string[] = [
-  'Concepts (Unified UI v2)',
   'Getting Started',
   'Landscaper AI',
   'Multifamily Workflows',
   'Land Development Workflows',
+  'Concepts (Unified UI v2)',
   'Administration',
   'Appendix',
 ];
