@@ -12,6 +12,7 @@ import {
   cilBook,
 } from '@coreui/icons';
 import { useHelpLandscaper, HelpMessage } from '@/contexts/HelpLandscaperContext';
+import { guideUrlForPage } from '@/lib/guide/pageChapterMap';
 import { getAuthHeaders } from '@/lib/authHeaders';
 // User Guide opens in a separate OS window via window.open()
 import './help-landscaper-panel.css';
@@ -259,6 +260,8 @@ export default function HelpLandscaperPanel() {
     messages,
     isLoading,
     currentPage,
+    activeFolder,
+    activeTab,
     closeHelp,
     sendMessage,
     clearConversation,
@@ -333,8 +336,9 @@ export default function HelpLandscaperPanel() {
           const h = 720;
           const left = window.screenX + window.outerWidth - w - 40;
           const top = window.screenY + 60;
+          // Context-aware deep-link: open the chapter covering the active page.
           window.open(
-            '/guide',
+            guideUrlForPage(activeFolder, activeTab),
             'landscape-guide',
             `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`,
           );
