@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -27,7 +28,8 @@ export function useExtractionStagingCount(projectId: number): StagingCountData {
     queryKey: ['extraction-staging', projectId],
     queryFn: async () => {
       const res = await fetch(
-        `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/`
+        `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/`,
+        { headers: getAuthHeaders() }
       );
       if (!res.ok) throw new Error(`Staging fetch failed: ${res.status}`);
       return res.json();

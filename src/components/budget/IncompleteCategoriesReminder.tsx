@@ -19,6 +19,11 @@ import type {
 } from '@/types/budget-categories';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
+
+// Budget-category endpoints live on Django (financial app mounted at /api/, no
+// "/financial/" segment). The relative "/api/financial/..." path 404s at Next.js.
+const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 interface IncompleteCategoriesReminderProps {
   projectId: number;
   className?: string;
@@ -51,7 +56,7 @@ export function IncompleteCategoriesReminder({
   const fetchIncomplete = async () => {
     try {
       const response = await fetch(
-        `/api/financial/budget-categories/incomplete/?project_id=${projectId}`, { headers: getAuthHeaders() });
+        `${DJANGO_API}/api/budget-categories/incomplete/?project_id=${projectId}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         // Endpoint doesn't exist yet - fail silently
@@ -84,7 +89,7 @@ export function IncompleteCategoriesReminder({
     try {
       // Dismiss each category
       const dismissPromises = data.categories.map((cat) =>
-        fetch(`/api/financial/budget-categories/${cat.category_id}/dismiss-reminder/`, {
+        fetch(`${DJANGO_API}/api/budget-categories/${cat.category_id}/dismiss-reminder/`, {
           method: 'POST',
           headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ days: 7 }),

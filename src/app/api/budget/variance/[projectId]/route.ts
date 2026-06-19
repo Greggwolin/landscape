@@ -22,22 +22,32 @@ export async function GET(
     const minVariancePct = searchParams.get('min_variance_pct') || '0';
     const levels = searchParams.get('levels') || '';
 
-    const url = new URL(`${DJANGO_API_URL}/api/financial/budget/variance/${projectId}/`);
+    const url = new URL(`${DJANGO_API_URL}/api/budget/variance/${projectId}/`);
     url.searchParams.set('min_variance_pct', minVariancePct);
     if (levels) {
       url.searchParams.set('levels', levels);
     }
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    // Forward the caller's credentials so Django authenticates the request.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const incomingAuth = request.headers.get('authorization');
+    if (incomingAuth) headers['Authorization'] = incomingAuth;
+    const incomingCookie = request.headers.get('cookie');
+    if (incomingCookie) headers['Cookie'] = incomingCookie;
+
+    const response = await fetch(url.toString(), { headers });
 
     if (!response.ok) {
+      // Surface Django's real status/body rather than masking everything as a 500.
       const errorText = await response.text();
       console.error(`Django API returned ${response.status}:`, errorText);
-      throw new Error(`Django API returned ${response.status}`);
+      let payload: unknown;
+      try {
+        payload = JSON.parse(errorText);
+      } catch {
+        payload = { error: errorText || `Django API returned ${response.status}` };
+      }
+      return NextResponse.json(payload, { status: response.status });
     }
 
     const data = await response.json();

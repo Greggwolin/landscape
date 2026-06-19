@@ -25,6 +25,7 @@ import {
 } from '@/types/acquisition';
 import { useAcquisitionEventTypeOptions } from '@/hooks/usePicklistOptions';
 import { formatMoney } from '@/utils/formatters/number';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 interface Props {
   projectId: number;
@@ -336,7 +337,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     const fetchCategories = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-        const res = await fetch(`${apiUrl}/api/acquisition/categories/`);
+        const res = await fetch(`${apiUrl}/api/acquisition/categories/`, { headers: getAuthHeaders() });
         if (!res.ok) {
           console.warn('Failed to fetch acquisition categories');
           return;
@@ -470,7 +471,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     setError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${apiUrl}/api/projects/${projectId}/acquisition/ledger/`);
+      const res = await fetch(`${apiUrl}/api/projects/${projectId}/acquisition/ledger/`, { headers: getAuthHeaders() });
       if (!res.ok) {
         throw new Error(`Failed to load ledger (${res.status})`);
       }
@@ -497,6 +498,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
       const apiUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
       const res = await fetch(`${apiUrl}/api/projects/${projectId}/acquisition/ledger/${acquisitionId}/`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       if (!res.ok) {
         throw new Error(`Delete failed (${res.status})`);
@@ -531,7 +533,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     try {
       const res = await fetch(`${apiUrl}/api/projects/${projectId}/acquisition/ledger/${acquisitionId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -570,7 +572,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     try {
       const res = await fetch(`${apiUrl}/api/projects/${projectId}/acquisition/ledger/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {

@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 export type InflationSelection = {
   set_id: number;
@@ -22,7 +23,7 @@ export type ProjectInflationSettings = {
 };
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || 'Failed to load inflation settings');

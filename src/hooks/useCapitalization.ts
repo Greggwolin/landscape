@@ -189,7 +189,7 @@ export function useLeveragedCashFlow(
     queryFn: () =>
       fetch(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           includeFinancing: true,
           ...(containerIds && containerIds.length > 0 ? { containerIds } : {}),

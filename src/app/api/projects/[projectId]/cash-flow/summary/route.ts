@@ -32,11 +32,15 @@ export async function GET(
     console.log(`Fetching cash flow summary from Django for project ${projectId}...`);
 
     const djangoUrl = `${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`;
+    // Forward the caller's credentials so Django authenticates the request.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const incomingAuth = request.headers.get('authorization');
+    if (incomingAuth) headers['Authorization'] = incomingAuth;
+    const incomingCookie = request.headers.get('cookie');
+    if (incomingCookie) headers['Cookie'] = incomingCookie;
     const djangoResponse = await fetch(djangoUrl, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     if (!djangoResponse.ok) {

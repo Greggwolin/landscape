@@ -526,7 +526,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
               try {
                 await fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     doc_id: session.docId,
                     intake_uuid: session.intakeUuid,
@@ -582,7 +582,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
               try {
                 await fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     doc_id: workbenchState.docId,
                     intake_uuid: workbenchState.intakeUuid,
@@ -717,7 +717,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
                     try {
                       await fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           doc_id: workbenchState.docId,
                           intake_uuid: workbenchState.intakeUuid,
