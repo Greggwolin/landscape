@@ -1,9 +1,7 @@
 'use client';
 
 import React from 'react';
-import { UI_MODE_COOKIE, type UiMode } from '@/lib/uiMode';
-
-const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+import { type UiMode } from '@/lib/uiMode';
 
 interface ClassicViewToggleProps {
   /** Project the toggle should switch views for. */
@@ -18,9 +16,10 @@ interface ClassicViewToggleProps {
  * Switches the active project between the classic tabbed shell (/projects/[id])
  * and the chat-first shell (/w/projects/[id]).
  *
- * Sets the `ui_mode` cookie, then does a FULL navigation (not a client-side
- * router push) so middleware re-evaluates routing with the new cookie value and
- * lands on the correct shell without a redirect bounce.
+ * Does a FULL navigation (not a client-side router push) to the destination
+ * with `?setui=<mode>`. Middleware sets the `ui_mode` cookie server-side on the
+ * redirect response and bounces to the clean URL, so the new mode is reliably
+ * present on the next request — no client cookie-write / navigation race.
  *
  * Rendered in both shell headers:
  *  - legacy ActiveProjectBar  → current="classic", label "Chat view"
@@ -38,9 +37,11 @@ export function ClassicViewToggle({
     target === 'classic' ? `/projects/${projectId}` : `/w/projects/${projectId}`;
 
   const handleClick = () => {
-    document.cookie =
-      `${UI_MODE_COOKIE}=${target}; path=/; max-age=${ONE_YEAR_SECONDS}; samesite=lax`;
-    window.location.assign(destination);
+    // Server-authoritative: navigating with ?setui=<mode> lets middleware set
+    // the ui_mode cookie on the redirect response, guaranteeing it is present on
+    // the next request (the old client document.cookie write raced with the
+    // navigation and middleware read a stale mode → bounced back to chat).
+    window.location.assign(`${destination}?setui=${target}`);
   };
 
   return (
