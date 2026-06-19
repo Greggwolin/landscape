@@ -19,6 +19,194 @@ const placeholder = (topic: string): string =>
   `Content for "${topic}" will be written during the content authoring pass. This section covers the key concepts, workflows, and interface elements relevant to ${topic.toLowerCase()}.`;
 
 export const guideChapters: GuideChapter[] = [
+  // ─── Group: Concepts (Unified UI v2) ──────────────────────────
+  // VERTICAL-SLICE TEMPLATE (Underwriting). Establishes the v2 dual-UI
+  // chapter pattern: shared concept body in normal blocks; interface-specific
+  // navigation in `uiswitch` blocks (Chat-first vs. Classic tabbed).
+  {
+    id: 'UW',
+    number: '2',
+    title: 'Underwriting',
+    subtitle: 'Modeling cash flows into value, yield, coverage, and return',
+    group: 'Concepts (Unified UI v2)',
+    sections: [
+      {
+        id: 'UW.1',
+        title: 'What This Is',
+        content: [
+          { type: 'prose', text: 'Underwriting is the activity of modeling expected cash flows over a property or project lifecycle and translating them into investment metrics — value, yield, coverage, return on cost, and timing. In Landscape it splits along whether the asset is already operating or is being built.' },
+          { type: 'subsection', number: '', title: 'Operating-asset underwriting', blocks: [
+            { type: 'prose', text: 'Project NOI forward, capitalize at a market rate or discount the cash flows over a holding period, and derive value, levered and unlevered IRR, equity multiple, and DSCR.' },
+          ]},
+          { type: 'subsection', number: '', title: 'Development underwriting', blocks: [
+            { type: 'prose', text: 'Build the cost stack (land + hard + soft + financing + contingency), model lease-up or sales absorption, project stabilized NOI and exit, and derive residual land value, return on cost, return on equity, and the gap between cost and exit value (the development premium).' },
+          ]},
+          { type: 'prose', text: 'Both modes share the same engine and the same period-by-period cash-flow construction. They differ in the inputs, the time-zero treatment (acquisition vs. ground-up), and the metrics that matter.' },
+        ],
+      },
+      {
+        id: 'UW.2',
+        title: 'Core Inputs',
+        content: [
+          { type: 'subsection', number: '', title: 'Operating-asset path', blocks: [
+            { type: 'table',
+              headers: ['Input', 'Single-period', 'Multi-period'],
+              rows: [
+                ['Income line items (rents, other income, vacancy / credit loss)', 'Required', 'Year-1 required; subsequent years modeled'],
+                ['Operating expenses (line items or normalized aggregate)', 'Required', 'Year-1 required; subsequent years modeled'],
+                ['NOI basis selection (F-12 Current / Market / Stabilized)', 'Required — drives which income and expense values feed the calc', 'Same'],
+                ['Capitalization rate', 'Required', 'Used as terminal / exit rate'],
+                ['Discount rate', '—', 'Required'],
+                ['Holding period', '—', 'Required (typically 5 / 7 / 10 years)'],
+                ['Reversion / sale', '—', 'Terminal rate × terminal NOI, less selling costs'],
+                ['Growth', '—', 'Per-line revenue, expense escalators, vacancy curve'],
+                ['Debt structure', 'For levered yield', 'Required for levered IRR / DSCR'],
+              ],
+            },
+          ]},
+          { type: 'subsection', number: '', title: 'Development path', blocks: [
+            { type: 'table',
+              headers: ['Input', 'Required'],
+              rows: [
+                ['Land basis', 'Yes (or solved for as residual)'],
+                ['Hard cost budget', 'Yes'],
+                ['Soft cost budget', 'Yes'],
+                ['Construction period and draw curve', 'Yes'],
+                ['Construction debt (rate, term, max LTC)', 'If levered'],
+                ['Lease-up or sales absorption schedule', 'Yes'],
+                ['Stabilized NOI or unit pricing', 'Yes'],
+                ['Exit cap or sale price', 'Yes'],
+                ['Permanent financing assumptions', 'If holding past stabilization'],
+              ],
+            },
+          ]},
+          { type: 'callout', label: 'Note', text: 'NOI is never an input. You supply income line items, operating expenses, and the NOI basis; the platform computes NOI from them.' },
+        ],
+      },
+      {
+        id: 'UW.3',
+        title: 'Core Outputs',
+        content: [
+          { type: 'prose', text: 'Every underwriting run produces: implied or projected value, levered and unlevered IRR, NPV, equity multiple, DSCR (with debt loaded), and a period-by-period cash flow schedule.' },
+          { type: 'subsection', number: '', title: 'Operating-asset additions', blocks: [
+            { type: 'prose', text: 'Yield-on-cost, cash-on-cash, and going-in vs. terminal cap.' },
+          ]},
+          { type: 'subsection', number: '', title: 'Development additions', blocks: [
+            { type: 'prose', text: 'Return on cost, return on equity, residual land value, and development spread (built basis vs. exit value).' },
+          ]},
+        ],
+      },
+      {
+        id: 'UW.4',
+        title: 'How Landscape Supports It',
+        content: [
+          { type: 'subsection', number: '', title: 'Operating side — three NOI bases', blocks: [
+            { type: 'prose', text: 'F-12 Current — forward twelve months, projected from the current rent roll and the current operating-expense run-rate. The as-is, going-forward view.' },
+            { type: 'prose', text: 'Market — current rents adjusted to market levels, with normalized operating expenses. What the property would produce if leased and operated at market today.' },
+            { type: 'prose', text: 'Stabilized — the same construct as Market, applied specifically to properties in lease-up (new construction) or value-add / rehab. Reflects what the property will produce once it reaches stabilized occupancy and stabilized expenses after the improvement plan is complete.' },
+            { type: 'prose', text: 'You select which basis feeds the underwriting; the platform handles the underlying data plumbing.' },
+          ]},
+          { type: 'subsection', number: '', title: 'Development side', blocks: [
+            { type: 'prose', text: 'The platform tracks the full cost stack — land, hard costs, soft costs, financing, and contingency — under the project’s container hierarchy (Area → Phase → Parcel for land development; Building → Floor → Unit for vertical). The absorption schedule (lease-up or sales) attaches to the project and feeds revenue timing. Construction-loan mechanics — draws, redraws, and conversion to permanent financing — are handled by the platform’s construction-loan engine.' },
+          ]},
+          { type: 'subsection', number: '', title: 'Granularity and persistence', blocks: [
+            { type: 'prose', text: 'Cash flows run monthly for multifamily and active development; annually otherwise. Every underwriting run is versioned. Reports and waterfall calculations read the latest version unless a specific version is pinned.' },
+          ]},
+        ],
+      },
+      {
+        id: 'UW.5',
+        title: 'Variants and Edge Cases',
+        content: [
+          { type: 'table',
+            headers: ['Situation', 'How it is handled'],
+            rows: [
+              ['Stabilized vs. as-is', 'A stabilized run minus lease-up cost and time-value drag yields the as-is value. Both tracked.'],
+              ['Below- or above-market rents', 'Modeled via the lease schedule, not as a manual adjustment.'],
+              ['Distressed / negative NOI', 'Single-period yields nonsensical results; the system warns and routes you to multi-period.'],
+              ['Land already owned', 'Residual land value becomes a check rather than an input; compare it to your existing basis.'],
+              ['Phased / merchant build', 'Sales absorption replaces lease-up; the schedule tracks sellouts rather than rent-up.'],
+              ['Levered vs. unlevered', 'Both run by default when debt is loaded, surfaced side-by-side.'],
+              ['Mid-construction acquisition', 'Hybrid path — land plus work-to-date as basis, completion as the remaining cost stack.'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'UW.6',
+        title: 'Running an Underwriting',
+        content: [
+          { type: 'prose', text: 'The analysis is identical underneath; how you start it depends on which interface you are in.' },
+          { type: 'uiswitch',
+            chat: [
+              { type: 'prose', text: 'Describe the run to Landscaper in plain language. It assembles the inputs, runs the engine, and returns the result as an artifact you can refine.' },
+              { type: 'subsection', number: '', title: 'Operating-asset prompts', blocks: [
+                { type: 'prose', text: '“Underwrite this property using market rents and an 8 cap.”' },
+                { type: 'prose', text: '“DCF this asset over 10 years at a 7.5% discount, terminal 8.”' },
+                { type: 'prose', text: '“Compare the three NOI bases and show me the implied value under each.”' },
+                { type: 'prose', text: '“Stress-test cap-rate expansion to 9% and growth flat at 2%.”' },
+              ]},
+              { type: 'subsection', number: '', title: 'Development prompts', blocks: [
+                { type: 'prose', text: '“Run the development underwriting on this site assuming $40k per lot land and a 7 cap exit.”' },
+                { type: 'prose', text: '“Solve for residual land value at a 15% return on cost.”' },
+                { type: 'prose', text: '“What’s the development spread if we hit $850 per square foot stabilized?”' },
+                { type: 'prose', text: '“Compare merchant-build sellout to hold-and-stabilize on this parcel.”' },
+              ]},
+            ],
+            classic: [
+              { type: 'prose', text: 'Open the project and work the tabs directly.' },
+              { type: 'subsection', number: '', title: 'Operating-asset path', blocks: [
+                { type: 'prose', text: 'In the Operations tab, choose the NOI basis (F-12 Current, Market, or Stabilized). Then open the Valuation folder and select the Income Approach tab. Choose Direct Cap or DCF, and enter the capitalization rate, discount rate, and holding period. The indicated value and cash flow populate in place.' },
+              ]},
+              { type: 'subsection', number: '', title: 'Development path', blocks: [
+                { type: 'prose', text: 'Enter the cost stack in the Budget tab and the lease-up or sales schedule in the absorption section. Open the Feasibility tab to solve residual land value and read return-on-cost / return-on-equity. Use the Capitalization folder to layer in debt, equity, and the waterfall.' },
+              ]},
+            ],
+          },
+        ],
+      },
+      {
+        id: 'UW.7',
+        title: 'Where the Results Appear',
+        content: [
+          { type: 'uiswitch',
+            chat: [
+              { type: 'table',
+                headers: ['Output', 'Where it renders'],
+                rows: [
+                  ['Value or residual-land-value summary', 'Chat reply plus the Underwriting artifact in the right panel'],
+                  ['Cash flow schedule', 'Right artifacts panel, expandable table'],
+                  ['Sensitivity grid', 'Right artifacts panel'],
+                  ['Cost-stack waterfall (development)', 'Right artifacts panel'],
+                  ['Source-cell trace', 'Inline in chat, cross-linked to documents and prior asks'],
+                  ['Embedded section in the deal report', 'Reports panel'],
+                ],
+              },
+            ],
+            classic: [
+              { type: 'table',
+                headers: ['Output', 'Where it renders'],
+                rows: [
+                  ['Indicated value', 'Income Approach tab (Valuation folder)'],
+                  ['Cash flow schedule', 'Income Approach / DCF view, in the tab'],
+                  ['Residual land value, return metrics', 'Feasibility tab'],
+                  ['Cost-stack and draws (development)', 'Budget and Capitalization tabs'],
+                  ['Assembled report', 'Reports folder'],
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'UW.8',
+        title: 'Related Chapters',
+        content: [
+          { type: 'prose', text: 'Property & Portfolio Modeling (how the asset is structured), Comparable Sales (cap-rate and exit-price evidence), Capitalization (debt, equity, construction loans, and the waterfall that allocates the result), Sensitivity & Scenarios, Report Generation, and Location Briefs (cap-rate and market-rent evidence).' },
+        ],
+      },
+    ],
+  },
   // ─── Group: Getting Started ───────────────────────────────────
   {
     id: '1',
@@ -791,6 +979,7 @@ export const guideChapters: GuideChapter[] = [
 
 /** All unique group labels in display order */
 export const guideGroups: string[] = [
+  'Concepts (Unified UI v2)',
   'Getting Started',
   'Landscaper AI',
   'Multifamily Workflows',

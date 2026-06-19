@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { GuideChapter, GuideBlock } from '@/types/guide';
 import GuideScreenshot from './GuideScreenshot';
 import GuideCallout from './GuideCallout';
@@ -8,6 +8,73 @@ import GuidePrintButton from './GuidePrintButton';
 
 interface GuideContentProps {
   chapter: GuideChapter;
+}
+
+/**
+ * Two-way navigation switch. Lets the reader toggle between the chat-first
+ * path and the classic tabbed path for an interface-specific step. The shared
+ * concept body of a chapter stays in normal blocks; only the navigation /
+ * how-to / where-it-renders content lives inside a switch.
+ */
+function UiSwitchBlock({
+  chat,
+  classic,
+}: {
+  chat: GuideBlock[];
+  classic: GuideBlock[];
+}) {
+  const [mode, setMode] = useState<'chat' | 'classic'>('chat');
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '0.3rem 0.9rem',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    border: '1px solid var(--cui-border-color)',
+    backgroundColor: active ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
+    color: active ? 'var(--cui-white, #fff)' : 'var(--cui-body-color)',
+  });
+
+  return (
+    <div
+      style={{
+        margin: '1.25rem 0',
+        border: '1px solid var(--cui-border-color)',
+        borderRadius: '6px',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        role="tablist"
+        aria-label="Interface path"
+        style={{ display: 'flex', borderBottom: '1px solid var(--cui-border-color)' }}
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'chat'}
+          onClick={() => setMode('chat')}
+          style={{ ...tabStyle(mode === 'chat'), borderRadius: 0, borderLeft: 'none', borderTop: 'none' }}
+        >
+          Chat-first
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'classic'}
+          onClick={() => setMode('classic')}
+          style={{ ...tabStyle(mode === 'classic'), borderRadius: 0, borderTop: 'none' }}
+        >
+          Classic (tabbed)
+        </button>
+      </div>
+      <div style={{ padding: '0.75rem 1rem' }}>
+        {(mode === 'chat' ? chat : classic).map((b, i) => (
+          <BlockRenderer key={i} block={b} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -88,6 +155,9 @@ function BlockRenderer({ block }: { block: GuideBlock }) {
           ))}
         </div>
       );
+
+    case 'uiswitch':
+      return <UiSwitchBlock chat={block.chat} classic={block.classic} />;
 
     default:
       return null;
