@@ -42,6 +42,26 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // ── UI-mode preference write (server-authoritative) ──
+  // The classic/chat toggle navigates to its destination with ?setui=<mode>.
+  // We set the ui_mode cookie HERE (on the redirect response) so it is
+  // guaranteed present on the very next request, then bounce to the clean URL.
+  // This replaces the old client-side document.cookie write, which raced with
+  // window.location.assign and let middleware read a stale mode on the GET
+  // /projects/:id (the "bounces back to chat" bug).
+  const setUi = request.nextUrl.searchParams.get('setui');
+  if (setUi === 'classic' || setUi === 'unified') {
+    const cleanUrl = request.nextUrl.clone();
+    cleanUrl.searchParams.delete('setui');
+    const res = NextResponse.redirect(cleanUrl);
+    res.cookies.set(UI_MODE_COOKIE, setUi, {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    });
+    return res;
+  }
+
   // ── Dual-modality routing (Session: LSCMD-DUALUI-0616-ec7) ──
   // Cookie-gated replacement for the old static /projects/:projectId redirect
   // (removed from next.config.ts, because next.config redirects run BEFORE
