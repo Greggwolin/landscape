@@ -202,9 +202,13 @@ class BudgetVarianceCalculator:
         categories_to_check: Dict[tuple, None] = {}  # Use dict as ordered set
         for level in range(1, 5):
             if levels is None or level in levels:
+                # .order_by() clears BudgetItem.Meta.ordering (fiscal_year, ...)
+                # which Django would otherwise inject into the SELECT DISTINCT —
+                # core_fin_fact_budget has no fiscal_year column, so leaving the
+                # default ordering in raises ProgrammingError.
                 category_ids = budget_items.filter(
                     **{f'category_l{level}_id__isnull': False}
-                ).values_list(f'category_l{level}_id', flat=True).distinct()
+                ).values_list(f'category_l{level}_id', flat=True).order_by().distinct()
 
                 for cat_id in category_ids:
                     categories_to_check[(level, cat_id)] = None

@@ -2,6 +2,7 @@
 // v1.0 · 2025-11-03
 
 import { useQuery } from '@tanstack/react-query';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 export interface CategoryVariance {
   category_id: number;
@@ -52,7 +53,8 @@ export function useBudgetVariance(
       });
 
       const response = await fetch(
-        `/api/budget/variance/${projectId}/?${params.toString()}`
+        `/api/budget/variance/${projectId}/?${params.toString()}`,
+        { headers: getAuthHeaders() }
       );
 
       if (!response.ok) {

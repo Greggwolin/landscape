@@ -284,7 +284,7 @@ export function useExtractionStaging(
     queryFn: async () => {
       const url = new URL(`${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/`);
       if (docId) url.searchParams.set('doc_id', String(docId));
-      const res = await fetch(url.toString());
+      const res = await fetch(url.toString(), { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`Failed to fetch staging data: ${res.status}`);
       return res.json();
     },

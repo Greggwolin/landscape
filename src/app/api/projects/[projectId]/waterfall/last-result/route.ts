@@ -19,9 +19,15 @@ export async function GET(req: NextRequest, { params }: Params) {
   const djangoUrl = `${DJANGO_API_URL}/api/calculations/project/${projectId}/waterfall/last-result/`;
 
   try {
+    // Forward the caller's credentials so Django authenticates the request.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const incomingAuth = req.headers.get('authorization');
+    if (incomingAuth) headers['Authorization'] = incomingAuth;
+    const incomingCookie = req.headers.get('cookie');
+    if (incomingCookie) headers['Cookie'] = incomingCookie;
     const djangoRes = await fetch(djangoUrl, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       cache: 'no-store',
     });
 

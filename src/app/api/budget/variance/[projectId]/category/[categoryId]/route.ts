@@ -18,14 +18,26 @@ export async function GET(
   try {
     const { projectId, categoryId } = await context.params;
 
-    const response = await fetch(`${DJANGO_API_URL}/api/financial/budget/variance/${projectId}/category/${categoryId}/`, {
-        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+    const cookie = request.headers.get('cookie');
+    const response = await fetch(`${DJANGO_API_URL}/api/budget/variance/${projectId}/category/${categoryId}/`, {
+        headers: {
+          ...(authHeader ? { Authorization: authHeader } : {}),
+          ...(cookie ? { Cookie: cookie } : {}),
+          'Content-Type': 'application/json',
+        },
       });
 
     if (!response.ok) {
+      // Surface Django's real status/body rather than masking everything as a 500.
       const errorText = await response.text();
       console.error(`Django API returned ${response.status}:`, errorText);
-      throw new Error(`Django API returned ${response.status}`);
+      let payload: unknown;
+      try {
+        payload = JSON.parse(errorText);
+      } catch {
+        payload = { error: errorText || `Django API returned ${response.status}` };
+      }
+      return NextResponse.json(payload, { status: response.status });
     }
 
     const data = await response.json();
