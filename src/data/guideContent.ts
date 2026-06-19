@@ -207,6 +207,133 @@ export const guideChapters: GuideChapter[] = [
       },
     ],
   },
+  {
+    id: 'CS',
+    number: '3',
+    title: 'Comparable Sales',
+    subtitle: 'Estimating value from recent sales of similar assets',
+    group: 'Concepts (Unified UI v2)',
+    sections: [
+      {
+        id: 'CS.1',
+        title: 'What This Is',
+        content: [
+          { type: 'prose', text: 'Comparable sales estimates value by reference to recent transactions of similar properties, adjusted for the ways each sale differs from the subject. It is the most direct read on what the market will pay, and the primary evidence behind both a value conclusion and the capitalization and exit-rate assumptions used elsewhere in the analysis.' },
+          { type: 'prose', text: 'The activity is the same across property types — land, multifamily, office, retail, industrial. What changes is the unit of comparison (per acre or per lot for land; per unit or per square foot for improved property) and which differences matter enough to adjust for.' },
+        ],
+      },
+      {
+        id: 'CS.2',
+        title: 'Core Inputs',
+        content: [
+          { type: 'table',
+            headers: ['Input', 'Role'],
+            rows: [
+              ['Subject characteristics', 'Size, location, property type, condition, and the attributes you will adjust against'],
+              ['Comparable sales', 'Sale price, sale date, size, location, property type, and terms for each comp'],
+              ['Unit of comparison', 'Per unit / per square foot for improved; per acre / per lot for land'],
+              ['Adjustment factors', 'Market conditions (time), location, physical differences, condition, and financing or conditions of sale'],
+            ],
+          },
+          { type: 'callout', label: 'Note', text: 'A sale becomes a comparable only after adjustment. The raw price is the starting point; the adjusted price is the evidence.' },
+        ],
+      },
+      {
+        id: 'CS.3',
+        title: 'Core Outputs',
+        content: [
+          { type: 'prose', text: 'An adjusted value for each comparable, an indicated value range across the set, a reconciled point value, and the supporting per-unit and per-square-foot (or per-acre / per-lot) figures. These also feed cap-rate and exit-price evidence used in the income and underwriting work.' },
+        ],
+      },
+      {
+        id: 'CS.4',
+        title: 'How Landscape Supports It',
+        content: [
+          { type: 'subsection', number: '', title: 'One comparables library, tagged by property type', blocks: [
+            { type: 'prose', text: 'All comparables live in a single library tagged by property type, rather than separate lists per asset class. When you pull comps for a subject, Landscape filters to the matching property type automatically, so a land subject draws land comps and a multifamily subject draws multifamily comps.' },
+          ]},
+          { type: 'subsection', number: '', title: 'Adjustment grid', blocks: [
+            { type: 'prose', text: 'Each comparable is adjusted in a grid — market conditions, location, physical, condition, and terms — producing an adjusted unit value per comp. The grid is the workpaper behind the indicated range.' },
+          ]},
+          { type: 'subsection', number: '', title: 'Map', blocks: [
+            { type: 'prose', text: 'Comps render on a map alongside the subject, so proximity and submarket fit are visible at a glance and location adjustments are grounded in geography rather than guesswork.' },
+          ]},
+        ],
+      },
+      {
+        id: 'CS.5',
+        title: 'Variants and Edge Cases',
+        content: [
+          { type: 'table',
+            headers: ['Situation', 'How it is handled'],
+            rows: [
+              ['Thin market / few comps', 'Widen the date or distance window; the indicated range carries more weight on fewer, closer comps. Flag the limited evidence in the conclusion.'],
+              ['Land vs. improved subject', 'Unit of comparison switches to per acre or per lot; physical adjustments shift to entitlements, topography, and access.'],
+              ['Dated sales', 'Apply a market-conditions (time) adjustment rather than discarding the comp.'],
+              ['Non-arm’s-length or portfolio sale', 'Adjust for conditions of sale, or exclude with a note; do not let a distorted price set the range.'],
+              ['Mixed-quality set', 'Reconcile toward the most similar comps; the point value need not be the mean of the range.'],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'CS.6',
+        title: 'Running a Comparable-Sales Analysis',
+        content: [
+          { type: 'prose', text: 'The grid and the adjustments are the same underneath; how you assemble them depends on the interface.' },
+          { type: 'uiswitch',
+            chat: [
+              { type: 'prose', text: 'Ask Landscaper to pull and adjust comps; it returns the grid and map as artifacts you can refine.' },
+              { type: 'prose', text: '“Pull sale comps for this property within 5 miles, last 18 months.”' },
+              { type: 'prose', text: '“Adjust these comps for time at 4% annual and size against the subject.”' },
+              { type: 'prose', text: '“Show me the indicated value range per unit and reconcile to a point.”' },
+              { type: 'prose', text: '“Drop the portfolio sale and re-run the range.”' },
+            ],
+            classic: [
+              { type: 'prose', text: 'Open the project, go to the Valuation folder, and select the Sales Comparison tab. Add comparables to the grid (or pull from the library), enter adjustments in each factor column, and read the adjusted unit values and indicated range. The map alongside the grid plots the comps against the subject.' },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'CS.7',
+        title: 'Where the Results Appear',
+        content: [
+          { type: 'uiswitch',
+            chat: [
+              { type: 'table',
+                headers: ['Output', 'Where it renders'],
+                rows: [
+                  ['Adjustment grid', 'Right artifacts panel, expandable table'],
+                  ['Comps map', 'Right artifacts panel, interactive map'],
+                  ['Indicated range and reconciled value', 'Chat reply plus the grid artifact'],
+                  ['Embedded section in the deal report', 'Reports panel'],
+                ],
+              },
+            ],
+            classic: [
+              { type: 'table',
+                headers: ['Output', 'Where it renders'],
+                rows: [
+                  ['Adjustment grid and indicated range', 'Sales Comparison tab (Valuation folder)'],
+                  ['Comps map', 'Map view alongside the Sales Comparison grid'],
+                  ['Reconciled value into the conclusion', 'Reconciliation tab'],
+                  ['Assembled report', 'Reports folder'],
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'CS.8',
+        title: 'Related Chapters',
+        content: [
+          { type: 'prose', text: 'Underwriting (cap-rate and exit-price evidence flow from here), Capitalization, Report Generation, and Location Briefs (market evidence that supports comp selection and adjustment).' },
+        ],
+      },
+    ],
+  },
   // ─── Group: Getting Started ───────────────────────────────────
   {
     id: '1',
