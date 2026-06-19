@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { Plus, MoreVertical, ExternalLink, Archive, Trash2 } from 'lucide-react';
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { getAuthHeaders, redirectToLoginExpired } from '@/lib/authHeaders';
@@ -40,6 +40,22 @@ function timeAgo(iso?: string | null): string {
   return `Updated ${days}d ago`;
 }
 
+// FB-318: shared style for the per-tile action menu items.
+const menuItemStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  width: '100%',
+  padding: '7px 10px',
+  borderRadius: 6,
+  border: 'none',
+  background: 'transparent',
+  color: 'var(--w-text-primary, #e5e7eb)',
+  fontSize: '0.85rem',
+  textAlign: 'left',
+  cursor: 'pointer',
+};
+
 function buildLocation(p: ProjectRow): string {
   if (p.location) return p.location;
   if (p.location_description) return p.location_description;
@@ -60,6 +76,64 @@ export default function WrapperProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // FB-318: per-tile actions (Open / Archive / Delete)
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  // Close the open action menu on any outside click.
+  useEffect(() => {
+    if (menuOpenId === null) return;
+    const close = () => setMenuOpenId(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [menuOpenId]);
+
+  function openProject(id: number) {
+    router.push(`/w/projects/${id}`);
+  }
+
+  // Archive = turn the active flag off; the list already hides inactive projects.
+  async function archiveProject(id: number) {
+    setMenuOpenId(null);
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/projects/${id}`, {
+        method: 'PATCH',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: false }),
+      });
+      if (res.status === 401) { redirectToLoginExpired(); return; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setProjects((prev) => prev.filter((p) => p.project_id !== id));
+    } catch (e) {
+      setError(`Could not archive project: ${String((e as Error)?.message || e)}`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Delete = soft-delete (recoverable), confirmed first.
+  async function deleteProject(id: number, name: string) {
+    setMenuOpenId(null);
+    const ok = window.confirm(
+      `Delete "${name}"?\n\nThe project is removed from your list. This is a soft delete — it can be recovered if needed.`
+    );
+    if (!ok) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/projects/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (res.status === 401) { redirectToLoginExpired(); return; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setProjects((prev) => prev.filter((p) => p.project_id !== id));
+    } catch (e) {
+      setError(`Could not delete project: ${String((e as Error)?.message || e)}`);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   // Projects selector opens with chat panel closed — full width for the grid
   useEffect(() => { closeChat(); }, [closeChat]);
@@ -172,6 +246,7 @@ export default function WrapperProjectsPage() {
               <div
                 key={p.project_id}
                 className="w-project-row"
+                style={{ position: 'relative', opacity: busyId === p.project_id ? 0.5 : 1 }}
                 onClick={() =>
                   router.push(
                     goto
@@ -180,6 +255,68 @@ export default function WrapperProjectsPage() {
                   )
                 }
               >
+                {/* FB-318: per-tile actions */}
+                <button
+                  type="button"
+                  aria-label="Project actions"
+                  className="w-project-row-actions-btn"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    border: 'none',
+                    background: menuOpenId === p.project_id ? 'var(--w-border, rgba(255,255,255,0.12))' : 'transparent',
+                    color: 'var(--w-text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                  disabled={busyId === p.project_id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpenId(menuOpenId === p.project_id ? null : p.project_id);
+                  }}
+                >
+                  <MoreVertical size={16} />
+                </button>
+                {menuOpenId === p.project_id && (
+                  <div
+                    role="menu"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      top: 38,
+                      right: 8,
+                      zIndex: 20,
+                      minWidth: 160,
+                      padding: 4,
+                      borderRadius: 8,
+                      background: 'var(--w-surface, #1f2430)',
+                      border: '1px solid var(--w-border, rgba(255,255,255,0.12))',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    <button type="button" role="menuitem" className="w-project-row-menu-item"
+                      style={menuItemStyle}
+                      onClick={(e) => { e.stopPropagation(); openProject(p.project_id); }}>
+                      <ExternalLink size={14} /> Open
+                    </button>
+                    <button type="button" role="menuitem" className="w-project-row-menu-item"
+                      style={menuItemStyle}
+                      onClick={(e) => { e.stopPropagation(); archiveProject(p.project_id); }}>
+                      <Archive size={14} /> Archive
+                    </button>
+                    <button type="button" role="menuitem" className="w-project-row-menu-item"
+                      style={{ ...menuItemStyle, color: '#f87171' }}
+                      onClick={(e) => { e.stopPropagation(); deleteProject(p.project_id, p.project_name); }}>
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                )}
                 <span className="w-project-row-name">{p.project_name}</span>
                 {loc && <div className="w-project-row-desc">{loc}</div>}
                 <div className="w-project-row-badges">

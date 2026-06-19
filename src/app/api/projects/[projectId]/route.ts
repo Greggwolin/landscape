@@ -135,7 +135,8 @@ export async function PATCH(req: NextRequest, context: Params) {
       'project_type',
       'template_id',
       'planning_efficiency',
-      'gis_metadata'
+      'gis_metadata',
+      'is_active'  // FB-318: archive (set false) / un-archive (set true)
     ]
 
     // Build SET clause dynamically
@@ -274,6 +275,42 @@ export async function GET(_req: NextRequest, context: Params) {
     console.error('Project GET error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch project', details: message },
+      { status: 500 }
+    )
+  }
+}
+
+// FB-318: soft-delete a project (mainly for projects created by accident/error).
+// Stamps deleted_at so the project drops out of the list but stays recoverable
+// by clearing the column. Distinct from archive (is_active = false), which is
+// handled via PATCH. Idempotent: re-deleting an already-deleted project is a no-op.
+export async function DELETE(req: NextRequest, context: Params) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(req, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
+  try {
+    const { projectId } = await context.params
+    if (!projectId) return NextResponse.json({ error: 'project id required' }, { status: 400 })
+
+    const rows = await sql`
+      UPDATE landscape.tbl_project
+      SET deleted_at = COALESCE(deleted_at, NOW()),
+          updated_at = NOW()
+      WHERE project_id = ${projectId}::bigint
+      RETURNING project_id, deleted_at
+    `
+
+    if (!rows || rows.length === 0) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, project_id: rows[0].project_id, deleted_at: rows[0].deleted_at })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('Project DELETE error:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete project', details: message },
       { status: 500 }
     )
   }
