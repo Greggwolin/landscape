@@ -23,9 +23,11 @@ export async function GET(
 
     console.log('[parcel-product-types] Fetching from:', url);
 
+    const authHeader = request.headers.get('Authorization');
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...(authHeader ? { Authorization: authHeader } : {}),
       },
     });
 

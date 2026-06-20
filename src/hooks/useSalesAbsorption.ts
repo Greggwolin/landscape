@@ -68,7 +68,7 @@ export function useParcelsWithSales(
         url += `?phase_id=${phaseIds}`;
       }
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch parcels with sales data');
       }
@@ -383,7 +383,7 @@ export function useParcelProductTypes(
         url += `?phase_id=${phaseIds}`;
       }
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch parcel product types');
       }

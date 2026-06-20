@@ -14,6 +14,7 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { projectId } = await context.params;
     const { searchParams } = new URL(request.url);
@@ -31,7 +32,9 @@ export async function GET(
       url += `?${queryParams.toString()}`;
     }
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}) },
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
