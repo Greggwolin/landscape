@@ -36,6 +36,14 @@ function getAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+/** Source-document provenance for an extracted-plan overlay (Phase 1). */
+export interface OverlayCropBbox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
 export interface SitePlanOverlayRecord {
   overlay_id: number;
   project_id: number;
@@ -46,6 +54,10 @@ export interface SitePlanOverlayRecord {
   rotation_deg: number;
   created_at: string;
   updated_at: string;
+  // Provenance — null for manually-uploaded overlays.
+  source_doc_id?: number | null;
+  source_page?: number | null;
+  source_crop_bbox?: OverlayCropBbox | null;
 }
 
 export interface SitePlanOverlayInput {
@@ -54,6 +66,11 @@ export interface SitePlanOverlayInput {
   corners: Corners;
   opacity: number;
   rotation_deg: number;
+  // Optional source-document provenance (extracted plans). Omitted by the
+  // manual-upload flow, so legacy overlay POSTs are unaffected.
+  source_doc_id?: number | null;
+  source_page?: number | null;
+  source_crop_bbox?: OverlayCropBbox | null;
 }
 
 export function useSitePlanOverlays(projectId: number | undefined) {

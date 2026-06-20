@@ -35,6 +35,12 @@ class ProjectOverlaySerializer(serializers.Serializer):
     opacity = serializers.FloatField(required=False, min_value=0.0, max_value=1.0)
     rotation_deg = serializers.FloatField(required=False, min_value=-360.0, max_value=360.0)
 
+    # Source-document provenance (Phase 1: extract + place). Optional — legacy
+    # overlays carry none, so these stay OUT of the required set.
+    source_doc_id = serializers.IntegerField(required=False, allow_null=True)
+    source_page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    source_crop_bbox = serializers.JSONField(required=False, allow_null=True)
+
     def validate_corners(self, value):
         if not isinstance(value, list) or len(value) != 4:
             raise serializers.ValidationError(

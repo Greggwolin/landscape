@@ -187,6 +187,24 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
         if (!artifactsOpen) toggleArtifacts();
       }
+      // Plan extraction (Phase 1) — extract_plan_image returns
+      // action='place_plan_overlay' with an overlay payload. MapTab lives in a
+      // different layout subtree, so a window event is the cross-tree seam (same
+      // rationale as the command bus): MapTab listens and re-uploads + drapes
+      // the PNG through the existing overlay editor. Never auto-saves — the user
+      // positions and saves. (Preview action 'show_plan_extract_preview' surfaces
+      // via the tool's chat message; no drape until the user confirms a crop.)
+      if (
+        toolName === 'extract_plan_image' &&
+        result.action === 'place_plan_overlay' &&
+        result.overlay
+      ) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('landscaper:place_plan_overlay', { detail: result.overlay }),
+          );
+        }
+      }
     },
     [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc],
   );
