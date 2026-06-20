@@ -23,9 +23,11 @@ export async function GET(
     console.log('[parcels-with-sales] DJANGO_API_URL:', DJANGO_API_URL);
     console.log('[parcels-with-sales] process.env.NEXT_PUBLIC_DJANGO_API_URL:', process.env.NEXT_PUBLIC_DJANGO_API_URL);
 
+    const authHeader = request.headers.get('Authorization');
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...(authHeader ? { Authorization: authHeader } : {}),
       },
     });
 

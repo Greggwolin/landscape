@@ -305,7 +305,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       try {
         const url = `/api/projects/${projectId}/benchmarks?type=improvement_offset&scope=project`;
         console.log('Fetching improvement offset from:', url);
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: getAuthHeaders() });
         if (response.ok) {
           const data = await response.json();
           console.log('Fetched improvement offset data:', data);

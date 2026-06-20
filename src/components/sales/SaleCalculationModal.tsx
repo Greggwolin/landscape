@@ -25,6 +25,7 @@ import type {
   CreateBenchmarkPayload,
 } from '@/types/sales-absorption';
 import SaveBenchmarkModal from './SaveBenchmarkModal';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 interface Props {
   open: boolean;
@@ -140,7 +141,7 @@ export default function SaleCalculationModal({
         `/api/projects/${projectId}/parcels/${parcel.parcel_id}/calculate-sale`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         }
       );
