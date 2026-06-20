@@ -19,10 +19,19 @@ CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config('CSRF_TRUSTED_ORIGIN
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Add Python calculation engine to path
-ENGINE_PATH = BASE_DIR.parent / 'services' / 'financial_engine_py'
-if ENGINE_PATH.exists():
-    sys.path.insert(0, str(ENGINE_PATH))
+# Add Python calculation engine to path.
+# The `financial_engine` package is vendored into the backend (backend/financial_engine)
+# so it ships inside the Railway build context (which is the backend/ directory). Ensure
+# BASE_DIR is importable so `import financial_engine` resolves in every environment.
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+# Backwards-compatible fallback: honor the legacy sibling location
+# (services/financial_engine_py) only when the vendored copy is absent.
+if not (BASE_DIR / 'financial_engine').exists():
+    ENGINE_PATH = BASE_DIR.parent / 'services' / 'financial_engine_py'
+    if ENGINE_PATH.exists():
+        sys.path.insert(0, str(ENGINE_PATH))
 
 
 # Quick-start development settings - unsuitable for production
