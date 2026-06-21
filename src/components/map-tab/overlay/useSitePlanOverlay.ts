@@ -51,6 +51,8 @@ export interface UseSitePlanOverlayResult {
   lastSnapped: boolean;
   setOpacity: (value: number) => void;
   setRotation: (deg: number) => void;
+  /** Externally drive the four corners (control-point georeference preview, D16). */
+  setCorners: (corners: Corners) => void;
   getState: () => SitePlanOverlayState;
 }
 
@@ -227,5 +229,18 @@ export function useSitePlanOverlay(
     [opacity]
   );
 
-  return { ready, opacity, rotationDeg, lastSnapped, setOpacity, setRotation, getState };
+  // Externally set all four corners (control-point georeference preview, D16).
+  // Mirrors setRotation's corner+handle sync; no-op until the overlay is built.
+  const setCorners = useCallback(
+    (next: Corners) => {
+      if (!cornersRef.current || !overlayRef.current) return;
+      cornersRef.current = next;
+      overlayRef.current.setCorners(next);
+      handlesRef.current.forEach((m, i) => m.setLngLat(next[i]));
+      onChangeRef.current?.({ corners: next, opacity, rotationDeg: rotationRef.current });
+    },
+    [opacity]
+  );
+
+  return { ready, opacity, rotationDeg, lastSnapped, setOpacity, setRotation, setCorners, getState };
 }

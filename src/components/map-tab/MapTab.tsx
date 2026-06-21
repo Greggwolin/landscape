@@ -34,6 +34,7 @@ import type {
 } from './types';
 import { MapCanvas, MARICOPA_PARCEL_OUTLINE_LAYER_ID } from './MapCanvas';
 import type { MapCanvasRef } from './MapCanvas';
+import type { MapMouseEvent } from 'maplibre-gl';
 import { LayerPanel } from './LayerPanel';
 import { DrawToolbar } from './DrawToolbar';
 import { FeatureModal } from './FeatureModal';
@@ -55,8 +56,11 @@ import { queryParcelsByBounds } from '@/lib/gis/parcelServiceClient';
 import { useUploadThing } from '@/lib/uploadthing';
 import { useSitePlanOverlay } from './overlay/useSitePlanOverlay';
 import { SitePlanOverlayControls } from './overlay/SitePlanOverlayControls';
-import { useSitePlanOverlays } from './hooks/useSitePlanOverlays';
+import { useSitePlanOverlays, type OverlayControlPoint } from './hooks/useSitePlanOverlays';
 import { addImageOverlay, type OverlayHandle } from '@/lib/gis/imageOverlay';
+import PlanExtractCanvas, { type ExtractedRegion } from './extract/PlanExtractCanvas';
+import { georeference, snapToVertex, recommendTpsWarp, type ControlPoint } from '@/lib/gis/controlPoints';
+import { takePendingPlanExtract } from '@/lib/gis/planExtractBridge';
 import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
@@ -64,6 +68,22 @@ import { useMarketCompetitors, type MarketCompetitiveProject } from '@/hooks/use
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 import './map-tab.css';
+
+/** Flatten a GeoJSON geometry's coordinates into [lng,lat] vertices (parcel snap candidates, D16). */
+function flattenGeoVertices(geom: GeoJSON.Geometry | undefined): Array<[number, number]> {
+  if (!geom) return [];
+  const out: Array<[number, number]> = [];
+  const ring = (r: number[][]) => r.forEach((p) => out.push([p[0], p[1]]));
+  switch (geom.type) {
+    case 'Point': out.push([geom.coordinates[0], geom.coordinates[1]]); break;
+    case 'LineString': ring(geom.coordinates); break;
+    case 'MultiLineString': geom.coordinates.forEach(ring); break;
+    case 'Polygon': geom.coordinates.forEach(ring); break;
+    case 'MultiPolygon': geom.coordinates.forEach((poly) => poly.forEach(ring)); break;
+    default: break;
+  }
+  return out;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -2022,6 +2042,33 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     source_page?: number | null;
     source_crop_bbox?: { x0: number; y0: number; x1: number; y1: number } | null;
   } | null>(null);
+
+  // Click-to-extract (D15) + control-point georeferencing (D16) state.
+  const [extractCanvasSrc, setExtractCanvasSrc] = useState<string | null>(null); // data URL → canvas modal
+  const [cpImageSrc, setCpImageSrc] = useState<string | null>(null);             // extracted PNG for the image-side picker
+  const [cpImgDims, setCpImgDims] = useState<{ w: number; h: number } | null>(null); // extracted image pixel space (= crop bbox)
+  const [cpMode, setCpMode] = useState(false);
+  const [controlPoints, setControlPoints] = useState<OverlayControlPoint[]>([]);
+  const [pendingImgPt, setPendingImgPt] = useState<{ x: number; y: number } | null>(null);
+  const [georefInfo, setGeorefInfo] = useState<{ kind: string; rmsMeters: number; recommendTps: boolean } | null>(null);
+  // Source-doc provenance when the canvas was opened from a chat extract (D15/D16
+  // chat mount). Null for the classic file-upload path. Merged into the overlay
+  // provenance on region export so Save records which doc/page the trace came from.
+  const [extractDocProvenance, setExtractDocProvenance] = useState<{ source_doc_id: number | null; source_page: number | null } | null>(null);
+
+  // Reset all click-to-extract / control-point state (on save, cancel, or new region).
+  const resetExtractState = useCallback(() => {
+    setControlPoints([]);
+    setGeorefInfo(null);
+    setPendingImgPt(null);
+    setCpMode(false);
+    setCpImgDims(null);
+    setExtractDocProvenance(null);
+    setCpImageSrc((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
   const [overlayInitial, setOverlayInitial] = useState<
     { corners?: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number; rotationDeg?: number } | undefined
   >(undefined);
@@ -2087,7 +2134,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   }, []);
 
   const handlePlanFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
+    (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       event.target.value = ''; // allow re-selecting the same file later
       if (!file) return;
@@ -2095,26 +2142,53 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         showToast('Site plan must be a PNG or JPG image');
         return;
       }
+      // Open the click-to-extract canvas with a CORS-clean data URL (no canvas taint).
+      // Classic upload carries no source-doc provenance.
+      setExtractDocProvenance(null);
+      const reader = new FileReader();
+      reader.onload = () =>
+        setExtractCanvasSrc(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => showToast('Could not read the image file');
+      reader.readAsDataURL(file);
+    },
+    [showToast]
+  );
+
+  // A traced region was exported from the canvas → re-upload the transparent PNG
+  // via the existing UploadThing flow and drape it; keep the crop for control points.
+  const handleExportRegion = useCallback(
+    async (region: ExtractedRegion) => {
       setUploadingPlan(true);
       setOverlaySaveError(null);
       try {
+        const file = new File([region.blob], 'plan_region.png', { type: 'image/png' });
         const res = await startPlanUpload([file]);
         const first = res?.[0];
         const serverData = (first as { serverData?: { storage_uri?: string } } | undefined)?.serverData;
         const url = serverData?.storage_uri ?? (first as { url?: string } | undefined)?.url ?? '';
         if (!url) throw new Error('Upload returned no URL');
-        // Enter edit mode for a NEW overlay, dropped at map center.
+        // Capture doc provenance (chat mount) before resetExtractState clears it.
+        const docProv = extractDocProvenance;
+        resetExtractState();
+        setCpImageSrc(URL.createObjectURL(region.blob));
+        setCpImgDims({ w: region.bbox.x1 - region.bbox.x0, h: region.bbox.y1 - region.bbox.y0 });
+        setOverlayProvenance({
+          source_doc_id: docProv?.source_doc_id ?? null,
+          source_page: docProv?.source_page ?? null,
+          source_crop_bbox: region.bbox,
+        });
         setEditingOverlayId(null);
         setOverlayInitial(undefined);
         setOverlayImageUrl(url);
-        showToast('Site plan added — drag the corners to fit, then Save');
+        setExtractCanvasSrc(null);
+        showToast('Region extracted — drag corners to fit, or place control points');
       } catch (err) {
-        showToast(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+        showToast(`Extract failed: ${err instanceof Error ? err.message : 'unknown error'}`);
       } finally {
         setUploadingPlan(false);
       }
     },
-    [startPlanUpload, showToast]
+    [startPlanUpload, showToast, resetExtractState, extractDocProvenance]
   );
 
   // Drape a plan image produced by the Landscaper extract_plan_image tool
@@ -2164,18 +2238,122 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     [startPlanUpload, showToast]
   );
 
-  // Seam for the Landscaper action layer: it dispatches
-  //   window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay',
-  //                                        { detail: result.overlay }))
-  // with the extract_plan_image tool's `overlay` payload to drape it here.
+  // Open the trace canvas for a plan rendered server-side (chat-first mount):
+  // fetch the page → CORS-clean data URL → the SAME canvas the upload path uses.
+  const openExtractCanvasFromUrl = useCallback(
+    async (url: string, sourceDocId: number | null, sourcePage: number | null) => {
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Could not load plan page (${resp.status})`);
+        const blob = await resp.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+          reader.onerror = () => reject(new Error('read failed'));
+          reader.readAsDataURL(blob);
+        });
+        if (!dataUrl) throw new Error('Empty image');
+        setExtractDocProvenance({ source_doc_id: sourceDocId, source_page: sourcePage });
+        setExtractCanvasSrc(dataUrl);
+      } catch (err) {
+        showToast(`Could not open plan canvas: ${err instanceof Error ? err.message : 'unknown error'}`);
+      }
+    },
+    [showToast]
+  );
+
+  // Cross-tree seam (same rationale as the command bus): CenterChatPanel dispatches
+  // a live CustomEvent AND latches the payload (planExtractBridge) so this works
+  // whether MapTab was already mounted (event) or mounts after navigation (latch).
+  // 'place_plan_overlay' → drape a server crop; 'extract_plan_canvas' → open the
+  // trace canvas. Both reuse the existing handlers — no duplicated logic.
   useEffect(() => {
-    const handler = (e: Event) => {
+    const onOverlay = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      takePendingPlanExtract(); // consumed live → clear the latch
       if (detail) applyExtractedPlanOverlay(detail);
     };
-    window.addEventListener('landscaper:place_plan_overlay', handler);
-    return () => window.removeEventListener('landscaper:place_plan_overlay', handler);
-  }, [applyExtractedPlanOverlay]);
+    const onCanvas = () => {
+      const p = takePendingPlanExtract();
+      if (p?.kind === 'canvas') {
+        openExtractCanvasFromUrl(p.payload.url, p.payload.sourceDocId ?? null, p.payload.sourcePage ?? null);
+      }
+    };
+    window.addEventListener('landscaper:place_plan_overlay', onOverlay);
+    window.addEventListener('landscaper:extract_plan_canvas', onCanvas);
+    // Drain anything latched before this map mounted (chat → map navigation).
+    const pending = takePendingPlanExtract();
+    if (pending?.kind === 'overlay') {
+      applyExtractedPlanOverlay(pending.payload);
+    } else if (pending?.kind === 'canvas') {
+      openExtractCanvasFromUrl(pending.payload.url, pending.payload.sourceDocId ?? null, pending.payload.sourcePage ?? null);
+    }
+    return () => {
+      window.removeEventListener('landscaper:place_plan_overlay', onOverlay);
+      window.removeEventListener('landscaper:extract_plan_canvas', onCanvas);
+    };
+  }, [applyExtractedPlanOverlay, openExtractCanvasFromUrl]);
+
+  // Control-point image-side pick: click the extracted plan thumbnail → image pixel.
+  const handleCpImageClick = useCallback(
+    (e: React.MouseEvent<HTMLImageElement>) => {
+      if (!cpImgDims) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * cpImgDims.w;
+      const y = ((e.clientY - rect.top) / rect.height) * cpImgDims.h;
+      setPendingImgPt({ x, y });
+      showToast('Now click the matching point on the parcel map');
+    },
+    [cpImgDims, showToast]
+  );
+
+  // Control-point map-side pick: a map click (after an image pick) snaps to a
+  // nearby parcel vertex, forms a control point, and re-georeferences live (D16).
+  useEffect(() => {
+    if (!mapInstance || !cpMode) return;
+    const map = mapInstance;
+    const onMapClick = (e: MapMouseEvent) => {
+      if (!pendingImgPt || !cpImgDims) return;
+      const clicked: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+      const layerIds = [
+        'tax-parcels-fill', 'la-parcels-all-fill', 'plan-parcels-fill',
+        MARICOPA_PARCEL_OUTLINE_LAYER_ID,
+      ].filter((id) => map.getLayer(id));
+      let vertices: Array<[number, number]> = [];
+      if (layerIds.length) {
+        const b = 14;
+        const feats = map.queryRenderedFeatures(
+          [[e.point.x - b, e.point.y - b], [e.point.x + b, e.point.y + b]],
+          { layers: layerIds },
+        );
+        vertices = feats.flatMap((f) => flattenGeoVertices(f.geometry));
+      }
+      const { point, snapped } = snapToVertex(clicked, vertices, 8);
+      const next: OverlayControlPoint[] = [
+        ...controlPoints,
+        { img: pendingImgPt, map: point, snapped },
+      ];
+      setControlPoints(next);
+      setPendingImgPt(null);
+      if (next.length >= 2) {
+        try {
+          const result = georeference(cpImgDims.w, cpImgDims.h, next as ControlPoint[]);
+          overlayEditor.setCorners(result.corners);
+          setGeorefInfo({
+            kind: result.kind,
+            rmsMeters: result.rmsMeters,
+            recommendTps: recommendTpsWarp(result, next.length),
+          });
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : 'Could not georeference — move points apart');
+        }
+      } else {
+        showToast(`Control point ${next.length} placed — add at least one more`);
+      }
+    };
+    map.on('click', onMapClick);
+    return () => { map.off('click', onMapClick); };
+  }, [mapInstance, cpMode, pendingImgPt, cpImgDims, controlPoints, overlayEditor, showToast]);
 
   const handleOverlaySave = useCallback(async () => {
     if (!overlayImageUrl) return;
@@ -2200,6 +2378,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           // Provenance only present for extracted plans; spread-empty otherwise
           // so manual overlays POST exactly as before.
           ...(overlayProvenance ?? {}),
+          // Control-point inputs (D16) — omitted for manual 4-corner drapes.
+          control_points: controlPoints.length ? controlPoints : undefined,
         });
         showToast('Overlay saved');
       }
@@ -2208,20 +2388,22 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       setEditingOverlayId(null);
       setOverlayInitial(undefined);
       setOverlayProvenance(null);
+      resetExtractState();
     } catch (err) {
       setOverlaySaveError(err instanceof Error ? err.message : 'Failed to save overlay');
     } finally {
       setOverlaySaving(false);
     }
-  }, [overlayImageUrl, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast, overlayProvenance]);
+  }, [overlayImageUrl, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast, overlayProvenance, controlPoints, resetExtractState]);
 
   const handleOverlayCancel = useCallback(() => {
     setOverlayImageUrl(null);
     setEditingOverlayId(null);
     setOverlayProvenance(null);
+    resetExtractState();
     setOverlayInitial(undefined);
     setOverlaySaveError(null);
-  }, []);
+  }, [resetExtractState]);
 
   const handleEditOverlay = useCallback(
     (overlay: { overlay_id: number; source_uri: string; corners: [[number, number], [number, number], [number, number], [number, number]]; opacity: number; rotation_deg: number }) => {
@@ -2567,6 +2749,72 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             onSave={handleOverlaySave}
             onCancel={handleOverlayCancel}
           />
+        )}
+
+        {/* ─── Control-point georeferencing (D16) ─── */}
+        {overlayImageUrl && cpImageSrc && (
+          <div className="map-tab-tools" style={{ marginTop: 8 }}>
+            <div className="map-tab-tools-header">Control Points</div>
+            <CButton
+              color={cpMode ? 'secondary' : 'primary'}
+              variant="outline"
+              size="sm"
+              onClick={() => { setCpMode((v) => !v); setPendingImgPt(null); }}
+            >
+              {cpMode ? 'Done placing points' : 'Place control points'}
+            </CButton>
+            {cpMode && (
+              <>
+                <div style={{ fontSize: 11, margin: '6px 0', opacity: 0.8 }}>
+                  {pendingImgPt
+                    ? 'Now click the matching point on the parcel map (snaps to vertices).'
+                    : 'Click a recognizable point on the plan image, then its match on the map.'}
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={cpImageSrc}
+                  alt="Extracted plan"
+                  onClick={handleCpImageClick}
+                  style={{
+                    width: '100%', cursor: 'crosshair', borderRadius: 4,
+                    border: '1px solid var(--cui-border-color)',
+                  }}
+                />
+              </>
+            )}
+            <div style={{ fontSize: 11, marginTop: 6 }}>
+              {controlPoints.length} control point{controlPoints.length === 1 ? '' : 's'}
+              {georefInfo && <> · {georefInfo.kind} · RMS {georefInfo.rmsMeters.toFixed(1)} m</>}
+            </div>
+            {georefInfo?.recommendTps && (
+              <div style={{ fontSize: 11, color: 'var(--cui-warning)', marginTop: 4 }}>
+                A warp (TPS) would fit tighter — later slice.
+              </div>
+            )}
+            {controlPoints.length > 0 && (
+              <button
+                type="button"
+                className="map-tab-parcel-remove"
+                style={{ marginTop: 6 }}
+                onClick={() => { setControlPoints([]); setGeorefInfo(null); setPendingImgPt(null); }}
+              >
+                Clear points
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ─── Click-to-extract canvas modal (D15) ─── */}
+        {extractCanvasSrc && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)' }}>
+            <div style={{ position: 'absolute', inset: '3%', borderRadius: 8, overflow: 'hidden', background: 'var(--cui-body-bg, #1A1E28)' }}>
+              <PlanExtractCanvas
+                imageSrc={extractCanvasSrc}
+                onExportRegion={handleExportRegion}
+                onClose={() => setExtractCanvasSrc(null)}
+              />
+            </div>
+          </div>
         )}
       </div>
 
