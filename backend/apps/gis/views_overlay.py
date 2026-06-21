@@ -27,7 +27,7 @@ from .serializers import ProjectOverlaySerializer
 _SELECT_COLS = (
     "overlay_id, project_id, title, source_uri, corners, "
     "opacity, rotation_deg, created_at, updated_at, "
-    "source_doc_id, source_page, source_crop_bbox"
+    "source_doc_id, source_page, source_crop_bbox, control_points"
 )
 
 
@@ -43,6 +43,10 @@ def _row_to_overlay(row):
     crop_bbox = row[11]
     if isinstance(crop_bbox, str):
         crop_bbox = json.loads(crop_bbox)
+    # control_points is JSONB too — same string/list ambiguity. May be NULL.
+    control_points = row[12]
+    if isinstance(control_points, str):
+        control_points = json.loads(control_points)
     return {
         "overlay_id": row[0],
         "project_id": row[1],
@@ -58,6 +62,8 @@ def _row_to_overlay(row):
         "source_doc_id": row[9],
         "source_page": row[10],
         "source_crop_bbox": crop_bbox,
+        # Control-point georeferencing inputs (D16). NULL for manual 4-corner drapes.
+        "control_points": control_points,
     }
 
 
@@ -85,8 +91,8 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
             cursor.execute(
                 "INSERT INTO landscape.tbl_project_overlay "
                 "(project_id, title, source_uri, corners, opacity, rotation_deg, "
-                "source_doc_id, source_page, source_crop_bbox) "
-                "VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb) "
+                "source_doc_id, source_page, source_crop_bbox, control_points) "
+                "VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb, %s::jsonb) "
                 f"RETURNING {_SELECT_COLS}",
                 [
                     int(project_pk),
@@ -99,6 +105,8 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
                     data.get("source_page"),
                     json.dumps(data["source_crop_bbox"])
                     if data.get("source_crop_bbox") is not None else None,
+                    json.dumps(data["control_points"])
+                    if data.get("control_points") is not None else None,
                 ],
             )
             row = cursor.fetchone()
@@ -136,6 +144,12 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
             params.append(
                 json.dumps(data["source_crop_bbox"])
                 if data["source_crop_bbox"] is not None else None
+            )
+        if "control_points" in data:
+            set_clauses.append("control_points = %s::jsonb")
+            params.append(
+                json.dumps(data["control_points"])
+                if data["control_points"] is not None else None
             )
 
         if not set_clauses:
