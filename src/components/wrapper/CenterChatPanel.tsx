@@ -11,6 +11,7 @@ import { ProjectHomepage } from '@/components/wrapper/ProjectHomepage';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { emitLandscapeCommand } from '@/lib/landscape-command-bus';
+import { setPendingPlanExtract, type PlanOverlayPayload } from '@/lib/gis/planExtractBridge';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
@@ -187,26 +188,41 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
         if (!artifactsOpen) toggleArtifacts();
       }
-      // Plan extraction (Phase 1) — extract_plan_image returns
-      // action='place_plan_overlay' with an overlay payload. MapTab lives in a
-      // different layout subtree, so a window event is the cross-tree seam (same
-      // rationale as the command bus): MapTab listens and re-uploads + drapes
-      // the PNG through the existing overlay editor. Never auto-saves — the user
-      // positions and saves. (Preview action 'show_plan_extract_preview' surfaces
-      // via the tool's chat message; no drape until the user confirms a crop.)
-      if (
-        toolName === 'extract_plan_image' &&
-        result.action === 'place_plan_overlay' &&
-        result.overlay
-      ) {
+      // Plan extraction (D15/D16) — extract_plan_image fires from chat. The map +
+      // trace canvas (MapTab) live in a different layout subtree and only mount on
+      // the /w/projects/[id]/map route, so for each action we: (a) latch the
+      // payload, (b) navigate the /w/ panel to the map so MapTab mounts (a no-op in
+      // the classic shell — no navigate subscriber there, and a no-op if already on
+      // the map), and (c) fire the live CustomEvent for the already-mounted case.
+      // MapTab drains the latch on mount, so nothing is lost; its existing handlers
+      // (canvas, drape, control points, save) do all the work — no duplication.
+      if (toolName === 'extract_plan_image' && result.action === 'show_plan_extract_preview') {
+        const preview = result.preview as { url?: string; doc_id?: number; page?: number } | undefined;
+        if (preview?.url) {
+          setPendingPlanExtract({
+            kind: 'canvas',
+            payload: { url: preview.url, sourceDocId: preview.doc_id ?? null, sourcePage: preview.page ?? null },
+          });
+          if (projectId) {
+            emitLandscapeCommand('navigate', { target_url: `/w/projects/${projectId}/map`, context: { tool: toolName } });
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('landscaper:extract_plan_canvas'));
+          }
+        }
+      }
+      if (toolName === 'extract_plan_image' && result.action === 'place_plan_overlay' && result.overlay) {
+        const overlay = result.overlay as PlanOverlayPayload;
+        setPendingPlanExtract({ kind: 'overlay', payload: overlay });
+        if (projectId) {
+          emitLandscapeCommand('navigate', { target_url: `/w/projects/${projectId}/map`, context: { tool: toolName } });
+        }
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent('landscaper:place_plan_overlay', { detail: result.overlay }),
-          );
+          window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay', { detail: overlay }));
         }
       }
     },
-    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc],
+    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc, projectId],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)

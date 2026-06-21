@@ -60,6 +60,7 @@ import { useSitePlanOverlays, type OverlayControlPoint } from './hooks/useSitePl
 import { addImageOverlay, type OverlayHandle } from '@/lib/gis/imageOverlay';
 import PlanExtractCanvas, { type ExtractedRegion } from './extract/PlanExtractCanvas';
 import { georeference, snapToVertex, recommendTpsWarp, type ControlPoint } from '@/lib/gis/controlPoints';
+import { takePendingPlanExtract } from '@/lib/gis/planExtractBridge';
 import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
@@ -2050,6 +2051,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const [controlPoints, setControlPoints] = useState<OverlayControlPoint[]>([]);
   const [pendingImgPt, setPendingImgPt] = useState<{ x: number; y: number } | null>(null);
   const [georefInfo, setGeorefInfo] = useState<{ kind: string; rmsMeters: number; recommendTps: boolean } | null>(null);
+  // Source-doc provenance when the canvas was opened from a chat extract (D15/D16
+  // chat mount). Null for the classic file-upload path. Merged into the overlay
+  // provenance on region export so Save records which doc/page the trace came from.
+  const [extractDocProvenance, setExtractDocProvenance] = useState<{ source_doc_id: number | null; source_page: number | null } | null>(null);
 
   // Reset all click-to-extract / control-point state (on save, cancel, or new region).
   const resetExtractState = useCallback(() => {
@@ -2058,6 +2063,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     setPendingImgPt(null);
     setCpMode(false);
     setCpImgDims(null);
+    setExtractDocProvenance(null);
     setCpImageSrc((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
@@ -2137,6 +2143,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         return;
       }
       // Open the click-to-extract canvas with a CORS-clean data URL (no canvas taint).
+      // Classic upload carries no source-doc provenance.
+      setExtractDocProvenance(null);
       const reader = new FileReader();
       reader.onload = () =>
         setExtractCanvasSrc(typeof reader.result === 'string' ? reader.result : null);
@@ -2159,10 +2167,16 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         const serverData = (first as { serverData?: { storage_uri?: string } } | undefined)?.serverData;
         const url = serverData?.storage_uri ?? (first as { url?: string } | undefined)?.url ?? '';
         if (!url) throw new Error('Upload returned no URL');
+        // Capture doc provenance (chat mount) before resetExtractState clears it.
+        const docProv = extractDocProvenance;
         resetExtractState();
         setCpImageSrc(URL.createObjectURL(region.blob));
         setCpImgDims({ w: region.bbox.x1 - region.bbox.x0, h: region.bbox.y1 - region.bbox.y0 });
-        setOverlayProvenance({ source_doc_id: null, source_page: null, source_crop_bbox: region.bbox });
+        setOverlayProvenance({
+          source_doc_id: docProv?.source_doc_id ?? null,
+          source_page: docProv?.source_page ?? null,
+          source_crop_bbox: region.bbox,
+        });
         setEditingOverlayId(null);
         setOverlayInitial(undefined);
         setOverlayImageUrl(url);
@@ -2174,7 +2188,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         setUploadingPlan(false);
       }
     },
-    [startPlanUpload, showToast, resetExtractState]
+    [startPlanUpload, showToast, resetExtractState, extractDocProvenance]
   );
 
   // Drape a plan image produced by the Landscaper extract_plan_image tool
@@ -2224,18 +2238,61 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     [startPlanUpload, showToast]
   );
 
-  // Seam for the Landscaper action layer: it dispatches
-  //   window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay',
-  //                                        { detail: result.overlay }))
-  // with the extract_plan_image tool's `overlay` payload to drape it here.
+  // Open the trace canvas for a plan rendered server-side (chat-first mount):
+  // fetch the page → CORS-clean data URL → the SAME canvas the upload path uses.
+  const openExtractCanvasFromUrl = useCallback(
+    async (url: string, sourceDocId: number | null, sourcePage: number | null) => {
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`Could not load plan page (${resp.status})`);
+        const blob = await resp.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+          reader.onerror = () => reject(new Error('read failed'));
+          reader.readAsDataURL(blob);
+        });
+        if (!dataUrl) throw new Error('Empty image');
+        setExtractDocProvenance({ source_doc_id: sourceDocId, source_page: sourcePage });
+        setExtractCanvasSrc(dataUrl);
+      } catch (err) {
+        showToast(`Could not open plan canvas: ${err instanceof Error ? err.message : 'unknown error'}`);
+      }
+    },
+    [showToast]
+  );
+
+  // Cross-tree seam (same rationale as the command bus): CenterChatPanel dispatches
+  // a live CustomEvent AND latches the payload (planExtractBridge) so this works
+  // whether MapTab was already mounted (event) or mounts after navigation (latch).
+  // 'place_plan_overlay' → drape a server crop; 'extract_plan_canvas' → open the
+  // trace canvas. Both reuse the existing handlers — no duplicated logic.
   useEffect(() => {
-    const handler = (e: Event) => {
+    const onOverlay = (e: Event) => {
       const detail = (e as CustomEvent).detail;
+      takePendingPlanExtract(); // consumed live → clear the latch
       if (detail) applyExtractedPlanOverlay(detail);
     };
-    window.addEventListener('landscaper:place_plan_overlay', handler);
-    return () => window.removeEventListener('landscaper:place_plan_overlay', handler);
-  }, [applyExtractedPlanOverlay]);
+    const onCanvas = () => {
+      const p = takePendingPlanExtract();
+      if (p?.kind === 'canvas') {
+        openExtractCanvasFromUrl(p.payload.url, p.payload.sourceDocId ?? null, p.payload.sourcePage ?? null);
+      }
+    };
+    window.addEventListener('landscaper:place_plan_overlay', onOverlay);
+    window.addEventListener('landscaper:extract_plan_canvas', onCanvas);
+    // Drain anything latched before this map mounted (chat → map navigation).
+    const pending = takePendingPlanExtract();
+    if (pending?.kind === 'overlay') {
+      applyExtractedPlanOverlay(pending.payload);
+    } else if (pending?.kind === 'canvas') {
+      openExtractCanvasFromUrl(pending.payload.url, pending.payload.sourceDocId ?? null, pending.payload.sourcePage ?? null);
+    }
+    return () => {
+      window.removeEventListener('landscaper:place_plan_overlay', onOverlay);
+      window.removeEventListener('landscaper:extract_plan_canvas', onCanvas);
+    };
+  }, [applyExtractedPlanOverlay, openExtractCanvasFromUrl]);
 
   // Control-point image-side pick: click the extracted plan thumbnail → image pixel.
   const handleCpImageClick = useCallback(
