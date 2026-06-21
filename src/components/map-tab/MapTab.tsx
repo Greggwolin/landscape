@@ -2015,6 +2015,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // saved row.
   const [overlayImageUrl, setOverlayImageUrl] = useState<string | null>(null);
   const [editingOverlayId, setEditingOverlayId] = useState<number | null>(null);
+  // Source-document provenance for an extracted-plan overlay (Phase 1). Null
+  // for the manual-upload path; carried into createOverlay on Save.
+  const [overlayProvenance, setOverlayProvenance] = useState<{
+    source_doc_id?: number | null;
+    source_page?: number | null;
+    source_crop_bbox?: { x0: number; y0: number; x1: number; y1: number } | null;
+  } | null>(null);
   const [overlayInitial, setOverlayInitial] = useState<
     { corners?: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number; rotationDeg?: number } | undefined
   >(undefined);
@@ -2110,6 +2117,66 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     [startPlanUpload, showToast]
   );
 
+  // Drape a plan image produced by the Landscaper extract_plan_image tool
+  // (action "place_plan_overlay"). The PNG lives in Django default_storage; we
+  // re-upload it through the SAME UploadThing flow the manual path uses, then
+  // enter the overlay editor with provenance attached so Save persists which
+  // doc/page/region it came from. Anchor/fit reuses the existing editor.
+  const applyExtractedPlanOverlay = useCallback(
+    async (payload: {
+      source_uri: string;
+      source_doc_id?: number | null;
+      source_page?: number | null;
+      source_crop_bbox?: { x0: number; y0: number; x1: number; y1: number } | null;
+    }) => {
+      if (!payload?.source_uri) return;
+      setUploadingPlan(true);
+      setOverlaySaveError(null);
+      try {
+        const resp = await fetch(payload.source_uri);
+        if (!resp.ok) throw new Error(`Could not load extracted image (${resp.status})`);
+        const blob = await resp.blob();
+        const file = new File(
+          [blob],
+          `plan_extract_${payload.source_doc_id ?? 'doc'}_p${payload.source_page ?? 1}.png`,
+          { type: 'image/png' }
+        );
+        const res = await startPlanUpload([file]);
+        const first = res?.[0];
+        const serverData = (first as { serverData?: { storage_uri?: string } } | undefined)?.serverData;
+        const url = serverData?.storage_uri ?? (first as { url?: string } | undefined)?.url ?? '';
+        if (!url) throw new Error('Upload returned no URL');
+        setEditingOverlayId(null);
+        setOverlayInitial(undefined);
+        setOverlayProvenance({
+          source_doc_id: payload.source_doc_id ?? null,
+          source_page: payload.source_page ?? null,
+          source_crop_bbox: payload.source_crop_bbox ?? null,
+        });
+        setOverlayImageUrl(url);
+        showToast('Plan image added — drag the corners to fit, then Save');
+      } catch (err) {
+        showToast(`Plan extract failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+      } finally {
+        setUploadingPlan(false);
+      }
+    },
+    [startPlanUpload, showToast]
+  );
+
+  // Seam for the Landscaper action layer: it dispatches
+  //   window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay',
+  //                                        { detail: result.overlay }))
+  // with the extract_plan_image tool's `overlay` payload to drape it here.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) applyExtractedPlanOverlay(detail);
+    };
+    window.addEventListener('landscaper:place_plan_overlay', handler);
+    return () => window.removeEventListener('landscaper:place_plan_overlay', handler);
+  }, [applyExtractedPlanOverlay]);
+
   const handleOverlaySave = useCallback(async () => {
     if (!overlayImageUrl) return;
     setOverlaySaving(true);
@@ -2130,6 +2197,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           corners: state.corners,
           opacity: state.opacity,
           rotation_deg: state.rotationDeg,
+          // Provenance only present for extracted plans; spread-empty otherwise
+          // so manual overlays POST exactly as before.
+          ...(overlayProvenance ?? {}),
         });
         showToast('Overlay saved');
       }
@@ -2137,16 +2207,18 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       setOverlayImageUrl(null);
       setEditingOverlayId(null);
       setOverlayInitial(undefined);
+      setOverlayProvenance(null);
     } catch (err) {
       setOverlaySaveError(err instanceof Error ? err.message : 'Failed to save overlay');
     } finally {
       setOverlaySaving(false);
     }
-  }, [overlayImageUrl, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast]);
+  }, [overlayImageUrl, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast, overlayProvenance]);
 
   const handleOverlayCancel = useCallback(() => {
     setOverlayImageUrl(null);
     setEditingOverlayId(null);
+    setOverlayProvenance(null);
     setOverlayInitial(undefined);
     setOverlaySaveError(null);
   }, []);

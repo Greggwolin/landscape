@@ -26,7 +26,8 @@ from .serializers import ProjectOverlaySerializer
 
 _SELECT_COLS = (
     "overlay_id, project_id, title, source_uri, corners, "
-    "opacity, rotation_deg, created_at, updated_at"
+    "opacity, rotation_deg, created_at, updated_at, "
+    "source_doc_id, source_page, source_crop_bbox"
 )
 
 
@@ -38,6 +39,10 @@ def _row_to_overlay(row):
     corners = row[4]
     if isinstance(corners, str):
         corners = json.loads(corners)
+    # source_crop_bbox is JSONB too — same string/dict ambiguity. May be NULL.
+    crop_bbox = row[11]
+    if isinstance(crop_bbox, str):
+        crop_bbox = json.loads(crop_bbox)
     return {
         "overlay_id": row[0],
         "project_id": row[1],
@@ -48,6 +53,11 @@ def _row_to_overlay(row):
         "rotation_deg": float(row[6]) if row[6] is not None else None,
         "created_at": row[7].isoformat() if row[7] else None,
         "updated_at": row[8].isoformat() if row[8] else None,
+        # Source-document provenance (Phase 1: extract + place). NULL for
+        # manually-uploaded overlays.
+        "source_doc_id": row[9],
+        "source_page": row[10],
+        "source_crop_bbox": crop_bbox,
     }
 
 
@@ -74,8 +84,9 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         with connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO landscape.tbl_project_overlay "
-                "(project_id, title, source_uri, corners, opacity, rotation_deg) "
-                "VALUES (%s, %s, %s, %s::jsonb, %s, %s) "
+                "(project_id, title, source_uri, corners, opacity, rotation_deg, "
+                "source_doc_id, source_page, source_crop_bbox) "
+                "VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb) "
                 f"RETURNING {_SELECT_COLS}",
                 [
                     int(project_pk),
@@ -84,6 +95,10 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
                     json.dumps(data["corners"]),
                     data.get("opacity", 0.7),
                     data.get("rotation_deg", 0),
+                    data.get("source_doc_id"),
+                    data.get("source_page"),
+                    json.dumps(data["source_crop_bbox"])
+                    if data.get("source_crop_bbox") is not None else None,
                 ],
             )
             row = cursor.fetchone()
@@ -108,13 +123,20 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
 
         set_clauses = []
         params = []
-        for column in ("title", "source_uri", "opacity", "rotation_deg"):
+        for column in ("title", "source_uri", "opacity", "rotation_deg",
+                       "source_doc_id", "source_page"):
             if column in data:
                 set_clauses.append(f"{column} = %s")
                 params.append(data[column])
         if "corners" in data:
             set_clauses.append("corners = %s::jsonb")
             params.append(json.dumps(data["corners"]))
+        if "source_crop_bbox" in data:
+            set_clauses.append("source_crop_bbox = %s::jsonb")
+            params.append(
+                json.dumps(data["source_crop_bbox"])
+                if data["source_crop_bbox"] is not None else None
+            )
 
         if not set_clauses:
             return Response(

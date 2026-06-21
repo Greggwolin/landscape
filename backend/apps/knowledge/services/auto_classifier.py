@@ -71,7 +71,12 @@ def extract_text_from_bytes(
             tmp_path = tmp.name
 
         if mime_type == 'application/pdf' or ext == '.pdf':
-            return _extract_pdf(tmp_path), None
+            text = _extract_pdf(tmp_path)
+            if text:
+                return text, None
+            # No native text layer — likely a scanned / image-only PDF. Route to
+            # the OCR seam, which never returns a silent empty result.
+            return _extract_pdf_with_ocr(tmp_path)
         elif ext == '.docx' or 'wordprocessingml' in mime_type:
             return _extract_docx(tmp_path), None
         elif ext == '.xlsx' or 'spreadsheetml' in mime_type:
@@ -98,6 +103,54 @@ def _extract_pdf(path: str) -> Optional[str]:
         for page in doc:
             parts.append(page.get_text())
     return "\n\n".join(parts).strip() or None
+
+
+def _extract_pdf_with_ocr(path: str) -> Tuple[Optional[str], Optional[str]]:
+    """OCR fallback seam for scanned / image-only PDFs (Phase 1: plan extraction).
+
+    Reached only when a PDF has no native text layer. It NEVER returns a silent
+    empty result: when OCR is not enabled / not provisioned it returns an
+    explicit error so the caller surfaces the scanned-PDF problem to the user
+    instead of an empty placeholder (see PROJECT PDF/OCR protocol).
+
+    When ``ENABLE_OCR`` is set and OCRmyPDF + its system binaries (Tesseract,
+    Ghostscript) are installed, it adds a text layer with OCRmyPDF and re-runs
+    the PyMuPDF text extraction.
+
+    Returns ``(text, error_message)``.
+    """
+    from django.conf import settings
+
+    if not getattr(settings, 'ENABLE_OCR', False):
+        return None, (
+            "Scanned or image-only PDF: no embedded text layer. OCR is required "
+            "but not enabled on this server (set ENABLE_OCR and provision "
+            "OCRmyPDF + Tesseract/Ghostscript). Surface this to the user rather "
+            "than treating the document as empty."
+        )
+
+    try:
+        import ocrmypdf  # noqa: F401
+    except ImportError:
+        return None, (
+            "Scanned PDF: OCR is enabled but OCRmyPDF is not installed on this "
+            "host (pip install ocrmypdf; requires tesseract + ghostscript)."
+        )
+
+    ocr_out = f"{path}.ocr.pdf"
+    try:
+        ocrmypdf.ocr(path, ocr_out, force_ocr=True, progress_bar=False)
+        text = _extract_pdf(ocr_out)
+        if text:
+            return text, None
+        return None, "OCR completed but no text could be recovered from the document."
+    except Exception as e:
+        return None, f"OCR failed: {e}"
+    finally:
+        try:
+            os.unlink(ocr_out)
+        except Exception:
+            pass
 
 
 def _extract_docx(path: str) -> Optional[str]:

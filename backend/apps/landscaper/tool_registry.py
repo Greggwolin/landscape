@@ -95,6 +95,8 @@ UNIVERSAL_TOOLS = [
     "compute_trust_score",
     # Map artifacts
     "generate_map_artifact",
+    # Plan image extraction (renders a plan/plat page -> transparent PNG for the overlay flow)
+    "extract_plan_image",
     # Location Brief artifact (universal, works pre-project)
     "generate_location_brief",
     # Geocoding (FB-317) — universal, address → coordinates

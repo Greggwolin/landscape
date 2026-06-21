@@ -4794,6 +4794,34 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "extract_plan_image",
+        "description": "Render a page (or a cropped region of a page) from an uploaded plan / plat / site-plan PDF into a transparent-background PNG, then hand it to the site-plan overlay (drape) flow so the user can place it on the map. STRICT TRIGGER: Fire ONLY when the user EXPLICITLY asks to extract / pull out / clip / crop / grab the site plan (or plat / exhibit) as an image for the map. DO NOT fire on general document questions, on 'open/show me the plan' (that is a document view, not an extraction), or as supplementary work tacked onto another tool's call. TWO-STEP, NEVER SILENT: first call with doc_id ALONE to render a preview + a proposed crop for the user to confirm; only after the user confirms a page and crop_bbox do you call again with both to produce the final cropped image. This tool never places the overlay itself — the user positions and saves it in the existing overlay editor. If you downloaded a plat during research, still surface the preview for confirmation; never auto-place.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer",
+                    "description": "The uploaded plan/plat/site-plan document to extract from. Required.",
+                },
+                "page": {
+                    "type": "integer",
+                    "description": "1-indexed page to render. Omit for a preview of the first page plus a proposed crop.",
+                },
+                "crop_bbox": {
+                    "type": "object",
+                    "description": "Crop rectangle in PDF page points {x0,y0,x1,y1}. Supply together with page to produce the final cropped image; omit for a preview.",
+                    "properties": {
+                        "x0": {"type": "number"},
+                        "y0": {"type": "number"},
+                        "x1": {"type": "number"},
+                        "y1": {"type": "number"},
+                    },
+                },
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
         "name": "generate_location_brief",
         "description": "Generate a property-type-aware economic location brief for any US city. Pulls FRED + Census ACS 5-Year data and narrates with Anthropic. Renders as an artifact in the right-side panel. STRICT TRIGGER: Fire ONLY when the user EXPLICITLY names an artifact-type output noun — 'brief', 'report', 'overview', 'profile', 'snapshot', or 'summary'. DO NOT fire on open-ended market questions (e.g., 'how's the market', 'what's going on', 'tell me about'), on context statements (e.g., 'I'm evaluating a deal', 'looking at office in...'), or on topic-specific questions (cap rates, comps, zoning, vacancy, brokers). For those non-trigger cases, follow the LOCATION BRIEF rules in your system prompt: OFFER the brief for soft asks, ask a focused follow-up for context-only statements, and never tack a brief onto another tool's call as 'supplementary research'. Depth: 'condensed' for a quick read, 'standard' (default) for most cases, 'comprehensive' only on explicit request for full T1/T2/T3 × 6 section analysis.",
         "input_schema": {

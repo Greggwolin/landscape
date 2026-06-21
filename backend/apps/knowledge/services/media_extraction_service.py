@@ -515,19 +515,13 @@ class MediaExtractionService:
     def _render_page_capture(self, doc: fitz.Document, page_num: int,
                               project_id: int, doc_id: int,
                               media_id: int, seen_hashes: set[str] = None,
-                              dpi: int = None) -> dict:
-        """Render an entire PDF page as a high-res PNG image."""
+                              dpi: int = None, clip=None) -> dict:
+        """Render an entire PDF page (or a clipped region) as a high-res PNG."""
         dpi = dpi or self.PAGE_CAPTURE_DPI
-        page = doc[page_num - 1]  # Convert 1-indexed to 0-indexed
 
-        zoom = dpi / 72.0
-        mat = fitz.Matrix(zoom, zoom)
-        pix = page.get_pixmap(matrix=mat)
-
-        # Convert to PNG bytes
-        image_bytes = pix.tobytes('png')
-        width = pix.width
-        height = pix.height
+        # Render via the shared pure helper. clip=None + alpha=False reproduces
+        # the prior full-page opaque behavior exactly (existing callers unchanged).
+        image_bytes, width, height = self._render_page_png(doc, page_num, clip=clip, dpi=dpi)
 
         # Compute SHA-256 hash for deduplication
         image_hash = hashlib.sha256(image_bytes).hexdigest()
@@ -585,6 +579,158 @@ class MediaExtractionService:
             'mime_type': 'image/png',
             'dpi': dpi,
         }
+
+    # ------------------------------------------------------------------ #
+    #  INTERNAL: _render_page_png  (pure render step — no DB, no storage)
+    # ------------------------------------------------------------------ #
+    def _render_page_png(self, doc: fitz.Document, page_num: int,
+                         clip=None, dpi: int = None, alpha: bool = False):
+        """Render one PDF page (or a clipped region) to PNG bytes.
+
+        ``page_num`` is 1-indexed. ``clip`` is an optional ``fitz.Rect`` (or a
+        4-tuple/list of PDF page points) to crop to. ``alpha=True`` yields an
+        RGBA PNG (transparency-capable) for plan crops; the default
+        (clip=None, alpha=False) reproduces the prior opaque full-page render
+        byte-for-byte. Returns ``(png_bytes, width_px, height_px)``.
+        """
+        dpi = dpi or self.PAGE_CAPTURE_DPI
+        page = doc[page_num - 1]  # 1-indexed -> 0-indexed
+        zoom = dpi / 72.0
+        mat = fitz.Matrix(zoom, zoom)
+        kwargs = {'matrix': mat, 'alpha': alpha}
+        if clip is not None:
+            kwargs['clip'] = clip if isinstance(clip, fitz.Rect) else fitz.Rect(*clip)
+        pix = page.get_pixmap(**kwargs)
+        return pix.tobytes('png'), pix.width, pix.height
+
+    # ------------------------------------------------------------------ #
+    #  PUBLIC: render_plan_crop  (Phase 1: extract + place)
+    # ------------------------------------------------------------------ #
+    def render_plan_crop(self, doc_id: int, page: int = None,
+                         crop_bbox=None, dpi: int = None) -> dict:
+        """Render a plan/plat document page (or a cropped region) to a PNG.
+
+        Two modes, mirroring the Landscaper extract_plan_image tool:
+
+        * **Preview** (``page`` omitted): render the first page full, save it,
+          and return a proposed crop (the full page rect) for the user to
+          confirm. Nothing is committed beyond the preview render.
+        * **Produce** (``page`` + ``crop_bbox`` supplied): render that page
+          clipped to ``crop_bbox`` as a transparency-capable RGBA PNG.
+
+        ``crop_bbox`` is ``{x0, y0, x1, y1}`` (or a 4-list) in PDF page points.
+        The PNG is saved to Django ``default_storage`` (the same backend used
+        for all other rendered media); the caller's frontend re-uploads it to
+        UploadThing via the existing overlay flow. Returns a dict with
+        ``url``, ``doc_id``, ``page``, ``crop_bbox`` and render dimensions.
+        """
+        meta = self._get_doc_meta(doc_id)
+        if not meta:
+            return {'success': False, 'error': f'Document {doc_id} not found'}
+
+        mime = (meta.get('mime_type') or '').lower()
+        storage_uri = meta.get('storage_uri')
+        name = (meta.get('doc_name') or '').lower()
+        if 'pdf' not in mime and not name.endswith('.pdf'):
+            return {
+                'success': False,
+                'error': f'Document {doc_id} is not a PDF (mime={mime or "unknown"})',
+            }
+        if not storage_uri:
+            return {'success': False, 'error': f'Document {doc_id} has no stored file'}
+
+        project_id = meta.get('project_id')
+        tmp_path = self._download_to_temp(storage_uri)
+        if not tmp_path:
+            return {'success': False, 'error': 'Could not download source document'}
+
+        doc = None
+        try:
+            doc = fitz.open(tmp_path)
+            page_count = doc.page_count
+            if page_count == 0:
+                return {'success': False, 'error': 'Document has no pages'}
+
+            preview = page is None
+            page_num = 1 if preview else int(page)
+            if page_num < 1 or page_num > page_count:
+                return {
+                    'success': False,
+                    'error': f'Page {page_num} out of range (1..{page_count})',
+                }
+
+            page_rect = doc[page_num - 1].rect
+            if preview:
+                # Full-page preview + a proposed crop (the whole page) to confirm.
+                png_bytes, w, h = self._render_page_png(doc, page_num, dpi=dpi)
+                key = f"plan_extracts/{project_id}/{doc_id}/preview_page_{page_num}.png"
+                saved = self._save_media_file(png_bytes, key)
+                return {
+                    'success': True,
+                    'mode': 'preview',
+                    'committed': False,
+                    'url': self._get_public_url(saved),
+                    'doc_id': doc_id,
+                    'page': page_num,
+                    'page_count': page_count,
+                    'page_width_pts': round(page_rect.width, 2),
+                    'page_height_pts': round(page_rect.height, 2),
+                    'proposed_crop_bbox': {
+                        'x0': 0.0, 'y0': 0.0,
+                        'x1': round(page_rect.width, 2),
+                        'y1': round(page_rect.height, 2),
+                    },
+                    'width_px': w,
+                    'height_px': h,
+                }
+
+            # Produce mode: a crop_bbox is required to clip to.
+            if not crop_bbox:
+                return {
+                    'success': False,
+                    'error': 'crop_bbox is required to produce a cropped plan image',
+                }
+            if isinstance(crop_bbox, dict):
+                rect = fitz.Rect(
+                    crop_bbox['x0'], crop_bbox['y0'],
+                    crop_bbox['x1'], crop_bbox['y1'],
+                )
+            else:
+                rect = fitz.Rect(*crop_bbox)
+            rect = rect & page_rect  # clamp to page bounds
+            if rect.is_empty:
+                return {'success': False, 'error': 'crop_bbox does not overlap the page'}
+
+            png_bytes, w, h = self._render_page_png(
+                doc, page_num, clip=rect, dpi=dpi, alpha=True
+            )
+            key = f"plan_extracts/{project_id}/{doc_id}/page_{page_num}_crop.png"
+            saved = self._save_media_file(png_bytes, key)
+            return {
+                'success': True,
+                'mode': 'image',
+                'committed': False,
+                'url': self._get_public_url(saved),
+                'doc_id': doc_id,
+                'page': page_num,
+                'crop_bbox': {
+                    'x0': round(rect.x0, 2), 'y0': round(rect.y0, 2),
+                    'x1': round(rect.x1, 2), 'y1': round(rect.y1, 2),
+                },
+                'width_px': w,
+                'height_px': h,
+                'mime_type': 'image/png',
+            }
+        except Exception as e:
+            logger.exception(f"[doc_id={doc_id}] render_plan_crop failed")
+            return {'success': False, 'error': str(e)}
+        finally:
+            if doc is not None:
+                doc.close()
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------ #
     #  INTERNAL: _generate_thumbnail
