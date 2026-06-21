@@ -44,6 +44,13 @@ export interface OverlayCropBbox {
   y1: number;
 }
 
+/** A control point used to georeference a drape (D16): image pixel ↔ map lng/lat. */
+export interface OverlayControlPoint {
+  img: { x: number; y: number };
+  map: [number, number];
+  snapped?: boolean;
+}
+
 export interface SitePlanOverlayRecord {
   overlay_id: number;
   project_id: number;
@@ -58,6 +65,7 @@ export interface SitePlanOverlayRecord {
   source_doc_id?: number | null;
   source_page?: number | null;
   source_crop_bbox?: OverlayCropBbox | null;
+  control_points?: OverlayControlPoint[] | null;
 }
 
 export interface SitePlanOverlayInput {
@@ -71,6 +79,7 @@ export interface SitePlanOverlayInput {
   source_doc_id?: number | null;
   source_page?: number | null;
   source_crop_bbox?: OverlayCropBbox | null;
+  control_points?: OverlayControlPoint[] | null;
 }
 
 export function useSitePlanOverlays(projectId: number | undefined) {

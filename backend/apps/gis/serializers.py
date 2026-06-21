@@ -41,6 +41,10 @@ class ProjectOverlaySerializer(serializers.Serializer):
     source_page = serializers.IntegerField(required=False, allow_null=True, min_value=1)
     source_crop_bbox = serializers.JSONField(required=False, allow_null=True)
 
+    # Control-point georeferencing inputs (D16). Optional — manual 4-corner
+    # drapes carry none, so this stays OUT of the required set.
+    control_points = serializers.JSONField(required=False, allow_null=True)
+
     def validate_corners(self, value):
         if not isinstance(value, list) or len(value) != 4:
             raise serializers.ValidationError(
