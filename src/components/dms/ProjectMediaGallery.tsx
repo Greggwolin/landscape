@@ -257,7 +257,7 @@ export default function ProjectMediaGallery({
  const fallbackDetected = Number(doc.media_scan_json?.total_detected ?? 0) || 0;
  const fallbackExtracted = Number(doc.media_scan_json?.total_extracted ?? 0) || 0;
  try {
- const res = await fetch(`${djangoBaseUrl}/api/dms/documents/${docId}/media/`);
+ const res = await fetch(`${djangoBaseUrl}/api/dms/documents/${docId}/media/`, { headers: getAuthHeaders() });
  if (!res.ok) {
  return [
  docId,
@@ -320,7 +320,8 @@ export default function ProjectMediaGallery({
  for (const docId of scannedDocIds) {
  try {
  const res = await fetch(
- `${djangoBaseUrl}/api/dms/documents/${docId}/media/`
+ `${djangoBaseUrl}/api/dms/documents/${docId}/media/`,
+ { headers: getAuthHeaders() }
  );
  if (!res.ok) continue;
  const data: DocMediaResponse = await res.json();
@@ -466,7 +467,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/scan/`,
  {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ mode: 'full' }),
  signal,
  }
@@ -478,7 +479,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/extract/`,
  {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ extract_all: true }),
  signal,
  }
@@ -499,7 +500,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/classify/`,
  {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ strategy: 'auto' }),
  signal: classifyController.signal,
  }
@@ -510,7 +511,7 @@ export default function ProjectMediaGallery({
  setScanProgress(`Saving ${i + 1} of ${docs.length}: ${name}`);
  const mediaListRes = await fetch(
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/`,
- { signal }
+ { signal, headers: getAuthHeaders() }
  );
  if (mediaListRes.ok) {
  const mediaList: DocMediaResponse = await mediaListRes.json();
@@ -523,7 +524,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/actions/`,
  {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ actions }),
  signal,
  }
@@ -562,7 +563,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/reset/`,
  {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ skip_deleted: true }),
  }
  );
@@ -630,7 +631,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/documents/${docId}/media/reset/`,
  {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ skip_deleted: skipDeleted }),
  }
  );
@@ -672,7 +673,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/media/${mediaId}/reclassify/`,
  {
  method: 'PATCH',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({ classification_id: classificationId }),
  }
  );
@@ -719,7 +720,7 @@ export default function ProjectMediaGallery({
  `${djangoBaseUrl}/api/dms/media/${mediaId}/discard/`,
  {
  method: 'PATCH',
- headers: { 'Content-Type': 'application/json' },
+ headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
  body: JSON.stringify({
  reason_code: reasonCode,
  reason_text: customReason,
