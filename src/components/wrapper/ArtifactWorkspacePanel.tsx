@@ -593,22 +593,22 @@ export function ArtifactWorkspacePanel({
         )}
       </div>
 
-      {/* ── Source Pointers ── (suppressed in takeover mode). */}
-      {!takeoverMode && (
+      {/* ── Source Pointers ── footer under the OPEN artifact. Shows whenever an
+          artifact is loaded (incl. takeover mode) so its data sources + drift
+          status are visible while viewing it. Collapsed by default. Previously
+          this lived only in the non-takeover rail, where it was unreachable
+          because opening an artifact (which it needs) also hid the section. */}
+      {active != null && (
         <div className="w-rail-card">
           <CollapsibleSection
             title="Source Pointers"
             icon={<Database size={15} />}
-            count={countSourcePointers(active?.source_pointers_json)}
+            count={countSourcePointers(active.source_pointers_json)}
             collapsed={pointersCollapsed}
             onToggle={() => setPointersCollapsed((v) => !v)}
             compact
           >
-            {!active ? (
-              <EmptyRow text="Select an artifact to see its source pointers." />
-            ) : (
-              renderSourcePointers(active.source_pointers_json)
-            )}
+            {renderSourcePointers(active.source_pointers_json)}
           </CollapsibleSection>
         </div>
       )}
