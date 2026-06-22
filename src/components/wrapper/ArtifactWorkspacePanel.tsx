@@ -954,22 +954,12 @@ interface EmptyActiveStateProps {
   hasArtifacts: boolean;
 }
 
-function EmptyActiveState({ hasArtifacts }: EmptyActiveStateProps) {
-  // FB-325: drop the "No artifact selected" block — when artifacts exist it
-  // wrongly implies there are none. Show nothing when artifacts are present;
-  // a soft hint (no "none selected" framing) only when there genuinely are none.
-  if (hasArtifacts) return null;
-  return (
-    <div style={emptyStateStyle}>
-      <div style={{ maxWidth: 320, lineHeight: 1.5 }}>
-        <FileText size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
-        <div>
-          Ask Landscaper to <em>show</em> or <em>summarize</em> something — operating
-          statement, rent roll, comp comparison — and it will appear here.
-        </div>
-      </div>
-    </div>
-  );
+function EmptyActiveState(_props: EmptyActiveStateProps) {
+  // LSCMD-ARTIFACT-EMPTYSTATE-0619: mirror the claude.ai pattern — when no
+  // artifact is open, the right panel stays blank rather than showing the
+  // "Ask Landscaper to show or summarize…" prompt box. Supersedes FB-325,
+  // which only suppressed the hint when artifacts already existed.
+  return null;
 }
 
 /**
