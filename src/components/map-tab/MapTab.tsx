@@ -31,6 +31,7 @@ import type {
   MapFeature,
   MapViewState,
   FeatureCategory,
+  SitePlanLegendItem,
 } from './types';
 import { MapCanvas, MARICOPA_PARCEL_OUTLINE_LAYER_ID } from './MapCanvas';
 import type { MapCanvasRef } from './MapCanvas';
@@ -307,6 +308,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // FB-323: competitor whose in-map detail drawer is open (null = closed).
   const [selectedCompetitor, setSelectedCompetitor] = useState<MarketCompetitiveProject | null>(null);
   const [featureSaving, setFeatureSaving] = useState(false);
+  // Click-to-edit a saved drawn shape (B): the selected feature opens in the
+  // FeatureModal in edit mode. Distinct from `pendingFeature` (a fresh draw).
+  const [editingFeature, setEditingFeature] = useState<MapFeature | null>(null);
+  const [featureDeleting, setFeatureDeleting] = useState(false);
+  // Per-overlay legend visibility (A). Overlay ids present here are HIDDEN;
+  // absence = visible (default). Site-plan records have no persisted visible flag.
+  const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<number>>(() => new Set());
 
   // ───── GIS Data State ─────
   const [planParcels, setPlanParcels] = useState<FeatureCollection | null>(null);
@@ -924,6 +932,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     features: savedFeatures,
     fetchFeatures,
     saveFeature,
+    updateFeature,
+    deleteFeature,
   } = useMapFeatures(projectId);
 
   // Fetch features on mount
@@ -1369,6 +1379,52 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   }, [clearCurrentFeature]);
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Callbacks: Feature edit/delete (click a saved drawn shape → edit it)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleFeatureEditSave = useCallback(
+    async (data: { label: string; category: FeatureCategory; notes: string; color?: string }) => {
+      if (!editingFeature) return;
+      setFeatureSaving(true);
+      try {
+        await updateFeature(editingFeature.id, {
+          label: data.label,
+          category: data.category,
+          notes: data.notes,
+          style: { ...editingFeature.style, ...(data.color ? { color: data.color } : {}) },
+        });
+        showToast(`Feature "${data.label}" updated`);
+        setEditingFeature(null);
+        setSelectedFeatureId(null);
+      } catch (err) {
+        showToast(`Error updating feature: ${err instanceof Error ? err.message : 'unknown'}`);
+      } finally {
+        setFeatureSaving(false);
+      }
+    },
+    [editingFeature, updateFeature, showToast]
+  );
+
+  const handleFeatureDelete = useCallback(async () => {
+    if (!editingFeature) return;
+    setFeatureDeleting(true);
+    try {
+      await deleteFeature(editingFeature.id);
+      showToast('Feature deleted');
+      setEditingFeature(null);
+      setSelectedFeatureId(null);
+    } catch (err) {
+      showToast(`Error deleting feature: ${err instanceof Error ? err.message : 'unknown'}`);
+    } finally {
+      setFeatureDeleting(false);
+    }
+  }, [editingFeature, deleteFeature, showToast]);
+
+  const handleFeatureEditClose = useCallback(() => {
+    setEditingFeature(null);
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: MapCanvas
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1388,6 +1444,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   const handleFeatureClick = useCallback((feature: MapFeature) => {
     setSelectedFeatureId(feature.id);
+    // Open the clicked drawn shape for editing (B).
+    setEditingFeature(feature);
   }, []);
 
   const handleTaxParcelToggle = useCallback((feature: Feature) => {
@@ -2471,6 +2529,35 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     [deleteOverlay, editingOverlayId, handleOverlayCancel, showToast]
   );
 
+  // Site plans surfaced in the legend (A) — title + per-plan visibility + edit state.
+  const sitePlansForLegend = useMemo<SitePlanLegendItem[]>(
+    () =>
+      savedOverlays.map((ov) => ({
+        overlay_id: ov.overlay_id,
+        title: ov.title || `Overlay ${ov.overlay_id}`,
+        visible: !hiddenOverlayIds.has(ov.overlay_id),
+        editing: editingOverlayId === ov.overlay_id,
+      })),
+    [savedOverlays, hiddenOverlayIds, editingOverlayId]
+  );
+
+  const handleToggleSitePlanVisibility = useCallback((overlayId: number) => {
+    setHiddenOverlayIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(overlayId)) next.delete(overlayId);
+      else next.add(overlayId);
+      return next;
+    });
+  }, []);
+
+  const handleEditSitePlan = useCallback(
+    (overlayId: number) => {
+      const ov = savedOverlays.find((o) => o.overlay_id === overlayId);
+      if (ov) handleEditOverlay(ov);
+    },
+    [savedOverlays, handleEditOverlay]
+  );
+
   // Read-only drapes for every saved overlay NOT currently being edited.
   const savedDrapeHandlesRef = useRef<Map<number, OverlayHandle>>(new Map());
   useEffect(() => {
@@ -2481,6 +2568,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
     for (const ov of savedOverlays) {
       if (editingOverlayId === ov.overlay_id) continue; // editor owns it (with handles)
+      if (hiddenOverlayIds.has(ov.overlay_id)) continue; // hidden via legend toggle (A)
       wanted.add(ov.overlay_id);
       const existing = handles.get(ov.overlay_id);
       if (existing) {
@@ -2508,7 +2596,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         handles.delete(id);
       }
     }
-  }, [savedOverlays, editingOverlayId, mapIsLoaded, overlayBeneathLayerId]);
+  }, [savedOverlays, editingOverlayId, mapIsLoaded, overlayBeneathLayerId, hiddenOverlayIds]);
 
   // Tear down all read-only drapes on unmount.
   useEffect(() => {
@@ -2561,6 +2649,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onToggleLayer={handleToggleLayer}
           onToggleGroup={handleToggleGroup}
           onZoomToLayer={handleZoomToLayer}
+          sitePlans={sitePlansForLegend}
+          onToggleSitePlan={handleToggleSitePlanVisibility}
+          onEditSitePlan={handleEditSitePlan}
+          onRemoveSitePlan={handleDeleteOverlay}
         />
         {isPhoenixMSA && (
         <div className="map-tab-parcel-panel">
@@ -3191,6 +3283,31 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onClose={handleFeatureModalClose}
           onSave={handleFeatureModalSave}
           isSaving={featureSaving}
+        />
+      )}
+
+      {/* ─── Feature Edit Modal (click a saved drawn shape → edit/delete) ─── */}
+      {editingFeature && (
+        <FeatureModal
+          isOpen={Boolean(editingFeature)}
+          featureType={editingFeature.feature_type}
+          coordinates={
+            ('coordinates' in editingFeature.geometry
+              ? editingFeature.geometry.coordinates
+              : null) as GeoJSON.Position | GeoJSON.Position[] | GeoJSON.Position[][] | null
+          }
+          measurements={{
+            length_ft: editingFeature.length_ft ?? undefined,
+            area_sqft: editingFeature.area_sqft ?? undefined,
+            area_acres: editingFeature.area_acres ?? undefined,
+            perimeter_ft: editingFeature.perimeter_ft ?? undefined,
+          }}
+          feature={editingFeature}
+          onClose={handleFeatureEditClose}
+          onSave={handleFeatureEditSave}
+          onDelete={handleFeatureDelete}
+          isSaving={featureSaving}
+          isDeleting={featureDeleting}
         />
       )}
 

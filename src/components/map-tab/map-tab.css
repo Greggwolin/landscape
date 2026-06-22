@@ -110,6 +110,33 @@
   padding: 4px 16px 4px 8px;
 }
 
+/* Site Plans legend rows — per-plan Edit / Remove actions */
+.layer-item-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  padding-left: 22px;
+}
+
+.layer-item-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--cui-primary, #5c6bc0);
+}
+
+.layer-item-action:hover {
+  text-decoration: underline;
+}
+
+.layer-item-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
 .layer-item-label {
   display: flex;
   align-items: center;

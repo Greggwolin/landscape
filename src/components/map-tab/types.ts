@@ -170,11 +170,25 @@ export interface MapCanvasProps {
   onCompetitorClick?: (competitorFeatureId: string) => void;
 }
 
+/** A saved site-plan overlay as shown in the legend's "Site Plans" section. */
+export interface SitePlanLegendItem {
+  overlay_id: number;
+  title: string;
+  visible: boolean;
+  /** True while this overlay is open in the overlay editor (Edit disabled). */
+  editing?: boolean;
+}
+
 export interface LayerPanelProps {
   layers: LayerState;
   onToggleLayer: (groupId: LayerGroupId, layerId: string) => void;
   onToggleGroup: (groupId: LayerGroupId) => void;
   onZoomToLayer: (groupId: LayerGroupId, layerId: string) => void;
+  /** Saved site plans surfaced in the legend (optional — omit to hide section). */
+  sitePlans?: SitePlanLegendItem[];
+  onToggleSitePlan?: (overlayId: number) => void;
+  onEditSitePlan?: (overlayId: number) => void;
+  onRemoveSitePlan?: (overlayId: number) => void;
 }
 
 export interface DrawToolbarProps {
