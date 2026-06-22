@@ -55,6 +55,8 @@ interface FeatureModalProps {
   /** Edit mode only — removes the feature. Presence renders the Delete button. */
   onDelete?: () => void;
   isDeleting?: boolean;
+  /** Edit mode (line/polygon) — enter vertex-reshape mode. Renders "Reshape". */
+  onReshape?: () => void;
 }
 
 // Normalize feature type to GeoJSON geometry type
@@ -97,6 +99,7 @@ export function FeatureModal({
   feature = null,
   onDelete,
   isDeleting = false,
+  onReshape,
 }: FeatureModalProps) {
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState<FeatureCategory>('annotation');
@@ -334,6 +337,19 @@ export function FeatureModal({
           <div className="feature-modal-coords">
             <span>{formatCoordinates()}</span>
           </div>
+
+          {/* Reshape — vertex editing (lines/polygons only) */}
+          {isEditMode && onReshape && normalizedType !== 'Point' && (
+            <button
+              type="button"
+              className="btn-cancel"
+              style={{ width: '100%', marginBottom: 8 }}
+              onClick={onReshape}
+              disabled={busy}
+            >
+              Reshape vertices
+            </button>
+          )}
 
           <div className="feature-modal-actions">
             {isEditMode && onDelete && (

@@ -451,6 +451,23 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
     drawRef.current.set(features);
   }, []);
 
+  // Load ONE saved feature into the draw control and enter direct_select so its
+  // vertices can be dragged / added (edge midpoints) / removed. draw.update
+  // fires with the new geometry (→ onFeatureUpdated). Points have no vertices,
+  // so callers should only invoke this for lines/polygons.
+  const editFeatureGeometry = useCallback((feature: GeoJSON.Feature) => {
+    if (!drawRef.current) return;
+    measureModeRef.current = false;
+    try { drawRef.current.deleteAll(); } catch { /* ignore */ }
+    const ids = drawRef.current.add(feature) as string[];
+    const id = ids?.[0];
+    if (!id) return;
+    drawRef.current.changeMode('direct_select', { featureId: id });
+    setActiveMode('direct_select');
+    setIsDrawing(false);
+    setCurrentFeature(null);
+  }, []);
+
   const getSelectedIds = useCallback((): string[] => {
     if (!drawRef.current) return [];
     return drawRef.current.getSelectedIds() as string[];
@@ -472,6 +489,7 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
     getFeatureGeoJSON,
     clearCurrentFeature,
     loadFeatures,
+    editFeatureGeometry,
     getSelectedIds,
   };
 }

@@ -63,6 +63,9 @@ interface SaveFeatureParams {
   area_acres?: number;
   perimeter_ft?: number;
   length_ft?: number;
+  /** Reshape (vertex edit) sends the new geometry through updateFeature.
+   *  saveFeature ignores this (it takes geometry as a separate arg). */
+  geometry?: GeoJSON.Geometry;
 }
 
 export function useMapFeatures(projectId: number | undefined) {
