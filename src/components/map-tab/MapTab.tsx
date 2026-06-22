@@ -2277,7 +2277,12 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const openExtractCanvasFromUrl = useCallback(
     async (url: string, sourceDocId: number | null, sourcePage: number | null) => {
       try {
-        const resp = await fetch(url);
+        // Extracted media lives on a public R2 bucket (*.r2.dev). A direct cross-origin fetch of it
+        // is CORS-blocked ("failed to fetch"); route those through the same-origin proxy so the
+        // canvas can read the bytes. Same-origin / Django URLs fetch directly.
+        const isR2 = /^https:\/\/[^/]*\.r2\.dev\//i.test(url);
+        const fetchUrl = isR2 ? `/api/media/proxy?url=${encodeURIComponent(url)}` : url;
+        const resp = await fetch(fetchUrl);
         if (!resp.ok) throw new Error(`Could not load plan page (${resp.status})`);
         const blob = await resp.blob();
         const dataUrl = await new Promise<string>((resolve, reject) => {
