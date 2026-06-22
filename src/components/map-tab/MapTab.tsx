@@ -312,6 +312,12 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // FeatureModal in edit mode. Distinct from `pendingFeature` (a fresh draw).
   const [editingFeature, setEditingFeature] = useState<MapFeature | null>(null);
   const [featureDeleting, setFeatureDeleting] = useState(false);
+  // Vertex-reshape (direct_select) of a saved shape. While set, that feature is
+  // hidden from the read-only canvas layer (its editable draw copy is shown
+  // instead) and draw.update persists its geometry. Ref mirrors state so the
+  // draw callback (created before this point) can read it without a stale closure.
+  const [reshapingFeatureId, setReshapingFeatureId] = useState<string | null>(null);
+  const reshapingFeatureIdRef = useRef<string | null>(null);
   // Per-overlay legend visibility (A). Overlay ids present here are HIDDEN;
   // absence = visible (default). Site-plan records have no persisted visible flag.
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<number>>(() => new Set());
@@ -943,7 +949,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   // Convert saved features to MapFeature[] for MapCanvas
   const mapFeatures = useMemo<MapFeature[]>(() => {
-    return savedFeatures.map((f) => ({
+    return savedFeatures
+      .filter((f) => f.id !== reshapingFeatureId)
+      .map((f) => ({
       id: f.id,
       project_id: f.project_id,
       feature_type: f.feature_type as MapFeature['feature_type'],
@@ -962,7 +970,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       created_at: f.created_at,
       updated_at: f.updated_at,
     }));
-  }, [savedFeatures]);
+  }, [savedFeatures, reshapingFeatureId]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Hooks: useMapDraw (MapboxDraw integration)
@@ -986,6 +994,26 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     setFeatureModalOpen(true);
   }, []);
 
+  // Persist a reshaped saved shape: draw.update fires (with recomputed area)
+  // while in direct_select; only persist for the feature we put into reshape.
+  const handleFeatureGeometryUpdated = useCallback(
+    async (df: DrawnFeature) => {
+      if (!reshapingFeatureIdRef.current || df.id !== reshapingFeatureIdRef.current) return;
+      try {
+        await updateFeature(df.id, {
+          geometry: { type: df.type, coordinates: df.coordinates } as GeoJSON.Geometry,
+          area_sqft: df.properties.area_sqft,
+          area_acres: df.properties.area_acres,
+          perimeter_ft: df.properties.perimeter_ft,
+          length_ft: df.properties.length_ft,
+        });
+      } catch (err) {
+        showToast(`Error saving shape: ${err instanceof Error ? err.message : 'unknown'}`);
+      }
+    },
+    [updateFeature, showToast]
+  );
+
   const {
     initializeDraw,
     liveMeasurement,
@@ -998,8 +1026,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     deleteSelected,
     cancelDraw,
     clearCurrentFeature,
+    editFeatureGeometry,
   } = useMapDraw(mapInstance, {
     onFeatureCreated: handleFeatureCreated,
+    onFeatureUpdated: handleFeatureGeometryUpdated,
     // Measure mode is ephemeral; once a measurement finishes, drop the tool
     // back to neutral so the toolbar button doesn't look stuck "active".
     onMeasureComplete: () => setActiveTool(null),
@@ -1423,6 +1453,32 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const handleFeatureEditClose = useCallback(() => {
     setEditingFeature(null);
   }, []);
+
+  // Enter vertex-reshape from the edit modal: hide the read-only copy, load the
+  // geometry into MapboxDraw in direct_select.
+  const handleReshapeFeature = useCallback(() => {
+    if (!editingFeature) return;
+    const f = editingFeature;
+    setEditingFeature(null);
+    setSelectedFeatureId(null);
+    reshapingFeatureIdRef.current = f.id;
+    setReshapingFeatureId(f.id);
+    editFeatureGeometry({
+      type: 'Feature',
+      id: f.id,
+      geometry: f.geometry,
+      properties: {},
+    });
+  }, [editingFeature, editFeatureGeometry]);
+
+  // Finish reshaping: drop back to simple_select, remove the editable draw copy
+  // (the saved layer re-renders the persisted geometry), clear reshape state.
+  const handleFinishReshape = useCallback(() => {
+    cancelDraw();
+    reshapingFeatureIdRef.current = null;
+    setReshapingFeatureId(null);
+    showToast('Shape updated');
+  }, [cancelDraw, showToast]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: MapCanvas
@@ -2607,6 +2663,24 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     };
   }, []);
 
+  // Keep saved drapes pinned to the TOP of the layer stack (Gregg's call: draped
+  // plans always on top). Drawn-shape / feature layers are (re)added by MapCanvas
+  // AFTER the overlay, so without this they cover the drape. Re-runs whenever the
+  // overlay set, per-overlay visibility, or the feature set changes. Parent
+  // effects run after MapCanvas's child effects, so the feature layers already
+  // exist when this moves the overlays above them. Hidden overlays have no handle
+  // (removed by the drape effect), so they stay hidden. Raster layers don't
+  // capture clicks, so shapes underneath stay selectable / reshapable.
+  useEffect(() => {
+    const m = mapCanvasRef.current?.getMap();
+    if (!m || !mapIsLoaded) return;
+    savedDrapeHandlesRef.current.forEach((handle) => {
+      try {
+        if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
+      } catch { /* ignore */ }
+    });
+  }, [savedOverlays, hiddenOverlayIds, mapFeatures, editingOverlayId, mapIsLoaded, reshapingFeatureId]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Loading indicator
   // ─────────────────────────────────────────────────────────────────────────
@@ -3306,9 +3380,38 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onClose={handleFeatureEditClose}
           onSave={handleFeatureEditSave}
           onDelete={handleFeatureDelete}
+          onReshape={handleReshapeFeature}
           isSaving={featureSaving}
           isDeleting={featureDeleting}
         />
+      )}
+
+      {/* ─── Reshape banner (vertex editing in progress) ─── */}
+      {reshapingFeatureId && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '8px 14px',
+            borderRadius: 6,
+            background: 'var(--cui-body-bg, #1f2430)',
+            color: 'var(--cui-body-color, #e5e5e5)',
+            border: '1px solid var(--cui-border-color)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            fontSize: 13,
+          }}
+        >
+          <span>Reshaping — drag a vertex, click an edge midpoint to add one, or select a vertex and press Delete to remove it.</span>
+          <button type="button" className="btn-save" onClick={handleFinishReshape}>
+            Done
+          </button>
+        </div>
       )}
 
       {/* ─── Toast ─── */}
