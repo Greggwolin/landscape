@@ -2049,6 +2049,19 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const [cpImgDims, setCpImgDims] = useState<{ w: number; h: number } | null>(null); // extracted image pixel space (= crop bbox)
   const [cpMode, setCpMode] = useState(false);
   const [controlPoints, setControlPoints] = useState<OverlayControlPoint[]>([]);
+  // "Add Site Plan" picker (#1): plans already extracted into the project's media.
+  const [planPicker, setPlanPicker] = useState<{
+    open: boolean;
+    loading: boolean;
+    items: Array<{
+      media_id: number;
+      thumbnail_uri?: string | null;
+      storage_uri: string;
+      source_page?: number | null;
+      doc_id?: number | null;
+      asset_name?: string | null;
+    }>;
+  }>({ open: false, loading: false, items: [] });
   const [pendingImgPt, setPendingImgPt] = useState<{ x: number; y: number } | null>(null);
   const [georefInfo, setGeorefInfo] = useState<{ kind: string; rmsMeters: number; recommendTps: boolean } | null>(null);
   // Source-doc provenance when the canvas was opened from a chat extract (D15/D16
@@ -2129,9 +2142,30 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     fetchOverlays();
   }, [fetchOverlays]);
 
-  const handleAddSitePlanClick = useCallback(() => {
-    planFileInputRef.current?.click();
-  }, []);
+  const handleAddSitePlanClick = useCallback(async () => {
+    // Default to plans already in the project: check for extracted media first;
+    // fall back to the local-file picker when there's none (or on any error).
+    if (!projectId) { planFileInputRef.current?.click(); return; }
+    setPlanPicker((p) => ({ ...p, loading: true }));
+    try {
+      const base = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+      const res = await fetch(
+        `${base}/api/dms/media/available/?project_id=${projectId}`,
+        { headers: getAuthHeaders() },
+      );
+      const data = res.ok ? await res.json() : { items: [] };
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (items.length) {
+        setPlanPicker({ open: true, loading: false, items });
+      } else {
+        setPlanPicker({ open: false, loading: false, items: [] });
+        planFileInputRef.current?.click();
+      }
+    } catch {
+      setPlanPicker({ open: false, loading: false, items: [] });
+      planFileInputRef.current?.click();
+    }
+  }, [projectId, getAuthHeaders]);
 
   const handlePlanFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2455,7 +2489,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             url: ov.source_uri,
             corners: ov.corners,
             opacity: ov.opacity,
-            beforeId: overlayBeneathLayerId,
+            // No beforeId: a SAVED drape sits on TOP of the stack (parcels,
+            // basemap) so it reads as the finished site plan. During editing the
+            // active overlay still drops beneath the parcel layer for alignment.
           })
         );
       }
@@ -2801,6 +2837,54 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                 Clear points
               </button>
             )}
+          </div>
+        )}
+
+        {/* ─── "Use a plan already in the project" picker (#1) ─── */}
+        {planPicker.open && (
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setPlanPicker((p) => ({ ...p, open: false }))}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 'min(720px,90vw)', maxHeight: '80vh', overflow: 'auto', background: 'var(--cui-body-bg, #1A1E28)', border: '1px solid var(--cui-border-color)', borderRadius: 8, padding: 16 }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <strong>Use a plan already in this project</strong>
+                <button className="btn btn-sm btn-ghost-secondary" onClick={() => setPlanPicker((p) => ({ ...p, open: false }))}>✕</button>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--cui-medium-emphasis-color,#9aa7ba)', marginBottom: 12 }}>
+                Pick an image already pulled from this project&apos;s documents, or search your computer.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+                {planPicker.items.map((it) => (
+                  <button
+                    key={it.media_id}
+                    type="button"
+                    onClick={() => {
+                      setPlanPicker((p) => ({ ...p, open: false }));
+                      openExtractCanvasFromUrl(it.storage_uri, it.doc_id ?? null, it.source_page ?? null);
+                    }}
+                    style={{ padding: 0, border: '1px solid var(--cui-border-color)', borderRadius: 6, background: 'var(--cui-tertiary-bg, #222b3a)', cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={it.thumbnail_uri || it.storage_uri} alt={it.asset_name || 'plan media'} style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
+                    <div style={{ fontSize: 11, padding: '4px 6px', color: 'var(--cui-body-color)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {it.asset_name || `Page ${it.source_page ?? '?'}`}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => { setPlanPicker((p) => ({ ...p, open: false })); planFileInputRef.current?.click(); }}
+                >
+                  Search local files…
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
