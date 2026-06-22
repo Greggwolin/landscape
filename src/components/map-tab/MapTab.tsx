@@ -347,6 +347,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   const PARCEL_MIN_ZOOM = 12.5;
   const COUNTY_PARCEL_MIN_ZOOM = 12.5;
+  // County GIS circuit-breaker tuning.
+  const COUNTY_FAILURE_THRESHOLD = 2;
+  const COUNTY_COOLDOWN_MS = 60_000;
 
   const autoCounty = useMemo(
     () => normalizeCountyValue(projectCounty ?? null),
@@ -2033,13 +2036,35 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const lastParcelKeyRef = useRef<string>('');
   const lastCountyParcelKeyRef = useRef<string>('');
   const countyParcelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Circuit-breaker for a slow/down county GIS service. After
+  // COUNTY_FAILURE_THRESHOLD consecutive failures we stop auto-querying on
+  // viewport changes for COUNTY_COOLDOWN_MS so a dead service isn't hammered
+  // on every pan. Reset on the next success, an explicit retry, or county
+  // change.
+  const countyFailureCountRef = useRef(0);
+  const countyCooldownUntilRef = useRef(0);
 
   useEffect(() => {
     lastCountyParcelKeyRef.current = '';
+    countyFailureCountRef.current = 0;
+    countyCooldownUntilRef.current = 0;
     setTaxParcels(null);
     setSelectedTaxParcels({});
     setTaxError(null);
   }, [resolvedCounty]);
+
+  // Treat turning the tax-parcels layer on as an explicit retry: clear the
+  // circuit-breaker so the user can force a fresh county query (and a new key)
+  // without waiting out the cooldown.
+  const prevTaxLayerVisibleRef = useRef(false);
+  useEffect(() => {
+    if (taxParcelsLayerVisible && !prevTaxLayerVisibleRef.current) {
+      countyFailureCountRef.current = 0;
+      countyCooldownUntilRef.current = 0;
+      lastCountyParcelKeyRef.current = '';
+    }
+    prevTaxLayerVisibleRef.current = taxParcelsLayerVisible;
+  }, [taxParcelsLayerVisible]);
 
   useEffect(() => {
     if (!isLosAngelesCounty) return;
@@ -2079,6 +2104,14 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     if (!countyParcelBoundsKey) return;
     if (lastCountyParcelKeyRef.current === countyParcelBoundsKey) return;
 
+    // Circuit-breaker: while the county service is in cooldown after repeated
+    // failures, don't auto-query on viewport changes. Surface the quiet note
+    // once and keep whatever parcels are already on the map.
+    if (Date.now() < countyCooldownUntilRef.current) {
+      setTaxError('County parcels temporarily unavailable');
+      return;
+    }
+
     if (countyParcelTimerRef.current) {
       clearTimeout(countyParcelTimerRef.current);
     }
@@ -2098,11 +2131,26 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           const normalized = normalizeParcelFeatureCollection(result);
           setTaxParcels(normalized);
           lastCountyParcelKeyRef.current = countyParcelBoundsKey;
+          // Service is healthy again — reset the breaker.
+          countyFailureCountRef.current = 0;
+          countyCooldownUntilRef.current = 0;
         } catch (error) {
           if (!active) return;
           console.warn('Failed to fetch county parcels:', error);
-          setTaxParcels(null);
-          setTaxError('Unable to load county parcels');
+          countyFailureCountRef.current += 1;
+          // Keep the last good parcel set on a transient failure; only blank
+          // when we have nothing to show.
+          setTaxParcels((prev) =>
+            prev && (prev.features?.length ?? 0) > 0 ? prev : null
+          );
+          if (countyFailureCountRef.current >= COUNTY_FAILURE_THRESHOLD) {
+            // Trip the breaker: stop hammering for the cooldown window and
+            // show a single quiet note instead of flooding on every pan.
+            countyCooldownUntilRef.current = Date.now() + COUNTY_COOLDOWN_MS;
+            setTaxError('County parcels temporarily unavailable');
+          } else {
+            setTaxError('Unable to load county parcels');
+          }
         } finally {
           if (active) setTaxLoading(false);
         }
@@ -2125,6 +2173,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     countyParcelBoundsKey,
     getAuthHeaders,
     COUNTY_PARCEL_MIN_ZOOM,
+    COUNTY_FAILURE_THRESHOLD,
+    COUNTY_COOLDOWN_MS,
   ]);
 
   const selectedParcelList = useMemo(

@@ -68,8 +68,11 @@ const MARICOPA_PARCEL_OUTLINE_SOURCE_ID = 'maricopa-parcel-outline';
 // Exported so MapTab can drape the site-plan overlay *beneath* the parcel
 // outline (success criterion: parcel outlines render above the drape).
 export const MARICOPA_PARCEL_OUTLINE_LAYER_ID = 'maricopa-parcel-outline-layer';
-const MARICOPA_PARCEL_OUTLINE_TILES =
-  'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/ParcelOutline/MapServer/tile/{z}/{y}/{x}';
+// Loaded via a same-origin proxy (src/app/api/gis/parcel-outline-tile) rather
+// than directly from the county host, which sends no CORS header and so fails
+// every tile when loaded as a raster source. MapLibre fills {z}/{x}/{y}; the
+// proxy swaps to the county's {z}/{y}/{x} order server-side.
+const MARICOPA_PARCEL_OUTLINE_TILES = '/api/gis/parcel-outline-tile/{z}/{x}/{y}';
 
 const normalizeParcelId = (value: string) => value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 
