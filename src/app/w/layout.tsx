@@ -179,6 +179,22 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     return 'dashboard';
   })();
 
+  // When the user opens the project Map, give it the full canvas BY DEFAULT:
+  // collapse the left sidebar and close the center chat panel. Fires only on
+  // entry to the map route (tracked via ref), so the user can re-open either
+  // one afterward without it snapping shut again.
+  const enteredMapRef = useRef(false);
+  useEffect(() => {
+    const isMapRoute = activePage === 'map';
+    if (isMapRoute && !enteredMapRef.current) {
+      closeChat();
+      setCollapsed(true);
+      setSidebarWidth(COLLAPSED_WIDTH);
+    }
+    enteredMapRef.current = isMapRoute;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePage]);
+
   // Extract current projectId from URL
   const projectIdMatch = pathname.match(/\/projects\/(\d+)/);
   const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined;
