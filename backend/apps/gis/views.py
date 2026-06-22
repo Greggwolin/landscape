@@ -138,7 +138,12 @@ def _fetch_arcgis_geojson(
             result_offset=offset,
         )
 
-        response = requests.get(f"{service.url}/query", params=params, timeout=20)
+        # Fail fast on a slow/down county service. A 20s timeout meant each
+        # failing query hung for 20s, and the map re-queries on every viewport
+        # change — so a pan during an outage stacked multiple 20s hangs. 6s
+        # keeps the map responsive; the caller (parcel_query) catches the
+        # raised timeout and returns a clean 502 the frontend already handles.
+        response = requests.get(f"{service.url}/query", params=params, timeout=6)
         response.raise_for_status()
         payload = response.json()
 
