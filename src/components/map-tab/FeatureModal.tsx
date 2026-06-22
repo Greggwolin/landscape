@@ -8,7 +8,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { FeatureCategory } from './types';
+import type { FeatureCategory, MapFeature } from './types';
 import { CATEGORIES_BY_FEATURE_TYPE, FEATURE_CATEGORIES } from './constants';
 
 export type FeatureGeometryType = 'Point' | 'LineString' | 'Polygon';
@@ -50,6 +50,11 @@ interface FeatureModalProps {
     color: string;
   }) => void;
   isSaving?: boolean;
+  /** When provided, the modal opens in EDIT mode prefilled from this feature. */
+  feature?: Partial<MapFeature> | null;
+  /** Edit mode only — removes the feature. Presence renders the Delete button. */
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
 // Normalize feature type to GeoJSON geometry type
@@ -89,6 +94,9 @@ export function FeatureModal({
   onClose,
   onSave,
   isSaving = false,
+  feature = null,
+  onDelete,
+  isDeleting = false,
 }: FeatureModalProps) {
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState<FeatureCategory>('annotation');
@@ -98,15 +106,24 @@ export function FeatureModal({
   // Normalize the feature type
   const normalizedType = normalizeFeatureType(featureType);
   const displayLabel = getFeatureTypeLabel(normalizedType);
+  const isEditMode = Boolean(feature && feature.id);
+  const busy = isSaving || isDeleting;
 
   // Get categories for this feature type
   const categories = useMemo(() => {
     return CATEGORIES_BY_FEATURE_TYPE[normalizedType] || FEATURE_CATEGORIES;
   }, [normalizedType]);
 
-  // Reset form when modal opens
+  // Reset (create) or prefill (edit) the form when the modal opens.
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    if (feature) {
+      setLabel(feature.label ?? '');
+      setNotes(feature.notes ?? '');
+      setColor(feature.style?.color ?? DEFAULT_FEATURE_COLOR);
+      if (feature.category) setCategory(feature.category);
+      else if (categories.length > 0) setCategory(categories[0].value);
+    } else {
       setLabel('');
       setNotes('');
       setColor(DEFAULT_FEATURE_COLOR);
@@ -115,13 +132,13 @@ export function FeatureModal({
         setCategory(categories[0].value);
       }
     }
-  }, [isOpen, categories]);
+  }, [isOpen, categories, feature]);
 
   if (!isOpen || !coordinates) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!label.trim() || isSaving) return;
+    if (!label.trim() || busy) return;
 
     onSave({
       label: label.trim(),
@@ -219,7 +236,7 @@ export function FeatureModal({
     <div className="feature-modal-overlay" onClick={onClose}>
       <div className="feature-modal" onClick={(e) => e.stopPropagation()}>
         <div className="feature-modal-header">
-          <h3>Save {displayLabel}</h3>
+          <h3>{isEditMode ? 'Edit' : 'Save'} {displayLabel}</h3>
           <button type="button" className="feature-modal-close" onClick={onClose}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -319,20 +336,35 @@ export function FeatureModal({
           </div>
 
           <div className="feature-modal-actions">
+            {isEditMode && onDelete && (
+              <button
+                type="button"
+                className="btn-cancel"
+                style={{ marginRight: 'auto', color: 'var(--cui-danger)' }}
+                onClick={onDelete}
+                disabled={busy}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            )}
             <button
               type="button"
               className="btn-cancel"
               onClick={onClose}
-              disabled={isSaving}
+              disabled={busy}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="btn-save"
-              disabled={!label.trim() || isSaving}
+              disabled={!label.trim() || busy}
             >
-              {isSaving ? 'Saving...' : `Save ${displayLabel}`}
+              {isSaving
+                ? 'Saving...'
+                : isEditMode
+                ? `Update ${displayLabel}`
+                : `Save ${displayLabel}`}
             </button>
           </div>
         </form>
