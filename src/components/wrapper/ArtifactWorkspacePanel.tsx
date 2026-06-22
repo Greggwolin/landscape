@@ -594,11 +594,13 @@ export function ArtifactWorkspacePanel({
       </div>
 
       {/* ── Source Pointers ── footer under the OPEN artifact. Shows whenever an
-          artifact is loaded (incl. takeover mode) so its data sources + drift
-          status are visible while viewing it. Collapsed by default. Previously
-          this lived only in the non-takeover rail, where it was unreachable
-          because opening an artifact (which it needs) also hid the section. */}
-      {active != null && (
+          artifact is loaded (incl. takeover mode) AND it actually carries source
+          pointers, so its data sources + drift status are visible while viewing
+          it. Collapsed by default. Hidden when the artifact has no pointers —
+          most tools don't record them yet, so a "0" stub would look broken.
+          Previously this lived only in the non-takeover rail, where it was
+          unreachable because opening an artifact (which it needs) also hid it. */}
+      {active != null && countSourcePointers(active.source_pointers_json) > 0 && (
         <div className="w-rail-card">
           <CollapsibleSection
             title="Source Pointers"
