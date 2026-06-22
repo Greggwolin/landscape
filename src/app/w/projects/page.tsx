@@ -231,15 +231,17 @@ export default function WrapperProjectsPage() {
           {filtered.map((p) => {
             const loc = buildLocation(p);
             const typeLabel = getPropertyTypeLabel(p.project_type_code);
-            const typeBadgeStyle = getPropertyTypeBadgeStyle(p.project_type_code, 'soft');
+            const typeBadgeStyle = getPropertyTypeBadgeStyle(p.project_type_code, 'solid');
             const hasType = !!getPropertyTypeTokenRef(p.project_type_code);
 
-            // Subtype badge — uses parent type color with outline variant
+            // Subtype badge — canonical solid fill in the parent type's color
+            // (soft/outline variants are near-invisible for dark hues like Land
+            // Development / Office on the dark /w/ shell)
             const subtypeLabel = p.property_subtype
               ? getPropertyTypeLabel(p.property_subtype)
               : null;
             const subtypeBadgeStyle = p.property_subtype
-              ? getPropertyTypeBadgeStyle(p.project_type_code, 'outline')
+              ? getPropertyTypeBadgeStyle(p.project_type_code, 'solid')
               : null;
 
             return (
