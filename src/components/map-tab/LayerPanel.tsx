@@ -104,16 +104,27 @@ export function LayerPanel({
             {sitePlansExpanded && (
               <div className="layer-group-items">
                 {sitePlans!.map((plan) => (
-                  <div key={plan.overlay_id} className="layer-item">
-                    <label className="layer-item-label">
+                  <div
+                    key={plan.overlay_id}
+                    className={`layer-item${plan.unavailable ? ' layer-item-unavailable' : ''}`}
+                  >
+                    <label className={`layer-item-label${plan.unavailable ? ' disabled' : ''}`}>
                       <input
                         type="checkbox"
-                        checked={plan.visible}
+                        // A missing image can't be shown — keep it unchecked + disabled.
+                        checked={plan.visible && !plan.unavailable}
+                        disabled={plan.unavailable}
                         onChange={() => onToggleSitePlan?.(plan.overlay_id)}
                         className="layer-item-checkbox"
                       />
-                      <span className="layer-item-name" title={plan.title}>
+                      <span
+                        className={`layer-item-name${plan.unavailable ? ' disabled' : ''}`}
+                        title={plan.unavailable ? 'Site-plan image unavailable — remove and re-drape' : plan.title}
+                      >
                         {plan.title}
+                        {plan.unavailable && (
+                          <span className="layer-item-warning"> · image unavailable — re-drape</span>
+                        )}
                       </span>
                     </label>
                     <div className="layer-item-actions">
@@ -121,7 +132,8 @@ export function LayerPanel({
                         type="button"
                         className="layer-item-action"
                         onClick={() => onEditSitePlan?.(plan.overlay_id)}
-                        disabled={plan.editing}
+                        // Can't re-enter the editor on a 404'd image — re-drape instead.
+                        disabled={plan.editing || plan.unavailable}
                       >
                         Edit
                       </button>

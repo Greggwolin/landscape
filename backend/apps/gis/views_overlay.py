@@ -16,13 +16,22 @@ LSCMD-CW-OVERLAY-P1-0613-GV
 """
 
 import json
+import uuid
 
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.db import connection
 from rest_framework import status, viewsets
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .serializers import ProjectOverlaySerializer
+
+# Durable overlay-image upload (LSCMD-OVERLAY-DURABLE-0622-ot4) accepts PNG/JPEG.
+_ALLOWED_OVERLAY_MIME = {"image/png", "image/jpeg"}
+_MAX_OVERLAY_BYTES = 24 * 1024 * 1024  # 24 MB — comfortably above a draped plan crop
 
 _SELECT_COLS = (
     "overlay_id, project_id, title, source_uri, corners, "
@@ -183,3 +192,51 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         if not deleted:
             return Response({"error": "Overlay not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def overlay_image_upload(request, project_pk=None):
+    """Persist a draped site-plan image to durable media storage and return its URL.
+
+    The draped PNG is written to the SAME Django ``default_storage`` backend
+    (Cloudflare R2 in production) that ``MediaExtractionService`` uses for
+    extracted media — deliberately NOT the UploadThing document uploader. An
+    UploadThing file uploaded via the document uploader is not tied to a retained
+    ``core_doc`` and gets orphan-swept shortly after upload, so overlays whose
+    ``source_uri`` pointed at it would 404 ("site-plan drape vanished"). Writing
+    to R2 here makes the saved overlay durable; the returned URL becomes the
+    overlay's ``source_uri`` and is served to MapLibre through the same-origin
+    ``/api/media/proxy`` route (R2's public bucket is not CORS-enabled).
+
+    Route (apps/projects/urls.py):
+        POST /api/projects/<id>/overlays/upload-image/   (multipart: file=<png|jpeg>)
+    Returns: ``{"url": <public url>, "key": <storage path>}``
+    """
+    upload = request.FILES.get("file")
+    if upload is None:
+        return Response({"error": "file is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    content_type = (getattr(upload, "content_type", "") or "").lower()
+    if content_type not in _ALLOWED_OVERLAY_MIME:
+        return Response(
+            {"error": f"Unsupported image type: {content_type or 'unknown'} (png or jpeg only)"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if upload.size and upload.size > _MAX_OVERLAY_BYTES:
+        return Response(
+            {"error": "Image exceeds the 24MB limit"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    ext = "jpg" if content_type == "image/jpeg" else "png"
+    key = f"overlays/{int(project_pk)}/{uuid.uuid4().hex}.{ext}"
+    saved_path = default_storage.save(key, ContentFile(upload.read()))
+    url = default_storage.url(saved_path)
+    # Local/dev filesystem storage returns a relative MEDIA_URL path; make it
+    # absolute so the browser loads it from Django, not the Next.js origin.
+    # (Production R2 storage already returns an absolute public URL.)
+    if url.startswith("/"):
+        url = request.build_absolute_uri(url)
+    return Response({"url": url, "key": saved_path}, status=status.HTTP_201_CREATED)

@@ -177,6 +177,9 @@ export interface SitePlanLegendItem {
   visible: boolean;
   /** True while this overlay is open in the overlay editor (Edit disabled). */
   editing?: boolean;
+  /** True when the overlay's source image failed to load (404). Legend shows a
+   *  "re-drape" affordance and the drape is skipped instead of rendering blank. */
+  unavailable?: boolean;
 }
 
 export interface LayerPanelProps {
