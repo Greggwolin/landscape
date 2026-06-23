@@ -182,6 +182,13 @@ export interface SitePlanLegendItem {
   unavailable?: boolean;
 }
 
+/** A drawn shape as shown in the legend's "Annotations" section. */
+export interface AnnotationLegendItem {
+  id: string;
+  label: string;
+  feature_type?: string;
+}
+
 export interface LayerPanelProps {
   layers: LayerState;
   onToggleLayer: (groupId: LayerGroupId, layerId: string) => void;
@@ -194,6 +201,12 @@ export interface LayerPanelProps {
   onRemoveSitePlan?: (overlayId: number) => void;
   /** Rename a saved overlay in place (editable name after creation). */
   onRenameSitePlan?: (overlayId: number, title: string) => void;
+  /** Drawn shapes surfaced in the legend (optional — omit to hide section). */
+  annotations?: AnnotationLegendItem[];
+  /** Rename a drawn shape in place (persists feature.label). */
+  onRenameAnnotation?: (id: string, label: string) => void;
+  onEditAnnotation?: (id: string) => void;
+  onRemoveAnnotation?: (id: string) => void;
 }
 
 export interface DrawToolbarProps {
