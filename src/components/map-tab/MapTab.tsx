@@ -319,6 +319,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // draw callback (created before this point) can read it without a stale closure.
   const [reshapingFeatureId, setReshapingFeatureId] = useState<string | null>(null);
   const reshapingFeatureIdRef = useRef<string | null>(null);
+  // After a vertex reshape finishes, reopen the edit modal for this feature so
+  // the user can review/save other changes (name, color). Resolved against the
+  // freshly-persisted geometry by an effect once reshape state has cleared.
+  const [reopenEditId, setReopenEditId] = useState<string | null>(null);
   // Per-overlay legend visibility (A). Overlay ids present here are HIDDEN;
   // absence = visible (default). Site-plan records have no persisted visible flag.
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<number>>(() => new Set());
@@ -1480,13 +1484,42 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   }, [editingFeature, editFeatureGeometry]);
 
   // Finish reshaping: drop back to simple_select, remove the editable draw copy
-  // (the saved layer re-renders the persisted geometry), clear reshape state.
+  // (the saved layer re-renders the persisted geometry), clear reshape state, and
+  // reopen the edit modal so the user can save/adjust the rest of the shape.
   const handleFinishReshape = useCallback(() => {
+    const id = reshapingFeatureIdRef.current;
     cancelDraw();
     reshapingFeatureIdRef.current = null;
     setReshapingFeatureId(null);
+    if (id) setReopenEditId(id);
     showToast('Shape updated');
   }, [cancelDraw, showToast]);
+
+  // Reopen the edit modal once reshape state has cleared (so mapFeatures includes
+  // the reshaped feature again, with its updated geometry/area).
+  useEffect(() => {
+    if (!reopenEditId) return;
+    const f = mapFeatures.find((x) => x.id === reopenEditId);
+    if (f) {
+      setSelectedFeatureId(f.id);
+      setEditingFeature(f);
+    }
+    setReopenEditId(null);
+  }, [reopenEditId, mapFeatures]);
+
+  // While reshaping, a double-click finishes the edit (and reopens the modal) —
+  // "save by double-clicking a vertex". Geometry is already persisted live on each
+  // draw.update; this is the explicit commit/exit gesture the user expects.
+  useEffect(() => {
+    if (!mapInstance || !reshapingFeatureId) return;
+    const map = mapInstance;
+    const onDblClick = (e: MapMouseEvent) => {
+      e.preventDefault(); // suppress map double-click zoom
+      handleFinishReshape();
+    };
+    map.on('dblclick', onDblClick);
+    return () => { map.off('dblclick', onDblClick); };
+  }, [mapInstance, reshapingFeatureId, handleFinishReshape]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: MapCanvas
@@ -2858,11 +2891,19 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     // drawn-shape layers (user-features-*) still fire underneath it
     // (queryRenderedFeatures ignores occlusion), so shapes stay selectable and
     // editable even where the drape covers them.
-    savedDrapeHandlesRef.current.forEach((handle) => {
-      try {
-        if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
-      } catch { /* ignore */ }
-    });
+    const lift = () => {
+      savedDrapeHandlesRef.current.forEach((handle) => {
+        try {
+          if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
+        } catch { /* ignore */ }
+      });
+    };
+    lift();
+    // Re-assert on the next frame so the drape wins even when MapCanvas re-adds the
+    // shape/draw layers AFTER this effect — e.g. right after a vertex reshape, where
+    // the drape was otherwise left sitting behind the re-rendered shape.
+    const raf = requestAnimationFrame(lift);
+    return () => cancelAnimationFrame(raf);
   }, [savedOverlays, hiddenOverlayIds, mapFeatures, editingOverlayId, mapIsLoaded, reshapingFeatureId]);
 
   // ─────────────────────────────────────────────────────────────────────────
