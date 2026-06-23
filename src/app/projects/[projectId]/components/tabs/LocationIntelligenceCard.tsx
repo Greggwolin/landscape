@@ -146,6 +146,11 @@ export default function LocationIntelligenceCard({
     }
     return [parsedLon, parsedLat];
   });
+  // Geocoded approximate center used only for first-time placement (no saved
+  // coordinates yet). The map renders here so the user can drop the pin by
+  // clicking; the first click persists real coordinates and flips to edit mode.
+  const [placementCenter, setPlacementCenter] = useState<[number, number] | null>(null);
+  const activeCenter = resolvedCenter ?? placementCenter;
 
   const [demographicsLoadStatus, setDemographicsLoadStatus] = useState<'idle' | 'loading' | 'complete' | 'error'>('idle');
 
@@ -313,7 +318,7 @@ export default function LocationIntelligenceCard({
   }, [parsedLat, parsedLon]);
 
   useEffect(() => {
-    if (!isOpen || resolvedCenter !== null || isResolvingCenter) {
+    if (!isOpen || resolvedCenter !== null || placementCenter !== null || isResolvingCenter) {
       return;
     }
 
@@ -335,7 +340,31 @@ export default function LocationIntelligenceCard({
         if (cancelled) return;
 
         if (detailsLat === null || detailsLon === null) {
-          setCenterError('Add project latitude/longitude to enable Location Intelligence.');
+          // No saved coordinates. Try a geocoded approximate center (from the
+          // project address) so the user can drop the pin by clicking the map.
+          // Falls back to the "Location required" prompt if geocoding fails.
+          try {
+            const mapResponse = await fetch(`/api/projects/${projectId}/map`, { headers: getAuthHeaders() });
+            if (mapResponse.ok) {
+              const mapData = await mapResponse.json();
+              const fallback = mapData?.center;
+              if (
+                !cancelled &&
+                Array.isArray(fallback) &&
+                Number.isFinite(Number(fallback[0])) &&
+                Number.isFinite(Number(fallback[1]))
+              ) {
+                setPlacementCenter([Number(fallback[0]), Number(fallback[1])]);
+                return;
+              }
+            }
+          } catch {
+            // Ignore and fall through to the prompt below.
+          }
+
+          if (!cancelled) {
+            setCenterError('Add project latitude/longitude to enable Location Intelligence.');
+          }
           return;
         }
 
@@ -356,10 +385,10 @@ export default function LocationIntelligenceCard({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isResolvingCenter, projectId, resolvedCenter]);
+  }, [isOpen, isResolvingCenter, projectId, resolvedCenter, placementCenter]);
 
   useEffect(() => {
-    if (!isOpen || !resolvedCenter || !shouldMountMap) {
+    if (!isOpen || !activeCenter || !shouldMountMap) {
       return;
     }
 
@@ -368,7 +397,7 @@ export default function LocationIntelligenceCard({
     }, 120);
 
     return () => window.clearTimeout(timeout);
-  }, [isOpen, resolvedCenter, shouldMountMap]);
+  }, [isOpen, activeCenter, shouldMountMap]);
 
   const handleToggle = useCallback(() => {
     setIsOpen((value) => !value);
@@ -386,6 +415,30 @@ export default function LocationIntelligenceCard({
       return next;
     });
   }, []);
+
+  // Persist a new project location (first-time placement or pin reposition).
+  // Mirrors the canonical save path used by ProjectTabMap: PATCH the project,
+  // which stamps gis_metadata.location_override so the saved pin sticks.
+  const handlePersistLocation = useCallback(async (lngLat: [number, number]) => {
+    const [lon, lat] = lngLat;
+    // Optimistically reflect the new pin; this also flips placement → edit mode.
+    setResolvedCenter([lon, lat]);
+    setPlacementCenter(null);
+    setCenterError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location_lat: lat, location_lon: lon }),
+      });
+      if (!response.ok) {
+        throw new Error((await response.text()) || 'Failed to save location');
+      }
+    } catch (err) {
+      console.error('Failed to save project location:', err);
+      setCenterError('The new pin location could not be saved. Please try again.');
+    }
+  }, [projectId]);
 
   const handleRingClick = useCallback((ring: RingDemographics) => {
     setSelectedRadius(ring.radius_miles);
@@ -443,7 +496,7 @@ export default function LocationIntelligenceCard({
             </div>
           )}
 
-          {!isResolvingCenter && !resolvedCenter && (
+          {!isResolvingCenter && !activeCenter && (
             <div
               className="rounded p-3"
               style={{
@@ -458,8 +511,21 @@ export default function LocationIntelligenceCard({
             </div>
           )}
 
-          {resolvedCenter && (
+          {activeCenter && (
             <div className="location-intelligence-map-shell">
+              {!resolvedCenter && placementCenter && (
+                <div
+                  className="rounded p-2 mb-2"
+                  style={{
+                    background: 'var(--cui-secondary-bg)',
+                    border: '1px solid var(--cui-border-color)',
+                    color: 'var(--cui-secondary-color)',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  No saved location yet — click the map to drop the project pin.
+                </div>
+              )}
               <div
                 className="position-relative overflow-hidden location-intelligence-map-frame"
                 style={{
@@ -470,13 +536,16 @@ export default function LocationIntelligenceCard({
               >
                 {shouldMountMap ? (
                   <LocationMap
-                    center={resolvedCenter}
+                    center={activeCenter}
                     rings={demographics?.rings || []}
                     userPoints={rentalComparablePoints}
                     layers={layers}
                     selectedRadius={selectedRadius}
                     onRingClick={handleRingClick}
-                    isAddingPoint={false}
+                    hasLocation={resolvedCenter !== null}
+                    onMapClick={resolvedCenter === null ? handlePersistLocation : undefined}
+                    onLocationMove={resolvedCenter !== null ? handlePersistLocation : undefined}
+                    isAddingPoint={resolvedCenter === null}
                     resizeToken={mapResizeToken}
                   />
                 ) : (
