@@ -1,16 +1,29 @@
 /* Housing Price Comparables tile for Land projects */
 'use client';
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
 import { DEFAULT_SFD_PRODUCTS, getProductBand } from '@/lib/napkin/sfdCompStats';
 
+export type SfCompsFilters = {
+  radiusMiles: number;
+  soldWithinDays: number;
+  minYearBuilt?: number;
+};
+
 type SfCompsTileProps = {
   projectId: number;
   title?: string;
+  /**
+   * When both are provided, the tile becomes controlled and shares its filter set
+   * with the parent (e.g. the competitive map), so the list and map stay in sync.
+   * When omitted, the tile manages its own filters internally (original behavior).
+   */
+  filters?: SfCompsFilters;
+  onFiltersChange?: (filters: SfCompsFilters) => void;
 };
 
 type LotSizeTier = 'low' | 'mid' | 'high' | 'none';
@@ -59,17 +72,45 @@ function formatAsOfDate(value: string | null | undefined): string {
   }
 }
 
-export function SfCompsTile({ projectId, title = 'Housing Price Comparables' }: SfCompsTileProps) {
-  // Committed values used for the API query
-  const [radiusMiles, setRadiusMiles] = useState<number>(3);
-  const [soldWithinDays, setSoldWithinDays] = useState<number>(180);
-  const [minYearBuilt, setMinYearBuilt] = useState<number | undefined>(undefined);
+export function SfCompsTile({ projectId, title = 'Housing Price Comparables', filters, onFiltersChange }: SfCompsTileProps) {
+  // When the parent supplies `filters` + `onFiltersChange`, the tile is controlled and
+  // shares one filter set with the parent (so the competitive map can mirror it exactly).
+  const isControlled = filters !== undefined && onFiltersChange !== undefined;
+
+  // Internal committed values used when the tile is uncontrolled (original behavior).
+  const [internalFilters, setInternalFilters] = useState<SfCompsFilters>({
+    radiusMiles: 3,
+    soldWithinDays: 180,
+    minYearBuilt: undefined
+  });
+
+  const committed: SfCompsFilters = isControlled ? (filters as SfCompsFilters) : internalFilters;
+  const radiusMiles = committed.radiusMiles;
+  const soldWithinDays = committed.soldWithinDays;
+  const minYearBuilt = committed.minYearBuilt;
+
+  const commitFilters = useCallback((next: SfCompsFilters) => {
+    if (isControlled) {
+      onFiltersChange?.(next);
+    } else {
+      setInternalFilters(next);
+    }
+  }, [isControlled, onFiltersChange]);
+
+  const currentYear = new Date().getFullYear();
 
   // Draft values for the input fields (updated on every keystroke)
-  const [draftRadius, setDraftRadius] = useState<string>('3');
-  const [draftDays, setDraftDays] = useState<string>('180');
-  const [draftMinYear, setDraftMinYear] = useState<string>('');
+  const [draftRadius, setDraftRadius] = useState<string>(String(committed.radiusMiles));
+  const [draftDays, setDraftDays] = useState<string>(String(committed.soldWithinDays));
+  const [draftMinYear, setDraftMinYear] = useState<string>(committed.minYearBuilt ? String(committed.minYearBuilt) : '');
   const [showAllSales, setShowAllSales] = useState(false);
+
+  // Keep the draft inputs in sync if committed filters change from outside (controlled mode).
+  useEffect(() => {
+    setDraftRadius(String(committed.radiusMiles));
+    setDraftDays(String(committed.soldWithinDays));
+    setDraftMinYear(committed.minYearBuilt ? String(committed.minYearBuilt) : '');
+  }, [committed.radiusMiles, committed.soldWithinDays, committed.minYearBuilt]);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useSfComps(projectId, {
     radiusMiles,
@@ -81,38 +122,37 @@ export function SfCompsTile({ projectId, title = 'Housing Price Comparables' }: 
   const commitRadius = useCallback(() => {
     const value = parseFloat(draftRadius);
     if (Number.isFinite(value) && value >= 0.5) {
-      setRadiusMiles(value);
+      commitFilters({ ...committed, radiusMiles: value });
     } else {
       // Reset to current value if invalid
       setDraftRadius(String(radiusMiles));
     }
-  }, [draftRadius, radiusMiles]);
+  }, [draftRadius, radiusMiles, committed, commitFilters]);
 
   // Commit days value on blur or Enter
   const commitDays = useCallback(() => {
     const value = parseInt(draftDays, 10);
     if (Number.isFinite(value) && value >= 30) {
-      setSoldWithinDays(value);
+      commitFilters({ ...committed, soldWithinDays: value });
     } else {
       // Reset to current value if invalid
       setDraftDays(String(soldWithinDays));
     }
-  }, [draftDays, soldWithinDays]);
+  }, [draftDays, soldWithinDays, committed, commitFilters]);
 
-  const currentYear = new Date().getFullYear();
   const commitMinYear = useCallback(() => {
     const trimmed = draftMinYear.trim();
     if (trimmed.length === 0) {
-      setMinYearBuilt(undefined);
+      commitFilters({ ...committed, minYearBuilt: undefined });
       return;
     }
     const value = parseInt(trimmed, 10);
     if (Number.isFinite(value) && value >= 1900 && value <= currentYear) {
-      setMinYearBuilt(value);
+      commitFilters({ ...committed, minYearBuilt: value });
     } else {
       setDraftMinYear(minYearBuilt ? String(minYearBuilt) : '');
     }
-  }, [draftMinYear, minYearBuilt, currentYear]);
+  }, [draftMinYear, minYearBuilt, currentYear, committed, commitFilters]);
 
   const handleRadiusKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -304,7 +344,7 @@ export function SfCompsTile({ projectId, title = 'Housing Price Comparables' }: 
                 />
               </div>
               <div>
-                <label className="text-muted small d-block mb-1">Year Built</label>
+                <label className="text-muted small d-block mb-1">Min Year Built</label>
                 <input
                   type="number"
                   min={1900}

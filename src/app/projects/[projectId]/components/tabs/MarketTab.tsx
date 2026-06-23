@@ -61,6 +61,14 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
   const [editingComp, setEditingComp] = useState<MarketCompetitiveProject | null>(null);
   const [selectedCompetitorId, setSelectedCompetitorId] = useState<number | null>(null);
 
+  // Shared filters for the SFD Pricing list AND the Recent Sales layer on the map,
+  // so the two always agree (the map mirrors whatever the list is filtered to).
+  const [sfFilters, setSfFilters] = useState<{ radiusMiles: number; soldWithinDays: number; minYearBuilt?: number }>({
+    radiusMiles: 3,
+    soldWithinDays: 180,
+    minYearBuilt: undefined
+  });
+
   // Queries
   const { data: competitors = [], isLoading: loadingComps } = useMarketCompetitors(projectId);
 
@@ -351,7 +359,7 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-market-row="pricing">
         {/* Left Column - SFD Pricing */}
         <div>
-          <SfCompsTile projectId={projectId} title="SFD Pricing" />
+          <SfCompsTile projectId={projectId} title="SFD Pricing" filters={sfFilters} onFiltersChange={setSfFilters} />
         </div>
 
         {/* Right Column - Landscaper Analysis */}
@@ -444,6 +452,7 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
               selectedCompetitorId={selectedCompetitorId}
               onSelectCompetitor={setSelectedCompetitorId}
               onClearSelection={() => setSelectedCompetitorId(null)}
+              recentSalesFilters={sfFilters}
             />
           </CCardBody>
         </CCard>

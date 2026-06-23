@@ -45,6 +45,15 @@ interface MarketMapViewProps {
   selectedCompetitorId?: number | null;
   onSelectCompetitor?: (id: number) => void;
   onClearSelection?: () => void;
+  /**
+   * Filters for the "Recent Sales" layer. When provided (e.g. from the SFD Pricing
+   * tile), the map mirrors the list exactly. When omitted, falls back to defaults.
+   */
+  recentSalesFilters?: {
+    radiusMiles: number;
+    soldWithinDays: number;
+    minYearBuilt?: number;
+  };
 }
 
 // Helper to categorize price relative to dataset
@@ -65,7 +74,8 @@ export default function MarketMapView({
   className = '',
   selectedCompetitorId = null,
   onSelectCompetitor,
-  onClearSelection
+  onClearSelection,
+  recentSalesFilters
 }: MarketMapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -149,10 +159,12 @@ export default function MarketMapView({
     return value;
   };
 
-  // Fetch Redfin comps
+  // Fetch Redfin comps for the "Recent Sales" layer.
+  // Mirror the SFD Pricing list's filters when supplied so the map matches the list exactly.
   const { data: compsData } = useSfComps(projectId, {
-    radiusMiles: 5,
-    soldWithinDays: 180
+    radiusMiles: recentSalesFilters?.radiusMiles ?? 5,
+    soldWithinDays: recentSalesFilters?.soldWithinDays ?? 180,
+    ...(recentSalesFilters?.minYearBuilt !== undefined ? { minYearBuilt: recentSalesFilters.minYearBuilt } : {})
   });
   const comps = compsData?.comps || [];
 
