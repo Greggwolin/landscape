@@ -37,8 +37,9 @@ export default function PropertyPage({ projectId }: PropertyPageProps) {
             <CCardBody className="studio-card-body" style={{ padding: '8px' }}>
               <ProjectTabMap
                 projectId={String(projectId)}
-                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+                styleUrl="google-hybrid"
                 tabId="property-page"
+                enablePinEditing
               />
             </CCardBody>
           </CCard>

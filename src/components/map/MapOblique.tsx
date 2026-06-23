@@ -146,6 +146,17 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  [center, zoom, pitch, bearing]
  );
 
+ // Keep the latest onMapClick without rebinding the one-time click handler.
+ const onMapClickRef = useRef(onMapClick);
+ useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+
+ // Reactive placement cursor: crosshair only when a click would place the pin,
+ // default otherwise so the map reads as pannable.
+ useEffect(() => {
+ const map = mapRef.current;
+ if (map) map.getCanvas().style.cursor = onMapClick ? 'crosshair' : '';
+ }, [onMapClick, mapLoaded]);
+
  // Main effect: Create map once
  // Only recreate if styleUrl changes or component unmounts
  useEffect(() => {
@@ -188,7 +199,6 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  setMapLoaded(true);
  });
 
- if (onMapClick) {
  map.on('click', (event) => {
  // Check if the click originated from a marker element
  // MapLibre fires map click even when clicking markers, so we check originalEvent
@@ -198,10 +208,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  return;
  }
  const { lng, lat } = event.lngLat;
- onMapClick([lng, lat]);
+ onMapClickRef.current?.([lng, lat]);
  });
- map.getCanvas().style.cursor = 'crosshair';
- }
 
  mapRef.current = map;
  setMapInstance(map);

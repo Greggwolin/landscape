@@ -6,8 +6,9 @@
 
 'use client';
 
-import React, { useRef, useState, useMemo, useEffect } from 'react';
-import { MapOblique, MapObliqueRef } from './MapOblique';
+import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import maplibregl from 'maplibre-gl';
+import { MapOblique, MapObliqueRef, useMapOblique } from './MapOblique';
 import { useProjectMapData } from '@/lib/map/hooks';
 import useSWRMutation from 'swr/mutation';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
@@ -37,9 +38,82 @@ export interface ProjectTabMapProps {
   rentalComparables?: RentalComparable[]; // Optional rental comparables to display as markers
   comparableColors?: ComparableColorMap; // Optional color mapping for comparable markers
   onMarkerClick?: (propertyName: string) => void; // Callback when a comparable marker is clicked
+  /**
+   * When true, the subject pin is repositioned via a double-click → drag gesture
+   * (saved on drag end) and plain clicks pan instead of relocating the pin. A
+   * plain click only places the pin when no user location is set yet. Default
+   * (false) preserves the legacy click-to-relocate behavior for other surfaces.
+   */
+  enablePinEditing?: boolean;
 }
 
-export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [], comparableColors = {}, onMarkerClick }: ProjectTabMapProps) {
+/**
+ * Draggable subject-location pin rendered as a child of MapOblique (uses the
+ * map-instance context). Double-click enters move mode; drag end calls onMove.
+ * Marked `.map-marker` so MapOblique's map-click handler ignores clicks on it.
+ */
+function DraggableSubjectPin({
+  center,
+  onMove,
+}: {
+  center: [number, number];
+  onMove: (lngLat: [number, number]) => void;
+}) {
+  const map = useMapOblique();
+  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const onMoveRef = useRef(onMove);
+  useEffect(() => { onMoveRef.current = onMove; }, [onMove]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    if (markerRef.current) {
+      markerRef.current.setLngLat(center);
+      return;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'map-marker';
+    el.style.cursor = 'pointer';
+    el.style.width = '32px';
+    el.style.height = '32px';
+    el.title = 'Double-click to move the project location';
+    el.innerHTML = `
+      <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="14" fill="var(--cui-warning)" stroke="var(--cui-body-color)" stroke-width="3"/>
+      </svg>
+    `;
+
+    const marker = new maplibregl.Marker({ element: el, draggable: false }).setLngLat(center).addTo(map);
+
+    // Double-click the pin to enter move mode. stopPropagation keeps MapLibre's
+    // double-click-zoom from firing on the underlying canvas.
+    el.addEventListener('dblclick', (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      marker.setDraggable(true);
+      el.style.opacity = '0.85';
+    });
+
+    marker.on('dragend', () => {
+      const { lng, lat } = marker.getLngLat();
+      marker.setDraggable(false);
+      el.style.opacity = '1';
+      onMoveRef.current([lng, lat]);
+    });
+
+    markerRef.current = marker;
+  }, [map, center]);
+
+  useEffect(() => () => {
+    markerRef.current?.remove();
+    markerRef.current = null;
+  }, []);
+
+  return null;
+}
+
+export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [], comparableColors = {}, onMarkerClick, enablePinEditing = false }: ProjectTabMapProps) {
   const subjectMarkerColor = 'dodgerblue';
   const pendingMarkerColor = 'darkorange';
   const defaultComparableColor = 'mediumseagreen';
@@ -101,7 +175,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
   // Use JSON.stringify to ensure memoization only changes when actual values change
   const markers = useMemo(() => {
-    const base: Array<{ id: string; coordinates: [number, number]; color: string; stroke?: string; label: string; popup?: string }> = data?.center
+    const base: Array<{ id: string; coordinates: [number, number]; color: string; stroke?: string; label: string; popup?: string }> = data?.center && !enablePinEditing
       ? [{ id: 'subject', coordinates: data.center, color: subjectMarkerColor, label: 'Subject Property' }]
       : [];
 
@@ -140,7 +214,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
 
     return base;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation, rentalComparables, comparableColors]);
+  }, [data?.center ? JSON.stringify(data.center) : null, pendingLocation, rentalComparables, comparableColors, enablePinEditing]);
 
   // Create a lookup map from marker ID to property name for click handling
   const markerIdToPropertyName = useMemo(() => {
@@ -199,6 +273,24 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
       setSaveError(message);
     }
   };
+
+  // Persist a pin reposition from the double-click → drag gesture. Unlike
+  // handleMapClick it doesn't drop a separate "New Location" marker.
+  const handlePinMove = useCallback(async ([lng, lat]: [number, number]) => {
+    setSaveError(null);
+    setSaveSuccess(null);
+    try {
+      await saveLocation({ lat, lng });
+      setSaveSuccess('Location saved');
+      await mutate();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save location';
+      setSaveError(message);
+    }
+  }, [saveLocation, mutate]);
+
+  // A user-set pin exists when the project location was explicitly overridden.
+  const hasUserLocation = Boolean((data as { location_override?: boolean } | undefined)?.location_override);
 
   const handleResetLocation = async () => {
     setSaveError(null);
@@ -306,9 +398,13 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
           showExtrusions={false}
           markers={markers}
           lines={lines}
-          onMapClick={handleMapClick}
+          onMapClick={enablePinEditing && hasUserLocation ? undefined : handleMapClick}
           onFeatureClick={handleFeatureClick}
-        />
+        >
+          {enablePinEditing && data.center && (
+            <DraggableSubjectPin center={data.center} onMove={handlePinMove} />
+          )}
+        </MapOblique>
       </div>
 
       {/* Controls Panel - Accordion */}
