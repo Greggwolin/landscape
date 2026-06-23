@@ -18,12 +18,30 @@ export function LayerPanel({
   onToggleSitePlan,
   onEditSitePlan,
   onRemoveSitePlan,
+  onRenameSitePlan,
 }: LayerPanelProps) {
-  // "Site Plans" is its own legend section (saved overlays carry per-plan
+  // "Overlays" is its own legend section (saved overlays carry per-plan
   // actions the generic layer rows don't). Local expand state — there's no
   // group-id in the LayerState model for it.
   const [sitePlansExpanded, setSitePlansExpanded] = useState(true);
   const hasSitePlans = Array.isArray(sitePlans) && sitePlans.length > 0;
+  // Inline rename: the overlay id being renamed + the in-progress text.
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const startRename = (overlayId: number, current: string) => {
+    setRenamingId(overlayId);
+    setRenameValue(current);
+  };
+  const commitRename = () => {
+    if (renamingId != null) onRenameSitePlan?.(renamingId, renameValue);
+    setRenamingId(null);
+    setRenameValue('');
+  };
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameValue('');
+  };
 
   return (
     <div className="layer-panel">
@@ -98,7 +116,7 @@ export function LayerPanel({
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </span>
-              <span className="layer-group-label">Site Plans</span>
+              <span className="layer-group-label">Overlays</span>
             </button>
 
             {sitePlansExpanded && (
@@ -117,17 +135,43 @@ export function LayerPanel({
                         onChange={() => onToggleSitePlan?.(plan.overlay_id)}
                         className="layer-item-checkbox"
                       />
-                      <span
-                        className={`layer-item-name${plan.unavailable ? ' disabled' : ''}`}
-                        title={plan.unavailable ? 'Site-plan image unavailable — remove and re-drape' : plan.title}
-                      >
-                        {plan.title}
-                        {plan.unavailable && (
-                          <span className="layer-item-warning"> · image unavailable — re-drape</span>
-                        )}
-                      </span>
+                      {renamingId === plan.overlay_id ? (
+                        <input
+                          type="text"
+                          className="layer-item-rename-input"
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onClick={(e) => e.preventDefault()}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); commitRename(); }
+                            else if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className={`layer-item-name${plan.unavailable ? ' disabled' : ''}`}
+                          title={plan.unavailable ? 'Overlay image unavailable — remove and re-drape' : plan.title}
+                          onDoubleClick={() => onRenameSitePlan && startRename(plan.overlay_id, plan.title)}
+                        >
+                          {plan.title}
+                          {plan.unavailable && (
+                            <span className="layer-item-warning"> · image unavailable — re-drape</span>
+                          )}
+                        </span>
+                      )}
                     </label>
                     <div className="layer-item-actions">
+                      {onRenameSitePlan && renamingId !== plan.overlay_id && (
+                        <button
+                          type="button"
+                          className="layer-item-action"
+                          onClick={() => startRename(plan.overlay_id, plan.title)}
+                        >
+                          Rename
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="layer-item-action"

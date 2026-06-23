@@ -10,6 +10,9 @@
 import React from 'react';
 
 export interface SitePlanOverlayControlsProps {
+  /** Editable overlay name (set during creation; pre-filled when editing). */
+  title: string;
+  onTitleChange: (value: string) => void;
   opacity: number;
   rotationDeg: number;
   snapping: boolean;
@@ -31,6 +34,8 @@ const labelStyle: React.CSSProperties = {
 };
 
 export function SitePlanOverlayControls({
+  title,
+  onTitleChange,
   opacity,
   rotationDeg,
   snapping,
@@ -56,7 +61,7 @@ export function SitePlanOverlayControls({
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--w-text-primary, var(--cui-body-color))' }}>
-          Site Plan Overlay
+          Overlay
         </span>
         {snapping && (
           <span
@@ -70,6 +75,28 @@ export function SitePlanOverlayControls({
             {lastSnapped ? '● snapped to lot' : '○ snap on'}
           </span>
         )}
+      </div>
+
+      {/* Name */}
+      <div>
+        <div style={labelStyle}>
+          <span>Name</span>
+        </div>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Overlay name"
+          style={{
+            width: '100%',
+            fontSize: '12px',
+            padding: '4px 6px',
+            borderRadius: '4px',
+            border: '1px solid var(--w-border, var(--cui-border-color))',
+            background: 'var(--w-bg-input, var(--cui-body-bg))',
+            color: 'var(--w-text-primary, var(--cui-body-color))',
+          }}
+        />
       </div>
 
       {/* Opacity */}
