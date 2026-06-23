@@ -7,7 +7,7 @@ from rest_framework.routers import DefaultRouter
 from .views import ProjectViewSet, AnalysisTypeConfigViewSet, AnalysisDraftViewSet
 from .views_preferences import UserPreferenceViewSet
 from apps.market_intel.views import RentComparableViewSet, MarketRateAnalysisViewSet, MarketCompetitiveProjectViewSet, MarketMacroDataViewSet, ExpenseComparableViewSet
-from apps.gis.views_overlay import ProjectOverlayViewSet
+from apps.gis.views_overlay import ProjectOverlayViewSet, overlay_image_upload
 
 router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
@@ -60,6 +60,10 @@ urlpatterns = [
     path('projects/<int:project_pk>/overlays/',
          ProjectOverlayViewSet.as_view({'get': 'list', 'post': 'create'}),
          name='project-overlays-list'),
+    # Durable drape-image upload (R2) — LSCMD-OVERLAY-DURABLE-0622-ot4
+    path('projects/<int:project_pk>/overlays/upload-image/',
+         overlay_image_upload,
+         name='project-overlays-upload-image'),
     path('overlays/<int:pk>/',
          ProjectOverlayViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'put': 'partial_update', 'delete': 'destroy'}),
          name='project-overlays-detail'),

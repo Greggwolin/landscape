@@ -186,6 +186,19 @@
   text-decoration: none;
 }
 
+/* Saved overlay whose source image 404'd (C): muted row + an inline re-drape hint. */
+.layer-item-name.disabled:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
+.layer-item-warning {
+  color: var(--cui-warning, #e0a800);
+  font-size: 0.75rem;
+  font-style: italic;
+  white-space: nowrap;
+}
+
 .layer-item-count {
   color: var(--cui-secondary-color, #9ca3af);
   font-size: 11px;

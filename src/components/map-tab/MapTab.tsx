@@ -54,7 +54,7 @@ import {
 import type { RingDemographics } from '@/components/location-intelligence';
 import { fetchParcelsByAPN, fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
 import { queryParcelsByBounds } from '@/lib/gis/parcelServiceClient';
-import { useUploadThing } from '@/lib/uploadthing';
+import { uploadOverlayImageDurable, toRenderableOverlayUrl } from '@/lib/gis/overlayImageStore';
 import { useSitePlanOverlay } from './overlay/useSitePlanOverlay';
 import { SitePlanOverlayControls } from './overlay/SitePlanOverlayControls';
 import { useSitePlanOverlays, type OverlayControlPoint } from './hooks/useSitePlanOverlays';
@@ -321,6 +321,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // Per-overlay legend visibility (A). Overlay ids present here are HIDDEN;
   // absence = visible (default). Site-plan records have no persisted visible flag.
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<number>>(() => new Set());
+  // Overlays whose source_uri image fails to load (C). Surfaced in the legend as
+  // "image unavailable — re-drape" and skipped by the read-only drape loop so a
+  // missing image reads as an explicit broken state, not a silent blank.
+  const [unavailableOverlayIds, setUnavailableOverlayIds] = useState<Set<number>>(() => new Set());
 
   // ───── GIS Data State ─────
   const [planParcels, setPlanParcels] = useState<FeatureCollection | null>(null);
@@ -2280,17 +2284,14 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   const overlayEditor = useSitePlanOverlay({
     map: mapInstance,
-    imageUrl: overlayImageUrl,
+    // overlayImageUrl is the durable (R2) source_uri saved on the overlay; wrap it
+    // through the same-origin proxy for rendering since R2's public bucket isn't
+    // CORS-enabled and MapLibre's image source fetches the bytes. The raw,
+    // unwrapped overlayImageUrl is what gets persisted as source_uri on Save.
+    imageUrl: overlayImageUrl ? toRenderableOverlayUrl(overlayImageUrl) : null,
     parcels: overlayParcels,
     beneathLayerId: overlayBeneathLayerId,
     initial: overlayInitial,
-  });
-
-  const { startUpload: startPlanUpload } = useUploadThing('documentUploader', {
-    headers: {
-      'x-project-id': String(projectId),
-      'x-workspace-id': '1',
-    },
   });
 
   const {
@@ -2360,11 +2361,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       setOverlaySaveError(null);
       try {
         const file = new File([region.blob], 'plan_region.png', { type: 'image/png' });
-        const res = await startPlanUpload([file]);
-        const first = res?.[0];
-        const serverData = (first as { serverData?: { storage_uri?: string } } | undefined)?.serverData;
-        const url = serverData?.storage_uri ?? (first as { url?: string } | undefined)?.url ?? '';
-        if (!url) throw new Error('Upload returned no URL');
+        // Durable R2 store (NOT UploadThing) so the saved drape never gets orphan-swept.
+        const url = await uploadOverlayImageDurable(projectId, file, getAuthHeaders());
         // Capture doc provenance (chat mount) before resetExtractState clears it.
         const docProv = extractDocProvenance;
         resetExtractState();
@@ -2386,7 +2384,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         setUploadingPlan(false);
       }
     },
-    [startPlanUpload, showToast, resetExtractState, extractDocProvenance]
+    [projectId, getAuthHeaders, showToast, resetExtractState, extractDocProvenance]
   );
 
   // Drape a plan image produced by the Landscaper extract_plan_image tool
@@ -2413,11 +2411,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           `plan_extract_${payload.source_doc_id ?? 'doc'}_p${payload.source_page ?? 1}.png`,
           { type: 'image/png' }
         );
-        const res = await startPlanUpload([file]);
-        const first = res?.[0];
-        const serverData = (first as { serverData?: { storage_uri?: string } } | undefined)?.serverData;
-        const url = serverData?.storage_uri ?? (first as { url?: string } | undefined)?.url ?? '';
-        if (!url) throw new Error('Upload returned no URL');
+        // Durable R2 store (NOT UploadThing) so the saved drape never gets orphan-swept.
+        const url = await uploadOverlayImageDurable(projectId, file, getAuthHeaders());
         setEditingOverlayId(null);
         setOverlayInitial(undefined);
         setOverlayProvenance({
@@ -2433,7 +2428,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         setUploadingPlan(false);
       }
     },
-    [startPlanUpload, showToast]
+    [projectId, getAuthHeaders, showToast]
   );
 
   // Open the trace canvas for a plan rendered server-side (chat-first mount):
@@ -2643,8 +2638,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         title: ov.title || `Overlay ${ov.overlay_id}`,
         visible: !hiddenOverlayIds.has(ov.overlay_id),
         editing: editingOverlayId === ov.overlay_id,
+        unavailable: unavailableOverlayIds.has(ov.overlay_id),
       })),
-    [savedOverlays, hiddenOverlayIds, editingOverlayId]
+    [savedOverlays, hiddenOverlayIds, editingOverlayId, unavailableOverlayIds]
   );
 
   const handleToggleSitePlanVisibility = useCallback((overlayId: number) => {
@@ -2664,6 +2660,52 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     [savedOverlays, handleEditOverlay]
   );
 
+  // Probe each saved overlay's image so a 404'd drape (e.g. the legacy
+  // orphan-swept UploadThing URLs) surfaces as an explicit "unavailable" state (C)
+  // instead of a silent blank. An <img> load works cross-origin without CORS, so
+  // it detects availability for both R2 (via proxy) and legacy UploadThing URLs.
+  // Keyed by the URL last probed so a re-draped overlay (new source_uri) re-checks.
+  const probedOverlaySourcesRef = useRef<Map<number, string>>(new Map());
+  useEffect(() => {
+    for (const ov of savedOverlays) {
+      if (probedOverlaySourcesRef.current.get(ov.overlay_id) === ov.source_uri) continue;
+      probedOverlaySourcesRef.current.set(ov.overlay_id, ov.source_uri);
+      const id = ov.overlay_id;
+      const img = new Image();
+      img.onload = () =>
+        setUnavailableOverlayIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      img.onerror = () =>
+        setUnavailableOverlayIds((prev) => {
+          if (prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.add(id);
+          return next;
+        });
+      img.src = toRenderableOverlayUrl(ov.source_uri);
+    }
+    // Drop probe cache + unavailable flags for overlays no longer present.
+    const liveIds = new Set(savedOverlays.map((o) => o.overlay_id));
+    for (const cachedId of probedOverlaySourcesRef.current.keys()) {
+      if (!liveIds.has(cachedId)) probedOverlaySourcesRef.current.delete(cachedId);
+    }
+    setUnavailableOverlayIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const flaggedId of prev) {
+        if (!liveIds.has(flaggedId)) {
+          next.delete(flaggedId);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [savedOverlays]);
+
   // Read-only drapes for every saved overlay NOT currently being edited.
   const savedDrapeHandlesRef = useRef<Map<number, OverlayHandle>>(new Map());
   useEffect(() => {
@@ -2675,6 +2717,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     for (const ov of savedOverlays) {
       if (editingOverlayId === ov.overlay_id) continue; // editor owns it (with handles)
       if (hiddenOverlayIds.has(ov.overlay_id)) continue; // hidden via legend toggle (A)
+      if (unavailableOverlayIds.has(ov.overlay_id)) continue; // image 404 → legend shows re-drape (C)
       wanted.add(ov.overlay_id);
       const existing = handles.get(ov.overlay_id);
       if (existing) {
@@ -2685,7 +2728,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           ov.overlay_id,
           addImageOverlay(m, {
             id: `saved-${ov.overlay_id}`,
-            url: ov.source_uri,
+            // R2 source_uris aren't CORS-enabled for MapLibre's image-source fetch;
+            // route them through the same-origin proxy. Legacy/UploadThing URLs pass through.
+            url: toRenderableOverlayUrl(ov.source_uri),
             corners: ov.corners,
             opacity: ov.opacity,
             // No beforeId: a SAVED drape sits on TOP of the stack (parcels,
@@ -2702,7 +2747,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         handles.delete(id);
       }
     }
-  }, [savedOverlays, editingOverlayId, mapIsLoaded, overlayBeneathLayerId, hiddenOverlayIds]);
+  }, [savedOverlays, editingOverlayId, mapIsLoaded, overlayBeneathLayerId, hiddenOverlayIds, unavailableOverlayIds]);
 
   // Tear down all read-only drapes on unmount.
   useEffect(() => {
