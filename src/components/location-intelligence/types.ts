@@ -72,18 +72,6 @@ export interface LocationMapProps {
   onMapClick?: (lngLat: [number, number]) => void;
   onRingClick?: (ring: RingDemographics, lngLat: [number, number]) => void;
   onPointClick?: (point: UserMapPoint) => void;
-  /**
-   * Called when the existing project pin is repositioned via the
-   * double-click → drag → drag-end gesture. When provided, the center renders
-   * as a draggable marker instead of the lightweight circle layer.
-   */
-  onLocationMove?: (lngLat: [number, number]) => void;
-  /**
-   * Whether a project location is already set. When true, plain map clicks pan
-   * the map (the pin is only moved via the double-click drag gesture). When
-   * false, a plain click places the initial pin via onMapClick.
-   */
-  hasLocation?: boolean;
   isAddingPoint?: boolean;
   resizeToken?: number;
 }

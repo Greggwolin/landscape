@@ -1024,23 +1024,3 @@
     grid-template-columns: 1fr;
   }
 }
-
-/* =====================================================
-   Draggable project-location pin (double-click to move)
-   ===================================================== */
-
-.location-map-center-pin {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fbbf24;
-  border: 2px solid #000;
-  box-sizing: border-box;
-  cursor: pointer;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
-}
-
-.location-map-center-pin.is-moving {
-  cursor: grabbing;
-  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.45);
-}

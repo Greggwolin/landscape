@@ -32,20 +32,14 @@ export function LocationMap({
   onMapClick,
   onRingClick,
   onPointClick,
-  onLocationMove,
-  hasLocation = false,
   isAddingPoint = false,
   resizeToken = 0,
 }: LocationMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
-  const centerMarkerRef = useRef<maplibregl.Marker | null>(null);
   const onMapClickRef = useRef(onMapClick);
   const onRingClickRef = useRef(onRingClick);
-  const onLocationMoveRef = useRef(onLocationMove);
-  const hasLocationRef = useRef(hasLocation);
-  const isAddingPointRef = useRef(isAddingPoint);
   const ringsRef = useRef(rings);
   const centerRef = useRef(center);
   const layersRef = useRef(layers);
@@ -61,18 +55,6 @@ export function LocationMap({
   useEffect(() => {
     onRingClickRef.current = onRingClick;
   }, [onRingClick]);
-
-  useEffect(() => {
-    onLocationMoveRef.current = onLocationMove;
-  }, [onLocationMove]);
-
-  useEffect(() => {
-    hasLocationRef.current = hasLocation;
-  }, [hasLocation]);
-
-  useEffect(() => {
-    isAddingPointRef.current = isAddingPoint;
-  }, [isAddingPoint]);
 
   useEffect(() => {
     ringsRef.current = rings;
@@ -147,11 +129,7 @@ export function LocationMap({
         }
       }
 
-      // Only place the pin via a plain click when explicitly in add-point mode
-      // or when no project location exists yet (first-time placement). Once a
-      // location is set, plain clicks fall through to MapLibre's default pan and
-      // the pin is moved only via the double-click → drag gesture.
-      if (onMapClickRef.current && (isAddingPointRef.current || !hasLocationRef.current)) {
+      if (onMapClickRef.current) {
         onMapClickRef.current(lngLat);
       }
     });
@@ -176,17 +154,9 @@ export function LocationMap({
     map.current.getCanvas().style.cursor = isAddingPoint ? 'crosshair' : '';
   }, [isAddingPoint]);
 
-  // Keep center marker in sync. When location editing is enabled
-  // (onLocationMove provided), the center renders as a draggable DOM marker that
-  // enters "move mode" on double-click; otherwise it stays a lightweight circle
-  // layer (the default for read-only consumers).
+  // Keep center marker in sync
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
-
-    if (onLocationMove) {
-      syncDraggableCenter();
-      return;
-    }
 
     // Ensure style is loaded before adding sources/layers
     if (!map.current.isStyleLoaded()) {
@@ -202,46 +172,6 @@ export function LocationMap({
     }
 
     addCenterMarker();
-
-    function syncDraggableCenter() {
-      if (!map.current) return;
-
-      // Editing mode owns the center: drop the circle-layer rendition so the
-      // pin isn't drawn twice.
-      if (map.current.getLayer(CENTER_SOURCE_ID)) map.current.removeLayer(CENTER_SOURCE_ID);
-      if (map.current.getSource(CENTER_SOURCE_ID)) map.current.removeSource(CENTER_SOURCE_ID);
-
-      if (centerMarkerRef.current) {
-        centerMarkerRef.current.setLngLat(center);
-        return;
-      }
-
-      const el = document.createElement('div');
-      el.className = 'location-map-center-pin';
-      el.title = 'Double-click to move the project location';
-
-      const marker = new maplibregl.Marker({ element: el, draggable: false }).setLngLat(center);
-      marker.addTo(map.current);
-
-      // Double-click the pin to enter move mode. stopPropagation keeps MapLibre's
-      // double-click-zoom from firing on the underlying canvas.
-      el.addEventListener('dblclick', (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        marker.setDraggable(true);
-        el.classList.add('is-moving');
-      });
-
-      // On drag end, persist the new location and leave move mode.
-      marker.on('dragend', () => {
-        const { lng, lat } = marker.getLngLat();
-        marker.setDraggable(false);
-        el.classList.remove('is-moving');
-        onLocationMoveRef.current?.([lng, lat]);
-      });
-
-      centerMarkerRef.current = marker;
-    }
 
     function addCenterMarker() {
       if (!map.current) return;
@@ -278,13 +208,7 @@ export function LocationMap({
         },
       });
     }
-  }, [mapLoaded, center, styleRevision, onLocationMove]);
-
-  // Remove the draggable center marker on unmount.
-  useEffect(() => () => {
-    centerMarkerRef.current?.remove();
-    centerMarkerRef.current = null;
-  }, []);
+  }, [mapLoaded, center, styleRevision]);
 
   // Draw ring circles using Turf.js
   useEffect(() => {

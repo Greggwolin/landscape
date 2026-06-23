@@ -429,8 +429,9 @@ export default function ProjectTab({
           <div style={{ height: '100%' }}>
             <ProjectTabMap
               projectId={String(project.project_id)}
-              styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+              styleUrl="google-hybrid"
               tabId="project"
+              enablePinEditing
             />
           </div>
         </CCardBody>
