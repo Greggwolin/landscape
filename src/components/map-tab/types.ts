@@ -192,6 +192,8 @@ export interface LayerPanelProps {
   onToggleSitePlan?: (overlayId: number) => void;
   onEditSitePlan?: (overlayId: number) => void;
   onRemoveSitePlan?: (overlayId: number) => void;
+  /** Rename a saved overlay in place (editable name after creation). */
+  onRenameSitePlan?: (overlayId: number, title: string) => void;
 }
 
 export interface DrawToolbarProps {

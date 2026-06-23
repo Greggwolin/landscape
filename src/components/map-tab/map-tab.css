@@ -199,6 +199,18 @@
   white-space: nowrap;
 }
 
+/* Inline overlay-rename field (legend). Sits where the name label normally is. */
+.layer-item-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: inherit;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--cui-primary, #5c6bc0);
+  background: var(--cui-body-bg, #fff);
+  color: var(--cui-body-color, inherit);
+}
+
 .layer-item-count {
   color: var(--cui-secondary-color, #9ca3af);
   font-size: 11px;

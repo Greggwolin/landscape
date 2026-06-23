@@ -2203,6 +2203,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // saved row.
   const [overlayImageUrl, setOverlayImageUrl] = useState<string | null>(null);
   const [editingOverlayId, setEditingOverlayId] = useState<number | null>(null);
+  // Editable overlay name, bound to the editor's name field. Defaults to 'Overlay'
+  // for a fresh drape; seeded from the saved title when editing an existing one.
+  const [overlayTitle, setOverlayTitle] = useState<string>('Overlay');
   // Source-document provenance for an extracted-plan overlay (Phase 1). Null
   // for the manual-upload path; carried into createOverlay on Save.
   const [overlayProvenance, setOverlayProvenance] = useState<{
@@ -2338,7 +2341,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       event.target.value = ''; // allow re-selecting the same file later
       if (!file) return;
       if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
-        showToast('Site plan must be a PNG or JPG image');
+        showToast('Overlay image must be a PNG or JPG');
         return;
       }
       // Open the click-to-extract canvas with a CORS-clean data URL (no canvas taint).
@@ -2559,8 +2562,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     setOverlaySaveError(null);
     try {
       const state = overlayEditor.getState();
+      const title = overlayTitle.trim() || 'Overlay';
       if (editingOverlayId != null) {
         await updateOverlay(editingOverlayId, {
+          title,
           corners: state.corners,
           opacity: state.opacity,
           rotation_deg: state.rotationDeg,
@@ -2568,7 +2573,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         showToast('Overlay updated');
       } else {
         await createOverlay({
-          title: 'Site Plan',
+          title,
           source_uri: overlayImageUrl,
           corners: state.corners,
           opacity: state.opacity,
@@ -2586,27 +2591,30 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       setEditingOverlayId(null);
       setOverlayInitial(undefined);
       setOverlayProvenance(null);
+      setOverlayTitle('Overlay');
       resetExtractState();
     } catch (err) {
       setOverlaySaveError(err instanceof Error ? err.message : 'Failed to save overlay');
     } finally {
       setOverlaySaving(false);
     }
-  }, [overlayImageUrl, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast, overlayProvenance, controlPoints, resetExtractState]);
+  }, [overlayImageUrl, overlayTitle, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast, overlayProvenance, controlPoints, resetExtractState]);
 
   const handleOverlayCancel = useCallback(() => {
     setOverlayImageUrl(null);
     setEditingOverlayId(null);
     setOverlayProvenance(null);
+    setOverlayTitle('Overlay');
     resetExtractState();
     setOverlayInitial(undefined);
     setOverlaySaveError(null);
   }, [resetExtractState]);
 
   const handleEditOverlay = useCallback(
-    (overlay: { overlay_id: number; source_uri: string; corners: [[number, number], [number, number], [number, number], [number, number]]; opacity: number; rotation_deg: number }) => {
+    (overlay: { overlay_id: number; title?: string | null; source_uri: string; corners: [[number, number], [number, number], [number, number], [number, number]]; opacity: number; rotation_deg: number }) => {
       setOverlaySaveError(null);
       setEditingOverlayId(overlay.overlay_id);
+      setOverlayTitle(overlay.title?.trim() || 'Overlay');
       setOverlayInitial({
         corners: overlay.corners,
         opacity: overlay.opacity,
@@ -2658,6 +2666,23 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       if (ov) handleEditOverlay(ov);
     },
     [savedOverlays, handleEditOverlay]
+  );
+
+  // Rename a saved overlay in place from the legend (editable name after creation).
+  const handleRenameSitePlan = useCallback(
+    async (overlayId: number, title: string) => {
+      const next = title.trim();
+      if (!next) return;
+      const ov = savedOverlays.find((o) => o.overlay_id === overlayId);
+      if (ov && (ov.title ?? '') === next) return; // no-op if unchanged
+      try {
+        await updateOverlay(overlayId, { title: next });
+        showToast('Overlay renamed');
+      } catch {
+        showToast('Failed to rename overlay');
+      }
+    },
+    [savedOverlays, updateOverlay, showToast]
   );
 
   // Probe each saved overlay's image so a 404'd drape (e.g. the legacy
@@ -2769,9 +2794,21 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   useEffect(() => {
     const m = mapCanvasRef.current?.getMap();
     if (!m || !mapIsLoaded) return;
+    // 1) Lift saved drapes above the reference layers (parcels, basemap) so the
+    //    overlay reads as the top reference surface (Gregg's call: always on top).
     savedDrapeHandlesRef.current.forEach((handle) => {
       try {
         if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
+      } catch { /* ignore */ }
+    });
+    // 2) Then lift the interactive drawn-shape layers ABOVE the drapes. Shapes
+    //    drawn over a site plan must stay both visible AND clickable/editable — a
+    //    raster drape sitting on top otherwise swallows the click ("nothing
+    //    happens" on select). Keeping the thin outlines/points above the drape
+    //    preserves the "overlay on top" read while restoring selection.
+    ['user-features-fill', 'user-features-line', 'user-features-point'].forEach((id) => {
+      try {
+        if (m.getLayer(id)) m.moveLayer(id);
       } catch { /* ignore */ }
     });
   }, [savedOverlays, hiddenOverlayIds, mapFeatures, editingOverlayId, mapIsLoaded, reshapingFeatureId]);
@@ -2822,6 +2859,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onToggleSitePlan={handleToggleSitePlanVisibility}
           onEditSitePlan={handleEditSitePlan}
           onRemoveSitePlan={handleDeleteOverlay}
+          onRenameSitePlan={handleRenameSitePlan}
         />
         {isPhoenixMSA && (
         <div className="map-tab-parcel-panel">
@@ -2985,9 +3023,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           />
         </div>
 
-        {/* ─── Site Plan Overlay ─── */}
+        {/* ─── Overlays ─── */}
         <div className="map-tab-tools">
-          <div className="map-tab-tools-header">Site Plan</div>
+          <div className="map-tab-tools-header">Overlays</div>
           <input
             ref={planFileInputRef}
             type="file"
@@ -3003,7 +3041,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               disabled={uploadingPlan}
               onClick={handleAddSitePlanClick}
             >
-              {uploadingPlan ? 'Uploading…' : 'Add Site Plan'}
+              {uploadingPlan ? 'Uploading…' : 'Add Overlay'}
             </CButton>
           )}
           {savedOverlays.length > 0 && (
@@ -3040,6 +3078,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
         {overlayImageUrl && (
           <SitePlanOverlayControls
+            title={overlayTitle}
+            onTitleChange={setOverlayTitle}
             opacity={overlayEditor.opacity}
             rotationDeg={overlayEditor.rotationDeg}
             snapping={Boolean(overlayParcels?.features?.length)}
