@@ -19,15 +19,25 @@ export function LayerPanel({
   onEditSitePlan,
   onRemoveSitePlan,
   onRenameSitePlan,
+  annotations,
+  onRenameAnnotation,
+  onEditAnnotation,
+  onRemoveAnnotation,
 }: LayerPanelProps) {
   // "Overlays" is its own legend section (saved overlays carry per-plan
   // actions the generic layer rows don't). Local expand state — there's no
   // group-id in the LayerState model for it.
   const [sitePlansExpanded, setSitePlansExpanded] = useState(true);
   const hasSitePlans = Array.isArray(sitePlans) && sitePlans.length > 0;
+  // "Annotations" — one row per drawn shape, with an editable name.
+  const [annotationsExpanded, setAnnotationsExpanded] = useState(true);
+  const hasAnnotations = Array.isArray(annotations) && annotations.length > 0;
   // Inline rename: the overlay id being renamed + the in-progress text.
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  // Inline rename for annotations (string ids, separate from overlays).
+  const [renamingAnnId, setRenamingAnnId] = useState<string | null>(null);
+  const [annRenameValue, setAnnRenameValue] = useState('');
 
   const startRename = (overlayId: number, current: string) => {
     setRenamingId(overlayId);
@@ -41,6 +51,20 @@ export function LayerPanel({
   const cancelRename = () => {
     setRenamingId(null);
     setRenameValue('');
+  };
+
+  const startAnnRename = (id: string, current: string) => {
+    setRenamingAnnId(id);
+    setAnnRenameValue(current);
+  };
+  const commitAnnRename = () => {
+    if (renamingAnnId != null) onRenameAnnotation?.(renamingAnnId, annRenameValue);
+    setRenamingAnnId(null);
+    setAnnRenameValue('');
+  };
+  const cancelAnnRename = () => {
+    setRenamingAnnId(null);
+    setAnnRenameValue('');
   };
 
   return (
@@ -188,6 +212,87 @@ export function LayerPanel({
                       >
                         Remove
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Annotations — one row per drawn shape, with an editable name */}
+        {hasAnnotations && (
+          <div className="layer-group">
+            <button
+              type="button"
+              className="layer-group-header"
+              onClick={() => setAnnotationsExpanded((v) => !v)}
+            >
+              <span className={`layer-group-chevron ${annotationsExpanded ? 'expanded' : ''}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              <span className="layer-group-label">Annotations</span>
+            </button>
+
+            {annotationsExpanded && (
+              <div className="layer-group-items">
+                {annotations!.map((ann) => (
+                  <div key={ann.id} className="layer-item">
+                    <label className="layer-item-label">
+                      {renamingAnnId === ann.id ? (
+                        <input
+                          type="text"
+                          className="layer-item-rename-input"
+                          autoFocus
+                          value={annRenameValue}
+                          onChange={(e) => setAnnRenameValue(e.target.value)}
+                          onClick={(e) => e.preventDefault()}
+                          onBlur={commitAnnRename}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); commitAnnRename(); }
+                            else if (e.key === 'Escape') { e.preventDefault(); cancelAnnRename(); }
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="layer-item-name"
+                          title={ann.label}
+                          onDoubleClick={() => onRenameAnnotation && startAnnRename(ann.id, ann.label)}
+                        >
+                          {ann.label}
+                        </span>
+                      )}
+                    </label>
+                    <div className="layer-item-actions">
+                      {onRenameAnnotation && renamingAnnId !== ann.id && (
+                        <button
+                          type="button"
+                          className="layer-item-action"
+                          onClick={() => startAnnRename(ann.id, ann.label)}
+                        >
+                          Rename
+                        </button>
+                      )}
+                      {onEditAnnotation && (
+                        <button
+                          type="button"
+                          className="layer-item-action"
+                          onClick={() => onEditAnnotation(ann.id)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {onRemoveAnnotation && (
+                        <button
+                          type="button"
+                          className="layer-item-action"
+                          onClick={() => onRemoveAnnotation(ann.id)}
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

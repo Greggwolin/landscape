@@ -32,6 +32,7 @@ import type {
   MapViewState,
   FeatureCategory,
   SitePlanLegendItem,
+  AnnotationLegendItem,
 } from './types';
 import { MapCanvas, MARICOPA_PARCEL_OUTLINE_LAYER_ID } from './MapCanvas';
 import type { MapCanvasRef } from './MapCanvas';
@@ -318,6 +319,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // draw callback (created before this point) can read it without a stale closure.
   const [reshapingFeatureId, setReshapingFeatureId] = useState<string | null>(null);
   const reshapingFeatureIdRef = useRef<string | null>(null);
+  // After a vertex reshape finishes, reopen the edit modal for this feature so
+  // the user can review/save other changes (name, color). Resolved against the
+  // freshly-persisted geometry by an effect once reshape state has cleared.
+  const [reopenEditId, setReopenEditId] = useState<string | null>(null);
   // Per-overlay legend visibility (A). Overlay ids present here are HIDDEN;
   // absence = visible (default). Site-plan records have no persisted visible flag.
   const [hiddenOverlayIds, setHiddenOverlayIds] = useState<Set<number>>(() => new Set());
@@ -1479,13 +1484,42 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   }, [editingFeature, editFeatureGeometry]);
 
   // Finish reshaping: drop back to simple_select, remove the editable draw copy
-  // (the saved layer re-renders the persisted geometry), clear reshape state.
+  // (the saved layer re-renders the persisted geometry), clear reshape state, and
+  // reopen the edit modal so the user can save/adjust the rest of the shape.
   const handleFinishReshape = useCallback(() => {
+    const id = reshapingFeatureIdRef.current;
     cancelDraw();
     reshapingFeatureIdRef.current = null;
     setReshapingFeatureId(null);
+    if (id) setReopenEditId(id);
     showToast('Shape updated');
   }, [cancelDraw, showToast]);
+
+  // Reopen the edit modal once reshape state has cleared (so mapFeatures includes
+  // the reshaped feature again, with its updated geometry/area).
+  useEffect(() => {
+    if (!reopenEditId) return;
+    const f = mapFeatures.find((x) => x.id === reopenEditId);
+    if (f) {
+      setSelectedFeatureId(f.id);
+      setEditingFeature(f);
+    }
+    setReopenEditId(null);
+  }, [reopenEditId, mapFeatures]);
+
+  // While reshaping, a double-click finishes the edit (and reopens the modal) —
+  // "save by double-clicking a vertex". Geometry is already persisted live on each
+  // draw.update; this is the explicit commit/exit gesture the user expects.
+  useEffect(() => {
+    if (!mapInstance || !reshapingFeatureId) return;
+    const map = mapInstance;
+    const onDblClick = (e: MapMouseEvent) => {
+      e.preventDefault(); // suppress map double-click zoom
+      handleFinishReshape();
+    };
+    map.on('dblclick', onDblClick);
+    return () => { map.off('dblclick', onDblClick); };
+  }, [mapInstance, reshapingFeatureId, handleFinishReshape]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: MapCanvas
@@ -2685,6 +2719,63 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     [savedOverlays, updateOverlay, showToast]
   );
 
+  // Drawn shapes surfaced in the legend's "Annotations" section — one row per
+  // saved feature, with a user-editable name. Falls back to a type-based label
+  // when the feature has no name yet.
+  const annotationsForLegend = useMemo<AnnotationLegendItem[]>(
+    () =>
+      savedFeatures.map((f, i) => ({
+        id: f.id,
+        label: f.label?.trim() || `${f.feature_type ?? 'Annotation'} ${i + 1}`,
+        feature_type: f.feature_type ?? undefined,
+      })),
+    [savedFeatures]
+  );
+
+  // Rename a drawn shape in place from the legend (persists feature.label).
+  const handleRenameAnnotation = useCallback(
+    async (featureId: string, label: string) => {
+      const next = label.trim();
+      if (!next) return;
+      const f = savedFeatures.find((x) => x.id === featureId);
+      if (f && (f.label ?? '') === next) return; // no-op if unchanged
+      try {
+        await updateFeature(featureId, { label: next });
+        showToast('Annotation renamed');
+      } catch {
+        showToast('Failed to rename annotation');
+      }
+    },
+    [savedFeatures, updateFeature, showToast]
+  );
+
+  // Open a drawn shape for editing (reshape / color / delete) from the legend.
+  // Resolve against mapFeatures (typed MapFeature[]) so the edit modal gets the
+  // shape the rest of the edit flow expects.
+  const handleEditAnnotation = useCallback(
+    (featureId: string) => {
+      const f = mapFeatures.find((x) => x.id === featureId);
+      if (f) {
+        setSelectedFeatureId(f.id);
+        setEditingFeature(f);
+      }
+    },
+    [mapFeatures]
+  );
+
+  // Remove a drawn shape from the legend.
+  const handleRemoveAnnotation = useCallback(
+    async (featureId: string) => {
+      try {
+        await deleteFeature(featureId);
+        showToast('Annotation removed');
+      } catch {
+        showToast('Failed to remove annotation');
+      }
+    },
+    [deleteFeature, showToast]
+  );
+
   // Probe each saved overlay's image so a 404'd drape (e.g. the legacy
   // orphan-swept UploadThing URLs) surfaces as an explicit "unavailable" state (C)
   // instead of a silent blank. An <img> load works cross-origin without CORS, so
@@ -2794,23 +2885,25 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   useEffect(() => {
     const m = mapCanvasRef.current?.getMap();
     if (!m || !mapIsLoaded) return;
-    // 1) Lift saved drapes above the reference layers (parcels, basemap) so the
-    //    overlay reads as the top reference surface (Gregg's call: always on top).
-    savedDrapeHandlesRef.current.forEach((handle) => {
-      try {
-        if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
-      } catch { /* ignore */ }
-    });
-    // 2) Then lift the interactive drawn-shape layers ABOVE the drapes. Shapes
-    //    drawn over a site plan must stay both visible AND clickable/editable — a
-    //    raster drape sitting on top otherwise swallows the click ("nothing
-    //    happens" on select). Keeping the thin outlines/points above the drape
-    //    preserves the "overlay on top" read while restoring selection.
-    ['user-features-fill', 'user-features-line', 'user-features-point'].forEach((id) => {
-      try {
-        if (m.getLayer(id)) m.moveLayer(id);
-      } catch { /* ignore */ }
-    });
+    // Lift saved drapes to the very top of the stack so the overlay always renders
+    // ON TOP — above parcels/basemap AND above drawn shapes (Gregg's call). The
+    // raster drape is non-interactive: the layer-scoped click handlers on the
+    // drawn-shape layers (user-features-*) still fire underneath it
+    // (queryRenderedFeatures ignores occlusion), so shapes stay selectable and
+    // editable even where the drape covers them.
+    const lift = () => {
+      savedDrapeHandlesRef.current.forEach((handle) => {
+        try {
+          if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
+        } catch { /* ignore */ }
+      });
+    };
+    lift();
+    // Re-assert on the next frame so the drape wins even when MapCanvas re-adds the
+    // shape/draw layers AFTER this effect — e.g. right after a vertex reshape, where
+    // the drape was otherwise left sitting behind the re-rendered shape.
+    const raf = requestAnimationFrame(lift);
+    return () => cancelAnimationFrame(raf);
   }, [savedOverlays, hiddenOverlayIds, mapFeatures, editingOverlayId, mapIsLoaded, reshapingFeatureId]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2860,6 +2953,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onEditSitePlan={handleEditSitePlan}
           onRemoveSitePlan={handleDeleteOverlay}
           onRenameSitePlan={handleRenameSitePlan}
+          annotations={annotationsForLegend}
+          onRenameAnnotation={handleRenameAnnotation}
+          onEditAnnotation={handleEditAnnotation}
+          onRemoveAnnotation={handleRemoveAnnotation}
         />
         {isPhoenixMSA && (
         <div className="map-tab-parcel-panel">
