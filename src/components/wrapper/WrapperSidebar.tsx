@@ -164,8 +164,6 @@ const FOLDER_ICONS: Record<string, string[]> = {
   map: ['M1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6Z', 'M8 2V18', 'M16 6V22'],
 };
 const FOLDER_ICON_FALLBACK = ['M12 12h.01'];
-// Icon for chat-generated artifact rows.
-const ARTIFACT_ICON = ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6', 'M9 13h6', 'M9 17h4'];
 
 // Propeller-beanie icon for Help nav item (reuses shared HelpIcon)
 // Static by default; spin state is driven by help chat's thinking status.
@@ -254,7 +252,6 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   onRestoreThread,
   onDeleteThreadPermanently,
   projectNav,
-  artifactNav,
 }) => {
   const router = useRouter();
   const [threadsCollapsed, setThreadsCollapsed] = useState(false);
@@ -266,7 +263,6 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   // collapsed to cut the busyness.
   const [platformCollapsed, setPlatformCollapsed] = useState(true);
   const [projectsNavOpen, setProjectsNavOpen] = useState(false);
-  const [artifactsCollapsed, setArtifactsCollapsed] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(projectNav?.activeFolder ? [projectNav.activeFolder] : []),
   );
@@ -497,33 +493,6 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                   </React.Fragment>
                 );
               })}
-            </div>
-          )}
-          {/* Artifacts — studio only. Chat-generated artifacts not tied to a
-              folder screen. Click opens in the right panel (replace). */}
-          {artifactNav && artifactNav.artifacts.length > 0 && (
-            <div className="sb-section">
-              <div
-                className="sb-section-label sb-section-label--toggle"
-                style={{ cursor: 'pointer' }}
-                onClick={() => setArtifactsCollapsed((v) => !v)}
-              >
-                <span>Artifacts</span>
-                <span className="sb-section-chev">{artifactsCollapsed ? '▸' : '▾'}</span>
-              </div>
-              {!artifactsCollapsed &&
-                artifactNav.artifacts.map((a) => (
-                  <div
-                    key={a.id}
-                    className={`sb-nav-item${a.id === artifactNav.activeArtifactId ? ' active' : ''}`}
-                    data-label={a.title}
-                    title={a.title}
-                    onClick={() => artifactNav.onSelectArtifact(a.id)}
-                  >
-                    <NavIcon d={ARTIFACT_ICON} />
-                    <span className="sb-nav-label">{a.title}</span>
-                  </div>
-                ))}
             </div>
           )}
           {threads.length > 0 && (

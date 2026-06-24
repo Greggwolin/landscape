@@ -55,6 +55,9 @@ function StudioShellInner() {
   // Rail collapse is owned by WrapperSidebar (inside StudioSidebar); only the
   // right content panel's collapse is tracked here.
   const [contentOpen, setContentOpen] = useState(true);
+  // Right panel view: the routed screen, or the artifacts workspace. The
+  // artifacts trigger lives in the right-panel header (not the left rail).
+  const [rightView, setRightView] = useState<'screen' | 'artifacts'>('screen');
 
   // ── Project sourcing (mirrors classic page.tsx) ──────────────────────
   const [fallbackProject, setFallbackProject] = useState<ProjectSummary | null>(null);
@@ -105,6 +108,21 @@ function StudioShellInner() {
     tileConfig: currentProject?.tile_config,
   });
 
+  // The one right panel holds two content kinds: a Landscaper artifact when one
+  // is active (set by CenterChatPanel tool results), otherwise the structured
+  // router surface.
+  const hasArtifact =
+    activeArtifactId != null ||
+    !!activeLocationBrief ||
+    !!activeMapArtifact ||
+    !!activeExcelAudit;
+
+  // Selecting a screen returns the right panel to that screen; a chat-created
+  // artifact opens the artifacts view automatically. These hooks MUST run before
+  // any early return (rules-of-hooks) — keep them above the loading/not-found gates.
+  useEffect(() => { setRightView('screen'); }, [currentFolder, currentTab]);
+  useEffect(() => { if (hasArtifact) setRightView('artifacts'); }, [hasArtifact]);
+
   // ── Loading / not-found (same gates as classic) ─────────────────────
   if (isLoading || fallbackLoading) {
     return (
@@ -150,14 +168,13 @@ function StudioShellInner() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routerProject = currentProject as any;
 
-  // The one right panel holds two content kinds: a Landscaper artifact when one
-  // is active (set by CenterChatPanel tool results), otherwise the structured
-  // router surface. Closing an artifact returns to the structured surface.
-  const hasArtifact =
-    activeArtifactId != null ||
-    !!activeLocationBrief ||
-    !!activeMapArtifact ||
-    !!activeExcelAudit;
+  const backToScreen = () => {
+    setActiveArtifactId(null);
+    setActiveLocationBrief(null);
+    setActiveMapArtifact(null);
+    setActiveExcelAudit(null);
+    setRightView('screen');
+  };
 
   return (
     <div className="studio-shell">
@@ -181,43 +198,67 @@ function StudioShellInner() {
         projectTypeCode={effectivePropertyType ?? undefined}
       />
 
-      {/* RIGHT — one panel, two content kinds: active artifact OR routed surface */}
+      {/* RIGHT — one panel: the routed screen, OR the artifacts workspace
+          (reached from the header button or auto-opened by a chat artifact). */}
       {contentOpen ? (
-        hasArtifact ? (
+        rightView === 'artifacts' || hasArtifact ? (
           <div className="wrapper-right-panel">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                borderBottom: '1px solid var(--w-border, #1f2329)',
+              }}
+            >
+              <button
+                type="button"
+                className="w-btn w-btn-ghost w-btn-sm"
+                onClick={backToScreen}
+                title="Back to the current screen"
+              >
+                ← Screen
+              </button>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Artifacts</span>
+            </div>
             {activeArtifactId != null ? (
               <ArtifactWorkspacePanel projectId={projectId} takeoverMode />
             ) : activeLocationBrief ? (
-              <LocationBriefArtifact
-                config={activeLocationBrief}
-                onClose={() => setActiveLocationBrief(null)}
-              />
+              <LocationBriefArtifact config={activeLocationBrief} onClose={backToScreen} />
             ) : activeMapArtifact ? (
-              <MapArtifactRenderer
-                config={activeMapArtifact}
-                onClose={() => setActiveMapArtifact(null)}
-              />
+              <MapArtifactRenderer config={activeMapArtifact} onClose={backToScreen} />
             ) : activeExcelAudit ? (
-              <ExcelAuditArtifact
-                config={activeExcelAudit}
-                onClose={() => setActiveExcelAudit(null)}
-              />
-            ) : null}
+              <ExcelAuditArtifact config={activeExcelAudit} onClose={backToScreen} />
+            ) : (
+              <ArtifactWorkspacePanel projectId={projectId} />
+            )}
           </div>
         ) : (
           <RightContentPanel
             title={contentTitle}
             subtitle={currentProject.project_name}
             actions={
-              <button
-                type="button"
-                className="w-btn w-btn-icon"
-                title={chatOpen ? 'Collapse content (chat full width)' : 'Collapse content'}
-                aria-label="Collapse content panel"
-                onClick={() => setContentOpen(false)}
-              >
-                ⇥
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="w-btn w-btn-icon"
+                  title="Artifacts"
+                  aria-label="Show artifacts"
+                  onClick={() => setRightView('artifacts')}
+                >
+                  ◳
+                </button>
+                <button
+                  type="button"
+                  className="w-btn w-btn-icon"
+                  title={chatOpen ? 'Collapse content (chat full width)' : 'Collapse content'}
+                  aria-label="Collapse content panel"
+                  onClick={() => setContentOpen(false)}
+                >
+                  ⇥
+                </button>
+              </>
             }
           >
             <ProjectContentRouter
