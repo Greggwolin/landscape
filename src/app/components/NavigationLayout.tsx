@@ -40,8 +40,13 @@ export default function NavigationLayout({
   // Auto-hide navigation on auth routes and wrapper layout (has its own sidebar)
   const isAuthRoute = AUTH_ROUTES.some(route => pathname?.startsWith(route));
   const isWrapperRoute = pathname?.startsWith('/w');
+  // The /studio shell (collapsible left-nav project workspace) is fully
+  // self-contained — it owns its own 3-zone frame and must not inherit the
+  // legacy TopNavigationBar chrome. Additive: only adds /studio to the
+  // chrome-free set; no effect on existing routes.
+  const isStudioRoute = pathname?.startsWith('/studio');
 
-  if (hideNavigation || isAuthRoute || isWrapperRoute) {
+  if (hideNavigation || isAuthRoute || isWrapperRoute || isStudioRoute) {
     return <>{children}</>;
   }
 

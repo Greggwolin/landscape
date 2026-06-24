@@ -13,8 +13,9 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 // Routes that are dark-only — theme is forced to dark regardless of any stored
 // preference, and the forced value is never persisted. '/login' is the auth shell;
 // '/w' is the unified UI, which has no light mode (a stored 'light' from the legacy
-// folder/tab UI must NOT leak into it).
-const AUTH_DARK_ROUTES = ['/login', '/w'];
+// folder/tab UI must NOT leak into it). '/studio' is the isolated left-nav project
+// shell — same dark-only contract as '/w'.
+const AUTH_DARK_ROUTES = ['/login', '/w', '/studio'];
 
 export const CoreUIThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<'light' | 'dark'>('dark'); // Phase 1: Changed default to dark

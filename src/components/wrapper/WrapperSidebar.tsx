@@ -6,6 +6,7 @@ import CIcon from '@coreui/icons-react';
 import { cilPlus, cilSearch, cilMenu, cilMoon, cilSun, cilAccountLogout } from '@coreui/icons';
 import { HelpIcon } from '@/components/icons/HelpIcon';
 import { UiModeSwitch } from '@/components/ui/UiModeSwitch';
+import { type FolderTab, formatFolderLabel } from '@/lib/utils/folderTabConfig';
 
 interface Thread {
   id: string;
@@ -45,6 +46,10 @@ export interface WrapperSidebarProps {
   sidebarWidth: number;
   onResizeStart: (e: React.PointerEvent) => void;
 
+  /** Optional hover passthrough (studio peek-on-hover when collapsed). */
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+
   // Data
   threads?: Thread[];
   /** Archived threads (Universal Archive Pattern Phase 1a). Rendered in a
@@ -80,6 +85,33 @@ export interface WrapperSidebarProps {
    *  the "Help" item is relabeled "Help / Feedback" — non-admins submit
    *  feedback through the Help flyout (#FB), so Help is their feedback entry. */
   isAdmin?: boolean;
+
+  /**
+   * OPTIONAL project folder/sub-tab tree. When provided (only the /studio shell
+   * passes it; /w/ never does), an additive section renders at the top of
+   * sb-scroll showing the project's folders + sub-tabs as `.sb-nav-item` rows
+   * with real icons — same treatment as the global nav. Generated from
+   * createFolderConfig upstream; nothing hardcoded here.
+   */
+  projectNav?: {
+    projectName?: string;
+    folders: FolderTab[];
+    activeFolder: string;
+    activeTab: string;
+    onSelectFolder: (folderId: string) => void;
+    onSelectTab: (folderId: string, tabId: string) => void;
+  };
+
+  /**
+   * OPTIONAL chat-generated artifacts (studio only). Rendered as an "Artifacts"
+   * section below the folder tree. Clicking one opens it in the right panel
+   * (sets activeArtifactId upstream). /w/ never passes this.
+   */
+  artifactNav?: {
+    artifacts: Array<{ id: number; title: string }>;
+    activeArtifactId: number | null;
+    onSelectArtifact: (id: number) => void;
+  };
 }
 
 // Simple inline SVG icon component
@@ -115,6 +147,25 @@ const NAV_ITEMS: Array<{ id: string; label: string; paths: string[]; badge?: str
     'M12 17h.01',
   ] },
 ];
+
+// Real CoreUI-style line icons for the project folder tree (mirrors NAV_ITEMS
+// `paths`). Keyed by folder id from createFolderConfig. Folders without an entry
+// fall back to a generic dot path.
+const FOLDER_ICONS: Record<string, string[]> = {
+  home: ['M3 12 12 3l9 9', 'M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10'],
+  property: ['M3 21h18', 'M5 21V7l8-4 8 4v14', 'M9 9h.01', 'M13 9h.01', 'M9 13h.01', 'M13 13h.01', 'M9 17h.01', 'M13 17h.01'],
+  budget: ['M3 3v18h18', 'M7 16V9', 'M12 16V5', 'M17 16v-4'],
+  operations: ['M3 3v18h18', 'M7 16V9', 'M12 16V5', 'M17 16v-4'],
+  feasibility: ['M4 2h16a2 2 0 012 2v16a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z', 'M8 6h8', 'M8 10h.01', 'M12 10h.01', 'M16 10h.01', 'M8 14h.01', 'M12 14h.01', 'M16 14h.01', 'M8 18h.01'],
+  valuation: ['M4 2h16a2 2 0 012 2v16a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z', 'M8 6h8', 'M8 10h.01', 'M12 10h.01', 'M16 10h.01', 'M8 14h.01', 'M12 14h.01', 'M16 14h.01', 'M8 18h.01'],
+  capital: ['M12 2 2 7l10 5 10-5-10-5z', 'M2 17l10 5 10-5', 'M2 12l10 5 10-5'],
+  reports: ['M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2', 'M8 2h8v4H8z'],
+  documents: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6'],
+  map: ['M1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6Z', 'M8 2V18', 'M16 6V22'],
+};
+const FOLDER_ICON_FALLBACK = ['M12 12h.01'];
+// Icon for chat-generated artifact rows.
+const ARTIFACT_ICON = ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6', 'M9 13h6', 'M9 17h4'];
 
 // Propeller-beanie icon for Help nav item (reuses shared HelpIcon)
 // Static by default; spin state is driven by help chat's thinking status.
@@ -183,6 +234,8 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   onToggleCollapse,
   sidebarWidth,
   onResizeStart,
+  onMouseEnter,
+  onMouseLeave,
   threads = [],
   archivedThreads = [],
   scheduledAgents = [],
@@ -200,12 +253,35 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   onArchiveThread,
   onRestoreThread,
   onDeleteThreadPermanently,
+  projectNav,
+  artifactNav,
 }) => {
   const router = useRouter();
   const [threadsCollapsed, setThreadsCollapsed] = useState(false);
   const [archivedCollapsed, setArchivedCollapsed] = useState(true);
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
+  // Studio-only nav grouping state. The folder section is always shown (no
+  // project-name header). Platform group + Projects-recents group default
+  // collapsed to cut the busyness.
+  const [platformCollapsed, setPlatformCollapsed] = useState(true);
+  const [projectsNavOpen, setProjectsNavOpen] = useState(false);
+  const [artifactsCollapsed, setArtifactsCollapsed] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    () => new Set(projectNav?.activeFolder ? [projectNav.activeFolder] : []),
+  );
+  React.useEffect(() => {
+    const af = projectNav?.activeFolder;
+    if (!af) return;
+    setExpandedFolders((prev) => (prev.has(af) ? prev : new Set(prev).add(af)));
+  }, [projectNav?.activeFolder]);
+  const toggleFolderExpanded = (id: string) =>
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   // Thread "See more" state — capped at DEFAULT_THREAD_CAP by default.
   // If the active thread sits past the cap, expand automatically so the
   // user always sees the row that matches the URL they're on.
@@ -245,11 +321,24 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
       item.id === 'help' && !isAdmin ? { ...item, label: 'Help / Feedback' } : item,
     );
 
+  // ── Studio-mode nav grouping (gated on projectNav; /w/ unaffected) ────
+  const studioMode = !!projectNav;
+  const PRIMARY_IDS = ['dashboard', 'projects'];
+  const PLATFORM_ORDER = ['landscaper', 'platform-knowledge', 'admin', 'tools', 'admin-feedback', 'help'];
+  const primaryNav = studioMode
+    ? (PRIMARY_IDS.map((id) => navItems.find((n) => n.id === id)).filter(Boolean) as typeof navItems)
+    : navItems;
+  const platformNav = studioMode
+    ? (PLATFORM_ORDER.map((id) => navItems.find((n) => n.id === id)).filter(Boolean) as typeof navItems)
+    : [];
+
   return (
     <>
       <div
         className={`wrapper-sidebar${collapsed ? ' collapsed' : ''}`}
         style={{ width: collapsed ? 48 : sidebarWidth }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         {/* Header */}
         <div className="sb-header">
@@ -275,10 +364,55 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
 
         <div className="sb-divider" />
 
-        {/* Navigation */}
+        {/* Navigation (primary). In studio mode the secondary items move into a
+            collapsible "Platform" group at the bottom, and "Projects" becomes a
+            collapsible group of recent projects + "Show All". /w/ is unchanged. */}
         <div className="sb-nav">
-          {navItems.map((item) => {
+          {primaryNav.map((item) => {
             const isActive = activePage === item.id;
+            if (studioMode && item.id === 'projects') {
+              return (
+                <React.Fragment key={item.id}>
+                  <div
+                    className={`sb-nav-item${isActive ? ' active' : ''}`}
+                    data-label={item.label}
+                    title={item.label}
+                    onClick={() => setProjectsNavOpen((v) => !v)}
+                  >
+                    <NavIcon d={item.paths} />
+                    <span className="sb-nav-label">{item.label}</span>
+                    <span className="sb-section-chev">{projectsNavOpen ? '▾' : '▸'}</span>
+                  </div>
+                  {projectsNavOpen &&
+                    recentProjects.slice(0, DEFAULT_PROJECT_CAP).map((p) => (
+                      <div
+                        key={p.id}
+                        className="sb-nav-item"
+                        data-label={p.name}
+                        title={p.name}
+                        style={{ paddingLeft: 34 }}
+                        onClick={p.onClick}
+                      >
+                        <span className="sb-nav-icon" aria-hidden="true" />
+                        <span className="sb-nav-label">{p.name}</span>
+                      </div>
+                    ))}
+                  {projectsNavOpen && (
+                    <div
+                      className="sb-nav-item"
+                      data-label="Show All"
+                      title="Open the full project list"
+                      style={{ paddingLeft: 34 }}
+                      onClick={() => onNavigate('projects')}
+                    >
+                      <span className="sb-nav-icon" aria-hidden="true" />
+                      <span className="sb-nav-label" style={{ opacity: 0.8 }}>Show All →</span>
+                    </div>
+                  )}
+                  <div className="sb-divider" />
+                </React.Fragment>
+              );
+            }
             return (
               <div
                 key={item.id}
@@ -301,6 +435,97 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
 
         {/* Scrollable sections */}
         <div className="sb-scroll">
+          {/* Project folder tree — studio only (gated on projectNav). Real
+              icons + `.sb-nav-item` rows, same treatment as the global nav. */}
+          {projectNav && (
+            <div className="sb-section">
+              {projectNav.folders.map((folder) => {
+                const hasSub = folder.subTabs.length > 0;
+                const isActiveFolder = folder.id === projectNav.activeFolder;
+                const isOpen = expandedFolders.has(folder.id);
+                const label = formatFolderLabel(folder.label);
+                return (
+                  <React.Fragment key={folder.id}>
+                    <div
+                      className={`sb-nav-item${isActiveFolder ? ' active' : ''}`}
+                      data-label={label}
+                      title={label}
+                      onClick={() => {
+                        if (hasSub) toggleFolderExpanded(folder.id);
+                        projectNav.onSelectFolder(folder.id);
+                      }}
+                    >
+                      <NavIcon d={FOLDER_ICONS[folder.id] || FOLDER_ICON_FALLBACK} />
+                      <span className="sb-nav-label">{label}</span>
+                      {hasSub && (
+                        <span
+                          className="sb-section-chev"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={isOpen ? 'Collapse section' : 'Expand section'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFolderExpanded(folder.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleFolderExpanded(folder.id);
+                            }
+                          }}
+                        >
+                          {isOpen ? '▾' : '▸'}
+                        </span>
+                      )}
+                    </div>
+                    {hasSub && isOpen && folder.subTabs.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className={`sb-nav-item${
+                          isActiveFolder && sub.id === projectNav.activeTab ? ' active' : ''
+                        }`}
+                        data-label={sub.label}
+                        title={sub.label}
+                        style={{ paddingLeft: 34 }}
+                        onClick={() => projectNav.onSelectTab(folder.id, sub.id)}
+                      >
+                        <span className="sb-nav-icon" aria-hidden="true" />
+                        <span className="sb-nav-label">{sub.label}</span>
+                      </div>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
+          {/* Artifacts — studio only. Chat-generated artifacts not tied to a
+              folder screen. Click opens in the right panel (replace). */}
+          {artifactNav && artifactNav.artifacts.length > 0 && (
+            <div className="sb-section">
+              <div
+                className="sb-section-label sb-section-label--toggle"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setArtifactsCollapsed((v) => !v)}
+              >
+                <span>Artifacts</span>
+                <span className="sb-section-chev">{artifactsCollapsed ? '▸' : '▾'}</span>
+              </div>
+              {!artifactsCollapsed &&
+                artifactNav.artifacts.map((a) => (
+                  <div
+                    key={a.id}
+                    className={`sb-nav-item${a.id === artifactNav.activeArtifactId ? ' active' : ''}`}
+                    data-label={a.title}
+                    title={a.title}
+                    onClick={() => artifactNav.onSelectArtifact(a.id)}
+                  >
+                    <NavIcon d={ARTIFACT_ICON} />
+                    <span className="sb-nav-label">{a.title}</span>
+                  </div>
+                ))}
+            </div>
+          )}
           {threads.length > 0 && (
             <div className="sb-section">
               <div
@@ -469,7 +694,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             </div>
           )}
 
-          {recentProjects.length > 0 && (
+          {!studioMode && recentProjects.length > 0 && (
             <div className="sb-section">
               <div
                 className="sb-section-label sb-section-label--toggle"
@@ -503,6 +728,41 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Platform group — studio only. Secondary nav collapsed into a group at
+            the bottom of the panel (Landscaper AI, Platform Knowledge, Admin,
+            Tools, Feedback, Help). Default collapsed. */}
+        {studioMode && platformNav.length > 0 && (
+          <>
+            <div className="sb-divider" />
+            <div className="sb-nav sb-platform-group">
+              <div
+                className="sb-section-label sb-section-label--toggle"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setPlatformCollapsed((v) => !v)}
+              >
+                <span>Platform</span>
+                <span className="sb-section-chev">{platformCollapsed ? '▸' : '▾'}</span>
+              </div>
+              {!platformCollapsed &&
+                platformNav.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`sb-nav-item${activePage === item.id ? ' active' : ''}`}
+                    data-label={item.label}
+                    onClick={() => onNavigate(item.id)}
+                    title={item.label}
+                  >
+                    {item.id === 'platform-knowledge'
+                      ? <PropellerBeanieIcon isThinking={isHelpThinking} />
+                      : <NavIcon d={item.paths} />}
+                    <span className="sb-nav-label">{item.label}</span>
+                    {item.badge && <span className="sb-nav-badge">{item.badge}</span>}
+                  </div>
+                ))}
+            </div>
+          </>
+        )}
 
         {/* Always-visible Chat / Classic selector (sits above the account footer
             so it's reachable from the home screen, not only inside a project). */}

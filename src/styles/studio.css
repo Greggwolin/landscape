@@ -1,0 +1,56 @@
+/**
+ * Studio Shell — three-zone project workspace (/studio/[id]).
+ *
+ *   LEFT  : StudioSidebar → the REAL unified-UI `WrapperSidebar` (own dark
+ *           surface, collapse, resize — all from wrapper.css). Nothing here.
+ *   CENTER: .wrapper-chat-center (CenterChatPanel)
+ *   RIGHT : .wrapper-right-panel (RightContentPanel → ProjectContentRouter / artifact)
+ *
+ * The sidebar, center, and right panels all bring their own styling from
+ * wrapper.css; the center/right are `flex: 1; min-width: 0` and split the space
+ * left after the sidebar. This file only owns the flex container + the right
+ * content collapse strip. CoreUI tokens only — no hardcoded hex.
+ */
+
+.studio-shell {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+}
+
+/* RIGHT — content collapsed strip (chat takes full width). */
+.studio-content-collapsed {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  border-left: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+.studio-content-expand {
+  background: none;
+  border: none;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px;
+  border-radius: 4px;
+}
+.studio-content-expand:hover {
+  color: var(--cui-body-color);
+  background: var(--cui-secondary-bg);
+}
+
+/* Folder/tab content components were authored for a wide container; keep the
+   placeholder/empty states comfortable inside the right panel body. */
+.wrapper-right-body .folder-content-placeholder {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--cui-secondary-color);
+}
