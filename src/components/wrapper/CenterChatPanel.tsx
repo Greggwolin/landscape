@@ -120,6 +120,13 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           context: { tool: toolName },
         });
       }
+      // navigate_to_screen → switch the studio folder/sub-tab in place.
+      if (result.action === 'navigate_screen' && typeof result.folder === 'string') {
+        emitLandscapeCommand('navigate_screen', {
+          folder: result.folder,
+          tab: typeof result.tab === 'string' ? result.tab : undefined,
+        });
+      }
       if (toolName === 'open_input_modal' && result.action === 'open_modal' && typeof result.modal_name === 'string') {
         emitLandscapeCommand('open_modal', {
           modal_name: result.modal_name,

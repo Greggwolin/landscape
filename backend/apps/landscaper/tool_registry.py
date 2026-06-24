@@ -80,6 +80,7 @@ UNIVERSAL_TOOLS = [
     "open_input_modal",
     "navigate_to_project",
     "navigate_to_dashboard",
+    "navigate_to_screen",
     # Server-side report-as-artifact rendering (LF-USERDASH-0514 Phase 3.5).
     # Single tool exposes every registered report (RPT_01..RPT_20+) as an
     # artifact. Schema is built server-side, so large outputs (rent rolls,

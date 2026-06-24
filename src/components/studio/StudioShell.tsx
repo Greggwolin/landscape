@@ -19,11 +19,12 @@
  * content match the legacy surface for every project type.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useProjectContext, type ProjectSummary } from '@/app/components/ProjectProvider';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { useLandscapeCommand } from '@/lib/landscape-command-bus';
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
@@ -122,6 +123,16 @@ function StudioShellInner() {
   // any early return (rules-of-hooks) — keep them above the loading/not-found gates.
   useEffect(() => { setRightView('screen'); }, [currentFolder, currentTab]);
   useEffect(() => { if (hasArtifact) setRightView('artifacts'); }, [hasArtifact]);
+
+  // Chat drives the screens: navigate_to_screen emits a navigate_screen command;
+  // switch the folder/sub-tab in place. Stays above the early-return gates.
+  useLandscapeCommand(
+    'navigate_screen',
+    useCallback(
+      (p: { folder: string; tab?: string }) => setFolderTab(p.folder, p.tab),
+      [setFolderTab],
+    ),
+  );
 
   // ── Loading / not-found (same gates as classic) ─────────────────────
   if (isLoading || fallbackLoading) {

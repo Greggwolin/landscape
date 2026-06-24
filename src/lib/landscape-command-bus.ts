@@ -95,6 +95,17 @@ export interface LandscapeCommandPayloadMap {
     /** Optional context for diagnostics — project name, friendly title, etc. */
     context?: Record<string, unknown>;
   };
+
+  /**
+   * Switch the active folder/sub-tab screen inside the studio project shell
+   * WITHOUT a route change. Backed by the navigate_to_screen Landscaper tool
+   * ({ action: 'navigate_screen', folder, tab }). The studio shell subscribes
+   * and calls setFolderTab.
+   */
+  navigate_screen: {
+    folder: string;
+    tab?: string;
+  };
 }
 
 export type LandscapeCommand = keyof LandscapeCommandPayloadMap;

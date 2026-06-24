@@ -4480,6 +4480,36 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "navigate_to_screen",
+        "description": (
+            "Switch the active screen inside the current project workspace "
+            "(the folder/sub-tab surface) without a full page change. Fire "
+            "ONLY on explicit navigation intent that names a screen — 'take me "
+            "to the budget', 'open land use', 'show the cost approach', 'go to "
+            "the map'. Do NOT fire for data questions ('what's the total "
+            "budget?') — answer those in place. folder is one of: home, "
+            "property, budget, operations, feasibility, valuation, capital, "
+            "reports, documents, map. tab is the optional sub-tab id within the "
+            "folder (e.g. market, landuse, parcels, sales, cashflow, debt, "
+            "equity); omit for folders with no sub-tabs. Invalid ids degrade "
+            "gracefully."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "folder": {
+                    "type": "string",
+                    "description": "Top-level folder id (e.g. property, budget, map).",
+                },
+                "tab": {
+                    "type": "string",
+                    "description": "Optional sub-tab id within the folder.",
+                },
+            },
+            "required": ["folder"],
+        },
+    },
+    {
         "name": "render_report_as_artifact",
         "description": (
             "Render any of the project's registered reports as an artifact in "

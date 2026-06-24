@@ -263,3 +263,46 @@ def navigate_to_dashboard_tool(
         'target_url': '/w/dashboard',
         'message': 'Returning to your dashboard.',
     }
+
+
+@register_tool('navigate_to_screen')
+def navigate_to_screen_tool(
+    tool_input: Dict[str, Any] = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    Switch the active screen inside the current project workspace (the studio
+    folder/sub-tab surface) without a full page change.
+
+    Fire ONLY on explicit navigation intent that names a screen — "take me to
+    the budget", "open land use", "show the cost approach", "go to the map".
+    For data questions ("what's the total budget?"), answer in place instead.
+
+    tool_input: {
+        folder: str  — one of: home | property | budget | operations |
+                       feasibility | valuation | capital | reports |
+                       documents | map
+        tab: str (optional) — sub-tab id within the folder (e.g. market,
+                       landuse, parcels, sales, cashflow, debt, equity)
+    }
+    The studio shell applies this via setFolderTab; invalid ids degrade
+    gracefully (the current screen is kept).
+    """
+    ti = tool_input or {}
+    folder = (ti.get('folder') or '').strip().lower()
+    tab = ti.get('tab')
+    tab = tab.strip().lower() if isinstance(tab, str) and tab.strip() else None
+    if not folder:
+        return {
+            'success': False,
+            'error': 'missing_folder',
+            'message': 'Which screen? e.g. budget, property, map.',
+        }
+    label = folder if not tab else f'{folder} → {tab}'
+    return {
+        'success': True,
+        'action': 'navigate_screen',
+        'folder': folder,
+        'tab': tab,
+        'message': f'Opening {label}.',
+    }
