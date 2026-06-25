@@ -20,7 +20,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useProjectContext, type ProjectSummary } from '@/app/components/ProjectProvider';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
@@ -39,6 +39,7 @@ import { StudioSidebar } from './StudioSidebar';
 function StudioShellInner() {
   const params = useParams();
   const projectId = Number(params.projectId);
+  const router = useRouter();
   const searchParams = useSearchParams();
   // Thread deep-link: /studio/[id]?thread=<uuid> opens that specific conversation
   // (mirrors how /w/ wires initialThreadId). Many entry points carry ?thread.
@@ -138,6 +139,20 @@ function StudioShellInner() {
       (p: { folder: string; tab?: string }) => setFolderTab(p.folder, p.tab),
       [setFolderTab],
     ),
+  );
+
+  // Project / dashboard navigation from chat: navigate_to_project &
+  // navigate_to_dashboard emit a 'navigate' command with a target_url. The /w/
+  // shell handles this; the studio must too now that it's the primary project
+  // shell (target_url is /studio/[id] post-JB14, or /w/projects/[id] which the
+  // funnel redirects into /studio). Hook stays above the early-return gates.
+  useLandscapeCommand(
+    'navigate',
+    useCallback((p: { target_url?: string }) => {
+      if (p && typeof p.target_url === 'string' && p.target_url) {
+        router.push(p.target_url);
+      }
+    }, [router]),
   );
 
   // ── Loading / not-found (same gates as classic) ─────────────────────
