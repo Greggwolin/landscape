@@ -14,6 +14,7 @@
 
 .studio-shell {
   display: flex;
+  position: relative; /* anchor for the ephemeral screen-router toast (JB43) */
   height: 100vh;
   width: 100%;
   overflow: hidden;

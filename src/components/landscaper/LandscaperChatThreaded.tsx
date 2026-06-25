@@ -98,16 +98,22 @@ interface LandscaperChatThreadedProps {
    */
   onBeforeSend?: () => Promise<{ contextSuffix?: string } | void>;
   /**
-   * Studio screen-router pre-send hook (JB37). Fires inside `handleSend` with the
-   * trimmed user text BEFORE the message is sent. Return a non-empty string to
-   * short-circuit the model: the message is NOT sent to the LLM, the user's text
-   * is shown locally, and the returned string is echoed as a local assistant line
-   * ("Opening <screen>."). Return null/undefined/empty to send normally.
+   * Studio screen-router pre-send hook (JB37, revised JB43). Fires inside
+   * `handleSend` with the trimmed user text BEFORE the message is sent. Return
+   * `true` to short-circuit: the message is NOT sent to the LLM and the input is
+   * cleared. The handler itself performs the navigation and shows its OWN
+   * ephemeral confirmation (a transient toast — NOT a chat message). Return
+   * false/undefined to send normally.
+   *
+   * JB43: must NOT inject any message into the thread. Injecting a user+assistant
+   * pair made a pure-nav hit look like a saved conversation that vanished on
+   * refresh (no thread was ever persisted). The chat stays in its real state
+   * (blank, or the actual active thread).
    *
    * Only the studio wires this (StudioShell → CenterChatPanel). When undefined
    * (every /w/ and classic caller), the send path is unchanged.
    */
-  onBeforeUserSend?: (text: string) => string | null | void;
+  onBeforeUserSend?: (text: string) => boolean | void;
   /**
    * Universal drop-zone (FB-298) — pending attachments shown as pills on the
    * composer. Supplied by the shared `useChatAttachment` hook in the parent
@@ -392,7 +398,6 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     sendMessage,
     loadThreads,
     loadAllThreads,
-    appendLocalMessage,
   } = useLandscaperThreads({
     projectId: projectId !== undefined ? projectId.toString() : undefined,
     pageContext,
@@ -645,18 +650,15 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
     const currentMessage = input.trim();
 
-    // Studio screen-router (JB37): if a deterministic nav intent is recognized,
-    // navigate in code and short-circuit BEFORE the model ever sees the text.
-    // The hook returns the echo line ("Opening <screen>."); we show the user's
-    // own message + that confirmation locally, then bail (no LLM round-trip).
-    if (onBeforeUserSend) {
-      const echo = onBeforeUserSend(currentMessage);
-      if (echo) {
-        setInput('');
-        appendLocalMessage(currentMessage, 'user');
-        appendLocalMessage(echo, 'assistant');
-        return;
-      }
+    // Studio screen-router (JB37, revised JB43): if a deterministic nav intent
+    // is recognized, the handler navigates in code and shows its own ephemeral
+    // toast, then we short-circuit BEFORE the model ever sees the text. We do
+    // NOT inject any message — that previously fabricated a phantom, non-persisted
+    // "thread" (user+echo pair) that vanished on refresh. Just clear the input
+    // and bail; the chat keeps its real state (blank or the active thread).
+    if (onBeforeUserSend && onBeforeUserSend(currentMessage) === true) {
+      setInput('');
+      return;
     }
 
     setInput('');

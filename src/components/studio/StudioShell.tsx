@@ -68,6 +68,27 @@ function StudioShellInner() {
   // artifacts trigger lives in the right-panel header (not the left rail).
   const [rightView, setRightView] = useState<'screen' | 'artifacts'>('screen');
 
+  // Ephemeral screen-router confirmation (JB43). A nav hit shows a transient
+  // toast — NOT a chat message — so a pure-nav request never masquerades as a
+  // saved conversation in a phantom thread. Keyed by an incrementing nonce so
+  // repeating the same nav re-triggers the toast + its auto-dismiss timer.
+  const [navToast, setNavToast] = useState<{ text: string; n: number } | null>(null);
+  const navToastN = useRef(0);
+  const showNavToast = useCallback((text: string) => {
+    navToastN.current += 1;
+    setNavToast({ text, n: navToastN.current });
+  }, []);
+  useEffect(() => {
+    if (!navToast) return;
+    const t = setTimeout(() => setNavToast(null), 2200);
+    return () => clearTimeout(t);
+  }, [navToast]);
+
+  // New-chat force-remount key (JB43). Bumping this remounts the chat subtree so
+  // the active thread resets to null (JB33 blank — first send creates the
+  // thread). Used by both the header "+" and the sidebar "New chat".
+  const [chatSessionKey, setChatSessionKey] = useState(0);
+
   // ── Project sourcing (mirrors classic page.tsx) ──────────────────────
   const [fallbackProject, setFallbackProject] = useState<ProjectSummary | null>(null);
   const [fallbackLoading, setFallbackLoading] = useState(false);
@@ -151,14 +172,29 @@ function StudioShellInner() {
   // phrases and data questions ("what's the budget", "...breakdown by phase")
   // don't match the resolver, so they fall through to the model untouched.
   const handleBeforeUserSend = useCallback(
-    (text: string): string | null => {
+    (text: string): boolean => {
       const target = resolveScreenIntent(text, folderConfig.folders);
-      if (!target) return null;
+      if (!target) return false;
       setFolderTab(target.folder, target.tab);
-      return `Opening ${target.label}.`;
+      // JB43: confirm ephemerally (toast), NOT by injecting a chat message into
+      // a thread that was never created. Returning true short-circuits the send.
+      showNavToast(`Opening ${target.label}.`);
+      return true;
     },
-    [folderConfig.folders, setFolderTab],
+    [folderConfig.folders, setFolderTab, showNavToast],
   );
+
+  // New chat IN PLACE (JB43): start a fresh blank studio chat. Drop any ?thread
+  // deep-link so a refresh stays blank, then remount the chat subtree so the
+  // active thread resets to null (JB33 — first send creates + persists it). No
+  // /w/chat redirect, no eager thread create, no 404. Shared by the header "+"
+  // (CenterChatPanel) and the sidebar "New chat" (StudioSidebar).
+  const handleNewChat = useCallback(() => {
+    if (searchParams.get('thread')) {
+      router.replace(`/studio/${projectId}`);
+    }
+    setChatSessionKey((k) => k + 1);
+  }, [searchParams, router, projectId]);
 
   // Project / dashboard navigation from chat: navigate_to_project &
   // navigate_to_dashboard emit a 'navigate' command with a target_url. The /w/
@@ -240,6 +276,7 @@ function StudioShellInner() {
         currentTab={currentTab}
         onSelectFolder={(folderId) => setFolderTab(folderId)}
         onSelectTab={(folderId, tabId) => setFolderTab(folderId, tabId)}
+        onNewChat={handleNewChat}
       />
 
       {/* CENTER — Landscaper chat (renders null when chatOpen is false) */}
@@ -248,7 +285,9 @@ function StudioShellInner() {
         projectName={currentProject.project_name}
         projectTypeCode={effectivePropertyType ?? undefined}
         initialThreadId={initialThreadId}
+        sessionKey={chatSessionKey}
         onBeforeUserSend={handleBeforeUserSend}
+        onNewChat={handleNewChat}
       />
 
       {/* RIGHT — one panel: the routed screen, OR the artifacts workspace
@@ -333,6 +372,35 @@ function StudioShellInner() {
           >
             ⇤
           </button>
+        </div>
+      )}
+
+      {/* Ephemeral screen-router confirmation (JB43) — a transient toast, NOT a
+          chat message. Fades after ~2.2s; never persisted, never a thread. */}
+      {navToast && (
+        <div
+          key={navToast.n}
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 80,
+            maxWidth: 'min(90%, 420px)',
+            padding: '8px 14px',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--cui-body-color, #e6e6e6)',
+            background: 'var(--cui-tertiary-bg, #2a2f3a)',
+            border: '1px solid var(--cui-border-color, #3a3f4b)',
+            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.35)',
+            pointerEvents: 'none',
+          }}
+        >
+          {navToast.text}
         </div>
       )}
     </div>

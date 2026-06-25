@@ -75,7 +75,14 @@ interface CenterChatPanelProps {
    * intercept clean "show me [screen]" phrases and navigate in code before the
    * LLM is invoked; every /w/ caller omits it, leaving the send path unchanged.
    */
-  onBeforeUserSend?: (text: string) => string | null | void;
+  onBeforeUserSend?: (text: string) => boolean | void;
+  /**
+   * Studio "new chat" handler (JB43). When provided, the header "+" starts a
+   * fresh BLANK chat in place (no eager thread create, no /w/chat redirect) by
+   * delegating to this callback instead of `handleStartChat`. /w/ callers omit
+   * it, preserving the existing project-homepage new-chat behavior.
+   */
+  onNewChat?: () => void;
 }
 
 /**
@@ -86,7 +93,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat }: CenterChatPanelProps) {
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
@@ -95,6 +102,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
   // On /w/chat routes, chat IS the content — always visible regardless of chatOpen toggle.
   const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
+  // Studio surface (/studio/[id]) — recovery + new-chat must stay in place here,
+  // never bounce to /w/chat (JB43-STUDIO-CHAT-FIXES-0625).
+  const isStudioRoute = /^\/studio\/\d+/.test(pathname);
 
   // Auto-open chat panel when navigating to a chat route (ensures toggle state stays in sync)
   useEffect(() => {
@@ -667,7 +677,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             {projectId && !showHomepage && (
               <button
                 className="w-btn w-btn-icon w-btn-sm"
-                onClick={() => handleStartChat('')}
+                onClick={() => (onNewChat ? onNewChat() : handleStartChat(''))}
                 title="New chat in this project"
               >
                 <CIcon icon={cilPlus} size="sm" />
@@ -753,13 +763,18 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
               if (!artifactsOpen) toggleArtifacts();
             }}
             onThreadNotFound={() => {
-              // URL-pinned thread is permanently gone (404). Redirect to
-              // /w/chat root so the user gets a fresh session instead of
-              // looping recovery attempts on a dead URL.
+              // URL-pinned thread is permanently gone (404). Recover to a fresh
+              // blank chat for THIS surface — never strand the user on a dead URL.
+              if (isStudioRoute && projectId) {
+                // Studio: drop the bad ?thread and stay blank in /studio/[id]
+                // (JB43). No /w/chat bounce, no red error (hook no longer sets one).
+                router.replace(`/studio/${projectId}`);
+                return;
+              }
               if (isChatRoute) {
                 router.replace('/w/chat');
               }
-              // Project routes: leave the user on the page; the chat panel
+              // Other project routes: leave the user on the page; the chat panel
               // will fall back to project-scoped get_or_create on next send.
             }}
           />

@@ -64,6 +64,11 @@ interface StudioSidebarProps {
   currentTab: string;
   onSelectFolder: (folderId: string) => void;
   onSelectTab: (folderId: string, tabId: string) => void;
+  /**
+   * Start a fresh BLANK chat in place in the studio (JB43). Replaces the old
+   * `router.push('/w/chat')` that ejected the user out of the studio shell.
+   */
+  onNewChat: () => void;
 }
 
 export function StudioSidebar({
@@ -74,6 +79,7 @@ export function StudioSidebar({
   currentTab,
   onSelectFolder,
   onSelectTab,
+  onNewChat,
 }: StudioSidebarProps) {
   const router = useRouter();
   const {
@@ -354,7 +360,7 @@ export function StudioSidebar({
       isHelpThinking={isHelpLoading}
       isAdmin={user?.is_staff === true}
       onSearchClick={openSearch}
-      onNewChat={() => router.push('/w/chat')}
+      onNewChat={onNewChat}
       currentTheme={theme === 'light' ? 'light' : 'dark'}
       onThemeToggle={toggleTheme}
       onLogout={logout}

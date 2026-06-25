@@ -491,12 +491,17 @@ export function useLandscaperThreads({
           // resurrect a different thread. SHORT-CIRCUIT recovery: a 404
           // here is permanent (thread is genuinely gone), retrying 5x
           // floods the console with errors and leaves the user stranded.
-          // Set threadNotFound so CenterChatPanel can redirect to /w/chat.
+          // `threadNotFound` is the recovery signal — the surface-aware
+          // `onThreadNotFound` handler (CenterChatPanel) routes the user to a
+          // fresh blank chat for its surface (/studio/[id] or /w/chat). We do
+          // NOT set a user-facing `error` here: it rendered as a red banner
+          // that (a) was misleading on project/studio routes that don't
+          // "redirect", and (b) flashed during a normal new-chat recovery
+          // (JB43-STUDIO-CHAT-FIXES-0625).
           setActiveThread(null);
           setMessages([]);
           setThreadNotFound(true);
           recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
-          setError('Thread not found — redirecting to a new chat');
         }
         return;
       }
@@ -1112,27 +1117,7 @@ export function useLandscaperThreads({
     }
   }, [activeThread]);
 
-  // Append a purely-local (non-persisted) message to the visible thread. Used by
-  // the studio screen-router (JB37) to echo "Opening <screen>." without a server
-  // round-trip when a nav phrase short-circuits the LLM. Additive: no existing
-  // caller invokes this, so /w/ and classic behavior are unchanged.
-  const appendLocalMessage = useCallback(
-    (content: string, role: 'user' | 'assistant' = 'assistant') => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          messageId: `local-${role}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          role,
-          content,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    },
-    [],
-  );
-
   return {
-    appendLocalMessage,
     // Thread state
     threads,
     allThreads,
