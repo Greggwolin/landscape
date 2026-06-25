@@ -52,7 +52,7 @@ export function UiModeSwitch({ collapsed = false, recentProjectId }: UiModeSwitc
     let destination: string;
     if (projectMatch) {
       const id = projectMatch[1];
-      destination = target === 'classic' ? `/projects/${id}` : `/w/projects/${id}`;
+      destination = target === 'classic' ? `/projects/${id}` : `/studio/${id}`;
     } else if (target === 'classic') {
       // No project open and classic has no home: open the most-recent project in
       // the classic shell so one click lands the user on real classic content.
