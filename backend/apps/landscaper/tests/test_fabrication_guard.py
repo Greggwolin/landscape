@@ -71,3 +71,72 @@ def test_passes_navigate_only_no_figure():
 def test_passes_empty_content():
     assert guard("", []) is False
     assert guard(None, []) is False
+
+
+# ── JB50 slice 2: structure-only tightening ──────────────────────────────────
+
+def test_blocks_dollar_claim_when_only_a_structure_tool_ran():
+    # Reading get_equity_structure (tiers/splits — no computed $) must NOT license
+    # invented dollar totals. Previously this was exempt; now it is blocked.
+    content = "Per the structure, the LP receives $129.7M and the GP promote is $14.4M."
+    assert guard(content, [{'tool': 'get_equity_structure'}]) is True
+
+
+def test_passes_percent_or_dollar_claim_when_a_numbers_tool_ran():
+    # A numbers-producing tool still legitimizes figures.
+    content = "Per the model, distributions are $129.7M to LP with a 1.9x multiple."
+    assert guard(content, [{'tool': 'calculate_waterfall'}]) is False
+
+
+# ── JB50 slice 2: fabricated artifact bodies ─────────────────────────────────
+
+def _reno_card_body():
+    # The JB48 fabrication shape: a card full of invented dollars.
+    return {
+        'tool': 'create_artifact',
+        'input': {
+            'title': 'Renovation Budget',
+            'blocks': [{
+                'type': 'table',
+                'rows': [
+                    ['Total Renovation', '$2.94M'],
+                    ['Per SF', '$25/SF'],
+                    ['Per Unit', '$3,500/unit'],
+                ],
+            }],
+        },
+    }
+
+
+def test_blocks_fabricated_artifact_with_no_numbers_tool():
+    # The forced case: a card with dollar cells and no numbers tool this turn.
+    # Empty chat text — caught via the artifact body, not the reply text.
+    assert guard("", [_reno_card_body()]) is True
+
+
+def test_blocks_fabricated_artifact_even_with_a_structure_tool():
+    # Reading get_equity_structure does not license dollars baked into a card.
+    assert guard("", [{'tool': 'get_equity_structure'}, _reno_card_body()]) is True
+
+
+def test_passes_artifact_when_a_numbers_tool_sourced_it():
+    # Compute then card: the numbers tool legitimizes the card's figures.
+    assert guard("", [{'tool': 'get_budget_items'}, _reno_card_body()]) is False
+
+
+def test_blocks_update_artifact_with_percent_figure():
+    body = {'tool': 'update_artifact', 'input': {'blocks': [{'rows': [['Vacancy', '9.7%']]}]}}
+    assert guard("", [body]) is True
+
+
+def test_passes_artifact_with_no_money_tokens():
+    # A non-financial card (no $/%/x) is not flagged.
+    body = {'tool': 'create_artifact', 'input': {'title': 'Unit Mix', 'blocks': [{'rows': [['1BR', '12 units']]}]}}
+    assert guard("", [body]) is False
+
+
+def test_blocks_object_shaped_artifact_call():
+    class TC:
+        tool = 'create_artifact'
+        input = {'rows': [['Total', '$4.98M']]}
+    assert guard("", [TC()]) is True

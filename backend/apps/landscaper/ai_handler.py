@@ -3677,20 +3677,34 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
 # moment any financial-source tool ran (so "30 line items" / "8% pref" inside a
 # real tool-sourced answer don't trip it). Source list intentionally generous —
 # per the calibration rule, widen the source list rather than loosen the match.
-_FINANCIAL_SOURCE_PREFIXES = (
+# JB50 slice 2 — coarse two-bucket split (hardens JB13).
+# NUMBERS-producing tools return real $/%/x figures, so a financial claim in the
+# reply (or a card) is sourced when one ran this turn.
+_NUMBERS_PRODUCING_PREFIXES = (
     'get_budget', 'calculate_', 'compute_', 'run_draft_calculations',
-    'get_deal_summary', 'get_data_completeness', 'get_operating_statement',
-    'get_cashflow_results', 'get_equity_structure', 'get_waterfall_tiers',
-    'classify_waterfall', 'get_valuation_reconciliation', 'get_value_add_assumptions',
+    'get_deal_summary', 'get_operating_statement', 'get_cashflow_results',
+    'get_valuation_reconciliation', 'get_value_add_assumptions',
     'get_project_assumptions_detail', 'render_report_as_artifact',
-    'generate_report_preview', 'export_report', 'list_available_reports',
-    'get_appraisal_knowledge', 'get_sales_comp', 'get_rental_comp',
+    'generate_report_preview', 'export_report', 'get_sales_comp', 'get_rental_comp',
     'get_expense_comparables', 'get_land_comp_detail', 'get_revenue_rent',
-    'get_cre_rent_roll', 'get_unit', 'get_project_fields', 'get_field_schema',
-    'get_property_attributes', 'get_demographics', 'get_benchmark',
+    'get_cre_rent_roll', 'get_unit', 'get_demographics', 'get_benchmark',
     'get_absorption_benchmarks', 'search_irem_benchmarks', 'store_appraisal_valuation',
-    'store_construction_benchmarks', 'query_platform_knowledge', 'scenario_', 'whatif_',
+    'store_construction_benchmarks', 'scenario_', 'whatif_',
 )
+# STRUCTURE-only tools return shape (tiers, splits, schema, completeness, attribute
+# counts, RAG text) but NOT computed money — reading them must NOT license invented
+# dollar figures (the get_equity_structure case the spec calls out).
+_STRUCTURE_ONLY_PREFIXES = (
+    'get_equity_structure', 'get_waterfall_tiers', 'classify_waterfall',
+    'get_data_completeness', 'get_field_schema', 'get_project_fields',
+    'get_property_attributes', 'list_available_reports', 'get_appraisal_knowledge',
+    'query_platform_knowledge',
+)
+# Union kept for backward compatibility with any other reference.
+_FINANCIAL_SOURCE_PREFIXES = _NUMBERS_PRODUCING_PREFIXES + _STRUCTURE_ONLY_PREFIXES
+
+# Tools whose INPUT body is a rendered card we must inspect for baked-in figures.
+_ARTIFACT_BODY_TOOLS = ('create_artifact', 'update_artifact')
 
 _MONEY_OR_PCT_RE = re.compile(
     r'\$\s?\d[\d,]*(?:\.\d+)?\s?(?:[MmBbKk]|million|billion|thousand)?'
@@ -3704,21 +3718,47 @@ _FIN_CLAIM_KW = re.compile(
 )
 
 
-def reply_states_unsourced_financials(content: str, tool_calls: list) -> bool:
-    """True when the reply states a project financial figure but no financial
-    read/calc tool ran this turn. tool_calls entries are dicts ({'tool': name})
-    or objects (.name/.tool)."""
-    if not content:
-        return False
-    called = []
+def _tool_name(tc) -> str:
+    """Tool name from a tool_calls entry (dict {'tool'/'name': ...} or object)."""
+    if isinstance(tc, dict):
+        return str(tc.get('name') or tc.get('tool') or '')
+    return str(getattr(tc, 'name', '') or getattr(tc, 'tool', '') or '')
+
+
+def _artifact_body_states_financials(tool_calls: list) -> bool:
+    """True when a create/update_artifact body has a money/percent/multiple figure
+    baked into it (JB50 slice 2). Only meaningful when no numbers-producing tool
+    ran — in that case any $ in a card is unsourced (fabricated or carried from
+    memory). Scans the serialized tool input, so labeled-dollar cells/labels
+    ("$2.94M", "$25/SF", "9.7%") are caught. (Bare numeric cells with no $/%/x
+    sign are out of scope of _MONEY_OR_PCT_RE — the 2b decision rule is the
+    primary defense; this is the safety net for the common labeled-dollar case.)"""
     for tc in (tool_calls or []):
-        if isinstance(tc, dict):
-            called.append(str(tc.get('name') or tc.get('tool') or ''))
-        else:
-            called.append(str(getattr(tc, 'name', '') or getattr(tc, 'tool', '') or ''))
-    if any(n.startswith(_FINANCIAL_SOURCE_PREFIXES) for n in called):
-        return False  # a financial tool ran → figures are legitimized
-    return bool(_MONEY_OR_PCT_RE.search(content)) and bool(_FIN_CLAIM_KW.search(content))
+        if not _tool_name(tc).startswith(_ARTIFACT_BODY_TOOLS):
+            continue
+        body = tc.get('input') if isinstance(tc, dict) else getattr(tc, 'input', None)
+        if body is not None and _MONEY_OR_PCT_RE.search(str(body)):
+            return True
+    return False
+
+
+def reply_states_unsourced_financials(content: str, tool_calls: list) -> bool:
+    """True when the reply OR a created artifact states a project financial figure
+    but no NUMBERS-producing tool ran this turn. tool_calls entries are dicts
+    ({'tool': name, 'input': ...}) or objects (.name/.tool/.input).
+
+    JB50 slice 2 hardens JB13: (1) reading a STRUCTURE-only tool (tiers/splits/
+    schema, e.g. get_equity_structure) no longer licenses invented dollars — only
+    a NUMBERS-producing tool does; (2) create_artifact bodies are inspected, not
+    just chat text, so a fabricated card is caught even with no chat figures."""
+    called = [_tool_name(tc) for tc in (tool_calls or [])]
+    if any(n.startswith(_NUMBERS_PRODUCING_PREFIXES) for n in called):
+        return False  # a numbers-producing tool ran → figures are legitimized
+    # No numbers tool this turn: flag a financial claim in the chat text...
+    if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
+        return True
+    # ...or money/percent figures baked into a created/updated artifact body.
+    return _artifact_body_states_financials(tool_calls)
 
 
 def _build_screen_manifest_block(screens: Optional[List[Dict[str, Any]]]) -> str:
@@ -4858,14 +4898,30 @@ def get_landscaper_response(
                     reply_states_unsourced_financials(final_content, tool_calls_made):
                 logger.warning(
                     "[FabricationGuard] Blocked unsourced financial figures — no "
-                    "financial tool ran this turn. tools=%s",
+                    "numbers-producing tool ran this turn. tools=%s",
                     [tc.get('tool') for tc in (tool_calls_made or []) if isinstance(tc, dict)],
                 )
-                final_content = (
-                    "I don't have those figures from the project's data yet. Tell me which "
-                    "screen or calculation you want and I'll pull it — I won't estimate them."
-                )
+                # Mirror the operating_statement_guard envelope (JB50 slice 2) so a
+                # downstream/next turn can recover with a clean question instead of
+                # the blunt fallback. NOTE: at reply-assembly the create_artifact has
+                # already persisted, so this flags + replaces the chat text but does
+                # NOT un-create the card — hard prevention is the create_artifact
+                # service path (services.py), a follow-up.
+                guard_envelope = {
+                    'code': 'unsourced_financials',
+                    'guidance': (
+                        'A dollar/percent figure appeared in the reply or a card but no '
+                        'numbers-producing tool ran this turn. Open the screen that shows it '
+                        '(navigate_to_screen) or call the relevant calculate_/get_ tool, then answer.'
+                    ),
+                    'suggested_user_question': (
+                        "I don't have those figures from the project's data yet — want me to open "
+                        "the screen that shows them, or run the calculation? I won't estimate them."
+                    ),
+                }
+                final_content = guard_envelope['suggested_user_question']
                 metadata['fabrication_guard_blocked'] = True
+                metadata['fabrication_guard'] = guard_envelope
         except Exception as _fg_err:  # never let the guard break a response
             logger.error("[FabricationGuard] guard error (passing original content through): %s", _fg_err)
 
