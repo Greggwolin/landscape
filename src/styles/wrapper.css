@@ -194,13 +194,19 @@
 .wrapper-sidebar.collapsed .sb-new-chat-stub,
 .wrapper-sidebar.collapsed .sb-search,
 .wrapper-sidebar.collapsed .sb-divider,
-.wrapper-sidebar.collapsed .sb-scroll,
 .wrapper-sidebar.collapsed .sb-footer .sb-user-name,
 .wrapper-sidebar.collapsed .sb-footer .sb-user-plan,
+.wrapper-sidebar.collapsed .sb-user-meta,
 .wrapper-sidebar.collapsed .sb-section-label,
 .wrapper-sidebar.collapsed .sb-thread,
 .wrapper-sidebar.collapsed .sb-agent,
+.wrapper-sidebar.collapsed .sb-nav-subitem,
+.wrapper-sidebar.collapsed .sb-nav-icon:empty,
 .wrapper-sidebar.collapsed .sb-nav-badge { display: none; }
+/* Collapsed: keep the scrollable nav (folder tree) visible as an icon rail,
+   aligned with the primary nav; only its sub-rows/labels are hidden (above). */
+.wrapper-sidebar.collapsed .sb-scroll { padding: 0 6px; overflow: visible; }
+.wrapper-sidebar.collapsed .sb-section { margin: 0; }
 .wrapper-sidebar.collapsed .sb-header { justify-content: center; padding: 0; background: var(--w-header-bg, #08090A); }
 .wrapper-sidebar.collapsed .sb-logo { display: none; }
 .wrapper-sidebar.collapsed .sb-collapse { display: flex; margin-left: 0; }
@@ -476,7 +482,7 @@
 .sb-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 8px;
   background: var(--w-accent);
   display: flex;
   align-items: center;

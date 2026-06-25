@@ -384,7 +384,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                     recentProjects.slice(0, DEFAULT_PROJECT_CAP).map((p) => (
                       <div
                         key={p.id}
-                        className="sb-nav-item"
+                        className="sb-nav-item sb-nav-subitem"
                         data-label={p.name}
                         title={p.name}
                         style={{ paddingLeft: 34 }}
@@ -396,7 +396,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                     ))}
                   {projectsNavOpen && (
                     <div
-                      className="sb-nav-item"
+                      className="sb-nav-item sb-nav-subitem"
                       data-label="Show All"
                       title="Open the full project list"
                       style={{ paddingLeft: 34 }}
@@ -479,7 +479,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                     {hasSub && isOpen && folder.subTabs.map((sub) => (
                       <div
                         key={sub.id}
-                        className={`sb-nav-item${
+                        className={`sb-nav-item sb-nav-subitem${
                           isActiveFolder && sub.id === projectNav.activeTab ? ' active' : ''
                         }`}
                         data-label={sub.label}
@@ -717,7 +717,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 <span>Platform</span>
                 <span className="sb-section-chev">{platformCollapsed ? '▸' : '▾'}</span>
               </div>
-              {!platformCollapsed &&
+              {(!platformCollapsed || collapsed) &&
                 platformNav.map((item) => (
                   <div
                     key={item.id}
@@ -744,7 +744,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
         {/* Footer */}
         <div className="sb-footer">
           <div className="sb-avatar">{userInitials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="sb-user-meta" style={{ flex: 1, minWidth: 0 }}>
             <div className="sb-user-name">{userName}</div>
             <div className="sb-user-plan">{userPlan}</div>
           </div>
