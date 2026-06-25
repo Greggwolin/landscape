@@ -33,6 +33,7 @@ import { LocationBriefArtifact } from '@/components/wrapper/LocationBriefArtifac
 import { MapArtifactRenderer } from '@/components/wrapper/MapArtifactRenderer';
 import { ExcelAuditArtifact } from '@/components/wrapper/ExcelAuditArtifact';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
+import { resolveScreenIntent } from '@/lib/studio/screenIntent';
 import ProjectContentRouter from '@/app/projects/[projectId]/ProjectContentRouter';
 import { StudioSidebar } from './StudioSidebar';
 
@@ -141,6 +142,24 @@ function StudioShellInner() {
     ),
   );
 
+  // Deterministic screen-router (JB37): intercept clean "show me / open / take
+  // me to [screen]" messages in code BEFORE the model is invoked, so the LLM
+  // can't reinterpret a pure nav request (it has variously narrated, opened the
+  // report catalog, or computed instead). Returns the echo line on a hit (which
+  // the chat shows as a local assistant message and then bails — no LLM round-
+  // trip); returns null to let the model handle the message normally. Qualified
+  // phrases and data questions ("what's the budget", "...breakdown by phase")
+  // don't match the resolver, so they fall through to the model untouched.
+  const handleBeforeUserSend = useCallback(
+    (text: string): string | null => {
+      const target = resolveScreenIntent(text, folderConfig.folders);
+      if (!target) return null;
+      setFolderTab(target.folder, target.tab);
+      return `Opening ${target.label}.`;
+    },
+    [folderConfig.folders, setFolderTab],
+  );
+
   // Project / dashboard navigation from chat: navigate_to_project &
   // navigate_to_dashboard emit a 'navigate' command with a target_url. The /w/
   // shell handles this; the studio must too now that it's the primary project
@@ -229,6 +248,7 @@ function StudioShellInner() {
         projectName={currentProject.project_name}
         projectTypeCode={effectivePropertyType ?? undefined}
         initialThreadId={initialThreadId}
+        onBeforeUserSend={handleBeforeUserSend}
       />
 
       {/* RIGHT — one panel: the routed screen, OR the artifacts workspace

@@ -98,6 +98,17 @@ interface LandscaperChatThreadedProps {
    */
   onBeforeSend?: () => Promise<{ contextSuffix?: string } | void>;
   /**
+   * Studio screen-router pre-send hook (JB37). Fires inside `handleSend` with the
+   * trimmed user text BEFORE the message is sent. Return a non-empty string to
+   * short-circuit the model: the message is NOT sent to the LLM, the user's text
+   * is shown locally, and the returned string is echoed as a local assistant line
+   * ("Opening <screen>."). Return null/undefined/empty to send normally.
+   *
+   * Only the studio wires this (StudioShell → CenterChatPanel). When undefined
+   * (every /w/ and classic caller), the send path is unchanged.
+   */
+  onBeforeUserSend?: (text: string) => string | null | void;
+  /**
    * Universal drop-zone (FB-298) — pending attachments shown as pills on the
    * composer. Supplied by the shared `useChatAttachment` hook in the parent
    * panel so both UIs render identical pills. When omitted, no pill row shows.
@@ -336,6 +347,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     showThreadList: showThreadListProp,
     onActiveThreadChange,
     onBeforeSend,
+    onBeforeUserSend,
     attachments,
     onRemoveAttachment,
     onAddAttachments,
@@ -380,6 +392,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     sendMessage,
     loadThreads,
     loadAllThreads,
+    appendLocalMessage,
   } = useLandscaperThreads({
     projectId: projectId !== undefined ? projectId.toString() : undefined,
     pageContext,
@@ -631,6 +644,21 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     userHasSentMessage.current = true;
 
     const currentMessage = input.trim();
+
+    // Studio screen-router (JB37): if a deterministic nav intent is recognized,
+    // navigate in code and short-circuit BEFORE the model ever sees the text.
+    // The hook returns the echo line ("Opening <screen>."); we show the user's
+    // own message + that confirmation locally, then bail (no LLM round-trip).
+    if (onBeforeUserSend) {
+      const echo = onBeforeUserSend(currentMessage);
+      if (echo) {
+        setInput('');
+        appendLocalMessage(currentMessage, 'user');
+        appendLocalMessage(echo, 'assistant');
+        return;
+      }
+    }
+
     setInput('');
 
     // Pre-send hook: parent may upload pending attachments and return a

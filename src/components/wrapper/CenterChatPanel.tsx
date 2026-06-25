@@ -69,6 +69,13 @@ interface CenterChatPanelProps {
    *  set (i.e., unassigned/home chats), so the surface reads as the user's
    *  own space rather than the generic "Landscaper." LF-USERDASH-0514. */
   userName?: string;
+  /**
+   * Studio screen-router pre-send hook (JB37). Forwarded verbatim to
+   * LandscaperChatThreaded's `onBeforeUserSend`. The studio passes this to
+   * intercept clean "show me [screen]" phrases and navigate in code before the
+   * LLM is invoked; every /w/ caller omits it, leaving the send path unchanged.
+   */
+  onBeforeUserSend?: (text: string) => string | null | void;
 }
 
 /**
@@ -79,7 +86,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend }: CenterChatPanelProps) {
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
@@ -734,6 +741,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             onThreadCountChange={handleThreadCountChange}
             showThreadList={threadListVisible}
             onBeforeSend={attachment.handleBeforeSend}
+            onBeforeUserSend={onBeforeUserSend}
             attachments={attachment.pendingAttachments}
             onRemoveAttachment={attachment.removeAttachment}
             onAddAttachments={attachment.addFiles}

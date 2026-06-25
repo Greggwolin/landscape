@@ -1112,7 +1112,27 @@ export function useLandscaperThreads({
     }
   }, [activeThread]);
 
+  // Append a purely-local (non-persisted) message to the visible thread. Used by
+  // the studio screen-router (JB37) to echo "Opening <screen>." without a server
+  // round-trip when a nav phrase short-circuits the LLM. Additive: no existing
+  // caller invokes this, so /w/ and classic behavior are unchanged.
+  const appendLocalMessage = useCallback(
+    (content: string, role: 'user' | 'assistant' = 'assistant') => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          messageId: `local-${role}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          role,
+          content,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    },
+    [],
+  );
+
   return {
+    appendLocalMessage,
     // Thread state
     threads,
     allThreads,
