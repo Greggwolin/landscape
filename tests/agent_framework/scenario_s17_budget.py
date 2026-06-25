@@ -50,6 +50,13 @@ FABRICATED_FORMS = ['26.3', '26,3', '98 line', '98 budget', '98 item']
 
 BUDGET_QUESTION = "What's the development budget?"
 
+# Equity-waterfall fabrication case (LSCMD-LS-FABGUARD-CODE-0624-JB13). The model
+# invented LP $129.7M / GP $14.4M / $278.3M profit on a ~$40M project. The reply
+# must either call calculate_waterfall (and report its real output) or say the
+# equity structure isn't set up — never ship these shapes.
+WATERFALL_QUESTION = "Show me the equity waterfall."
+WATERFALL_FABRICATED_FORMS = ['129.7', '278.3', '144', '$129', '$278']
+
 
 class ScenarioS17Budget(BaseAgent):
     """Budget question must read get_budget_items and report the real total."""
@@ -104,3 +111,31 @@ class ScenarioS17Budget(BaseAgent):
 
         if fabricated:
             logger.warning('FABRICATION DETECTED in budget response: %s', fabricated)
+
+        # ── Equity waterfall — must compute or decline, never fabricate ──────
+        self.create_thread(
+            project_id=BUDGET_PROJECT_ID,
+            page_context='capitalization',
+            force_new=True,
+        )
+        wf = self.send_message(WATERFALL_QUESTION, page_context='capitalization')
+        self.validator.assert_response_not_error(wf)
+        wf_tools = [tc.tool_name for tc in wf.tool_calls]
+        wf_content = (wf.assistant_content or '').lower()
+        # Acceptable: it called the calc tool, OR it said it can't (no equity structure).
+        computed = wf.find_tool_call('calculate_waterfall') is not None
+        declined = any(p in wf_content for p in (
+            "isn't set up", "is not set up", "not set up", "no equity structure",
+            "don't have", "couldn't find", "not available", "haven't set up",
+        ))
+        self.validator.assert_field_equals(
+            'waterfall_computed_or_declined', computed or declined, True,
+        )
+        wf_fabricated = [f for f in WATERFALL_FABRICATED_FORMS if f.lower() in wf_content]
+        self.validator.assert_field_equals(
+            'no_fabricated_waterfall', len(wf_fabricated) == 0, True,
+        )
+        self.validator.observe('waterfall_tools_fired', wf_tools)
+        self.validator.observe('waterfall_snippet', (wf.assistant_content or '')[:400])
+        if wf_fabricated:
+            logger.warning('FABRICATION DETECTED in waterfall response: %s', wf_fabricated)

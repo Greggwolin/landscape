@@ -18,6 +18,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 # Also try repo root
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '.env'))
 
+import re
 import anthropic
 from django.conf import settings
 from django.db import connection
@@ -3639,6 +3640,59 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
         return None
 
 
+# ── Fabrication guard (LSCMD-LS-FABGUARD-CODE-0624-JB13) ──────────────────────
+# Deterministic post-response check. If the assistant's final reply STATES a
+# project financial figure (a money/percent/multiple token together with a
+# financial keyword) but NO financial read/calculation tool ran that turn, the
+# number was not sourced from project data → block it. Conservative by design:
+# requires BOTH a money/percent token AND a financial keyword, and is exempt the
+# moment any financial-source tool ran (so "30 line items" / "8% pref" inside a
+# real tool-sourced answer don't trip it). Source list intentionally generous —
+# per the calibration rule, widen the source list rather than loosen the match.
+_FINANCIAL_SOURCE_PREFIXES = (
+    'get_budget', 'calculate_', 'compute_', 'run_draft_calculations',
+    'get_deal_summary', 'get_data_completeness', 'get_operating_statement',
+    'get_cashflow_results', 'get_equity_structure', 'get_waterfall_tiers',
+    'classify_waterfall', 'get_valuation_reconciliation', 'get_value_add_assumptions',
+    'get_project_assumptions_detail', 'render_report_as_artifact',
+    'generate_report_preview', 'export_report', 'list_available_reports',
+    'get_appraisal_knowledge', 'get_sales_comp', 'get_rental_comp',
+    'get_expense_comparables', 'get_land_comp_detail', 'get_revenue_rent',
+    'get_cre_rent_roll', 'get_unit', 'get_project_fields', 'get_field_schema',
+    'get_property_attributes', 'get_demographics', 'get_benchmark',
+    'get_absorption_benchmarks', 'search_irem_benchmarks', 'store_appraisal_valuation',
+    'store_construction_benchmarks', 'query_platform_knowledge', 'scenario_', 'whatif_',
+)
+
+_MONEY_OR_PCT_RE = re.compile(
+    r'\$\s?\d[\d,]*(?:\.\d+)?\s?(?:[MmBbKk]|million|billion|thousand)?'
+    r'|\b\d+(?:\.\d+)?\s?%'
+    r'|\b\d+(?:\.\d+)?x\b',
+    re.I,
+)
+_FIN_CLAIM_KW = re.compile(
+    r'\b(IRR|NPV|equity multiple|promote|pref|hurdle|profit|invested|return|'
+    r'cash ?flow|budget|cap rate|NOI|valuation|waterfall|DSCR|equity)\b', re.I,
+)
+
+
+def reply_states_unsourced_financials(content: str, tool_calls: list) -> bool:
+    """True when the reply states a project financial figure but no financial
+    read/calc tool ran this turn. tool_calls entries are dicts ({'tool': name})
+    or objects (.name/.tool)."""
+    if not content:
+        return False
+    called = []
+    for tc in (tool_calls or []):
+        if isinstance(tc, dict):
+            called.append(str(tc.get('name') or tc.get('tool') or ''))
+        else:
+            called.append(str(getattr(tc, 'name', '') or getattr(tc, 'tool', '') or ''))
+    if any(n.startswith(_FINANCIAL_SOURCE_PREFIXES) for n in called):
+        return False  # a financial tool ran → figures are legitimized
+    return bool(_MONEY_OR_PCT_RE.search(content)) and bool(_FIN_CLAIM_KW.search(content))
+
+
 def get_landscaper_response(
     messages: List[Dict[str, str]],
     project_context: Dict[str, Any],
@@ -4705,6 +4759,28 @@ def get_landscaper_response(
             metadata['has_pending_mutations'] = True
         else:
             metadata['has_pending_mutations'] = False
+
+        # Fabrication guard (LSCMD-LS-FABGUARD-CODE-0624-JB13): if the reply
+        # states project financial figures but no financial read/calc tool ran
+        # this turn, replace it with a safe message instead of shipping invented
+        # numbers. Crash-safe (never break a response) + kill-switch via
+        # settings.LANDSCAPER_FABRICATION_GUARD. v1 uses the fallback message;
+        # a force-the-tool retry is the planned follow-up.
+        try:
+            if getattr(settings, 'LANDSCAPER_FABRICATION_GUARD', True) and \
+                    reply_states_unsourced_financials(final_content, tool_calls_made):
+                logger.warning(
+                    "[FabricationGuard] Blocked unsourced financial figures — no "
+                    "financial tool ran this turn. tools=%s",
+                    [tc.get('tool') for tc in (tool_calls_made or []) if isinstance(tc, dict)],
+                )
+                final_content = (
+                    "I don't have those figures from the project's data yet. Tell me which "
+                    "screen or calculation you want and I'll pull it — I won't estimate them."
+                )
+                metadata['fabrication_guard_blocked'] = True
+        except Exception as _fg_err:  # never let the guard break a response
+            logger.error("[FabricationGuard] guard error (passing original content through): %s", _fg_err)
 
         return {
             'content': final_content,
