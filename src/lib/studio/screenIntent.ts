@@ -72,6 +72,11 @@ const SCREEN_ALIASES: Record<string, [string, string?]> = {
   'rent roll': ['property', 'rent-roll'],
   'location': ['property', 'location'],
   'acquisition': ['property', 'acquisition'],
+  'renovation': ['property', 'renovation'],
+  'renovation budget': ['property', 'renovation'],
+  'renovation plan': ['property', 'renovation'],
+  'value add': ['property', 'renovation'],
+  'value-add': ['property', 'renovation'],
   // Documents / Reports / Map / Home
   'documents': ['documents', 'all'],
   'docs': ['documents', 'all'],

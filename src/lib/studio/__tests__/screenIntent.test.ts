@@ -129,3 +129,46 @@ describe('resolveScreenIntent — property details alias + typo tolerance (JB45)
     expect(resolveScreenIntent('show me land use', incomeFolders)).toBeNull();
   });
 });
+
+describe('resolveScreenIntent — renovation / value-add aliases (JB48)', () => {
+  // The Renovation sub-tab is gated behind value-add (requiresValueAdd), so the
+  // folder list must enable it (6th param). Mirrors a value-add MF deal like
+  // Chadron Terrace, where Property · Renovation is the real Value-Add page.
+  const renoFolders = createFolderConfig('MF', undefined, undefined, undefined, undefined, true).folders;
+
+  it('opens Property · Renovation for "show me the renovation budget" (not a fabricated artifact)', () => {
+    expect(resolveScreenIntent('show me the renovation budget', renoFolders)).toEqual({
+      folder: 'property',
+      tab: 'renovation',
+      label: 'Renovation',
+    });
+  });
+
+  it('opens Property · Renovation for "show me renovation"', () => {
+    expect(resolveScreenIntent('show me renovation', renoFolders)).toEqual({
+      folder: 'property',
+      tab: 'renovation',
+      label: 'Renovation',
+    });
+  });
+
+  it('opens Property · Renovation for "show me the value-add"', () => {
+    expect(resolveScreenIntent('show me the value-add', renoFolders)).toEqual({
+      folder: 'property',
+      tab: 'renovation',
+      label: 'Renovation',
+    });
+  });
+
+  it('does not hijack the data question "what\'s the renovation cost per unit?"', () => {
+    expect(resolveScreenIntent("what's the renovation cost per unit?", renoFolders)).toBeNull();
+  });
+
+  it('falls through on a land project (no renovation screen) → model', () => {
+    expect(resolveScreenIntent('show me the renovation budget', landFolders)).toBeNull();
+  });
+
+  it('falls through on income WITHOUT value-add (renovation sub-tab not exposed)', () => {
+    expect(resolveScreenIntent('show me the renovation budget', incomeFolders)).toBeNull();
+  });
+});
