@@ -16,7 +16,7 @@ import { FileDropProvider } from '@/contexts/FileDropContext';
 import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLandscapeCommand } from '@/lib/landscape-command-bus';
+import { useLandscapeCommand, emitLandscapeCommand } from '@/lib/landscape-command-bus';
 import { redirectToLoginExpired } from '@/lib/authHeaders';
 import '@/styles/wrapper.css';
 
@@ -234,6 +234,23 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     [router],
   );
   useLandscapeCommand('navigate', handleNavigateCommand);
+
+  // navigate_to_screen targets the studio in-panel folder/sub-tab surface, which
+  // the /w/ shell doesn't have. Bridge the screens that have an input modal to
+  // that modal here so "open the budget" still works in /w/ (additive — this
+  // command was previously unhandled here). Screens without a modal are a no-op.
+  const handleNavigateScreen = useCallback(
+    (payload: { folder?: string }) => {
+      const FOLDER_TO_MODAL: Record<string, string> = {
+        budget: 'budget',
+        operations: 'operating_statement',
+      };
+      const modal = payload?.folder ? FOLDER_TO_MODAL[payload.folder] : undefined;
+      if (modal) emitLandscapeCommand('open_modal', { modal_name: modal });
+    },
+    [],
+  );
+  useLandscapeCommand('navigate_screen', handleNavigateScreen);
 
   // LF-USERDASH-0514: clear active-artifact state when the project context
   // changes. activeLocationBrief / activeMapArtifact / activeExcelAudit /
