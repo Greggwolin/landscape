@@ -2305,6 +2305,20 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                     'unassigned': True,
                 }
 
+            # JB50: the studio chat sends a live screen manifest (one entry per
+            # folder/sub-tab, derived from the frontend folderConfig) so the model
+            # can be told the real screens this project exposes. Only project-scoped
+            # threads carry it; we validate shape and ignore malformed input so a
+            # bad payload can never reach the prompt builder. /w/ + classic don't
+            # send it → key absent → _build_screen_manifest_block no-ops.
+            _screens = request.data.get('available_screens')
+            if thread.project_id is not None and isinstance(_screens, list) and _screens:
+                project_context['available_screens'] = [
+                    {'folder': s['folder'], 'label': s['label'], 'tab': s.get('tab')}
+                    for s in _screens
+                    if isinstance(s, dict) and s.get('folder') and s.get('label')
+                ]
+
             # Get past conversation context for RAG — only for project-scoped threads
             # (unassigned threads don't generate embeddings — see EmbeddingService.embed_message)
             if thread.project_id is not None:

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
 import { redirectToLoginExpired } from '@/lib/authHeaders';
+import type { ScreenManifestEntry } from '@/lib/studio/screenManifest';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const REQUEST_TIMEOUT_MS = 150000;
@@ -117,6 +118,12 @@ interface UseLandscaperThreadsOptions {
   initialThreadId?: string;
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
   onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
+  /**
+   * Studio screen manifest (JB50). When set, each sent message includes an
+   * `available_screens` field so the backend can tell the model the real
+   * screens this project exposes. Studio-only — /w/ and classic omit it.
+   */
+  availableScreens?: ScreenManifestEntry[];
 }
 
 /** True when the projectId string represents a real project (not unassigned mode). */
@@ -199,7 +206,13 @@ export function useLandscaperThreads({
   initialThreadId,
   onFieldUpdate,
   onToolResult,
+  availableScreens,
 }: UseLandscaperThreadsOptions) {
+  // Held in a ref so sendMessage (a useCallback) reads the latest manifest
+  // without churning its identity each render (JB50).
+  const availableScreensRef = useRef<ScreenManifestEntry[] | undefined>(availableScreens);
+  availableScreensRef.current = availableScreens;
+
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
@@ -910,6 +923,12 @@ export function useLandscaperThreads({
             body: JSON.stringify({
               content: message,
               page_context: pageContext,  // Pass for context-aware tool filtering
+              // JB50: studio sends the live screen manifest so the backend can
+              // tell the model the real screens this project exposes. Omitted
+              // everywhere else (undefined) → /w/ + classic payloads unchanged.
+              ...(availableScreensRef.current && availableScreensRef.current.length
+                ? { available_screens: availableScreensRef.current }
+                : {}),
               ...(isHidden ? { hidden: true } : {}),
             }),
           }

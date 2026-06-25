@@ -19,7 +19,7 @@
  * content match the legacy surface for every project type.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useProjectContext, type ProjectSummary } from '@/app/components/ProjectProvider';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
@@ -34,6 +34,7 @@ import { MapArtifactRenderer } from '@/components/wrapper/MapArtifactRenderer';
 import { ExcelAuditArtifact } from '@/components/wrapper/ExcelAuditArtifact';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import { resolveScreenIntent } from '@/lib/studio/screenIntent';
+import { buildScreenManifest } from '@/lib/studio/screenManifest';
 import ProjectContentRouter from '@/app/projects/[projectId]/ProjectContentRouter';
 import { StudioSidebar } from './StudioSidebar';
 
@@ -141,6 +142,13 @@ function StudioShellInner() {
   // The one right panel holds two content kinds: a Landscaper artifact when one
   // is active (set by CenterChatPanel tool results), otherwise the structured
   // router surface.
+  // Live screen manifest sent to the model each turn (JB50 slice 1) — the real,
+  // project-type-aware screen list derived from the same folderConfig the rail uses.
+  const availableScreens = useMemo(
+    () => buildScreenManifest(folderConfig.folders),
+    [folderConfig.folders],
+  );
+
   const hasArtifact =
     activeArtifactId != null ||
     !!activeLocationBrief ||
@@ -299,6 +307,7 @@ function StudioShellInner() {
         sessionKey={chatSessionKey}
         onBeforeUserSend={handleBeforeUserSend}
         onNewChat={handleNewChat}
+        availableScreens={availableScreens}
       />
 
       {/* RIGHT — one panel: the routed screen, OR the artifacts workspace

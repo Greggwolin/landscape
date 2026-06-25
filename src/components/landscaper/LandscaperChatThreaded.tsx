@@ -115,6 +115,11 @@ interface LandscaperChatThreadedProps {
    */
   onBeforeUserSend?: (text: string) => boolean | void;
   /**
+   * Studio screen manifest (JB50). Forwarded to useLandscaperThreads so each
+   * sent message carries `available_screens`. Studio-only; /w/ + classic omit it.
+   */
+  availableScreens?: import('@/lib/studio/screenManifest').ScreenManifestEntry[];
+  /**
    * Universal drop-zone (FB-298) — pending attachments shown as pills on the
    * composer. Supplied by the shared `useChatAttachment` hook in the parent
    * panel so both UIs render identical pills. When omitted, no pill row shows.
@@ -354,6 +359,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onActiveThreadChange,
     onBeforeSend,
     onBeforeUserSend,
+    availableScreens,
     attachments,
     onRemoveAttachment,
     onAddAttachments,
@@ -404,6 +410,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     subtabContext,
     initialThreadId,
     onToolResult,
+    availableScreens,
   });
 
   // Bubble activeThread id changes up to the parent so /w/chat can sync the URL.

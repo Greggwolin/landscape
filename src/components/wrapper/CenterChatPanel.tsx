@@ -83,6 +83,11 @@ interface CenterChatPanelProps {
    * it, preserving the existing project-homepage new-chat behavior.
    */
   onNewChat?: () => void;
+  /**
+   * Studio screen manifest (JB50). Forwarded to LandscaperChatThreaded so each
+   * sent message carries `available_screens`. /w/ callers omit it (unchanged).
+   */
+  availableScreens?: import('@/lib/studio/screenManifest').ScreenManifestEntry[];
 }
 
 /**
@@ -93,7 +98,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat, availableScreens }: CenterChatPanelProps) {
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
@@ -752,6 +757,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             showThreadList={threadListVisible}
             onBeforeSend={attachment.handleBeforeSend}
             onBeforeUserSend={onBeforeUserSend}
+            availableScreens={availableScreens}
             attachments={attachment.pendingAttachments}
             onRemoveAttachment={attachment.removeAttachment}
             onAddAttachments={attachment.addFiles}

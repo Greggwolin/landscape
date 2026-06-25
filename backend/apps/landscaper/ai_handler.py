@@ -1563,30 +1563,49 @@ Examples of questions that REQUIRE a fresh DB read:
 If you answer any of these from memory without calling a read tool, you are likely giving
 the user incorrect information.
 
-NAVIGATION vs DATA INTENT (decide this first):
-- Navigational wording — "take me to", "open", "go to", "show me the [budget / land use /
-  map / equity waterfall / ...]" — means OPEN that screen. Call **navigate_to_screen** with the
-  matching folder (e.g. folder="budget"; "equity waterfall" / "waterfall" / "the equity" →
-  folder="capital", tab="equity"). Do NOT answer with a data summary; just navigate. The user
-  wants the panel, not a paragraph.
-  Use navigate_to_screen for this — NOT open_input_modal, and NOT create_artifact /
-  render_report_as_artifact. navigate_to_screen opens the ACTUAL interactive screen/form (e.g.
-  the live, editable budget grid with its inputs and phasing) in the working panel. "show me /
-  open the budget" means open that live budget form — do NOT build a read-only "Development
-  Budget" artifact or summary of it. The equity waterfall is likewise a SCREEN — the
-  Capitalization → Equity screen (folder="capital", tab="equity") — navigate to it; do NOT
-  narrate or compute its distributions/IRR in chat. (A genuine artifact like a location brief —
-  one with no underlying screen — is the only kind of thing that legitimately comes from a
-  generate/calculate tool here.) open_input_modal pops a BLOCKING modal and is ONLY for editing one specific record the
-  user explicitly asks to edit ("edit the rent roll", "let me enter property details").
+SCREEN vs CUSTOM CARD vs DATA — decide this first; when unsure, ASK before acting:
+
+This project already has built-in interactive screens (the budget grid, the renovation / value-add
+page, property details, the Capitalization → Equity waterfall, operations P&L, valuation, reports,
+map, documents, etc. — the SCREENS IN THIS PROJECT block lists the exact ones). Every request is one
+of three:
+
+1. OPEN A SCREEN — the user wants a page that already exists, asked for as-is ("show me / open /
+   take me to the [budget / renovation budget / property details / equity waterfall / ...]"). Call
+   **navigate_to_screen** with the matching folder (e.g. folder="budget"; "equity waterfall" /
+   "waterfall" / "the equity" → folder="capital", tab="equity"; "renovation budget" / "value-add" →
+   folder="property", tab="renovation"). Just navigate — do NOT answer with a data summary, and do
+   NOT build an artifact that duplicates a screen. navigate_to_screen opens the ACTUAL interactive,
+   editable screen (the live budget grid with its inputs and phasing; the real Value-Add page with
+   its real numbers) — which is what the user wants, not a read-only copy. NEVER use create_artifact
+   / render_report_as_artifact to reproduce something an existing screen already shows. (A genuine
+   artifact with no underlying screen — e.g. a location brief — is the only thing that legitimately
+   comes from a generate/calculate tool here.)
+
+2. BUILD A CUSTOM CARD — the user wants a slice, filter, or combination that NO existing screen shows
+   ("total renovation budget for just the 1BR units", "compare the 2BR vs 3BR rent premiums"). Only
+   then build an artifact — and EVERY number in it MUST come from a calculate_/compute_/get_ tool you
+   call this same turn. Never compose, estimate, or carry a dollar figure or percentage from memory
+   into a card. If you cannot source a number from a tool, do not put it in the card — ask.
+
+3. ANSWER — a quick figure or question ("what's the cap rate", "how many units"). Read the relevant
+   tool and report only what it returns. Never fabricate.
+
+WHEN UNSURE which of the three the user wants — i.e. you are NOT confident an existing screen covers
+the ask — ASK ONE short clarifying question BEFORE doing anything. Do NOT navigate, do NOT build a
+card, do NOT state figures on a guess. Example: "Did you want the Renovation page, or a 1BR-only
+breakdown built as a separate card?" Showing the user something they did not ask for is worse than a
+one-line question. This fires ONLY on genuine ambiguity — confident OPEN-A-SCREEN, confident CUSTOM,
+and confident ANSWER all proceed without a question. Do not ask needless questions on clear requests.
+
+open_input_modal pops a BLOCKING modal and is ONLY for editing one specific record the user
+explicitly asks to edit ("edit the rent roll", "let me enter property details").
 - Switching to a DIFFERENT project, or to home/dashboard — "take me to [project name or id]",
   "open the X deal", "switch to X", "go home", "back to the dashboard" — you MUST call the tool:
   navigate_to_project (with project_id or project_name) for a project, navigate_to_dashboard for
   home. This is non-negotiable: saying "Opening X now" or "I'll navigate you to X" WITHOUT calling
   the tool does NOTHING — the UI only moves when the tool actually fires. Never narrate a
   navigation you did not invoke; if you intend to navigate, emit the tool call in the SAME turn.
-- Data wording — "what is", "how much", "how many", "list", "break it down" — means ANSWER.
-  Read the relevant tool and report only what it returns. Never fabricate.
 
 DATA LOOKUP PRIORITY (CRITICAL):
 When the user asks about property data, comps, market info, budget / development cost, or any
@@ -3702,6 +3721,58 @@ def reply_states_unsourced_financials(content: str, tool_calls: list) -> bool:
     return bool(_MONEY_OR_PCT_RE.search(content)) and bool(_FIN_CLAIM_KW.search(content))
 
 
+def _build_screen_manifest_block(screens: Optional[List[Dict[str, Any]]]) -> str:
+    """Render the SCREENS IN THIS PROJECT block from the frontend folderConfig (JB50).
+
+    `screens` is the live, project-type-specific list the studio chat sends from its
+    createFolderConfig output — each entry a dict like {folder, tab?, label}. Returns
+    '' when none were supplied (e.g. home/unassigned chat) so nothing is injected.
+
+    Purpose: the model otherwise has NO per-project list of built-in screens (only a
+    flat folder list in one tool description), so it fabricates an artifact instead of
+    opening the real screen. This block gives it the exact screens that exist for THIS
+    project so it can prefer navigate_to_screen over a duplicate card. Bare labeled
+    list (folder + sub-tab labels + their ids); no hand-authored blurbs in v1.
+    """
+    if not screens or not isinstance(screens, (list, tuple)):
+        return ''
+    # Group sub-tabs under their folder, preserving first-seen order.
+    folders: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for s in screens:
+        if not isinstance(s, dict):
+            continue
+        folder_id = str(s.get('folder') or '').strip()
+        if not folder_id:
+            continue
+        label = str(s.get('label') or '').strip()
+        tab = s.get('tab')
+        if folder_id not in folders:
+            folders[folder_id] = {'label': '', 'subs': []}
+            order.append(folder_id)
+        entry = folders[folder_id]
+        if tab:
+            entry['subs'].append((str(tab), label))
+        elif label:
+            entry['label'] = label
+    if not order:
+        return ''
+    lines = [
+        "\n\n=== SCREENS IN THIS PROJECT ===",
+        "These are the built-in, interactive screens this project already has. When the",
+        "user asks for one of these as-is, OPEN it with navigate_to_screen(folder, tab) —",
+        "do NOT build an artifact that duplicates it. Only build a custom card for a",
+        "slice/filter no screen below covers (see SCREEN vs CUSTOM CARD vs DATA above).",
+    ]
+    for folder_id in order:
+        entry = folders[folder_id]
+        flabel = entry['label'] or folder_id
+        lines.append(f'- {flabel}  (folder="{folder_id}")')
+        for tab_id, sub_label in entry['subs']:
+            lines.append(f'    • {sub_label}  (tab="{tab_id}")')
+    return "\n".join(lines) + "\n"
+
+
 def get_landscaper_response(
     messages: List[Dict[str, str]],
     project_context: Dict[str, Any],
@@ -3764,6 +3835,13 @@ def get_landscaper_response(
             logger.warning(f"Failed to load user custom instructions: {e}")
 
     full_system = f"{system_prompt}\n{scope_section}\n{field_rules}{user_instructions_section}\n---\n{project_context_msg}"
+
+    # SCREENS IN THIS PROJECT (JB50) — the live, project-type-specific list of
+    # built-in screens, sent by the studio chat from its createFolderConfig output
+    # and threaded in via project_context['available_screens']. Lets the model open
+    # an existing screen instead of fabricating an artifact that duplicates one.
+    # Empty/absent (home, unassigned, /w/ until wired) → nothing injected.
+    full_system += _build_screen_manifest_block(project_context.get('available_screens'))
 
     # Unassigned thread context hint
     project_id = project_context.get('project_id')
