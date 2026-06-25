@@ -87,3 +87,45 @@ describe('resolveScreenIntent — project-type awareness (no cross-type misfire)
     });
   });
 });
+
+describe('resolveScreenIntent — property details alias + typo tolerance (JB45)', () => {
+  it('routes "show me the property details" to the Property Details screen', () => {
+    expect(resolveScreenIntent('show me the property details', incomeFolders)).toEqual({
+      folder: 'property',
+      tab: 'property-details',
+      label: 'Property Details',
+    });
+  });
+
+  it('routes the common typo "show me the propery details" to Property Details', () => {
+    expect(resolveScreenIntent('show me the propery details', incomeFolders)).toEqual({
+      folder: 'property',
+      tab: 'property-details',
+      label: 'Property Details',
+    });
+  });
+
+  it('tolerates a typo on a folder/sub-tab label — "take me to the budgett"', () => {
+    expect(resolveScreenIntent('take me to the budgett', landFolders)).toEqual({
+      folder: 'budget',
+      tab: 'budget',
+      label: 'Budget',
+    });
+  });
+
+  it('does not fuzzy-match short labels — "show me the cap" is NOT "map"', () => {
+    expect(resolveScreenIntent('show me the cap', landFolders)).toBeNull();
+  });
+
+  it('still does not hijack data questions — "show me the average rent"', () => {
+    expect(resolveScreenIntent('show me the average rent', incomeFolders)).toBeNull();
+  });
+
+  it('still does not hijack qualified phrases — "show me the budget breakdown by phase"', () => {
+    expect(resolveScreenIntent('show me the budget breakdown by phase', landFolders)).toBeNull();
+  });
+
+  it('falls through on income when Property has no land-use sub-tab (no cross-type fuzzy)', () => {
+    expect(resolveScreenIntent('show me land use', incomeFolders)).toBeNull();
+  });
+});

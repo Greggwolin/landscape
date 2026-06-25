@@ -147,10 +147,25 @@ function StudioShellInner() {
     !!activeMapArtifact ||
     !!activeExcelAudit;
 
-  // Selecting a screen returns the right panel to that screen; a chat-created
-  // artifact opens the artifacts view automatically. These hooks MUST run before
-  // any early return (rules-of-hooks) — keep them above the loading/not-found gates.
-  useEffect(() => { setRightView('screen'); }, [currentFolder, currentTab]);
+  // Clear the active artifact pointers and return the right panel to the routed
+  // screen. The artifact is NOT deleted — it stays in the Artifacts list/history;
+  // this just stops it covering the screen. Mirrors the folder-click path's
+  // clear (StudioSidebar.clearActiveArtifacts) so EVERY navigation behaves the
+  // same (JB45).
+  const clearActiveArtifacts = useCallback(() => {
+    setActiveArtifactId(null);
+    setActiveLocationBrief(null);
+    setActiveMapArtifact(null);
+    setActiveExcelAudit(null);
+    setRightView('screen');
+  }, [setActiveArtifactId, setActiveLocationBrief, setActiveMapArtifact, setActiveExcelAudit]);
+
+  // Navigating to a screen (folder click, router, or navigate_screen command —
+  // all change currentFolder/currentTab) replaces any open artifact with that
+  // screen. A chat-created artifact (no folder change) still opens the artifacts
+  // view automatically. These hooks MUST run before any early return
+  // (rules-of-hooks) — keep them above the loading/not-found gates.
+  useEffect(() => { clearActiveArtifacts(); }, [currentFolder, currentTab, clearActiveArtifacts]);
   useEffect(() => { if (hasArtifact) setRightView('artifacts'); }, [hasArtifact]);
 
   // Chat drives the screens: navigate_to_screen emits a navigate_screen command;
@@ -158,30 +173,32 @@ function StudioShellInner() {
   useLandscapeCommand(
     'navigate_screen',
     useCallback(
-      (p: { folder: string; tab?: string }) => setFolderTab(p.folder, p.tab),
-      [setFolderTab],
+      (p: { folder: string; tab?: string }) => {
+        setFolderTab(p.folder, p.tab);
+        clearActiveArtifacts(); // JB45: bring the screen to the front
+      },
+      [setFolderTab, clearActiveArtifacts],
     ),
   );
 
   // Deterministic screen-router (JB37): intercept clean "show me / open / take
   // me to [screen]" messages in code BEFORE the model is invoked, so the LLM
   // can't reinterpret a pure nav request (it has variously narrated, opened the
-  // report catalog, or computed instead). Returns the echo line on a hit (which
-  // the chat shows as a local assistant message and then bails — no LLM round-
-  // trip); returns null to let the model handle the message normally. Qualified
-  // phrases and data questions ("what's the budget", "...breakdown by phase")
-  // don't match the resolver, so they fall through to the model untouched.
+  // report catalog, or computed instead). On a hit it navigates, clears any open
+  // artifact so the screen comes to the front (JB45), shows an ephemeral toast,
+  // and returns true to short-circuit the send (JB43 — no chat message injected).
+  // Returns false for anything not a clean nav phrase, so data questions and
+  // qualified phrases ("what's the budget", "...breakdown by phase") reach the model.
   const handleBeforeUserSend = useCallback(
     (text: string): boolean => {
       const target = resolveScreenIntent(text, folderConfig.folders);
       if (!target) return false;
       setFolderTab(target.folder, target.tab);
-      // JB43: confirm ephemerally (toast), NOT by injecting a chat message into
-      // a thread that was never created. Returning true short-circuits the send.
+      clearActiveArtifacts(); // JB45: navigating replaces the open artifact
       showNavToast(`Opening ${target.label}.`);
       return true;
     },
-    [folderConfig.folders, setFolderTab, showNavToast],
+    [folderConfig.folders, setFolderTab, clearActiveArtifacts, showNavToast],
   );
 
   // New chat IN PLACE (JB43): start a fresh blank studio chat. Drop any ?thread
@@ -255,13 +272,7 @@ function StudioShellInner() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const routerProject = currentProject as any;
 
-  const backToScreen = () => {
-    setActiveArtifactId(null);
-    setActiveLocationBrief(null);
-    setActiveMapArtifact(null);
-    setActiveExcelAudit(null);
-    setRightView('screen');
-  };
+  const backToScreen = clearActiveArtifacts;
 
   return (
     <div className="studio-shell">
