@@ -515,48 +515,16 @@ export function useLandscaperThreads({
         return;
       }
 
-      // --- Branch 2: Project-scoped chat — existing get_or_create flow ---
-      const loadedThreads = await loadThreads();
+      // --- Branch 2: Project-scoped chat, no URL thread → start BLANK ---
+      // A bare project chat (no ?thread) opens a FRESH conversation rather than
+      // auto-resuming the most-recent thread. sendMessage creates the project-
+      // scoped thread on the first user message (mirrors Branch 3). Past threads
+      // stay browsable via the list / selectThread. (JB33-NEW-THREAD-ON-BLANK)
+      await loadThreads();
       if (mySignal.aborted) return;
-
-      const existingActive = loadedThreads.find((t: ChatThread) => t.isActive);
-
-      if (existingActive) {
-        setActiveThread(existingActive);
-        await loadThreadMessages(existingActive.threadId);
-      } else {
-        // No active thread for this (project, page_context) — use
-        // server-side get_or_create (SELECT FOR UPDATE protected). Handles
-        // both "reactivate most recent" and "create new" via one call.
-        const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            project_id: parseInt(projectId),
-            page_context: pageContext,
-            subtab_context: subtabContext || null,
-          }),
-        });
-
-        if (mySignal.aborted) return;
-
-        if (isAuthError(response)) {
-          // Token expired or revoked. Stop retrying and redirect to /login
-          // with the ?expired=1 marker so the login page can explain why
-          // (finding #13 — silent rendering of empty data was costing
-          // 30+ minutes of false-debug per session).
-          recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
-          redirectToLoginExpired();
-          return;
-        }
-
-        const data = await response.json();
-        if (data.success && data.thread) {
-          setActiveThread(data.thread);
-          await loadThreadMessages(data.thread.threadId);
-          await loadThreads();
-        }
-      }
+      setActiveThread(null);
+      setMessages([]);
+      return;
     } catch (err) {
       // Silently ignore aborts from unmount/context change
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -845,10 +813,50 @@ export function useLandscaperThreads({
             setError('Failed to start new thread');
             return;
           }
+        } else if (hasProjectId(projectId) && !initialThreadId) {
+          // Project-scoped bare chat, first message — create a FRESH project
+          // thread (mirrors the unassigned path above; bypasses get_or_create
+          // so we don't resurrect the most-recent thread). JB33. sendingRef set
+          // BEFORE the POST so the activeThread-watch effect skips the abort+
+          // reload race (same reason as the unassigned branch).
+          sendingRef.current = true;
+          try {
+            const response = await fetchWithTimeout(
+              `${DJANGO_API_URL}/api/landscaper/threads/new/`,
+              {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  project_id: parseInt(projectId),
+                  page_context: pageContext,
+                  subtab_context: subtabContext || null,
+                }),
+              }
+            );
+            if (isAuthError(response)) {
+              redirectToLoginExpired();
+              return;
+            }
+            const data = await response.json();
+            if (data.success && data.thread) {
+              setActiveThread(data.thread);
+              activeThreadRef.current = data.thread;
+              setMessages([]);
+              loadThreads();
+            } else {
+              setError(data.error || 'Failed to start new thread');
+              return;
+            }
+          } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            console.error('[LandscaperThreads] Failed to create project thread on first send:', err);
+            setError('Failed to start new thread');
+            return;
+          }
         } else {
-          // Project-scoped or URL-pinned with missing thread — run full
-          // initializeThread recovery. initializeThread keeps
-          // activeThreadRef in sync via the state→ref effect.
+          // URL-pinned (?thread) with a missing thread — run full
+          // initializeThread recovery. initializeThread keeps activeThreadRef
+          // in sync via the state→ref effect.
           console.log('[LandscaperThreads] No active thread — attempting recovery before send...');
           try {
             await initializeThread();
