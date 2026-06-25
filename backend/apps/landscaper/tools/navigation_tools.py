@@ -168,7 +168,7 @@ def navigate_to_project_tool(
             {
                 'success': True,
                 'action': 'navigate',
-                'target_url': '/w/projects/<id>',
+                'target_url': '/studio/<id>',
                 'project_id': <id>,
                 'project_name': <name>,
                 'message': 'Opening <name>.'
@@ -235,7 +235,9 @@ def navigate_to_project_tool(
         }
 
     # --- Build navigation envelope -----------------------------------------
-    target_url = f"/w/projects/{project['project_id']}"
+    # Studio is the single project shell (LSCMD-STUDIO-PRIMARY-SHELL-0624-JB14);
+    # land directly there instead of /w/projects (which now funnels into studio).
+    target_url = f"/studio/{project['project_id']}"
     return {
         'success': True,
         'action': 'navigate',

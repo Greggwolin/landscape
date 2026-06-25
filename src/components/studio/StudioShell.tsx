@@ -20,7 +20,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useProjectContext, type ProjectSummary } from '@/app/components/ProjectProvider';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
@@ -39,6 +39,12 @@ import { StudioSidebar } from './StudioSidebar';
 function StudioShellInner() {
   const params = useParams();
   const projectId = Number(params.projectId);
+  const searchParams = useSearchParams();
+  // Thread deep-link: /studio/[id]?thread=<uuid> opens that specific conversation
+  // (mirrors how /w/ wires initialThreadId). Many entry points carry ?thread.
+  const _threadParam = searchParams.get('thread');
+  const initialThreadId =
+    _threadParam && /^[0-9a-fA-F-]{36}$/.test(_threadParam) ? _threadParam : undefined;
   const { projects, activeProject, isLoading } = useProjectContext();
   const {
     chatOpen,
@@ -207,6 +213,7 @@ function StudioShellInner() {
         projectId={projectId}
         projectName={currentProject.project_name}
         projectTypeCode={effectivePropertyType ?? undefined}
+        initialThreadId={initialThreadId}
       />
 
       {/* RIGHT — one panel: the routed screen, OR the artifacts workspace

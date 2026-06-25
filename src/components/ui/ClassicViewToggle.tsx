@@ -34,7 +34,7 @@ export function ClassicViewToggle({
   const target: UiMode = current === 'classic' ? 'unified' : 'classic';
   const label = current === 'classic' ? 'Chat view' : 'Classic view';
   const destination =
-    target === 'classic' ? `/projects/${projectId}` : `/w/projects/${projectId}`;
+    target === 'classic' ? `/projects/${projectId}` : `/studio/${projectId}`;
 
   const handleClick = () => {
     // Server-authoritative: navigating with ?setui=<mode> lets middleware set
