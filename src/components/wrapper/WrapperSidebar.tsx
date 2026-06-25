@@ -317,16 +317,17 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
       item.id === 'help' && !isAdmin ? { ...item, label: 'Help / Feedback' } : item,
     );
 
-  // ── Studio-mode nav grouping (gated on projectNav; /w/ unaffected) ────
-  const studioMode = !!projectNav;
-  const PRIMARY_IDS = ['dashboard', 'projects'];
+  // ── Universal decluttered nav (applies on /w/ home AND studio). The folder
+  //    tree is the only project-specific addition (gated on projectNav below).
+  //    Primary nav = Home + Projects always; Map + Reports also sit up top when
+  //    there's NO project folder tree to hold them (i.e. the home).
+  const inProject = !!projectNav;
+  const PRIMARY_IDS = inProject
+    ? ['dashboard', 'projects']
+    : ['dashboard', 'projects', 'map', 'reports'];
   const PLATFORM_ORDER = ['landscaper', 'platform-knowledge', 'admin', 'tools', 'admin-feedback', 'help'];
-  const primaryNav = studioMode
-    ? (PRIMARY_IDS.map((id) => navItems.find((n) => n.id === id)).filter(Boolean) as typeof navItems)
-    : navItems;
-  const platformNav = studioMode
-    ? (PLATFORM_ORDER.map((id) => navItems.find((n) => n.id === id)).filter(Boolean) as typeof navItems)
-    : [];
+  const primaryNav = PRIMARY_IDS.map((id) => navItems.find((n) => n.id === id)).filter(Boolean) as typeof navItems;
+  const platformNav = PLATFORM_ORDER.map((id) => navItems.find((n) => n.id === id)).filter(Boolean) as typeof navItems;
 
   return (
     <>
@@ -366,7 +367,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
         <div className="sb-nav">
           {primaryNav.map((item) => {
             const isActive = activePage === item.id;
-            if (studioMode && item.id === 'projects') {
+            if (item.id === 'projects') {
               return (
                 <React.Fragment key={item.id}>
                   <div
@@ -663,7 +664,10 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             </div>
           )}
 
-          {!studioMode && recentProjects.length > 0 && (
+          {/* Recents now live in the Projects nav group above (universal). This
+              old bottom section is disabled; left in place to avoid unused-var
+              churn — remove in a dead-code cleanup pass. */}
+          {false && recentProjects.length > 0 && (
             <div className="sb-section">
               <div
                 className="sb-section-label sb-section-label--toggle"
@@ -698,10 +702,10 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
           )}
         </div>
 
-        {/* Platform group — studio only. Secondary nav collapsed into a group at
-            the bottom of the panel (Landscaper AI, Platform Knowledge, Admin,
+        {/* Platform group — universal (home AND studio). Secondary nav collapsed
+            into a group at the bottom (Landscaper AI, Platform Knowledge, Admin,
             Tools, Feedback, Help). Default collapsed. */}
-        {studioMode && platformNav.length > 0 && (
+        {platformNav.length > 0 && (
           <>
             <div className="sb-divider" />
             <div className="sb-nav sb-platform-group">
