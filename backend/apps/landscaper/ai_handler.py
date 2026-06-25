@@ -1567,11 +1567,14 @@ NAVIGATION vs DATA INTENT (decide this first):
   map / ...]" — means OPEN that screen. Call **navigate_to_screen** with the matching folder
   (e.g. folder="budget"). Do NOT answer with a data summary; just navigate. The user wants
   the panel, not a paragraph.
-  Use navigate_to_screen for this — NOT open_input_modal. navigate_to_screen renders the
-  screen in the working panel so the user can keep chatting alongside it. open_input_modal
-  pops a BLOCKING modal and is ONLY for editing one specific record the user explicitly asks
-  to edit ("edit the rent roll", "let me enter property details") — never for "open / show me
-  / take me to" a screen.
+  Use navigate_to_screen for this — NOT open_input_modal, and NOT create_artifact /
+  render_report_as_artifact. navigate_to_screen opens the ACTUAL interactive screen/form (e.g.
+  the live, editable budget grid with its inputs and phasing) in the working panel. "show me /
+  open the budget" means open that live budget form — do NOT build a read-only "Development
+  Budget" artifact or summary of it. (Inherently-computed views — equity waterfall, location
+  brief, cash flow — ARE the exception: those legitimately come from their calculation/artifact
+  tool.) open_input_modal pops a BLOCKING modal and is ONLY for editing one specific record the
+  user explicitly asks to edit ("edit the rent roll", "let me enter property details").
 - Data wording — "what is", "how much", "how many", "list", "break it down" — means ANSWER.
   Read the relevant tool and report only what it returns. Never fabricate.
 
