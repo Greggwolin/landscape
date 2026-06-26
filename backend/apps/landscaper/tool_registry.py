@@ -191,6 +191,7 @@ MF_ONLY_TOOLS = [
     # Lease & value-add assumptions
     "get_lease_assumptions", "update_lease_assumptions",
     "get_value_add_assumptions", "update_value_add_assumptions",
+    "get_renovation_breakdown",
     # Rent roll extraction
     "analyze_rent_roll_columns", "confirm_column_mapping", "compute_rent_roll_delta",
 ]

@@ -3957,6 +3957,31 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_renovation_breakdown",
+        "description": (
+            "Real per-unit-type renovation budget, broken out by bedroom count and tied "
+            "EXACTLY to the Renovation / Value-Add page. Call this for ANY renovation-budget "
+            "ask that is sliced by bedroom or unit type (e.g. 'the renovation budget for the "
+            "1BR units', 'renovation by bedroom') — pass `bedrooms` to filter to one type. "
+            "Returns real unit_count, renovation_cost, relocation_cost and total per type, plus "
+            "program totals. Build any renovation card ONLY from the numbers this returns — never "
+            "estimate counts, sizes, unit types, or costs. If `slice_empty` is true the requested "
+            "bedroom type has no units: tell the user that plainly and offer the rent roll (use "
+            "`available_unit_types`); do NOT invent a breakdown. If `value_add_enabled` is false, "
+            "say no renovation program is configured. Note: the page (and this tool) spread "
+            "renovation cost evenly per unit, so every unit type carries the same per-unit cost."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "bedrooms": {
+                    "type": "integer",
+                    "description": "Filter to one bedroom count (e.g. 1 for the 1BR units). Omit for the full per-type breakdown.",
+                },
+            },
+        },
+    },
+    {
         "name": "update_value_add_assumptions",
         "description": "Create or update value-add renovation assumptions. Uses the live table columns verified from the database.",
         "input_schema": {

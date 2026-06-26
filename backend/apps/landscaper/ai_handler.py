@@ -1592,11 +1592,15 @@ of three:
    actually RETURNED this same turn. Never compose, estimate, or carry from memory: dollar figures,
    percentages, unit counts, square footages, the unit mix, unit-type names, or per-type costs. Do NOT
    invent unit types ("1BR/1BA Tower", "Type 2", "2BR/1BA") — use ONLY the unit types the tool
-   returned. If no tool returns the exact slice the user asked for (e.g. there is no per-bedroom
-   renovation breakdown — renovation is a whole-property program), do NOT build a card and do NOT
-   fabricate one: OPEN the closest screen and say plainly you can't break it out that way. A
-   plausible-looking invented breakdown is the WORST failure here — it looks real and is not. If you
-   cannot source EVERY number from a tool this turn, navigate or ask — never fabricate.
+   returned. For a renovation-budget ask sliced by bedroom or unit type (e.g. "the renovation budget
+   for the 1BR units", "renovation by bedroom"), call get_renovation_breakdown (pass `bedrooms` to
+   filter) and build the card ONLY from the rows it returns — it ties exactly to the Renovation page.
+   If it returns slice_empty=true, tell the user there are no units of that type and offer the rent
+   roll (from available_unit_types) — never invent a breakdown. For any OTHER slice where no tool
+   returns the data, do NOT build a card and do NOT fabricate one: OPEN the closest screen and say
+   plainly you can't break it out that way. A plausible-looking invented breakdown is the WORST
+   failure here — it looks real and is not. If you cannot source EVERY number from a tool this turn,
+   navigate or ask — never fabricate.
 
 3. ANSWER — a quick figure or question ("what's the cap rate", "how many units"). Read the relevant
    tool and report only what it returns. Never fabricate.
@@ -3698,6 +3702,7 @@ _NUMBERS_PRODUCING_PREFIXES = (
     'generate_report_preview', 'export_report', 'get_sales_comp', 'get_rental_comp',
     'get_expense_comparables', 'get_land_comp_detail', 'get_revenue_rent',
     'get_cre_rent_roll', 'get_unit', 'get_demographics', 'get_benchmark',
+    'get_renovation_breakdown',
     'get_absorption_benchmarks', 'search_irem_benchmarks', 'store_appraisal_valuation',
     'store_construction_benchmarks', 'scenario_', 'whatif_',
 )
