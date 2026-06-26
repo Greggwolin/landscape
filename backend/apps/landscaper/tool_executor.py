@@ -15778,6 +15778,7 @@ def execute_tool(
     propose_only: bool = True,
     thread_id: Optional[str] = None,
     user_id: Optional[int] = None,
+    prior_tool_calls: Optional[list] = None,
 ) -> Dict[str, Any]:
     """
     Execute a tool call from Claude using the registry pattern.
@@ -15883,6 +15884,13 @@ def execute_tool(
         propose_only = False
         logger.info(f"Auto-executing {tool_name} (in AUTO_EXECUTE_TOOLS list)")
 
+    # JB55: thread the turn's already-run tools ONLY into the freeform
+    # create_artifact handler (it accepts **kwargs), so the create-time
+    # fabrication guard can verify a numbers tool sourced the card. Other
+    # handlers' uniform kwargs are untouched.
+    extra = {}
+    if tool_name == 'create_artifact' and prior_tool_calls is not None:
+        extra['prior_tool_calls'] = prior_tool_calls
     try:
         # All handlers receive the same kwargs for consistency
         return handler(
@@ -15892,6 +15900,7 @@ def execute_tool(
             source_message_id=source_message_id,
             thread_id=thread_id,
             user_id=user_id,
+            **extra,
         )
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)

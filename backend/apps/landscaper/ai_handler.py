@@ -4500,7 +4500,13 @@ def get_landscaper_response(
                     result = tool_executor(
                         tool_name=tool_name,
                         tool_input=tool_input,
-                        project_id=project_context.get('project_id')
+                        project_id=project_context.get('project_id'),
+                        # JB55: the tools already run this turn (this create call is
+                        # appended above, before execute), so the create-time
+                        # fabrication guard can check whether a numbers tool sourced
+                        # the card. Older tool_executor closures that don't accept this
+                        # kwarg are all updated in views.py.
+                        prior_tool_calls=[tc['tool'] for tc in tool_calls_made],
                     )
                     tool_exec_time = time.time() - tool_exec_start
                     result_str = _truncate_tool_result(result, tool_name=tool_name)

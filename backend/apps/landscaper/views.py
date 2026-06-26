@@ -459,8 +459,8 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
 
             # Create tool executor bound to this project
             _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
-            def tool_executor_fn(tool_name, tool_input, project_id=None):
-                return execute_tool(tool_name, tool_input, project_id or project.project_id, user_id=_uid)
+            def tool_executor_fn(tool_name, tool_input, project_id=None, prior_tool_calls=None):
+                return execute_tool(tool_name, tool_input, project_id or project.project_id, user_id=_uid, prior_tool_calls=prior_tool_calls)
 
             # Get page context for context-aware tool filtering
             page_context = request.data.get('page_context')
@@ -2335,12 +2335,13 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
             _bound_project_id = project.project_id if project is not None else None
 
-            def tool_executor_fn(tool_name, tool_input, project_id=None):
+            def tool_executor_fn(tool_name, tool_input, project_id=None, prior_tool_calls=None):
                 return execute_tool(
                     tool_name, tool_input,
                     project_id if project_id is not None else _bound_project_id,
                     thread_id=str(thread.id),
                     user_id=_uid,
+                    prior_tool_calls=prior_tool_calls,
                 )
 
             # Infer domain from thread's recent tool history when frontend sends 'home'
@@ -2556,9 +2557,9 @@ class GlobalChatViewSet(viewsets.ViewSet):
 
             # Create tool executor for global context
             _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
-            def tool_executor_fn(tool_name, tool_input, project_id=None):
+            def tool_executor_fn(tool_name, tool_input, project_id=None, prior_tool_calls=None):
                 # For global context, pass project_id=0 as sentinel
-                return execute_tool(tool_name, tool_input, project_id or 0, user_id=_uid)
+                return execute_tool(tool_name, tool_input, project_id or 0, user_id=_uid, prior_tool_calls=prior_tool_calls)
 
             # Get message history for context (last 10 messages in this page_context)
             recent_messages = ChatMessage.objects.filter(

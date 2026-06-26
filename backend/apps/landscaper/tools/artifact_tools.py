@@ -92,6 +92,9 @@ def create_artifact_tool(
                 'title', 'edit_target', 'source_pointers', 'artifact_subtype',
             ) if k in params},
             artifact_subtype=artifact_subtype,
+            # JB55: the turn's already-run tools, threaded from the tool loop so the
+            # create-time fabrication guard can verify a numbers tool sourced the card.
+            prior_tool_calls=kwargs.get('prior_tool_calls'),
         )
     except Exception as exc:
         logger.exception('create_artifact_tool failed')

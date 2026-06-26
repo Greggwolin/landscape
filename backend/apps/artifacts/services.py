@@ -25,6 +25,10 @@ from .registered_report_guard import (
     is_registered_report_artifact,
     validate_registered_report_artifact,
 )
+from .financial_artifact_guard import (
+    FinancialArtifactGuardError,
+    validate_financial_artifact_sourcing,
+)
 from .schema_validation import (
     SchemaValidationError,
     apply_json_patch,
@@ -131,6 +135,7 @@ def create_artifact_record(
     params_json: Any | None = None,
     artifact_subtype: str | None = None,
     dedup_key: str | None = None,
+    prior_tool_calls: list[str] | None = None,
 ) -> dict:
     """Create a new artifact + version 1 entry. Returns spec §6.1 envelope.
 
@@ -210,6 +215,27 @@ def create_artifact_record(
             # to_envelope_extras for the action-first shape.
             return {
                 'success': False,
+                **exc.to_envelope_extras(),
+            }
+
+    # Create-time fabrication guard (JB55). Hard prevention: a freeform
+    # create_artifact whose body states financial figures with NO numbers-producing
+    # tool this turn is rejected here, before persistence, so the card never
+    # renders — the create-side counterpart to JB50 slice 2's reply-assembly net.
+    # Gated to freeform create_artifact (bridge tools like render_report_as_artifact
+    # use a different tool_name); no-op when prior_tool_calls is None (REST/edit
+    # callers don't thread it). Real custom cards (a numbers tool ran) pass.
+    if tool_name == 'create_artifact':
+        try:
+            validate_financial_artifact_sourcing(
+                title=title,
+                schema=schema,
+                prior_tool_calls=prior_tool_calls,
+            )
+        except FinancialArtifactGuardError as exc:
+            return {
+                'success': False,
+                'error': f'financial artifact guard rejected: {exc}',
                 **exc.to_envelope_extras(),
             }
 
