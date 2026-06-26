@@ -68,6 +68,12 @@ function StudioShellInner() {
   // Right panel view: the routed screen, or the artifacts workspace. The
   // artifacts trigger lives in the right-panel header (not the left rail).
   const [rightView, setRightView] = useState<'screen' | 'artifacts'>('screen');
+  // Pop-out (right-panel reflow, Phase 1): promote the routed screen to a
+  // full-window overlay — the SAME render, just more room — for screens that
+  // assume a wide viewport (grids, side-by-side panels). Toggled from the
+  // right-panel header; Esc or the header collapse button returns. Independent
+  // of chat/artifacts state.
+  const [expanded, setExpanded] = useState(false);
 
   // Ephemeral screen-router confirmation (JB43). A nav hit shows a transient
   // toast — NOT a chat message — so a pure-nav request never masquerades as a
@@ -84,6 +90,17 @@ function StudioShellInner() {
     const t = setTimeout(() => setNavToast(null), 2200);
     return () => clearTimeout(t);
   }, [navToast]);
+
+  // Esc closes the pop-out overlay (Phase 1). Kept above the early-return gates
+  // so the hook order is stable.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
 
   // New-chat force-remount key (JB43). Bumping this remounts the chat subtree so
   // the active thread resets to null (JB33 blank — first send creates the
@@ -282,6 +299,20 @@ function StudioShellInner() {
 
   const backToScreen = clearActiveArtifacts;
 
+  // The routed screen, defined once and rendered in EITHER the right panel
+  // (normal) OR the full-window pop-out overlay (expanded) — never both, so the
+  // screen mounts a single time. Toggling `expanded` remounts it in the other
+  // host (an intentional, cheap refetch; Phase 3 summary cards rely on the
+  // collapse-time refresh to round-trip edited inputs).
+  const screenRouter = (
+    <ProjectContentRouter
+      project={routerProject}
+      currentFolder={currentFolder}
+      currentTab={currentTab}
+      setFolderTab={setFolderTab}
+    />
+  );
+
   return (
     <div className="studio-shell">
       {/* LEFT — the REAL unified-UI sidebar (global nav, search, threads,
@@ -311,8 +342,10 @@ function StudioShellInner() {
       />
 
       {/* RIGHT — one panel: the routed screen, OR the artifacts workspace
-          (reached from the header button or auto-opened by a chat artifact). */}
-      {contentOpen ? (
+          (reached from the header button or auto-opened by a chat artifact).
+          Suppressed while the screen is popped out (`expanded`) so the screen
+          mounts only once — in the overlay below. */}
+      {!expanded && (contentOpen ? (
         rightView === 'artifacts' || hasArtifact ? (
           <div className="wrapper-right-panel">
             <div
@@ -364,6 +397,15 @@ function StudioShellInner() {
                 <button
                   type="button"
                   className="w-btn w-btn-icon"
+                  title="Expand to full width"
+                  aria-label="Expand screen to full width"
+                  onClick={() => setExpanded(true)}
+                >
+                  ⤢
+                </button>
+                <button
+                  type="button"
+                  className="w-btn w-btn-icon"
                   title={chatOpen ? 'Collapse content (chat full width)' : 'Collapse content'}
                   aria-label="Collapse content panel"
                   onClick={() => setContentOpen(false)}
@@ -373,12 +415,7 @@ function StudioShellInner() {
               </>
             }
           >
-            <ProjectContentRouter
-              project={routerProject}
-              currentFolder={currentFolder}
-              currentTab={currentTab}
-              setFolderTab={setFolderTab}
-            />
+            {screenRouter}
           </RightContentPanel>
         )
       ) : (
@@ -392,6 +429,32 @@ function StudioShellInner() {
           >
             ⇤
           </button>
+        </div>
+      ))}
+
+      {/* Pop-out overlay (right-panel reflow, Phase 1): the SAME routed screen
+          at full window width. Same header (title + subtitle), with a collapse
+          control; Esc also closes. The underlying right panel is suppressed
+          while this is open, so the screen mounts once. */}
+      {expanded && (
+        <div className="studio-screen-overlay">
+          <RightContentPanel
+            title={contentTitle}
+            subtitle={currentProject.project_name}
+            actions={
+              <button
+                type="button"
+                className="w-btn w-btn-icon"
+                title="Exit full width"
+                aria-label="Exit full width"
+                onClick={() => setExpanded(false)}
+              >
+                ⤡
+              </button>
+            }
+          >
+            {screenRouter}
+          </RightContentPanel>
         </div>
       )}
 
