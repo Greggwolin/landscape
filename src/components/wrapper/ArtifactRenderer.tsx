@@ -628,7 +628,12 @@ function TableBlockRenderer({
               {block.columns.map((col) => (
                 <th
                   key={col.key}
-                  className={alignClass(col.align)}
+                  // Header alignment falls back to col.align when no
+                  // explicit header_align override is supplied. Lets
+                  // modification_spec.columns.header_align center the
+                  // header strip independently of body-cell alignment.
+                  // (LSCMD-SPEC-EXTEND-0521)
+                  className={alignClass(col.header_align ?? col.align)}
                   // size: undefined per CLAUDE.md tabular formatting rules
                 >
                   {_renderTwoLineHeader(col.label)}

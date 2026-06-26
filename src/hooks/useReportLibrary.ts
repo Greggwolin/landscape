@@ -44,9 +44,28 @@ export interface ModificationSpec {
     orientation?: 'portrait' | 'landscape';
   };
   columns?: {
+    /** Allowlist — keep only these columns. */
     visible?: string[];
+    /**
+     * Denylist — drop just these columns. Applied AFTER visible.
+     * Use when the user asks to hide specific columns; avoids the LLM
+     * enumerating the entire keep-list and getting it wrong.
+     * (LSCMD-SPEC-EXTEND-0521)
+     */
+    hidden?: string[];
     order?: string[];
     rename?: Record<string, string>;
+    /**
+     * Per-column body-cell alignment override. Maps column key to one
+     * of 'left' | 'right' | 'center'. (LSCMD-SPEC-EXTEND-0521)
+     */
+    align?: Record<string, 'left' | 'right' | 'center'>;
+    /**
+     * All-headers alignment override. Independent of body alignment
+     * so a "center all headers" request leaves numeric columns right-
+     * aligned in the data rows. (LSCMD-SPEC-EXTEND-0521)
+     */
+    header_align?: 'left' | 'right' | 'center';
   };
   grouping?: { by?: string | null };
   sort?: Array<{ key: string; direction?: 'asc' | 'desc' }>;
