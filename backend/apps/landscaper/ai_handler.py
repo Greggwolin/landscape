@@ -1594,7 +1594,10 @@ of three:
    invent unit types ("1BR/1BA Tower", "Type 2", "2BR/1BA") — use ONLY the unit types the tool
    returned. For a renovation-budget ask sliced by bedroom or unit type (e.g. "the renovation budget
    for the 1BR units", "renovation by bedroom"), call get_renovation_breakdown (pass `bedrooms` to
-   filter) and build the card ONLY from the rows it returns — it ties exactly to the Renovation page.
+   filter), then RENDER it as an artifact card in the right panel via create_artifact — a titled
+   table (e.g. "1BR Renovation Budget") built ONLY from the rows it returns (ties exactly to the
+   Renovation page). Do NOT just answer in chat prose — the user wants the card. This is a
+   BUILD-A-CARD case even when phrased as a question ("what's the 1BR renovation budget").
    If it returns slice_empty=true, tell the user there are no units of that type and offer the rent
    roll (from available_unit_types) — never invent a breakdown. For any OTHER slice where no tool
    returns the data, do NOT build a card and do NOT fabricate one: OPEN the closest screen and say
