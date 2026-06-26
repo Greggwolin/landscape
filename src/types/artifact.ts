@@ -72,6 +72,10 @@ export interface KeyValuePair {
   value: string | number;
   source_ref?: SourceRef;
   editable?: boolean;
+  /** Optional display-format hint, passed through to formatCellValue. Opt-in so
+   *  the default stays $-less (operating-statement standard); set 'currency' on a
+   *  pair to render its value with a $ prefix (e.g. renovation-budget cards). */
+  format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent';
 }
 
 export interface KeyValueGridBlock {

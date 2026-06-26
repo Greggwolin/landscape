@@ -1236,8 +1236,11 @@ function KeyValuePairRenderer({ pair, driftState, path, onUpdate, onCommitFieldE
     : styles.kvValue;
 
   // Apply tabular formatting standard to the value (thousand separators,
-  // parens for negatives, em-dash for zero/null, no $ symbol).
-  const display = formatCellValue(pair.value as string | number | null);
+  // parens for negatives, em-dash for zero/null). `pair.format` is opt-in: when
+  // a pair is tagged 'currency'/'currency2' it renders with a $ prefix (e.g.
+  // renovation-budget cards); without it the default stays $-less per the
+  // operating-statement standard.
+  const display = formatCellValue(pair.value as string | number | null, pair.format);
 
   /**
    * Commit handler.
