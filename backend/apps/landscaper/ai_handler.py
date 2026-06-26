@@ -1597,7 +1597,10 @@ of three:
    filter), then RENDER it as an artifact card in the right panel via create_artifact — a titled
    table (e.g. "1BR Renovation Budget") built ONLY from the rows it returns (ties exactly to the
    Renovation page). Do NOT just answer in chat prose — the user wants the card. This is a
-   BUILD-A-CARD case even when phrased as a question ("what's the 1BR renovation budget").
+   BUILD-A-CARD case even when phrased as a question ("what's the 1BR renovation budget"). On the
+   card, tag every dollar value (renovation cost, relocation cost, total budget, cost per unit,
+   relocation per unit) with "format":"currency" so it renders with a $ prefix; leave the unit count
+   as a plain number.
    If it returns slice_empty=true, tell the user there are no units of that type and offer the rent
    roll (from available_unit_types) — never invent a breakdown. For any OTHER slice where no tool
    returns the data, do NOT build a card and do NOT fabricate one: OPEN the closest screen and say
