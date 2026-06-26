@@ -19,6 +19,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '.env'))
 
 import re
+import json
+import math
 import anthropic
 from django.conf import settings
 from django.db import connection
@@ -3750,18 +3752,120 @@ def _artifact_body_states_financials(tool_calls: list) -> bool:
     return False
 
 
-def reply_states_unsourced_financials(content: str, tool_calls: list) -> bool:
+# ── Figure-level provenance (RV — anchored-then-invent close) ─────────────────
+# JB13/JB50 exempted the WHOLE reply the moment any numbers-producing tool ran.
+# That let the "ran one real tool, then invented the rest" case through: the model
+# reads a real rate, then states an invented unit count / size / total in prose
+# (e.g. "46 1BR units at 612 SF → $703,800"), and the blanket exemption shipped it.
+# The close: when a numbers tool ran, every money/percent/multiple figure in the
+# reply (and in any created card) must trace to a number the tools ACTUALLY
+# returned this turn. A figure that matches nothing the tools returned is unsourced
+# → block. Conservative: only fires when the reply is financial in nature
+# (_FIN_CLAIM_KW present), and exempts when no numbers were returned at all so a
+# tool failure can't mass-block a reply.
+_SUFFIX_SCALE = {
+    'k': 1e3, 'm': 1e6, 'b': 1e9,
+    'thousand': 1e3, 'million': 1e6, 'billion': 1e9,
+}
+_NUM_TOKEN_RE = re.compile(
+    r'(\d[\d,]*(?:\.\d+)?)\s*(k|m|b|thousand|million|billion|%)?', re.I)
+
+
+def _num_magnitudes(text: str) -> set:
+    """All numeric magnitudes in `text`, suffix-scaled, $/comma stripped, % sign
+    dropped. '$3.46M' and '3,460,000' both → 3460000.0; '9.7%' → 9.7."""
+    out = set()
+    for m in _NUM_TOKEN_RE.finditer(text or ''):
+        try:
+            v = float(m.group(1).replace(',', ''))
+        except (ValueError, AttributeError):
+            continue
+        suf = (m.group(2) or '').lower()
+        if suf in _SUFFIX_SCALE:
+            v *= _SUFFIX_SCALE[suf]
+        out.add(round(v, 4))
+    return out
+
+
+def _collect_sourced_numbers(tool_outputs) -> set:
+    """Every numeric magnitude the turn's tools actually RETURNED. `tool_outputs`
+    is the accumulated tool_executions list ({'tool','success','result'/'error'})."""
+    nums: set = set()
+    for te in (tool_outputs or []):
+        try:
+            payload = te.get('result', te) if isinstance(te, dict) else te
+            nums |= _num_magnitudes(json.dumps(payload, default=str))
+        except Exception:
+            try:
+                nums |= _num_magnitudes(str(te))
+            except Exception:
+                pass
+    return nums
+
+
+def _figure_magnitudes(text: str):
+    """(magnitude, is_pct) for each money/percent/multiple figure in `text`."""
+    figs = []
+    for m in _MONEY_OR_PCT_RE.finditer(text or ''):
+        tok = m.group(0)
+        is_pct = '%' in tok
+        for v in _num_magnitudes(tok):
+            figs.append((v, is_pct))
+    return figs
+
+
+def _figure_is_sourced(mag: float, is_pct: bool, sourced: set) -> bool:
+    """A reply figure is sourced if it (or, for a percent, its fraction) matches a
+    returned number within rounding tolerance."""
+    candidates = [mag, mag / 100.0] if is_pct else [mag]
+    for c in candidates:
+        for s in sourced:
+            if math.isclose(c, s, rel_tol=0.02, abs_tol=0.5):
+                return True
+    return False
+
+
+def _has_unsourced_figure(content: str, tool_calls: list, sourced: set) -> bool:
+    """True when the reply or a created/updated card states a financial figure that
+    traces to nothing the tools returned. Only evaluated when a numbers tool ran."""
+    # Pull figures from chat text AND from any artifact body built this turn.
+    figs = list(_figure_magnitudes(content or ''))
+    card_text = ''
+    for tc in (tool_calls or []):
+        if not _tool_name(tc).startswith(_ARTIFACT_BODY_TOOLS):
+            continue
+        body = tc.get('input') if isinstance(tc, dict) else getattr(tc, 'input', None)
+        if body is not None:
+            body_str = str(body)
+            card_text += '\n' + body_str
+            figs += _figure_magnitudes(body_str)
+    # Stay conservative: only police replies that are financial in nature.
+    if not (_FIN_CLAIM_KW.search(content or '') or _FIN_CLAIM_KW.search(card_text)):
+        return False
+    return any(not _figure_is_sourced(mag, is_pct, sourced) for mag, is_pct in figs)
+
+
+def reply_states_unsourced_financials(content: str, tool_calls: list,
+                                      tool_outputs: Optional[list] = None) -> bool:
     """True when the reply OR a created artifact states a project financial figure
-    but no NUMBERS-producing tool ran this turn. tool_calls entries are dicts
+    that isn't backed by the tools this turn. tool_calls entries are dicts
     ({'tool': name, 'input': ...}) or objects (.name/.tool/.input).
 
-    JB50 slice 2 hardens JB13: (1) reading a STRUCTURE-only tool (tiers/splits/
-    schema, e.g. get_equity_structure) no longer licenses invented dollars — only
-    a NUMBERS-producing tool does; (2) create_artifact bodies are inspected, not
-    just chat text, so a fabricated card is caught even with no chat figures."""
+    Two regimes:
+      • No numbers-producing tool ran (JB13/JB50) — any financial figure in the
+        chat text, or baked into a created card, is unsourced → block.
+      • A numbers-producing tool ran — figures are legitimized ONLY when
+        `tool_outputs` is supplied AND each figure traces to a returned number
+        (RV provenance). With no `tool_outputs` (legacy callers/tests), the old
+        blanket exemption is retained for back-compat."""
     called = [_tool_name(tc) for tc in (tool_calls or [])]
     if any(n.startswith(_NUMBERS_PRODUCING_PREFIXES) for n in called):
-        return False  # a numbers-producing tool ran → figures are legitimized
+        if tool_outputs is None:
+            return False  # legacy: a numbers tool ran → figures legitimized
+        sourced = _collect_sourced_numbers(tool_outputs)
+        if not sourced:
+            return False  # tools returned no numbers (e.g. failure) → don't mass-block
+        return _has_unsourced_figure(content, tool_calls, sourced)
     # No numbers tool this turn: flag a financial claim in the chat text...
     if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
         return True
@@ -4908,11 +5012,19 @@ def get_landscaper_response(
         # settings.LANDSCAPER_FABRICATION_GUARD. v1 uses the fallback message;
         # a force-the-tool retry is the planned follow-up.
         try:
+            # RV: in strict mode (default) pass the turn's tool OUTPUTS so the guard
+            # can check each stated figure against what the tools actually returned —
+            # closing the "ran one real tool, then invented the rest" gap. Set
+            # settings.LANDSCAPER_FABRICATION_GUARD_STRICT=False to fall back to the
+            # JB13/JB50 blanket exemption (a numbers tool legitimizes the whole reply).
+            _strict = getattr(settings, 'LANDSCAPER_FABRICATION_GUARD_STRICT', True)
             if getattr(settings, 'LANDSCAPER_FABRICATION_GUARD', True) and \
-                    reply_states_unsourced_financials(final_content, tool_calls_made):
+                    reply_states_unsourced_financials(
+                        final_content, tool_calls_made,
+                        tool_outputs=(tool_executions if _strict else None)):
                 logger.warning(
-                    "[FabricationGuard] Blocked unsourced financial figures — no "
-                    "numbers-producing tool ran this turn. tools=%s",
+                    "[FabricationGuard] Blocked unsourced financial figures — a stated "
+                    "figure did not trace to any tool output this turn. tools=%s",
                     [tc.get('tool') for tc in (tool_calls_made or []) if isinstance(tc, dict)],
                 )
                 # Mirror the operating_statement_guard envelope (JB50 slice 2) so a
@@ -4924,9 +5036,12 @@ def get_landscaper_response(
                 guard_envelope = {
                     'code': 'unsourced_financials',
                     'guidance': (
-                        'A dollar/percent figure appeared in the reply or a card but no '
-                        'numbers-producing tool ran this turn. Open the screen that shows it '
-                        '(navigate_to_screen) or call the relevant calculate_/get_ tool, then answer.'
+                        'A dollar/percent figure in the reply or a card does not trace to any '
+                        'number a tool returned this turn (either no numbers-producing tool ran, '
+                        'or a figure — e.g. a per-slice unit count, size, or total — was invented '
+                        'on top of a real one). Open the screen that shows it (navigate_to_screen) '
+                        'or call the relevant calculate_/get_ tool and report ONLY its returned '
+                        'figures, then answer.'
                     ),
                     'suggested_user_question': (
                         "I don't have those figures from the project's data yet — want me to open "
