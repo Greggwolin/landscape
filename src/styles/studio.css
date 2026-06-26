@@ -55,3 +55,20 @@
   text-align: center;
   color: var(--cui-secondary-color);
 }
+
+/* Pop-out overlay (right-panel reflow, Phase 1): the routed screen promoted to
+   the full window. Sits above the shell and the ephemeral nav toast (z 80).
+   The artifacts takeover shares the right panel and is not co-mounted with this
+   (the underlying panel is suppressed while expanded), so there is no z race. */
+.studio-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: var(--cui-body-bg);
+}
+.studio-screen-overlay .wrapper-right-panel {
+  flex: 1;
+  min-height: 0;
+}
