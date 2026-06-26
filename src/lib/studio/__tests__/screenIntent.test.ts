@@ -172,3 +172,43 @@ describe('resolveScreenIntent — renovation / value-add aliases (JB48)', () => 
     expect(resolveScreenIntent('show me the renovation budget', incomeFolders)).toBeNull();
   });
 });
+
+describe('resolveScreenIntent — renovation PER-SLICE asks open the page (RV)', () => {
+  // Renovation is whole-property: no per-bedroom / unit-type tool exists, so a
+  // sliced ask has nothing to source and the model fabricates a breakdown. The
+  // page is the answer — open it even as a data question, even without a nav verb.
+  const renoFolders = createFolderConfig('MF', undefined, undefined, undefined, undefined, true).folders;
+  const RENO = { folder: 'property', tab: 'renovation', label: 'Renovation' };
+
+  it('opens Renovation for "what is the 1BR renovation budget" (the failing case)', () => {
+    expect(resolveScreenIntent('what is the 1BR renovation budget', renoFolders)).toEqual(RENO);
+  });
+
+  it('opens Renovation for "show me the renovation budget for the 1BR units"', () => {
+    expect(resolveScreenIntent('show me the renovation budget for the 1BR units', renoFolders)).toEqual(RENO);
+  });
+
+  it('opens Renovation for a bare sliced ask "the 1BR renovation budget" (no nav verb)', () => {
+    expect(resolveScreenIntent('the 1BR renovation budget', renoFolders)).toEqual(RENO);
+  });
+
+  it('opens Renovation for "renovation budget by bedroom" and "2 bedroom renovation cost"', () => {
+    expect(resolveScreenIntent('renovation budget by bedroom', renoFolders)).toEqual(RENO);
+    expect(resolveScreenIntent('2 bedroom renovation cost', renoFolders)).toEqual(RENO);
+  });
+
+  it('still lets the answerable per-unit question reach the model (no slice qualifier)', () => {
+    // "per unit" is a standard metric the value-add tool returns — NOT a slice.
+    expect(resolveScreenIntent("what's the renovation cost per unit?", renoFolders)).toBeNull();
+    expect(resolveScreenIntent('what is the total renovation budget', renoFolders)).toBeNull();
+  });
+
+  it('does not fire for a non-renovation sliced ask (no renovation topic)', () => {
+    expect(resolveScreenIntent('compare the 2BR vs 3BR rent premiums', renoFolders)).toBeNull();
+  });
+
+  it('falls through on a project without the renovation screen even when sliced', () => {
+    expect(resolveScreenIntent('what is the 1BR renovation budget', landFolders)).toBeNull();
+    expect(resolveScreenIntent('what is the 1BR renovation budget', incomeFolders)).toBeNull();
+  });
+});
