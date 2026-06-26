@@ -17,7 +17,6 @@ from .models import BudgetItem
 from .serializers_budget_categories import (
     BudgetCategorySerializer,
     QuickAddCategorySerializer,
-    IncompleteCategorySerializer,
     CategoryDismissReminderSerializer,
     CategoryMarkCompleteSerializer,
 )
@@ -127,61 +126,6 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
         # Return full category data
         output_serializer = BudgetCategorySerializer(category)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
-
-    @action(detail=False, methods=['get'], url_path='incomplete')
-    def incomplete(self, request):
-        """
-        Get incomplete categories for a project.
-
-        Uses the database function get_incomplete_categories_for_project()
-        to return categories that:
-        1. Are marked incomplete
-        2. Are actively used in budget
-        3. Haven't been dismissed (or dismissal expired)
-
-        Query params:
-        - project_id (required): Project ID to check
-
-        Returns:
-        - List of incomplete categories with usage counts and missing fields
-        """
-        project_id = request.query_params.get('project_id')
-
-        if not project_id:
-            return Response(
-                {'error': 'project_id query parameter is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            project_id = int(project_id)
-        except ValueError:
-            return Response(
-                {'error': 'project_id must be an integer'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Call database function
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT * FROM landscape.get_incomplete_categories_for_project(%s)",
-                [project_id]
-            )
-
-            columns = [col[0] for col in cursor.description]
-            results = [
-                dict(zip(columns, row))
-                for row in cursor.fetchall()
-            ]
-
-        # Serialize results
-        serializer = IncompleteCategorySerializer(results, many=True)
-
-        return Response({
-            'project_id': project_id,
-            'count': len(results),
-            'categories': serializer.data
-        })
 
     @action(detail=True, methods=['post'], url_path='dismiss-reminder')
     def dismiss_reminder(self, request, category_id=None):

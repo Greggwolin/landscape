@@ -598,16 +598,6 @@ export function getColumnsByMode(
     ...(phaseColumn ? [phaseColumn] : []),
     stageColumn,
     ...napkinBeforeAmount,
-    {
-      accessorKey: 'variance_amount',
-      header: 'Var',
-      size: 100,
-      cell: () => (
-        <span className="text-muted text-center d-block" style={{ fontSize: '0.875rem' }}>
-          -
-        </span>
-      ),
-    },
     ...napkinTimingColumns,
   ];
 
@@ -617,16 +607,6 @@ export function getColumnsByMode(
     stageColumn,
     categoryColumnWithGroup,
     ...napkinBeforeAmount,
-    {
-      accessorKey: 'variance_amount',
-      header: 'Var',
-      size: 100,
-      cell: () => (
-        <span className="text-muted text-center d-block" style={{ fontSize: '0.875rem' }}>
-          -
-        </span>
-      ),
-    },
     ...napkinTimingColumns,
   ];
 
