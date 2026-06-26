@@ -27,25 +27,6 @@ const NAV_VERB_RE =
   /^\s*(?:show me|open|take me to|go to|navigate to|bring up|pull up|let'?s (?:see|go to))\s+(?:the\s+)?(.+?)\s*$/i;
 
 /**
- * RV — renovation per-slice asks open the Renovation page, not the model.
- *
- * Renovation is a whole-property program: there is NO per-bedroom / unit-type
- * renovation tool to read. So a *sliced* ask ("the 1BR renovation budget",
- * "renovation by bedroom") has nothing to source — the model fabricates a
- * per-bedroom breakdown, and the fabrication guard then dead-ends it with a
- * refusal. The Renovation page IS the answer. These fire even without a nav verb
- * and even as a data question ("what is the 1BR renovation budget").
- *
- * Tightly gated: BOTH a renovation topic AND a per-slice qualifier must be
- * present. Answerable renovation questions with no slice ("what's the renovation
- * cost per unit", "the total renovation budget") have no slice qualifier, so they
- * still fall through to the model, which sources them from the value-add tool.
- */
-const RENO_TOPIC_RE = /\b(?:reno(?:vation)?|value[-\s]?add)\b/i;
-const RENO_SLICE_RE =
-  /\b(?:\d+[-\s]?br|\d+[-\s]?ba|\d+[-\s]?bed(?:room)?s?|one[-\s]?bed(?:room)?|two[-\s]?bed(?:room)?|three[-\s]?bed(?:room)?|four[-\s]?bed(?:room)?|studio|(?:by|per)\s+(?:bed|bedroom|unit[-\s]?type|floor[-\s]?plan)|unit[-\s]?type)\b/i;
-
-/**
  * Phrases users say that don't match a folder/sub-tab label verbatim, mapped to
  * `[folderId, subTabId?]`. The exact-match pass below already covers every real
  * folder/sub-tab label (Budget, Equity, Cash Flow, Land Use, …); these are the
@@ -156,19 +137,6 @@ export function resolveScreenIntent(
   text: string,
   folders: FolderTab[],
 ): ScreenIntent | null {
-  const lc = (text || '').toLowerCase();
-
-  // RV — a renovation ask carrying a per-bedroom / unit-type slice opens the
-  // Renovation page (no per-slice tool exists; the page is the answer). Runs
-  // before the nav-verb gate so a sliced data question ("what is the 1BR
-  // renovation budget") routes here instead of reaching the model and fabricating.
-  // Only when this project actually exposes the Renovation sub-tab (value-add MF).
-  if (RENO_TOPIC_RE.test(lc) && RENO_SLICE_RE.test(lc)) {
-    const f = folders.find((x) => x.id === 'property');
-    const sub = f?.subTabs.find((s) => s.id === 'renovation');
-    if (f && sub) return { folder: f.id, tab: sub.id, label: sub.label };
-  }
-
   const m = NAV_VERB_RE.exec(text || '');
   if (!m) return null;
 
