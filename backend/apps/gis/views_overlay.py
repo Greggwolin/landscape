@@ -27,6 +27,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.projects.permissions import user_can_access_project
 from .serializers import ProjectOverlaySerializer
 
 # Durable overlay-image upload (LSCMD-OVERLAY-DURABLE-0622-ot4) accepts PNG/JPEG.
@@ -76,12 +77,39 @@ def _row_to_overlay(row):
     }
 
 
+def _overlay_project_id(pk):
+    """Return the owning project_id for an overlay row, or None if it doesn't exist.
+
+    Detail routes are keyed only by overlay_id, so the owning project is resolved
+    from the row before the ownership check can run.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT project_id FROM landscape.tbl_project_overlay WHERE overlay_id = %s",
+            [int(pk)],
+        )
+        row = cursor.fetchone()
+    return row[0] if row else None
+
+
+def _overlay_not_found():
+    # Same body whether the overlay is missing OR not the caller's — don't leak
+    # existence across accounts.
+    return Response({"error": "Overlay not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+def _project_not_found():
+    return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 class ProjectOverlayViewSet(viewsets.ViewSet):
     """CRUD for site-plan overlays, raw-SQL backed."""
 
     permission_classes = [IsAuthenticated]
 
     def list(self, request, project_pk=None):
+        if not user_can_access_project(request, project_pk):
+            return _project_not_found()
         with connection.cursor() as cursor:
             cursor.execute(
                 f"SELECT {_SELECT_COLS} FROM landscape.tbl_project_overlay "
@@ -93,6 +121,8 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         return Response({"count": len(overlays), "results": overlays})
 
     def create(self, request, project_pk=None):
+        if not user_can_access_project(request, project_pk):
+            return _project_not_found()
         serializer = ProjectOverlaySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -122,6 +152,9 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         return Response(_row_to_overlay(row), status=status.HTTP_201_CREATED)
 
     def retrieve(self, request, pk=None):
+        project_id = _overlay_project_id(pk)
+        if project_id is None or not user_can_access_project(request, project_id):
+            return _overlay_not_found()
         with connection.cursor() as cursor:
             cursor.execute(
                 f"SELECT {_SELECT_COLS} FROM landscape.tbl_project_overlay "
@@ -134,6 +167,9 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         return Response(_row_to_overlay(row))
 
     def partial_update(self, request, pk=None):
+        project_id = _overlay_project_id(pk)
+        if project_id is None or not user_can_access_project(request, project_id):
+            return _overlay_not_found()
         serializer = ProjectOverlaySerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -183,6 +219,9 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         return Response(_row_to_overlay(row))
 
     def destroy(self, request, pk=None):
+        project_id = _overlay_project_id(pk)
+        if project_id is None or not user_can_access_project(request, project_id):
+            return _overlay_not_found()
         with connection.cursor() as cursor:
             cursor.execute(
                 "DELETE FROM landscape.tbl_project_overlay WHERE overlay_id = %s",
@@ -214,6 +253,9 @@ def overlay_image_upload(request, project_pk=None):
         POST /api/projects/<id>/overlays/upload-image/   (multipart: file=<png|jpeg>)
     Returns: ``{"url": <public url>, "key": <storage path>}``
     """
+    if not user_can_access_project(request, project_pk):
+        return _project_not_found()
+
     upload = request.FILES.get("file")
     if upload is None:
         return Response({"error": "file is required"}, status=status.HTTP_400_BAD_REQUEST)

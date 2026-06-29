@@ -21,9 +21,25 @@ from .services.user_points_service import (
     VALID_CATEGORIES,
 )
 from .serializers import DemographicsResponseSerializer, BlockGroupStatsSerializer
+from apps.projects.permissions import user_can_access_project
 
 
 demographics_service = DemographicsService()
+
+
+def _map_feature_project_id(feature_id):
+    """Return the owning project_id for a map feature, or None if it doesn't exist.
+
+    The feature-detail route is keyed only by feature id, so the owning project is
+    resolved from the row before the ownership check can run.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT project_id FROM location_intelligence.project_map_features WHERE id = %s",
+            [str(feature_id)],
+        )
+        row = cursor.fetchone()
+    return row[0] if row else None
 
 
 @extend_schema(
@@ -151,6 +167,7 @@ def get_demographics(request):
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def get_project_demographics(request, project_id):
     """
     GET /api/v1/location-intelligence/demographics/project/{project_id}/
@@ -164,6 +181,9 @@ def get_project_demographics(request, project_id):
             {"error": "Invalid project_id"},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    if not user_can_access_project(request, project_id):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
     result = demographics_service.get_cached_demographics(project_id)
 
@@ -202,6 +222,7 @@ def get_project_demographics(request, project_id):
     tags=["Location Intelligence"]
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def cache_project_demographics(request, project_id):
     """
     POST /api/v1/location-intelligence/demographics/project/{project_id}/
@@ -215,6 +236,9 @@ def cache_project_demographics(request, project_id):
             {"error": "Invalid project_id"},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    if not user_can_access_project(request, project_id):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
     lat = request.data.get("lat")
     lon = request.data.get("lon")
@@ -261,6 +285,7 @@ def cache_project_demographics(request, project_id):
     tags=["Location Intelligence"]
 )
 @api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
 def delete_project_demographics(request, project_id):
     """
     DELETE /api/v1/location-intelligence/demographics/project/{project_id}/
@@ -274,6 +299,9 @@ def delete_project_demographics(request, project_id):
             {"error": "Invalid project_id"},
             status=status.HTTP_400_BAD_REQUEST
         )
+
+    if not user_can_access_project(request, project_id):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
     demographics_service.invalidate_cache(project_id)
     return Response(status=status.HTTP_204_NO_CONTENT)
@@ -891,6 +919,9 @@ def map_features_list(request, project_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    if not user_can_access_project(request, project_id):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT
@@ -947,6 +978,9 @@ def map_features_create(request):
                 {"error": f"{field} is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    if not user_can_access_project(request, data['project_id']):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
     # Validate feature_type
     feature_type = data['feature_type'].lower()
@@ -1052,6 +1086,16 @@ def map_feature_detail(request, feature_id):
 
     Get, update, or delete a map feature.
     """
+    # Resolve the owning project from the row first; 404 (same body) whether the
+    # feature is missing OR belongs to a project the caller can't access, so
+    # existence isn't leaked across accounts.
+    project_id = _map_feature_project_id(feature_id)
+    if project_id is None or not user_can_access_project(request, project_id):
+        return Response(
+            {"error": "Feature not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
     if request.method == "GET":
         with connection.cursor() as cursor:
             cursor.execute("""

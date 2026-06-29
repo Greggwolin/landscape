@@ -87,6 +87,36 @@ def filter_qs_by_owner_or_staff(qs, request, owner_path: str = 'created_by'):
     return qs.filter(**{owner_path: user})
 
 
+def user_can_access_project(request, project_id) -> bool:
+    """Return True if the request's user may access the given project.
+
+    Access = the user owns the project (``created_by``) OR is a staff/admin user
+    (:func:`is_admin_user`). Returns False for unauthenticated users, an invalid
+    or missing ``project_id``, and projects that do not exist — callers should
+    translate False into a **404** (not 403) so a non-owner can't probe which
+    project ids exist by changing the id in the request.
+
+    This is the single ownership gate adopted by every project-scoped GIS / map
+    endpoint (apps.gis, apps.location_intelligence). It mirrors the ``created_by``
+    scoping the main Project ViewSet already applies.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return False
+    try:
+        pid = int(project_id)
+    except (TypeError, ValueError):
+        return False
+
+    from .models import Project
+    row = Project.objects.filter(project_id=pid).values('created_by_id').first()
+    if row is None:
+        return False
+    if is_admin_user(user):
+        return True
+    return row['created_by_id'] == user.id
+
+
 class APIKeyPermission(permissions.BasePermission):
     """Custom permission for API key authentication."""
     

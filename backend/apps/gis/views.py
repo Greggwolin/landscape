@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.projects.models import Project
+from apps.projects.permissions import user_can_access_project
 from .serializers import GeoJSONSerializer, BoundarySerializer
 from .parcel_services import COUNTY_PARCEL_SERVICES, normalize_county_code, ParcelServiceConfig
 
@@ -25,10 +26,14 @@ class GISViewSet(viewsets.ViewSet):
     - GET /api/gis/boundaries/:project_id/ - Get project boundaries
     - POST /api/gis/boundaries/:project_id/ - Update project boundaries
     """
-    
+
+    permission_classes = [IsAuthenticated]
+
     @action(detail=False, methods=['get'], url_path='boundaries/(?P<project_id>[0-9]+)')
     def get_boundaries(self, request, project_id=None):
         """Get GIS boundaries for a project."""
+        if not user_can_access_project(request, project_id):
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
         try:
             project = Project.objects.get(project_id=project_id)
             gis_metadata = project.gis_metadata or {}
@@ -47,6 +52,8 @@ class GISViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='boundaries/(?P<project_id>[0-9]+)')
     def update_boundaries(self, request, project_id=None):
         """Update GIS boundaries for a project."""
+        if not user_can_access_project(request, project_id):
+            return Response({'error': 'Project not found'}, status=status.HTTP_404_NOT_FOUND)
         try:
             project = Project.objects.get(project_id=project_id)
             
@@ -285,6 +292,9 @@ def parcel_ingest(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    if not user_can_access_project(request, project_id):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
+
     normalized_features: List[Dict[str, Any]] = []
     for parcel in parcels:
         if not isinstance(parcel, dict):
@@ -377,6 +387,8 @@ def boundary_set(request):
             {"error": "projectId and geometry are required"},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    if not user_can_access_project(request, project_id):
+        return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
     try:
         with connection.cursor() as cursor:
             cursor.execute(
