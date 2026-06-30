@@ -618,9 +618,17 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       })
       .then((data) => {
         const rows = Array.isArray(data) ? data : data?.results || data?.projects || [];
+        const lastOpened = (pid: any) => {
+          try { return Number(localStorage.getItem(`project_${pid}_last_accessed`)) || 0; }
+          catch { return 0; }
+        };
         const sorted = rows
           .slice()
-          .sort((a: any, b: any) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+          .sort((a: any, b: any) => {
+            const la = lastOpened(a.project_id), lb = lastOpened(b.project_id);
+            if (la !== lb) return lb - la;                 // most recently OPENED first
+            return (b.updated_at || '').localeCompare(a.updated_at || ''); // fallback: last changed
+          })
           .filter((p: any) => p.project_id !== projectId)
           .slice(0, 5);
         setRecentProjects(

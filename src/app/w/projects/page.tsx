@@ -172,11 +172,18 @@ export default function WrapperProjectsPage() {
     };
   }, []);
 
-  // FB-324: order project tiles by most-recent interaction (updated_at desc).
+  // FB-327: order project tiles by most recently OPENED (localStorage timestamp
+  // written on open by ProjectProvider), falling back to last-modified (FB-324).
   // Sort a copy so the underlying fetch order is untouched.
-  const sorted = [...projects].sort((a, b) =>
-    (b.updated_at || '').localeCompare(a.updated_at || '')
-  );
+  const lastOpened = (pid: number) => {
+    try { return Number(localStorage.getItem(`project_${pid}_last_accessed`)) || 0; }
+    catch { return 0; }
+  };
+  const sorted = [...projects].sort((a, b) => {
+    const la = lastOpened(a.project_id), lb = lastOpened(b.project_id);
+    if (la !== lb) return lb - la;                               // most recently OPENED first
+    return (b.updated_at || '').localeCompare(a.updated_at || ''); // fallback: last changed
+  });
   const filtered = search
     ? sorted.filter((p) =>
         (p.project_name || '').toLowerCase().includes(search.toLowerCase())
