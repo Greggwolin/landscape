@@ -104,7 +104,7 @@ export const CATEGORIES_BY_FEATURE_TYPE: Record<
 // Default Layer State
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function getDefaultLayerGroups(): LayerGroup[] {
+export function getDefaultLayerGroups(isDevelopment = false): LayerGroup[] {
   return [
     {
       id: 'project-boundary',
@@ -170,7 +170,10 @@ export function getDefaultLayerGroups(): LayerGroup[] {
         {
           id: 'sale-comps',
           label: 'Sale Comps',
-          visible: true,
+          // Development projects show live market sales (Recent Sales) instead;
+          // the stored Sale Comps layer stays available but off by default so it
+          // doesn't render stale pins alongside the live market data.
+          visible: !isDevelopment,
           color: LAYER_COLORS.saleComps,
         },
         {
@@ -195,7 +198,9 @@ export function getDefaultLayerGroups(): LayerGroup[] {
         {
           id: 'recent-sales',
           label: 'Recent Sales',
-          visible: false,
+          // On by default for development projects so the map's sales layer
+          // matches the live feed shown on the Property > Market screen.
+          visible: isDevelopment,
           color: LAYER_COLORS.recentSales,
         },
         {
