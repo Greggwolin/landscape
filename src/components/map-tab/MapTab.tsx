@@ -299,7 +299,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const [basemap, setBasemap] = useState<BasemapStyle>('hybrid');
   const [activeTool, setActiveTool] = useState<DrawTool>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
-  const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups());
+  const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups(isDevelopmentProject));
   const mapCanvasRef = useRef<MapCanvasRef>(null);
   const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
 
