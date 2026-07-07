@@ -444,7 +444,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 return (
                   <React.Fragment key={folder.id}>
                     <div
-                      className={`sb-nav-item${isActiveFolder ? ' active' : ''}`}
+                      className={`sb-nav-item${isActiveFolder ? ' active' : ''}${hasSub ? ' has-flyout' : ''}`}
                       data-label={label}
                       title={label}
                       onClick={() => {
@@ -474,6 +474,31 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                         >
                           {isOpen ? '▾' : '▸'}
                         </span>
+                      )}
+                      {/* Collapsed-rail submenu flyout. Hidden by default; shown on
+                          hover only when the sidebar is collapsed (see wrapper.css).
+                          When the rail is expanded, sub-tabs render inline below and
+                          this flyout stays hidden. */}
+                      {hasSub && (
+                        <div className="sb-flyout" role="menu" aria-label={label}>
+                          <div className="sb-flyout-title">{label}</div>
+                          {folder.subTabs.map((sub) => (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              role="menuitem"
+                              className={`sb-flyout-item${
+                                isActiveFolder && sub.id === projectNav.activeTab ? ' active' : ''
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                projectNav.onSelectTab(folder.id, sub.id);
+                              }}
+                            >
+                              {sub.label}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
                     {hasSub && isOpen && folder.subTabs.map((sub) => (

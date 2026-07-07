@@ -239,6 +239,54 @@
 .wrapper-sidebar.collapsed .sb-footer .sb-avatar { margin: 0 auto; }
 .wrapper-sidebar.collapsed .sb-footer-actions { display: none; }
 
+/* ─── Collapsed-rail submenu flyout ───────────────────────────────────────
+   Icons that carry sub-tabs (the studio project folder tree) reveal an
+   interactive flyout of their sub-tabs on hover — but ONLY when the rail is
+   collapsed. Icons without a submenu keep the label-only ::after tooltip.
+   Expanded rail renders sub-tabs inline, so the flyout stays hidden there. */
+.sb-flyout { display: none; }
+/* An icon with a flyout suppresses the name-only tooltip; the flyout's own
+   title row carries the name instead. */
+.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover::after { content: none; }
+.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover > .sb-flyout {
+  display: block;
+  position: absolute;
+  left: 48px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 172px;
+  background: var(--w-bg-sidebar, #1a1e28);
+  border: 1px solid #323a49;
+  border-radius: 8px;
+  padding: 6px;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.sb-flyout-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--w-text-tertiary, rgba(255, 255, 255, 0.5));
+  padding: 4px 10px 6px;
+  white-space: nowrap;
+}
+.sb-flyout-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sb-flyout-item:hover { background: var(--w-bg-surface-hover); color: var(--w-text-primary); }
+.sb-flyout-item.active { background: var(--w-bg-surface); color: var(--w-text-primary); font-weight: 500; }
+
 /* ─── Sidebar Header ─── */
 .sb-header {
   padding: 6px 16px;
