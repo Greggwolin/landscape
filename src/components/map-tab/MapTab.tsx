@@ -310,6 +310,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // dramatic 3D tilt is opt-in. Both survive basemap switches (see MapCanvas).
   const [hillshadeEnabled, setHillshadeEnabled] = useState(true);
   const [terrain3dEnabled, setTerrain3dEnabled] = useState(false);
+  // Per-shape (drawn item) visibility. Ids in this set are hidden on the map;
+  // shapes default to visible (absent from the set). Independent of the
+  // category-level "Drawn Shapes" toggle.
+  const [hiddenAnnotationIds, setHiddenAnnotationIds] = useState<Set<string>>(() => new Set());
   const mapCanvasRef = useRef<MapCanvasRef>(null);
   const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
 
@@ -2769,8 +2773,28 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         id: f.id,
         label: f.label?.trim() || `${f.feature_type ?? 'Annotation'} ${i + 1}`,
         feature_type: f.feature_type ?? undefined,
+        visible: !hiddenAnnotationIds.has(f.id),
       })),
-    [savedFeatures]
+    [savedFeatures, hiddenAnnotationIds]
+  );
+
+  // Toggle a single drawn shape's visibility on the map (independent of the
+  // category-level "Drawn Shapes" toggle). Hidden shapes are excluded from the
+  // map's user-features source but keep their legend row (rename/edit/remove).
+  const handleToggleAnnotation = useCallback((featureId: string) => {
+    setHiddenAnnotationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(featureId)) next.delete(featureId);
+      else next.add(featureId);
+      return next;
+    });
+  }, []);
+
+  // Stable array for MapCanvas (a fresh array each render would re-fire its
+  // user-features effect on every render).
+  const hiddenAnnotationIdList = useMemo(
+    () => Array.from(hiddenAnnotationIds),
+    [hiddenAnnotationIds]
   );
 
   // Rename a drawn shape in place from the legend (persists feature.label).
@@ -2997,6 +3021,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onRemoveSitePlan={handleDeleteOverlay}
           onRenameSitePlan={handleRenameSitePlan}
           annotations={annotationsForLegend}
+          onToggleAnnotation={handleToggleAnnotation}
           onRenameAnnotation={handleRenameAnnotation}
           onEditAnnotation={handleEditAnnotation}
           onRemoveAnnotation={handleRemoveAnnotation}
@@ -3385,6 +3410,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onCompetitorClick={handleCompetitorClick}
           hillshadeEnabled={hillshadeEnabled}
           terrain3dEnabled={terrain3dEnabled}
+          hiddenAnnotationIds={hiddenAnnotationIdList}
         />
 
         {/* FB-323: in-map competitor detail drawer */}
