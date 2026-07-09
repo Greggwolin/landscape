@@ -2,12 +2,114 @@
  * LayerPanel Component
  *
  * Left sidebar showing the layer tree with toggleable groups and layers.
+ *
+ * Data-layer rows (the `layers.groups` entries) are drag-reorderable within
+ * their group via @dnd-kit when `onReorderLayer` is supplied — the legend order
+ * is the source of truth for the map's draw order (top of legend = drawn on
+ * top). The Overlays (site plans) and Annotations (per-shape) sections stay
+ * pinned; they carry their own "always on top" semantics.
  */
 
 'use client';
 
 import React, { useState } from 'react';
-import type { LayerPanelProps } from './types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { LayerGroup, LayerItem, LayerGroupId, LayerPanelProps } from './types';
+
+/** A single draggable data-layer row. Keeps the existing checkbox / color /
+ *  name / count controls; the grip handle is the only drag affordance so
+ *  clicking the row still toggles or zooms. */
+function SortableLayerRow({
+  group,
+  layer,
+  dragEnabled,
+  onToggleLayer,
+  onZoomToLayer,
+}: {
+  group: LayerGroup;
+  layer: LayerItem;
+  dragEnabled: boolean;
+  onToggleLayer: (groupId: LayerGroupId, layerId: string) => void;
+  onZoomToLayer: (groupId: LayerGroupId, layerId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: layer.id,
+    disabled: !dragEnabled || layer.disabled,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`layer-item layer-item-sortable ${layer.disabled ? 'disabled' : ''}${isDragging ? ' layer-item-dragging' : ''}`}
+    >
+      {dragEnabled && !layer.disabled && (
+        <button
+          type="button"
+          className="layer-item-drag-handle"
+          aria-label={`Reorder ${layer.label}`}
+          title="Drag to reorder"
+          {...attributes}
+          {...listeners}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="9" cy="6" r="1.6" />
+            <circle cx="15" cy="6" r="1.6" />
+            <circle cx="9" cy="12" r="1.6" />
+            <circle cx="15" cy="12" r="1.6" />
+            <circle cx="9" cy="18" r="1.6" />
+            <circle cx="15" cy="18" r="1.6" />
+          </svg>
+        </button>
+      )}
+      <label className={`layer-item-label ${layer.disabled ? 'disabled' : ''}`}>
+        <input
+          type="checkbox"
+          checked={layer.visible}
+          onChange={() => onToggleLayer(group.id, layer.id)}
+          disabled={layer.disabled}
+          className="layer-item-checkbox"
+        />
+        <span className="layer-item-color" style={{ backgroundColor: layer.color }} />
+        <span
+          className={`layer-item-name ${layer.disabled ? 'disabled' : ''}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (layer.disabled) return;
+            onZoomToLayer(group.id, layer.id);
+          }}
+        >
+          {layer.label}
+        </span>
+        {layer.count !== undefined && layer.count > 0 && (
+          <span className="layer-item-count">({layer.count})</span>
+        )}
+      </label>
+    </div>
+  );
+}
 
 export function LayerPanel({
   layers,
@@ -23,6 +125,7 @@ export function LayerPanel({
   onRenameAnnotation,
   onEditAnnotation,
   onRemoveAnnotation,
+  onReorderLayer,
 }: LayerPanelProps) {
   // "Overlays" is its own legend section (saved overlays carry per-plan
   // actions the generic layer rows don't). Local expand state — there's no
@@ -38,6 +141,20 @@ export function LayerPanel({
   // Inline rename for annotations (string ids, separate from overlays).
   const [renamingAnnId, setRenamingAnnId] = useState<string | null>(null);
   const [annRenameValue, setAnnRenameValue] = useState('');
+
+  const dragEnabled = typeof onReorderLayer === 'function';
+  // A small activation distance so a click on the handle that doesn't move
+  // (or a click elsewhere on the row) never starts a drag.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (group: LayerGroup) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    onReorderLayer?.(group.id, String(active.id), String(over.id));
+  };
 
   const startRename = (overlayId: number, current: string) => {
     setRenamingId(overlayId);
@@ -88,40 +205,43 @@ export function LayerPanel({
               <span className="layer-group-label">{group.label}</span>
             </button>
 
-            {/* Group Layers */}
+            {/* Group Layers — drag-reorderable within the group */}
             {group.expanded && (
               <div className="layer-group-items">
-                {group.layers.map((layer) => (
-                  <div key={layer.id} className={`layer-item ${layer.disabled ? 'disabled' : ''}`}>
-                    <label className={`layer-item-label ${layer.disabled ? 'disabled' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={layer.visible}
-                        onChange={() => onToggleLayer(group.id, layer.id)}
-                        disabled={layer.disabled}
-                        className="layer-item-checkbox"
-                      />
-                      <span
-                        className="layer-item-color"
-                        style={{ backgroundColor: layer.color }}
-                      />
-                      <span
-                        className={`layer-item-name ${layer.disabled ? 'disabled' : ''}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (layer.disabled) return;
-                          onZoomToLayer(group.id, layer.id);
-                        }}
-                      >
-                        {layer.label}
-                      </span>
-                      {layer.count !== undefined && layer.count > 0 && (
-                        <span className="layer-item-count">({layer.count})</span>
-                      )}
-                    </label>
-                  </div>
-                ))}
+                {dragEnabled ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd(group)}
+                  >
+                    <SortableContext
+                      items={group.layers.map((l) => l.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {group.layers.map((layer) => (
+                        <SortableLayerRow
+                          key={layer.id}
+                          group={group}
+                          layer={layer}
+                          dragEnabled={dragEnabled}
+                          onToggleLayer={onToggleLayer}
+                          onZoomToLayer={onZoomToLayer}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  group.layers.map((layer) => (
+                    <SortableLayerRow
+                      key={layer.id}
+                      group={group}
+                      layer={layer}
+                      dragEnabled={false}
+                      onToggleLayer={onToggleLayer}
+                      onZoomToLayer={onZoomToLayer}
+                    />
+                  ))
+                )}
               </div>
             )}
           </div>

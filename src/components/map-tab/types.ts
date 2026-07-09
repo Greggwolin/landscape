@@ -168,6 +168,10 @@ export interface MapCanvasProps {
    *  ("competitor-<id>"). Optional so non-/w mounts that don't render a detail
    *  panel are unaffected. */
   onCompetitorClick?: (competitorFeatureId: string) => void;
+  /** When true, a hillshade relief layer renders from the free DEM source. */
+  hillshadeEnabled?: boolean;
+  /** When true, 3D terrain (mesh + camera pitch) is enabled from the same DEM. */
+  terrain3dEnabled?: boolean;
 }
 
 /** A saved site-plan overlay as shown in the legend's "Site Plans" section. */
@@ -207,6 +211,10 @@ export interface LayerPanelProps {
   onRenameAnnotation?: (id: string, label: string) => void;
   onEditAnnotation?: (id: string) => void;
   onRemoveAnnotation?: (id: string) => void;
+  /** Reorder a data-layer row within its group via drag-and-drop: `activeId`
+   *  moves to `overId`'s position. Only the `layers.groups` rows are draggable;
+   *  the Overlays and Annotations sections stay pinned. Omit to disable drag. */
+  onReorderLayer?: (groupId: LayerGroupId, activeId: string, overId: string) => void;
 }
 
 export interface DrawToolbarProps {
