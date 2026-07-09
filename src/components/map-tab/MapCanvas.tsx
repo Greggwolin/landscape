@@ -18,6 +18,8 @@ import { RING_COLORS } from '@/components/location-intelligence';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
+import { registerTerrain, type TerrainController } from '@/lib/maps/terrain';
+import { applyLayerOrder, flattenLegendOrder } from '@/lib/maps/layerOrder';
 import type { GoogleBasemapType } from '@/lib/maps/googleBasemaps';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
@@ -356,6 +358,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onSubjectDragEnd,
     attachDrawActive,
     onCompetitorClick,
+    hillshadeEnabled,
+    terrain3dEnabled,
   },
   ref
 ) {
@@ -371,6 +375,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const subjectMarkerRef = useRef<maplibregl.Marker | null>(null);
   const attachDragMarkerRef = useRef<maplibregl.Marker | null>(null);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
+  const terrainControllerRef = useRef<TerrainController | null>(null);
   const lastCenterRef = useRef<[number, number] | null>(null);
 
   // Expose map to parent component
@@ -481,6 +486,10 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       canvasContextAttributes: { antialias: true },
     });
 
+    // Terrain/hillshade first, so the hillshade layer sits BELOW the raster-dim
+    // overlay (and below all data layers, which are added later). Config-driven
+    // and self-reasserting across basemap switches (setStyle wipes sources).
+    terrainControllerRef.current = registerTerrain(map.current);
     rasterDimCleanupRef.current = registerRasterDim(map.current, 0.1);
 
     // Add navigation controls
@@ -535,6 +544,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       resizeObserver?.disconnect();
       rasterDimCleanupRef.current?.();
       rasterDimCleanupRef.current = null;
+      terrainControllerRef.current?.destroy();
+      terrainControllerRef.current = null;
       map.current?.remove();
       map.current = null;
       setMapLoaded(false);
@@ -1935,6 +1946,33 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
 
      
   }, [mapLoaded, styleRevision, layers, features, selectedFeatureId]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Terrain / Hillshade (config lives in the controller; it self-reasserts
+  // across basemap switches). Driving from props keeps MapCanvas declarative.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapLoaded) return;
+    terrainControllerRef.current?.setHillshade(Boolean(hillshadeEnabled));
+  }, [hillshadeEnabled, mapLoaded, styleRevision]);
+
+  useEffect(() => {
+    if (!mapLoaded) return;
+    terrainControllerRef.current?.setThreeD(Boolean(terrain3dEnabled));
+  }, [terrain3dEnabled, mapLoaded, styleRevision]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Apply legend draw-order to the map. Defined LAST so it runs after every
+  // data-layer effect has (re)added its layers on any `layers` change — the
+  // legend row order becomes the on-screen stacking order. Pure helper lives in
+  // src/lib/maps/layerOrder.ts (extraction-friendly).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    applyLayerOrder(map.current, flattenLegendOrder(layers.groups));
+  }, [mapLoaded, styleRevision, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
