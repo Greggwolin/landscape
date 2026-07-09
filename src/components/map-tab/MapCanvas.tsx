@@ -367,6 +367,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     hillshadeEnabled,
     terrain3dEnabled,
     hiddenAnnotationIds,
+    pitch,
   },
   ref
 ) {
@@ -496,6 +497,9 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       style,
       center,
       zoom,
+      // Raised above MapLibre's default 60 so the 3D tilt slider can reach the
+      // higher oblique angles.
+      maxPitch: 80,
       canvasContextAttributes: { antialias: true },
     });
 
@@ -1702,7 +1706,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     if (!map.current || !mapLoaded) return;
 
     const demoRingsLayer = layers.groups
-      .find((g) => g.id === 'location-intel')
+      .find((g) => g.id === 'market')
       ?.layers.find((l) => l.id === 'demo-rings');
 
     if (!demoRingsLayer?.visible) {
@@ -1979,6 +1983,15 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     if (!mapLoaded) return;
     terrainControllerRef.current?.setThreeD(Boolean(terrain3dEnabled));
   }, [terrain3dEnabled, mapLoaded, styleRevision]);
+
+  // Live tilt (pitch) while 3D is on — driven by the Tilt slider. The terrain
+  // controller eases pitch to its default on enable and back to 0 on disable;
+  // this only overrides pitch live while 3D is active.
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (!terrain3dEnabled || typeof pitch !== 'number') return;
+    map.current.setPitch(pitch);
+  }, [pitch, terrain3dEnabled, mapLoaded]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Apply legend draw-order to the map. Defined LAST so it runs after every

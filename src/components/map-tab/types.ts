@@ -54,7 +54,6 @@ export interface MapFeature {
 
 export type LayerGroupId =
   | 'project-boundary'
-  | 'location-intel'
   | 'comparables'
   | 'market'
   | 'annotations';
@@ -174,6 +173,8 @@ export interface MapCanvasProps {
   terrain3dEnabled?: boolean;
   /** Ids of individual drawn shapes to hide on the map (per-shape visibility). */
   hiddenAnnotationIds?: string[];
+  /** Map pitch (tilt) in degrees, applied live while 3D terrain is enabled. */
+  pitch?: number;
 }
 
 /** A saved site-plan overlay as shown in the legend's "Site Plans" section. */
