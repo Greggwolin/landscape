@@ -122,6 +122,7 @@ export function LayerPanel({
   onRemoveSitePlan,
   onRenameSitePlan,
   annotations,
+  onToggleAnnotation,
   onRenameAnnotation,
   onEditAnnotation,
   onRemoveAnnotation,
@@ -340,7 +341,9 @@ export function LayerPanel({
           </div>
         )}
 
-        {/* Annotations — one row per drawn shape, with an editable name */}
+        {/* Drawn Items — one row per drawn shape, with a per-shape visibility
+            checkbox + editable name. Distinct from the "Annotations" category
+            group (Drawn Shapes / Measurements / Notes) rendered above. */}
         {hasAnnotations && (
           <div className="layer-group">
             <button
@@ -353,7 +356,7 @@ export function LayerPanel({
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </span>
-              <span className="layer-group-label">Annotations</span>
+              <span className="layer-group-label">Drawn Items</span>
             </button>
 
             {annotationsExpanded && (
@@ -361,6 +364,12 @@ export function LayerPanel({
                 {annotations!.map((ann) => (
                   <div key={ann.id} className="layer-item">
                     <label className="layer-item-label">
+                      <input
+                        type="checkbox"
+                        checked={ann.visible !== false}
+                        onChange={() => onToggleAnnotation?.(ann.id)}
+                        className="layer-item-checkbox"
+                      />
                       {renamingAnnId === ann.id ? (
                         <input
                           type="text"

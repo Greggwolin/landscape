@@ -360,6 +360,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onCompetitorClick,
     hillshadeEnabled,
     terrain3dEnabled,
+    hiddenAnnotationIds,
   },
   ref
 ) {
@@ -1842,12 +1843,17 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     safeRemoveLayer(map.current, 'user-features-point');
     safeRemoveSource(map.current, sourceId);
 
-    if (!drawnShapesLayer?.visible || features.length === 0) return;
+    // Per-shape visibility: drop individually-hidden drawn items from the source
+    // (independent of the category-level "Drawn Shapes" toggle above).
+    const hidden = new Set(hiddenAnnotationIds ?? []);
+    const visibleFeatures = features.filter((f) => !hidden.has(f.id));
+
+    if (!drawnShapesLayer?.visible || visibleFeatures.length === 0) return;
 
     // Convert features to GeoJSON
     const geojson: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: features.map((f) => ({
+      features: visibleFeatures.map((f) => ({
         type: 'Feature' as const,
         id: f.id,
         properties: {
@@ -1945,7 +1951,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     map.current.on('click', 'user-features-point', handlePointClick);
 
      
-  }, [mapLoaded, styleRevision, layers, features, selectedFeatureId]);
+  }, [mapLoaded, styleRevision, layers, features, selectedFeatureId, hiddenAnnotationIds]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Terrain / Hillshade (config lives in the controller; it self-reasserts
