@@ -244,9 +244,11 @@ function parseRedfinCSV(
       const baths = fields[9] ? parseFloat(fields[9]) : null;
       const pricePerSqft = sqft && sqft > 0 ? Math.round(price / sqft) : null;
 
-      // Filter by year built
-      if (minYearBuilt && yearBuilt && yearBuilt < minYearBuilt) continue;
-      if (maxYearBuilt && yearBuilt && yearBuilt > maxYearBuilt) continue;
+      // Filter by year built. When a year bound is set, exclude comps whose
+      // year built is unknown (null) — an unconfirmed vintage must not pass a
+      // vintage filter, otherwise it pollutes year-based (proforma) pricing sets.
+      if (minYearBuilt && (yearBuilt == null || yearBuilt < minYearBuilt)) continue;
+      if (maxYearBuilt && (yearBuilt == null || yearBuilt > maxYearBuilt)) continue;
 
       // Calculate distance
       const distanceMiles = Math.round(calculateDistanceMiles(projectLat, projectLng, lat, lng) * 100) / 100;

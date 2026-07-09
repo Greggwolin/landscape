@@ -807,9 +807,11 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     return marketGroup?.layers.find((l) => l.id === 'recent-sales')?.visible ?? false;
   }, [layers]);
 
+  // Match the Property > Market screen's default search window (3 mi / 180 days)
+  // so the map's Recent Sales count agrees with the Market screen's comp count.
   const { data: sfCompsData } = useSfComps(projectId, {
-    radiusMiles: 5,
-    soldWithinDays: 365,
+    radiusMiles: 3,
+    soldWithinDays: 180,
   });
 
   const recentSales = useMemo<FeatureCollection | null>(() => {
