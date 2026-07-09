@@ -310,6 +310,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // dramatic 3D tilt is opt-in. Both survive basemap switches (see MapCanvas).
   const [hillshadeEnabled, setHillshadeEnabled] = useState(true);
   const [terrain3dEnabled, setTerrain3dEnabled] = useState(false);
+  // Utility sidebar sections default collapsed so the Layers panel opens compact.
+  const [countyExpanded, setCountyExpanded] = useState(false);
+  const [drawExpanded, setDrawExpanded] = useState(false);
+  const [overlaysExpanded, setOverlaysExpanded] = useState(false);
   // Per-shape (drawn item) visibility. Ids in this set are hidden on the map;
   // shapes default to visible (absent from the set). Independent of the
   // category-level "Drawn Shapes" toggle.
@@ -3030,12 +3034,23 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         {isPhoenixMSA && (
         <div className="map-tab-parcel-panel">
           <div className="map-tab-panel-header">
-            <div>
-              <div className="map-tab-panel-title">County Parcels</div>
-              <div className="map-tab-panel-subtitle">
-                {resolvedCountyLabel}
+            <button
+              type="button"
+              className="map-tab-collapse-toggle"
+              onClick={() => setCountyExpanded((v) => !v)}
+            >
+              <span className={`layer-group-chevron ${countyExpanded ? 'expanded' : ''}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              <div>
+                <div className="map-tab-panel-title">County Parcels</div>
+                <div className="map-tab-panel-subtitle">
+                  {resolvedCountyLabel}
+                </div>
               </div>
-            </div>
+            </button>
             {!resolvedCounty && (
               <button
                 type="button"
@@ -3046,6 +3061,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               </button>
             )}
           </div>
+          {countyExpanded && (
           <div className="map-tab-panel-body">
             {!resolvedCounty && (
               <div className="map-tab-panel-message">
@@ -3179,19 +3195,46 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               </>
             )}
           </div>
+          )}
         </div>
         )}
         <div className="map-tab-tools">
-          <div className="map-tab-tools-header">Draw / Measure</div>
-          <DrawToolbar
-            activeTool={activeTool}
-            onToolChange={handleToolChange}
-          />
+          <button
+            type="button"
+            className="map-tab-tools-header map-tab-collapse-toggle"
+            onClick={() => setDrawExpanded((v) => !v)}
+          >
+            <span className={`layer-group-chevron ${drawExpanded ? 'expanded' : ''}`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+            <span>Draw / Measure</span>
+          </button>
+          {drawExpanded && (
+            <DrawToolbar
+              activeTool={activeTool}
+              onToolChange={handleToolChange}
+            />
+          )}
         </div>
 
         {/* ─── Overlays ─── */}
         <div className="map-tab-tools">
-          <div className="map-tab-tools-header">Overlays</div>
+          <button
+            type="button"
+            className="map-tab-tools-header map-tab-collapse-toggle"
+            onClick={() => setOverlaysExpanded((v) => !v)}
+          >
+            <span className={`layer-group-chevron ${overlaysExpanded ? 'expanded' : ''}`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+            <span>Overlays</span>
+          </button>
+          {overlaysExpanded && (
+          <>
           <input
             ref={planFileInputRef}
             type="file"
@@ -3239,6 +3282,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                 </div>
               ))}
             </div>
+          )}
+          </>
           )}
         </div>
 
@@ -3413,6 +3458,47 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           hiddenAnnotationIds={hiddenAnnotationIdList}
         />
 
+        {/* Floating display controls (map upper-LEFT) — Basemap + Hillshade + 3D.
+            Moved out of the bottom toolbar so the terrain toggles are visible
+            without scrolling. Anchored upper-left to clear the MapLibre nav /
+            zoom controls (upper-right). Wiring unchanged: same state + setters,
+            so hillshade default-on, 3D opt-in, and basemap-switch survival all
+            behave exactly as before. */}
+        <div className="map-tab-display-controls">
+          <div className="map-tab-display-row">
+            <label htmlFor="basemap-select">Basemap</label>
+            <select
+              id="basemap-select"
+              value={basemap}
+              onChange={(e) => setBasemap(e.target.value as BasemapStyle)}
+            >
+              {BASEMAP_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="map-tab-display-toggles">
+            <label className="map-tab-terrain-toggle" title="Elevation relief shading from a free global DEM">
+              <input
+                type="checkbox"
+                checked={hillshadeEnabled}
+                onChange={(e) => setHillshadeEnabled(e.target.checked)}
+              />
+              <span>Hillshade</span>
+            </label>
+            <label className="map-tab-terrain-toggle" title="Tilt the map into 3D terrain">
+              <input
+                type="checkbox"
+                checked={terrain3dEnabled}
+                onChange={(e) => setTerrain3dEnabled(e.target.checked)}
+              />
+              <span>3D</span>
+            </label>
+          </div>
+        </div>
+
         {/* FB-323: in-map competitor detail drawer */}
         <CompetitorDetailPanel
           competitor={selectedCompetitor}
@@ -3521,44 +3607,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           </div>
         )}
 
-        {/* ─── Bottom Toolbar: Basemap + Search + Export ─── */}
+        {/* ─── Bottom Toolbar: Search + Export (Basemap/Hillshade/3D moved to
+            the floating display card in the map's upper-left corner) ─── */}
         <div className="map-tab-bottom-toolbar">
-          <div className="map-tab-basemap-selector">
-            <label htmlFor="basemap-select">Basemap</label>
-            <select
-              id="basemap-select"
-              value={basemap}
-              onChange={(e) => setBasemap(e.target.value as BasemapStyle)}
-            >
-              {BASEMAP_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Terrain controls — hillshade (default on) + opt-in 3D tilt. Both
-              survive basemap switches and are fed by the free AWS DEM. */}
-          <div className="map-tab-terrain-controls">
-            <label className="map-tab-terrain-toggle" title="Elevation relief shading from a free global DEM">
-              <input
-                type="checkbox"
-                checked={hillshadeEnabled}
-                onChange={(e) => setHillshadeEnabled(e.target.checked)}
-              />
-              <span>Hillshade</span>
-            </label>
-            <label className="map-tab-terrain-toggle" title="Tilt the map into 3D terrain">
-              <input
-                type="checkbox"
-                checked={terrain3dEnabled}
-                onChange={(e) => setTerrain3dEnabled(e.target.checked)}
-              />
-              <span>3D</span>
-            </label>
-          </div>
-
           <div className="map-tab-search">
             <input
               type="text"
