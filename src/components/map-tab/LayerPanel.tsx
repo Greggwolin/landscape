@@ -133,8 +133,8 @@ export function LayerPanel({
   // group-id in the LayerState model for it.
   const [sitePlansExpanded, setSitePlansExpanded] = useState(true);
   const hasSitePlans = Array.isArray(sitePlans) && sitePlans.length > 0;
-  // "Annotations" — one row per drawn shape, with an editable name.
-  const [annotationsExpanded, setAnnotationsExpanded] = useState(true);
+  // Named drawn shapes are nested under the "Annotations" group; the group's own
+  // expand state (group.expanded) controls them, so no separate flag is needed.
   const hasAnnotations = Array.isArray(annotations) && annotations.length > 0;
   // Inline rename: the overlay id being renamed + the in-progress text.
   const [renamingId, setRenamingId] = useState<number | null>(null);
@@ -190,7 +190,12 @@ export function LayerPanel({
       <div className="layer-panel-header">Layers</div>
 
       <div className="layer-panel-content">
-        {layers.groups.map((group) => (
+        {layers.groups.map((group) => {
+          // The "Annotations" group is pinned (not drag-reorderable) and also
+          // hosts the individual named drawn shapes nested below its category
+          // toggles (folded in from the former standalone "Drawn Items" section).
+          const isAnnotations = group.id === 'annotations';
+          return (
           <div key={group.id} className="layer-group">
             {/* Group Header */}
             <button
@@ -206,10 +211,11 @@ export function LayerPanel({
               <span className="layer-group-label">{group.label}</span>
             </button>
 
-            {/* Group Layers — drag-reorderable within the group */}
+            {/* Group Layers — drag-reorderable within the group, EXCEPT the
+                pinned Annotations group. */}
             {group.expanded && (
               <div className="layer-group-items">
-                {dragEnabled ? (
+                {dragEnabled && !isAnnotations ? (
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -224,7 +230,7 @@ export function LayerPanel({
                           key={layer.id}
                           group={group}
                           layer={layer}
-                          dragEnabled={dragEnabled}
+                          dragEnabled
                           onToggleLayer={onToggleLayer}
                           onZoomToLayer={onZoomToLayer}
                         />
@@ -243,10 +249,83 @@ export function LayerPanel({
                     />
                   ))
                 )}
+
+                {/* Named drawn shapes, nested under the Annotations group. Each
+                    keeps its per-shape show/hide checkbox + Rename/Edit/Remove.
+                    Not draggable. */}
+                {isAnnotations && hasAnnotations && (
+                  <div className="layer-annotation-shapes">
+                    {annotations!.map((ann) => (
+                      <div key={ann.id} className="layer-item">
+                        <label className="layer-item-label">
+                          <input
+                            type="checkbox"
+                            checked={ann.visible !== false}
+                            onChange={() => onToggleAnnotation?.(ann.id)}
+                            className="layer-item-checkbox"
+                          />
+                          {renamingAnnId === ann.id ? (
+                            <input
+                              type="text"
+                              className="layer-item-rename-input"
+                              autoFocus
+                              value={annRenameValue}
+                              onChange={(e) => setAnnRenameValue(e.target.value)}
+                              onClick={(e) => e.preventDefault()}
+                              onBlur={commitAnnRename}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); commitAnnRename(); }
+                                else if (e.key === 'Escape') { e.preventDefault(); cancelAnnRename(); }
+                              }}
+                            />
+                          ) : (
+                            <span
+                              className="layer-item-name"
+                              title={ann.label}
+                              onDoubleClick={() => onRenameAnnotation && startAnnRename(ann.id, ann.label)}
+                            >
+                              {ann.label}
+                            </span>
+                          )}
+                        </label>
+                        <div className="layer-item-actions">
+                          {onRenameAnnotation && renamingAnnId !== ann.id && (
+                            <button
+                              type="button"
+                              className="layer-item-action"
+                              onClick={() => startAnnRename(ann.id, ann.label)}
+                            >
+                              Rename
+                            </button>
+                          )}
+                          {onEditAnnotation && (
+                            <button
+                              type="button"
+                              className="layer-item-action"
+                              onClick={() => onEditAnnotation(ann.id)}
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {onRemoveAnnotation && (
+                            <button
+                              type="button"
+                              className="layer-item-action"
+                              onClick={() => onRemoveAnnotation(ann.id)}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {/* Site Plans — saved overlays with per-plan visibility + edit/remove */}
         {hasSitePlans && (
@@ -341,94 +420,6 @@ export function LayerPanel({
           </div>
         )}
 
-        {/* Drawn Items — one row per drawn shape, with a per-shape visibility
-            checkbox + editable name. Distinct from the "Annotations" category
-            group (Drawn Shapes / Measurements / Notes) rendered above. */}
-        {hasAnnotations && (
-          <div className="layer-group">
-            <button
-              type="button"
-              className="layer-group-header"
-              onClick={() => setAnnotationsExpanded((v) => !v)}
-            >
-              <span className={`layer-group-chevron ${annotationsExpanded ? 'expanded' : ''}`}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </span>
-              <span className="layer-group-label">Drawn Items</span>
-            </button>
-
-            {annotationsExpanded && (
-              <div className="layer-group-items">
-                {annotations!.map((ann) => (
-                  <div key={ann.id} className="layer-item">
-                    <label className="layer-item-label">
-                      <input
-                        type="checkbox"
-                        checked={ann.visible !== false}
-                        onChange={() => onToggleAnnotation?.(ann.id)}
-                        className="layer-item-checkbox"
-                      />
-                      {renamingAnnId === ann.id ? (
-                        <input
-                          type="text"
-                          className="layer-item-rename-input"
-                          autoFocus
-                          value={annRenameValue}
-                          onChange={(e) => setAnnRenameValue(e.target.value)}
-                          onClick={(e) => e.preventDefault()}
-                          onBlur={commitAnnRename}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') { e.preventDefault(); commitAnnRename(); }
-                            else if (e.key === 'Escape') { e.preventDefault(); cancelAnnRename(); }
-                          }}
-                        />
-                      ) : (
-                        <span
-                          className="layer-item-name"
-                          title={ann.label}
-                          onDoubleClick={() => onRenameAnnotation && startAnnRename(ann.id, ann.label)}
-                        >
-                          {ann.label}
-                        </span>
-                      )}
-                    </label>
-                    <div className="layer-item-actions">
-                      {onRenameAnnotation && renamingAnnId !== ann.id && (
-                        <button
-                          type="button"
-                          className="layer-item-action"
-                          onClick={() => startAnnRename(ann.id, ann.label)}
-                        >
-                          Rename
-                        </button>
-                      )}
-                      {onEditAnnotation && (
-                        <button
-                          type="button"
-                          className="layer-item-action"
-                          onClick={() => onEditAnnotation(ann.id)}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      {onRemoveAnnotation && (
-                        <button
-                          type="button"
-                          className="layer-item-action"
-                          onClick={() => onRemoveAnnotation(ann.id)}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

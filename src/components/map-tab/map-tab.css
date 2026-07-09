@@ -277,6 +277,75 @@
   margin-bottom: 8px;
 }
 
+/* Collapsible utility-section headers (County Parcels / Draw-Measure / Overlays).
+   A reset button that carries the header text + a rotating chevron. */
+.map-tab-collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+/* Named drawn shapes nested under the Annotations group — subtle divider from
+   the category toggles above. */
+.layer-annotation-shapes {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--cui-border-color, #2d2d3a);
+}
+
+/* Floating display controls in the map's upper-LEFT corner (Basemap + Hillshade
+   + 3D). Compact card, legible over light and satellite imagery, clear of the
+   MapLibre nav/zoom controls in the upper-right. */
+.map-tab-display-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--cui-card-bg, rgba(26, 26, 36, 0.92));
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.map-tab-display-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-tab-display-row label {
+  font-size: 12px;
+  color: var(--cui-secondary-color, #9ca3af);
+}
+
+.map-tab-display-row select {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--cui-tertiary-bg, #252530);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 4px;
+  color: var(--cui-body-color, #e5e5e5);
+  cursor: pointer;
+}
+
+.map-tab-display-toggles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .draw-toolbar {
   display: flex;
   gap: 4px;
