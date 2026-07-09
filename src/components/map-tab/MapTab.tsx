@@ -52,6 +52,7 @@ import {
   readStoredLayerOrder,
   writeStoredLayerOrder,
 } from '@/lib/maps/layerOrder';
+import { DEFAULT_TERRAIN_CONFIG } from '@/lib/maps/terrain';
 import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './constants';
 import {
   useDemographics,
@@ -310,6 +311,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // dramatic 3D tilt is opt-in. Both survive basemap switches (see MapCanvas).
   const [hillshadeEnabled, setHillshadeEnabled] = useState(true);
   const [terrain3dEnabled, setTerrain3dEnabled] = useState(false);
+  // Live map tilt (pitch) while 3D is on; initialized to the terrain default.
+  const [tiltDeg, setTiltDeg] = useState<number>(DEFAULT_TERRAIN_CONFIG.pitchOnEnable);
   // Utility sidebar sections default collapsed so the Layers panel opens compact.
   const [countyExpanded, setCountyExpanded] = useState(false);
   const [drawExpanded, setDrawExpanded] = useState(false);
@@ -3456,6 +3459,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           hillshadeEnabled={hillshadeEnabled}
           terrain3dEnabled={terrain3dEnabled}
           hiddenAnnotationIds={hiddenAnnotationIdList}
+          pitch={tiltDeg}
         />
 
         {/* Floating display controls (map upper-LEFT) — Basemap + Hillshade + 3D.
@@ -3492,11 +3496,32 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               <input
                 type="checkbox"
                 checked={terrain3dEnabled}
-                onChange={(e) => setTerrain3dEnabled(e.target.checked)}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setTerrain3dEnabled(on);
+                  // Reset the tilt to the terrain default each time 3D is switched on.
+                  if (on) setTiltDeg(DEFAULT_TERRAIN_CONFIG.pitchOnEnable);
+                }}
               />
               <span>3D</span>
             </label>
           </div>
+          {terrain3dEnabled && (
+            <div className="map-tab-display-row map-tab-tilt-row">
+              <label htmlFor="map-tilt">Tilt</label>
+              <input
+                id="map-tilt"
+                type="range"
+                min={0}
+                max={75}
+                step={1}
+                value={tiltDeg}
+                onChange={(e) => setTiltDeg(Number(e.target.value))}
+                title="Adjust the 3D tilt angle"
+              />
+              <span className="map-tab-tilt-value">{Math.round(tiltDeg)}°</span>
+            </div>
+          )}
         </div>
 
         {/* FB-323: in-map competitor detail drawer */}

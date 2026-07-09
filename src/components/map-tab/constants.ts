@@ -132,37 +132,6 @@ export function getDefaultLayerGroups(): LayerGroup[] {
       ],
     },
     {
-      id: 'location-intel',
-      label: 'Location Intel',
-      expanded: true,
-      layers: [
-        {
-          id: 'demo-rings',
-          label: 'Demo Rings',
-          visible: false,
-          color: LAYER_COLORS.demoRings,
-        },
-        // {
-        //   id: 'block-groups',
-        //   label: 'Block Groups',
-        //   visible: false,
-        //   color: LAYER_COLORS.blockGroups,
-        // },
-        // {
-        //   id: 'pois',
-        //   label: 'POIs',
-        //   visible: false,
-        //   color: LAYER_COLORS.pois,
-        // },
-        // {
-        //   id: 'user-points',
-        //   label: 'User Points',
-        //   visible: true,
-        //   color: LAYER_COLORS.userPoints,
-        // },
-      ],
-    },
-    {
       id: 'comparables',
       label: 'Comparables',
       expanded: true,
@@ -192,6 +161,12 @@ export function getDefaultLayerGroups(): LayerGroup[] {
       label: 'Market',
       expanded: true,
       layers: [
+        {
+          id: 'demo-rings',
+          label: 'Demo Rings',
+          visible: false,
+          color: LAYER_COLORS.demoRings,
+        },
         {
           id: 'recent-sales',
           label: 'Recent Sales',
