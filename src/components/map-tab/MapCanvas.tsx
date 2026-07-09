@@ -57,6 +57,12 @@ function safeRemoveSource(m: maplibregl.Map, sourceId: string) {
 
 const PARCEL_MIN_ZOOM = 12.5;
 const TAX_PARCEL_MIN_ZOOM = 12.5;
+// The Maricopa parcel-outline tile cache only serves at LOD 14+ (published
+// minScale 36111.909643 = zoom ≈14). Requesting coarser tiles has no cache hit
+// and 502s through the same-origin proxy, flooding the console when zoomed out.
+// So the raster SOURCE must carry this minzoom (the layer minzoom only gates
+// drawing, not tile fetching).
+const MARICOPA_PARCEL_OUTLINE_MIN_ZOOM = Math.max(TAX_PARCEL_MIN_ZOOM, 14);
 const ALL_PARCEL_SOURCE_ID = 'la-parcels-all';
 const SUBJECT_PARCEL_SOURCE_ID = 'la-parcels-subject';
 const COMPS_PARCEL_SOURCE_ID = 'la-parcels-comps';
@@ -438,6 +444,11 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       type: 'raster',
       tiles: [MARICOPA_PARCEL_OUTLINE_TILES],
       tileSize: 256,
+      // Constrain to the county's cached range so MapLibre never requests
+      // out-of-range (coarse) tiles that 502 through the proxy. The county
+      // caches to LOD 23; MapLibre overzooms fine past maxzoom.
+      minzoom: MARICOPA_PARCEL_OUTLINE_MIN_ZOOM,
+      maxzoom: 23,
     });
 
     const beforeId = map.current.getLayer('tax-parcels-fill')
@@ -449,7 +460,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         id: MARICOPA_PARCEL_OUTLINE_LAYER_ID,
         type: 'raster',
         source: MARICOPA_PARCEL_OUTLINE_SOURCE_ID,
-        minzoom: TAX_PARCEL_MIN_ZOOM,
+        // Aligned with the source minzoom — nothing to draw below the cache floor.
+        minzoom: MARICOPA_PARCEL_OUTLINE_MIN_ZOOM,
         paint: {
           'raster-opacity': 0.85,
         },
