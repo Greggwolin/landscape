@@ -97,9 +97,6 @@ export function StudioSidebar({
   // ── Collapse + resize (mirrors /w/ layout) ──────────────────────────
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
-  // Peek-on-hover when collapsed — pairs with auto-collapse so navigation stays
-  // fast even though the rail hides itself after a content-changing click.
-  const [peeking, setPeeking] = useState(false);
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
@@ -341,9 +338,7 @@ export function StudioSidebar({
     <WrapperSidebar
       activePage="projects"
       onNavigate={handleNavigate}
-      collapsed={collapsed && !peeking}
-      onMouseEnter={() => { if (collapsed) setPeeking(true); }}
-      onMouseLeave={() => setPeeking(false)}
+      collapsed={collapsed}
       onToggleCollapse={handleToggleCollapse}
       sidebarWidth={sidebarWidth}
       onResizeStart={handleResizeStart}
