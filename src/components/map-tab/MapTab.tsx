@@ -46,6 +46,13 @@ import { useMapDraw } from './hooks/useMapDraw';
 import type { DrawnFeature } from './hooks/useMapDraw';
 import { useMapFeatures } from './hooks/useMapFeatures';
 import { fetchJson } from '@/lib/fetchJson';
+import { arrayMove } from '@dnd-kit/sortable';
+import {
+  applyStoredLayerOrder,
+  readStoredLayerOrder,
+  writeStoredLayerOrder,
+} from '@/lib/maps/layerOrder';
+import { DEFAULT_TERRAIN_CONFIG } from '@/lib/maps/terrain';
 import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './constants';
 import {
   useDemographics,
@@ -299,7 +306,21 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const [basemap, setBasemap] = useState<BasemapStyle>('hybrid');
   const [activeTool, setActiveTool] = useState<DrawTool>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
-  const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups(isDevelopmentProject));
+  const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups());
+  // Terrain: hillshade relief on by default (subtle, from the free DEM); the
+  // dramatic 3D tilt is opt-in. Both survive basemap switches (see MapCanvas).
+  const [hillshadeEnabled, setHillshadeEnabled] = useState(true);
+  const [terrain3dEnabled, setTerrain3dEnabled] = useState(false);
+  // Live map tilt (pitch) while 3D is on; initialized to the terrain default.
+  const [tiltDeg, setTiltDeg] = useState<number>(DEFAULT_TERRAIN_CONFIG.pitchOnEnable);
+  // Utility sidebar sections default collapsed so the Layers panel opens compact.
+  const [countyExpanded, setCountyExpanded] = useState(false);
+  const [drawExpanded, setDrawExpanded] = useState(false);
+  const [overlaysExpanded, setOverlaysExpanded] = useState(false);
+  // Per-shape (drawn item) visibility. Ids in this set are hidden on the map;
+  // shapes default to visible (absent from the set). Independent of the
+  // category-level "Drawn Shapes" toggle.
+  const [hiddenAnnotationIds, setHiddenAnnotationIds] = useState<Set<string>>(() => new Set());
   const mapCanvasRef = useRef<MapCanvasRef>(null);
   const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
 
@@ -1302,6 +1323,37 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       })
     );
   }, []);
+
+  // Persisted per-project layer order. No backend map-pref path exists, so this
+  // uses localStorage (ParcelHunt precedent), keyed by project id.
+  const layerOrderStorageKey = useMemo(() => `mapLayerOrder:${projectId}`, [projectId]);
+
+  // Restore a saved order on mount / project switch (client-side only).
+  useEffect(() => {
+    const stored = readStoredLayerOrder(layerOrderStorageKey);
+    if (!stored) return;
+    setLayers((prev) => applyStoredLayerOrder(prev, stored));
+  }, [layerOrderStorageKey]);
+
+  // Drag-reorder a data-layer row within its group: update the ordered state and
+  // persist it. MapCanvas re-stacks the actual MapLibre layers off this order
+  // (legend order = draw order), so the on-screen stacking follows the legend.
+  const handleReorderLayer = useCallback(
+    (groupId: LayerGroupId, activeId: string, overId: string) => {
+      setLayers((prev) => {
+        const next = prev.map((group) => {
+          if (group.id !== groupId) return group;
+          const from = group.layers.findIndex((l) => l.id === activeId);
+          const to = group.layers.findIndex((l) => l.id === overId);
+          if (from === -1 || to === -1 || from === to) return group;
+          return { ...group, layers: arrayMove(group.layers, from, to) };
+        });
+        writeStoredLayerOrder(layerOrderStorageKey, next);
+        return next;
+      });
+    },
+    [layerOrderStorageKey],
+  );
 
   const handleZoomToLayer = useCallback((_groupId: LayerGroupId, layerId: string) => {
     const m = mapCanvasRef.current?.getMap();
@@ -2728,8 +2780,28 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         id: f.id,
         label: f.label?.trim() || `${f.feature_type ?? 'Annotation'} ${i + 1}`,
         feature_type: f.feature_type ?? undefined,
+        visible: !hiddenAnnotationIds.has(f.id),
       })),
-    [savedFeatures]
+    [savedFeatures, hiddenAnnotationIds]
+  );
+
+  // Toggle a single drawn shape's visibility on the map (independent of the
+  // category-level "Drawn Shapes" toggle). Hidden shapes are excluded from the
+  // map's user-features source but keep their legend row (rename/edit/remove).
+  const handleToggleAnnotation = useCallback((featureId: string) => {
+    setHiddenAnnotationIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(featureId)) next.delete(featureId);
+      else next.add(featureId);
+      return next;
+    });
+  }, []);
+
+  // Stable array for MapCanvas (a fresh array each render would re-fire its
+  // user-features effect on every render).
+  const hiddenAnnotationIdList = useMemo(
+    () => Array.from(hiddenAnnotationIds),
+    [hiddenAnnotationIds]
   );
 
   // Rename a drawn shape in place from the legend (persists feature.label).
@@ -2904,7 +2976,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     // the drape was otherwise left sitting behind the re-rendered shape.
     const raf = requestAnimationFrame(lift);
     return () => cancelAnimationFrame(raf);
-  }, [savedOverlays, hiddenOverlayIds, mapFeatures, editingOverlayId, mapIsLoaded, reshapingFeatureId]);
+    // `layers` is included so a legend drag-reorder (which restacks data layers
+    // via MapCanvas) re-asserts the drape-on-top invariant right after.
+  }, [savedOverlays, hiddenOverlayIds, mapFeatures, editingOverlayId, mapIsLoaded, reshapingFeatureId, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Loading indicator
@@ -2954,19 +3028,32 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onRemoveSitePlan={handleDeleteOverlay}
           onRenameSitePlan={handleRenameSitePlan}
           annotations={annotationsForLegend}
+          onToggleAnnotation={handleToggleAnnotation}
           onRenameAnnotation={handleRenameAnnotation}
           onEditAnnotation={handleEditAnnotation}
           onRemoveAnnotation={handleRemoveAnnotation}
+          onReorderLayer={handleReorderLayer}
         />
         {isPhoenixMSA && (
         <div className="map-tab-parcel-panel">
           <div className="map-tab-panel-header">
-            <div>
-              <div className="map-tab-panel-title">County Parcels</div>
-              <div className="map-tab-panel-subtitle">
-                {resolvedCountyLabel}
+            <button
+              type="button"
+              className="map-tab-collapse-toggle"
+              onClick={() => setCountyExpanded((v) => !v)}
+            >
+              <span className={`layer-group-chevron ${countyExpanded ? 'expanded' : ''}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </span>
+              <div>
+                <div className="map-tab-panel-title">County Parcels</div>
+                <div className="map-tab-panel-subtitle">
+                  {resolvedCountyLabel}
+                </div>
               </div>
-            </div>
+            </button>
             {!resolvedCounty && (
               <button
                 type="button"
@@ -2977,6 +3064,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               </button>
             )}
           </div>
+          {countyExpanded && (
           <div className="map-tab-panel-body">
             {!resolvedCounty && (
               <div className="map-tab-panel-message">
@@ -3110,19 +3198,46 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               </>
             )}
           </div>
+          )}
         </div>
         )}
         <div className="map-tab-tools">
-          <div className="map-tab-tools-header">Draw / Measure</div>
-          <DrawToolbar
-            activeTool={activeTool}
-            onToolChange={handleToolChange}
-          />
+          <button
+            type="button"
+            className="map-tab-tools-header map-tab-collapse-toggle"
+            onClick={() => setDrawExpanded((v) => !v)}
+          >
+            <span className={`layer-group-chevron ${drawExpanded ? 'expanded' : ''}`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+            <span>Draw / Measure</span>
+          </button>
+          {drawExpanded && (
+            <DrawToolbar
+              activeTool={activeTool}
+              onToolChange={handleToolChange}
+            />
+          )}
         </div>
 
         {/* ─── Overlays ─── */}
         <div className="map-tab-tools">
-          <div className="map-tab-tools-header">Overlays</div>
+          <button
+            type="button"
+            className="map-tab-tools-header map-tab-collapse-toggle"
+            onClick={() => setOverlaysExpanded((v) => !v)}
+          >
+            <span className={`layer-group-chevron ${overlaysExpanded ? 'expanded' : ''}`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+            <span>Overlays</span>
+          </button>
+          {overlaysExpanded && (
+          <>
           <input
             ref={planFileInputRef}
             type="file"
@@ -3170,6 +3285,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                 </div>
               ))}
             </div>
+          )}
+          </>
           )}
         </div>
 
@@ -3339,7 +3456,73 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onParcelAttach={handleParcelAttach}
           onSubjectDragEnd={handleSubjectDragEnd}
           onCompetitorClick={handleCompetitorClick}
+          hillshadeEnabled={hillshadeEnabled}
+          terrain3dEnabled={terrain3dEnabled}
+          hiddenAnnotationIds={hiddenAnnotationIdList}
+          pitch={tiltDeg}
         />
+
+        {/* Floating display controls (map upper-LEFT) — Basemap + Hillshade + 3D.
+            Moved out of the bottom toolbar so the terrain toggles are visible
+            without scrolling. Anchored upper-left to clear the MapLibre nav /
+            zoom controls (upper-right). Wiring unchanged: same state + setters,
+            so hillshade default-on, 3D opt-in, and basemap-switch survival all
+            behave exactly as before. */}
+        <div className="map-tab-display-controls">
+          <div className="map-tab-display-row">
+            <label htmlFor="basemap-select">Basemap</label>
+            <select
+              id="basemap-select"
+              value={basemap}
+              onChange={(e) => setBasemap(e.target.value as BasemapStyle)}
+            >
+              {BASEMAP_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="map-tab-display-toggles">
+            <label className="map-tab-terrain-toggle" title="Elevation relief shading from a free global DEM">
+              <input
+                type="checkbox"
+                checked={hillshadeEnabled}
+                onChange={(e) => setHillshadeEnabled(e.target.checked)}
+              />
+              <span>Hillshade</span>
+            </label>
+            <label className="map-tab-terrain-toggle" title="Tilt the map into 3D terrain">
+              <input
+                type="checkbox"
+                checked={terrain3dEnabled}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setTerrain3dEnabled(on);
+                  // Reset the tilt to the terrain default each time 3D is switched on.
+                  if (on) setTiltDeg(DEFAULT_TERRAIN_CONFIG.pitchOnEnable);
+                }}
+              />
+              <span>3D</span>
+            </label>
+          </div>
+          {terrain3dEnabled && (
+            <div className="map-tab-display-row map-tab-tilt-row">
+              <label htmlFor="map-tilt">Tilt</label>
+              <input
+                id="map-tilt"
+                type="range"
+                min={0}
+                max={75}
+                step={1}
+                value={tiltDeg}
+                onChange={(e) => setTiltDeg(Number(e.target.value))}
+                title="Adjust the 3D tilt angle"
+              />
+              <span className="map-tab-tilt-value">{Math.round(tiltDeg)}°</span>
+            </div>
+          )}
+        </div>
 
         {/* FB-323: in-map competitor detail drawer */}
         <CompetitorDetailPanel
@@ -3449,23 +3632,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           </div>
         )}
 
-        {/* ─── Bottom Toolbar: Basemap + Search + Export ─── */}
+        {/* ─── Bottom Toolbar: Search + Export (Basemap/Hillshade/3D moved to
+            the floating display card in the map's upper-left corner) ─── */}
         <div className="map-tab-bottom-toolbar">
-          <div className="map-tab-basemap-selector">
-            <label htmlFor="basemap-select">Basemap</label>
-            <select
-              id="basemap-select"
-              value={basemap}
-              onChange={(e) => setBasemap(e.target.value as BasemapStyle)}
-            >
-              {BASEMAP_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div className="map-tab-search">
             <input
               type="text"

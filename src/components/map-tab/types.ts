@@ -54,7 +54,6 @@ export interface MapFeature {
 
 export type LayerGroupId =
   | 'project-boundary'
-  | 'location-intel'
   | 'comparables'
   | 'market'
   | 'annotations';
@@ -168,6 +167,14 @@ export interface MapCanvasProps {
    *  ("competitor-<id>"). Optional so non-/w mounts that don't render a detail
    *  panel are unaffected. */
   onCompetitorClick?: (competitorFeatureId: string) => void;
+  /** When true, a hillshade relief layer renders from the free DEM source. */
+  hillshadeEnabled?: boolean;
+  /** When true, 3D terrain (mesh + camera pitch) is enabled from the same DEM. */
+  terrain3dEnabled?: boolean;
+  /** Ids of individual drawn shapes to hide on the map (per-shape visibility). */
+  hiddenAnnotationIds?: string[];
+  /** Map pitch (tilt) in degrees, applied live while 3D terrain is enabled. */
+  pitch?: number;
 }
 
 /** A saved site-plan overlay as shown in the legend's "Site Plans" section. */
@@ -182,11 +189,13 @@ export interface SitePlanLegendItem {
   unavailable?: boolean;
 }
 
-/** A drawn shape as shown in the legend's "Annotations" section. */
+/** A drawn shape as shown in the legend's "Drawn Items" section. */
 export interface AnnotationLegendItem {
   id: string;
   label: string;
   feature_type?: string;
+  /** Per-shape visibility on the map (independent of the category toggle). */
+  visible: boolean;
 }
 
 export interface LayerPanelProps {
@@ -203,10 +212,16 @@ export interface LayerPanelProps {
   onRenameSitePlan?: (overlayId: number, title: string) => void;
   /** Drawn shapes surfaced in the legend (optional — omit to hide section). */
   annotations?: AnnotationLegendItem[];
+  /** Toggle a single drawn shape's visibility on the map (mirrors onToggleSitePlan). */
+  onToggleAnnotation?: (id: string) => void;
   /** Rename a drawn shape in place (persists feature.label). */
   onRenameAnnotation?: (id: string, label: string) => void;
   onEditAnnotation?: (id: string) => void;
   onRemoveAnnotation?: (id: string) => void;
+  /** Reorder a data-layer row within its group via drag-and-drop: `activeId`
+   *  moves to `overId`'s position. Only the `layers.groups` rows are draggable;
+   *  the Overlays and Annotations sections stay pinned. Omit to disable drag. */
+  onReorderLayer?: (groupId: LayerGroupId, activeId: string, overId: string) => void;
 }
 
 export interface DrawToolbarProps {

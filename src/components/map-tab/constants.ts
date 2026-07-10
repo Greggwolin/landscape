@@ -104,7 +104,7 @@ export const CATEGORIES_BY_FEATURE_TYPE: Record<
 // Default Layer State
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function getDefaultLayerGroups(isDevelopment = false): LayerGroup[] {
+export function getDefaultLayerGroups(): LayerGroup[] {
   return [
     {
       id: 'project-boundary',
@@ -132,37 +132,6 @@ export function getDefaultLayerGroups(isDevelopment = false): LayerGroup[] {
       ],
     },
     {
-      id: 'location-intel',
-      label: 'Location Intel',
-      expanded: true,
-      layers: [
-        {
-          id: 'demo-rings',
-          label: 'Demo Rings',
-          visible: false,
-          color: LAYER_COLORS.demoRings,
-        },
-        // {
-        //   id: 'block-groups',
-        //   label: 'Block Groups',
-        //   visible: false,
-        //   color: LAYER_COLORS.blockGroups,
-        // },
-        // {
-        //   id: 'pois',
-        //   label: 'POIs',
-        //   visible: false,
-        //   color: LAYER_COLORS.pois,
-        // },
-        // {
-        //   id: 'user-points',
-        //   label: 'User Points',
-        //   visible: true,
-        //   color: LAYER_COLORS.userPoints,
-        // },
-      ],
-    },
-    {
       id: 'comparables',
       label: 'Comparables',
       expanded: true,
@@ -170,10 +139,7 @@ export function getDefaultLayerGroups(isDevelopment = false): LayerGroup[] {
         {
           id: 'sale-comps',
           label: 'Sale Comps',
-          // Development projects show live market sales (Recent Sales) instead;
-          // the stored Sale Comps layer stays available but off by default so it
-          // doesn't render stale pins alongside the live market data.
-          visible: !isDevelopment,
+          visible: true,
           color: LAYER_COLORS.saleComps,
         },
         {
@@ -196,11 +162,15 @@ export function getDefaultLayerGroups(isDevelopment = false): LayerGroup[] {
       expanded: true,
       layers: [
         {
+          id: 'demo-rings',
+          label: 'Demo Rings',
+          visible: false,
+          color: LAYER_COLORS.demoRings,
+        },
+        {
           id: 'recent-sales',
           label: 'Recent Sales',
-          // On by default for development projects so the map's sales layer
-          // matches the live feed shown on the Property > Market screen.
-          visible: isDevelopment,
+          visible: false,
           color: LAYER_COLORS.recentSales,
         },
         {

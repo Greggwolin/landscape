@@ -18,6 +18,8 @@ import { RING_COLORS } from '@/components/location-intelligence';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
+import { registerTerrain, type TerrainController } from '@/lib/maps/terrain';
+import { applyLayerOrder, flattenLegendOrder } from '@/lib/maps/layerOrder';
 import type { GoogleBasemapType } from '@/lib/maps/googleBasemaps';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
@@ -55,6 +57,12 @@ function safeRemoveSource(m: maplibregl.Map, sourceId: string) {
 
 const PARCEL_MIN_ZOOM = 12.5;
 const TAX_PARCEL_MIN_ZOOM = 12.5;
+// The Maricopa parcel-outline tile cache only serves at LOD 14+ (published
+// minScale 36111.909643 = zoom ≈14). Requesting coarser tiles has no cache hit
+// and 502s through the same-origin proxy, flooding the console when zoomed out.
+// So the raster SOURCE must carry this minzoom (the layer minzoom only gates
+// drawing, not tile fetching).
+const MARICOPA_PARCEL_OUTLINE_MIN_ZOOM = Math.max(TAX_PARCEL_MIN_ZOOM, 14);
 const ALL_PARCEL_SOURCE_ID = 'la-parcels-all';
 const SUBJECT_PARCEL_SOURCE_ID = 'la-parcels-subject';
 const COMPS_PARCEL_SOURCE_ID = 'la-parcels-comps';
@@ -356,6 +364,10 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onSubjectDragEnd,
     attachDrawActive,
     onCompetitorClick,
+    hillshadeEnabled,
+    terrain3dEnabled,
+    hiddenAnnotationIds,
+    pitch,
   },
   ref
 ) {
@@ -371,6 +383,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const subjectMarkerRef = useRef<maplibregl.Marker | null>(null);
   const attachDragMarkerRef = useRef<maplibregl.Marker | null>(null);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
+  const terrainControllerRef = useRef<TerrainController | null>(null);
   const lastCenterRef = useRef<[number, number] | null>(null);
 
   // Expose map to parent component
@@ -432,6 +445,11 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       type: 'raster',
       tiles: [MARICOPA_PARCEL_OUTLINE_TILES],
       tileSize: 256,
+      // Constrain to the county's cached range so MapLibre never requests
+      // out-of-range (coarse) tiles that 502 through the proxy. The county
+      // caches to LOD 23; MapLibre overzooms fine past maxzoom.
+      minzoom: MARICOPA_PARCEL_OUTLINE_MIN_ZOOM,
+      maxzoom: 23,
     });
 
     const beforeId = map.current.getLayer('tax-parcels-fill')
@@ -443,7 +461,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         id: MARICOPA_PARCEL_OUTLINE_LAYER_ID,
         type: 'raster',
         source: MARICOPA_PARCEL_OUTLINE_SOURCE_ID,
-        minzoom: TAX_PARCEL_MIN_ZOOM,
+        // Aligned with the source minzoom — nothing to draw below the cache floor.
+        minzoom: MARICOPA_PARCEL_OUTLINE_MIN_ZOOM,
         paint: {
           'raster-opacity': 0.85,
         },
@@ -478,9 +497,16 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       style,
       center,
       zoom,
+      // Raised above MapLibre's default 60 so the 3D tilt slider can reach the
+      // higher oblique angles.
+      maxPitch: 80,
       canvasContextAttributes: { antialias: true },
     });
 
+    // Terrain/hillshade first, so the hillshade layer sits BELOW the raster-dim
+    // overlay (and below all data layers, which are added later). Config-driven
+    // and self-reasserting across basemap switches (setStyle wipes sources).
+    terrainControllerRef.current = registerTerrain(map.current);
     rasterDimCleanupRef.current = registerRasterDim(map.current, 0.1);
 
     // Add navigation controls
@@ -535,6 +561,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       resizeObserver?.disconnect();
       rasterDimCleanupRef.current?.();
       rasterDimCleanupRef.current = null;
+      terrainControllerRef.current?.destroy();
+      terrainControllerRef.current = null;
       map.current?.remove();
       map.current = null;
       setMapLoaded(false);
@@ -1678,7 +1706,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     if (!map.current || !mapLoaded) return;
 
     const demoRingsLayer = layers.groups
-      .find((g) => g.id === 'location-intel')
+      .find((g) => g.id === 'market')
       ?.layers.find((l) => l.id === 'demo-rings');
 
     if (!demoRingsLayer?.visible) {
@@ -1831,12 +1859,17 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     safeRemoveLayer(map.current, 'user-features-point');
     safeRemoveSource(map.current, sourceId);
 
-    if (!drawnShapesLayer?.visible || features.length === 0) return;
+    // Per-shape visibility: drop individually-hidden drawn items from the source
+    // (independent of the category-level "Drawn Shapes" toggle above).
+    const hidden = new Set(hiddenAnnotationIds ?? []);
+    const visibleFeatures = features.filter((f) => !hidden.has(f.id));
+
+    if (!drawnShapesLayer?.visible || visibleFeatures.length === 0) return;
 
     // Convert features to GeoJSON
     const geojson: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: features.map((f) => ({
+      features: visibleFeatures.map((f) => ({
         type: 'Feature' as const,
         id: f.id,
         properties: {
@@ -1934,7 +1967,43 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     map.current.on('click', 'user-features-point', handlePointClick);
 
      
-  }, [mapLoaded, styleRevision, layers, features, selectedFeatureId]);
+  }, [mapLoaded, styleRevision, layers, features, selectedFeatureId, hiddenAnnotationIds]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Terrain / Hillshade (config lives in the controller; it self-reasserts
+  // across basemap switches). Driving from props keeps MapCanvas declarative.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!mapLoaded) return;
+    terrainControllerRef.current?.setHillshade(Boolean(hillshadeEnabled));
+  }, [hillshadeEnabled, mapLoaded, styleRevision]);
+
+  useEffect(() => {
+    if (!mapLoaded) return;
+    terrainControllerRef.current?.setThreeD(Boolean(terrain3dEnabled));
+  }, [terrain3dEnabled, mapLoaded, styleRevision]);
+
+  // Live tilt (pitch) while 3D is on — driven by the Tilt slider. The terrain
+  // controller eases pitch to its default on enable and back to 0 on disable;
+  // this only overrides pitch live while 3D is active.
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (!terrain3dEnabled || typeof pitch !== 'number') return;
+    map.current.setPitch(pitch);
+  }, [pitch, terrain3dEnabled, mapLoaded]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Apply legend draw-order to the map. Defined LAST so it runs after every
+  // data-layer effect has (re)added its layers on any `layers` change — the
+  // legend row order becomes the on-screen stacking order. Pure helper lives in
+  // src/lib/maps/layerOrder.ts (extraction-friendly).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    applyLayerOrder(map.current, flattenLegendOrder(layers.groups));
+  }, [mapLoaded, styleRevision, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
