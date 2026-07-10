@@ -190,7 +190,11 @@
 }
 
 /* Collapsed sidebar */
-.wrapper-sidebar.collapsed { width: 48px; overflow: hidden; }
+/* overflow must be visible when collapsed so the per-icon submenu flyout (and
+   the name-only ::after tooltip) can escape the 48px rail to the right. The
+   expanded rail keeps overflow:hidden (base .wrapper-sidebar) to clip labels
+   during the width transition. */
+.wrapper-sidebar.collapsed { width: 48px; overflow: visible; }
 .wrapper-sidebar.collapsed .sb-new-chat-stub,
 .wrapper-sidebar.collapsed .sb-search,
 .wrapper-sidebar.collapsed .sb-divider,
@@ -261,6 +265,20 @@
   padding: 6px;
   z-index: 200;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+/* Invisible hover-bridge spanning the dead gap between the 48px icon rail and
+   the flyout (which starts at left:48px). Without it, the pointer leaves the
+   .sb-nav-item hover region while crossing the gap and the flyout closes before
+   it can be reached. The flyout is a child of .sb-nav-item, so keeping the
+   pointer over this bridge keeps the parent :hover active and the flyout open.
+   Extends slightly under the icon (left:-16px) so the hover path is continuous. */
+.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover > .sb-flyout::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -16px;
+  width: 16px;
 }
 .sb-flyout-title {
   font-size: 11px;
