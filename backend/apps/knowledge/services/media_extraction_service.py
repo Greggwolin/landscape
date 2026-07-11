@@ -261,6 +261,14 @@ class MediaExtractionService:
             # Delete existing 'pending' records for re-scan (preserve extracted/verified)
             self._delete_pending_records(doc_id)
 
+            # Re-scan dedup: load signatures of media that already have a live
+            # record for THIS document (extracted / classified / verified, or a
+            # user-discarded 'ignore'). We must not re-create pending records for
+            # these, or a subsequent extract would persist a second copy of an
+            # image that was already extracted. Embedded images are keyed by
+            # their PDF xref; page captures by page number.
+            existing_xrefs, existing_capture_pages = self._get_existing_live_signatures(doc_id)
+
             for page_num in range(total_pages):
                 page = doc[page_num]
                 display_page = page_num + 1  # 1-indexed for user display
@@ -271,7 +279,7 @@ class MediaExtractionService:
                 # Check if page is a capture candidate
                 is_candidate, reason = self._is_page_capture_candidate(page)
 
-                if is_candidate:
+                if is_candidate and display_page not in existing_capture_pages:
                     page_rect = page.rect
                     page_candidates.append({
                         'page': display_page,
@@ -294,6 +302,12 @@ class MediaExtractionService:
                 image_list = page.get_images(full=True)
                 for img_idx, img_info in enumerate(image_list):
                     xref = img_info[0]
+
+                    # Skip images already extracted for this doc on a prior scan.
+                    # Prevents duplicate pending records (and thus duplicate
+                    # extracted copies) when 'scan' is re-run after extraction.
+                    if xref in existing_xrefs:
+                        continue
 
                     # Get image dimensions from the xref
                     try:
@@ -882,6 +896,62 @@ class MediaExtractionService:
         except Exception:
             logger.exception(f"[project_id={project_id}] Failed to load project image hashes")
             return set()
+
+    def _get_existing_live_signatures(self, doc_id: int) -> tuple[set[int], set[int]]:
+        """Return signatures of media already recorded for this doc that a
+        re-scan must NOT re-create as pending.
+
+        Covers records that survive ``_delete_pending_records`` — i.e. anything
+        already extracted (has a stored file) or explicitly discarded by the
+        user (``user_action = 'ignore'``). Rejected/never-stored rows are not
+        counted, so a genuinely failed item can still be retried.
+
+        Returns:
+            (embedded_xrefs, capture_pages)
+              embedded_xrefs  — set of PDF xref ints for method='embedded'
+              capture_pages   — set of 1-indexed page numbers for method='page_capture'
+        """
+        embedded_xrefs: set[int] = set()
+        capture_pages: set[int] = set()
+        try:
+            with connection.cursor() as c:
+                c.execute("""
+                    SELECT extraction_method, source_page, source_region
+                    FROM landscape.core_doc_media
+                    WHERE doc_id = %s
+                      AND deleted_at IS NULL
+                      AND status != 'rejected'
+                      AND (
+                            (storage_uri IS NOT NULL AND storage_uri != '')
+                            OR user_action = 'ignore'
+                          )
+                """, [doc_id])
+                rows = c.fetchall()
+            for method, source_page, source_region in rows:
+                if method == 'page_capture':
+                    if source_page is not None:
+                        capture_pages.add(int(source_page))
+                elif method == 'embedded':
+                    region = source_region
+                    if isinstance(region, str):
+                        try:
+                            region = json.loads(region)
+                        except (ValueError, TypeError):
+                            region = None
+                    if isinstance(region, dict) and region.get('xref') is not None:
+                        try:
+                            embedded_xrefs.add(int(region['xref']))
+                        except (ValueError, TypeError):
+                            pass
+            if embedded_xrefs or capture_pages:
+                logger.info(
+                    f"[doc_id={doc_id}] Re-scan dedup: "
+                    f"{len(embedded_xrefs)} embedded xrefs + "
+                    f"{len(capture_pages)} page captures already live — will skip"
+                )
+        except Exception:
+            logger.exception(f"[doc_id={doc_id}] Failed to load existing media signatures")
+        return embedded_xrefs, capture_pages
 
     def _set_media_scan_status(self, doc_id: int, status: str):
         """Update media_scan_status on core_doc."""
