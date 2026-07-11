@@ -199,7 +199,17 @@ export default function ProjectMediaGallery({
  return [];
  },
  enabled: !!projectId,
- refetchInterval: 5000,
+ // Poll only while a scan is in flight (user-triggered `scanning`) or some doc
+ // is actively processing. When the pipeline is idle there is nothing to watch,
+ // so stop polling — an unconditional 5s refetch re-rendered the whole
+ // query-heavy gallery on a timer, which starved its repaint on the studio
+ // documents screen (LSCMD-STUDIO-FREEZE-0710-LN5). Resumes as soon as a scan
+ // starts or a processing doc appears in the freshly-fetched data.
+ refetchInterval: (query) => {
+  const rows = query.state.data as DocListItem[] | undefined;
+  const busy = scanning || (rows?.some((d) => isActiveScanStatus(d.media_scan_status)) ?? false);
+  return busy ? 5000 : false;
+ },
  });
 
  // All PDFs in the project
