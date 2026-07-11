@@ -1450,6 +1450,18 @@
   flex-direction: column;
 }
 
+/* DocumentsTab stacks DMSView above the Project Media gallery inside the flex-
+   column right-panel scroll container. DMSView's root is `h-full` (height:100%),
+   which is correct for its full-pane usages but here reserved a whole pane of
+   empty height and pushed Project Media far below the fold. Constrain it to
+   content height (scoped to the DocumentsTab host) so the gallery sits directly
+   beneath Project Documents (LSCMD-STUDIO-FREEZE-0710-LN5). */
+.dms-doc-tab-host,
+.dms-doc-tab-host > * {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
 /* ─── Page body spacing ─── */
 .w-page-body {
   padding: var(--w-sp-4);
