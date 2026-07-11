@@ -401,14 +401,64 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
               return (
                 <React.Fragment key={item.id}>
                   <div
-                    className={`sb-nav-item${isActive ? ' active' : ''}`}
+                    className={`sb-nav-item${isActive ? ' active' : ''}${recentProjects.length > 0 ? ' has-flyout' : ''}`}
                     data-label={item.label}
                     title={item.label}
-                    onClick={() => setProjectsNavOpen((v) => !v)}
+                    onClick={() => {
+                      // Collapsed rail: open the flyout (the inline recents list is
+                      // hidden when collapsed). Expanded rail: toggle inline recents.
+                      if (collapsed) openFlyoutFor('projects');
+                      else setProjectsNavOpen((v) => !v);
+                    }}
+                    onMouseEnter={collapsed && recentProjects.length > 0 ? () => openFlyoutFor('projects') : undefined}
+                    onMouseLeave={collapsed && recentProjects.length > 0 ? scheduleFlyoutClose : undefined}
                   >
                     <NavIcon d={item.paths} />
                     <span className="sb-nav-label">{item.label}</span>
                     <span className="sb-section-chev">{projectsNavOpen ? '▾' : '▸'}</span>
+                    {/* Collapsed-rail flyout — lists the recent projects + a "Show
+                        All" link, mirroring the studio folder flyouts. Only visible
+                        while the rail is collapsed (see wrapper.css); inert when the
+                        panel is expanded (recents render inline below instead). */}
+                    {recentProjects.length > 0 && (
+                      <div
+                        className={`sb-flyout${openFlyout === 'projects' ? ' open' : ''}`}
+                        role="menu"
+                        aria-label="Recent projects"
+                        onMouseEnter={() => openFlyoutFor('projects')}
+                        onMouseLeave={scheduleFlyoutClose}
+                      >
+                        <div className="sb-flyout-title">Projects</div>
+                        {recentProjects.slice(0, DEFAULT_PROJECT_CAP).map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            role="menuitem"
+                            className="sb-flyout-item"
+                            title={p.name}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenFlyout(null);
+                              p.onClick?.();
+                            }}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="sb-flyout-item"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenFlyout(null);
+                            onNavigate('projects');
+                          }}
+                        >
+                          Show All →
+                        </button>
+                      </div>
+                    )}
                   </div>
                   {projectsNavOpen &&
                     recentProjects.slice(0, DEFAULT_PROJECT_CAP).map((p) => (
