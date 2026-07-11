@@ -18,7 +18,6 @@ import { useBudgetData } from './hooks/useBudgetData';
 import type { BudgetItem } from './ColumnDefinitions';
 import BudgetItemModalV2, { type BudgetItemFormValues } from './BudgetItemModalV2';
 import QuickAddCategoryModal from './QuickAddCategoryModal';
-import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
@@ -50,7 +49,6 @@ const COLUMN_LABELS: Record<string, string> = {
   periods_to_complete: 'Duration',
   activity: 'Stage',
   category_l1_id: 'Category',
-  variance_amount: 'Variance',
   actions: 'Actions',
 };
 
@@ -536,9 +534,6 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
             </h4>
           </div>
         )}
-
-        {/* Incomplete Categories Reminder */}
-        <IncompleteCategoriesReminder projectId={projectId} className="mb-3" />
 
         {/* Filters Accordion */}
         <div className="mb-3">

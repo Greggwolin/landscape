@@ -539,7 +539,7 @@ export function getColumnsByMode(
     return 'id' in col && col.id === 'escalated_amount';
   });
 
-  // Split remaining columns to insert variance after amount
+  // Split remaining columns into the amount-and-before group vs the trailing timing columns
   // Include columns with accessorKey (data fields) and id (computed columns like escalated_amount)
   const napkinBeforeAmount = napkinWithoutPhase.filter(col => {
     if ('accessorKey' in col) {
@@ -598,16 +598,6 @@ export function getColumnsByMode(
     ...(phaseColumn ? [phaseColumn] : []),
     stageColumn,
     ...napkinBeforeAmount,
-    {
-      accessorKey: 'variance_amount',
-      header: 'Var',
-      size: 100,
-      cell: () => (
-        <span className="text-muted text-center d-block" style={{ fontSize: '0.875rem' }}>
-          -
-        </span>
-      ),
-    },
     ...napkinTimingColumns,
   ];
 
@@ -617,16 +607,6 @@ export function getColumnsByMode(
     stageColumn,
     categoryColumnWithGroup,
     ...napkinBeforeAmount,
-    {
-      accessorKey: 'variance_amount',
-      header: 'Var',
-      size: 100,
-      cell: () => (
-        <span className="text-muted text-center d-block" style={{ fontSize: '0.875rem' }}>
-          -
-        </span>
-      ),
-    },
     ...napkinTimingColumns,
   ];
 
