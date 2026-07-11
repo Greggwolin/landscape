@@ -252,7 +252,13 @@
 /* An icon with a flyout suppresses the name-only tooltip; the flyout's own
    title row carries the name instead. */
 .wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover::after { content: none; }
-.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover > .sb-flyout {
+/* The flyout shows on hover AND stays shown via the JS-set `.open` class during
+   a short close grace period (see WrapperSidebar), so the pointer can cross the
+   gap between the centered icon and the flyout (which starts at the 48px rail
+   edge) without :hover dropping and closing it. A pure-CSS hover-bridge proved
+   too pixel-fragile across shells/zoom levels. */
+.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover > .sb-flyout,
+.wrapper-sidebar.collapsed .sb-nav-item.has-flyout > .sb-flyout.open {
   display: block;
   position: absolute;
   left: 48px;
@@ -265,20 +271,6 @@
   padding: 6px;
   z-index: 200;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-}
-/* Invisible hover-bridge spanning the dead gap between the 48px icon rail and
-   the flyout (which starts at left:48px). Without it, the pointer leaves the
-   .sb-nav-item hover region while crossing the gap and the flyout closes before
-   it can be reached. The flyout is a child of .sb-nav-item, so keeping the
-   pointer over this bridge keeps the parent :hover active and the flyout open.
-   Extends slightly under the icon (left:-16px) so the hover path is continuous. */
-.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover > .sb-flyout::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -16px;
-  width: 16px;
 }
 .sb-flyout-title {
   font-size: 11px;

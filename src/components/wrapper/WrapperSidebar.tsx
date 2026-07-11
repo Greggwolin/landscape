@@ -278,6 +278,36 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
       else next.add(id);
       return next;
     });
+
+  // Collapsed-rail flyout: JS-controlled open state with a close grace period.
+  // The flyout sits at the 48px rail edge, offset from the centered icon; a
+  // pure-CSS :hover bridge was too pixel-fragile to keep it open while the
+  // pointer crossed that gap. Instead we hold it open for ~240ms after the
+  // pointer leaves BOTH the icon and the flyout, so it's reliably reachable.
+  const [openFlyout, setOpenFlyout] = useState<string | null>(null);
+  const flyoutCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelFlyoutClose = () => {
+    if (flyoutCloseTimer.current) {
+      clearTimeout(flyoutCloseTimer.current);
+      flyoutCloseTimer.current = null;
+    }
+  };
+  const openFlyoutFor = (id: string) => {
+    cancelFlyoutClose();
+    setOpenFlyout(id);
+  };
+  const scheduleFlyoutClose = () => {
+    cancelFlyoutClose();
+    flyoutCloseTimer.current = setTimeout(() => setOpenFlyout(null), 240);
+  };
+  // Clear any pending timer on unmount, and drop the flyout when the rail expands.
+  React.useEffect(() => () => cancelFlyoutClose(), []);
+  React.useEffect(() => {
+    if (!collapsed) {
+      cancelFlyoutClose();
+      setOpenFlyout(null);
+    }
+  }, [collapsed]);
   // Thread "See more" state — capped at DEFAULT_THREAD_CAP by default.
   // If the active thread sits past the cap, expand automatically so the
   // user always sees the row that matches the URL they're on.
@@ -451,6 +481,8 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                         if (hasSub) toggleFolderExpanded(folder.id);
                         projectNav.onSelectFolder(folder.id);
                       }}
+                      onMouseEnter={collapsed && hasSub ? () => openFlyoutFor(folder.id) : undefined}
+                      onMouseLeave={collapsed && hasSub ? scheduleFlyoutClose : undefined}
                     >
                       <NavIcon d={FOLDER_ICONS[folder.id] || FOLDER_ICON_FALLBACK} />
                       <span className="sb-nav-label">{label}</span>
@@ -480,7 +512,13 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                           When the rail is expanded, sub-tabs render inline below and
                           this flyout stays hidden. */}
                       {hasSub && (
-                        <div className="sb-flyout" role="menu" aria-label={label}>
+                        <div
+                          className={`sb-flyout${openFlyout === folder.id ? ' open' : ''}`}
+                          role="menu"
+                          aria-label={label}
+                          onMouseEnter={() => openFlyoutFor(folder.id)}
+                          onMouseLeave={scheduleFlyoutClose}
+                        >
                           <div className="sb-flyout-title">{label}</div>
                           {folder.subTabs.map((sub) => (
                             <button
