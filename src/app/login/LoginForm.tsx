@@ -20,7 +20,6 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tosAccepted, setTosAccepted] = useState(false);
-  const [tosAcceptedAt, setTosAcceptedAt] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [tosMap, setTosMap] = useState<Record<string, string>>({});
   const normalizedUsername = useMemo(() => username.trim().toLowerCase(), [username]);
@@ -48,25 +47,12 @@ export default function LoginForm() {
   }, [normalizedUsername, tosMap]);
 
   useEffect(() => {
-    setTosAcceptedAt(currentTosTimestamp);
     if (currentTosTimestamp) {
       setTosAccepted(true);
       return;
     }
     setTosAccepted(false);
   }, [currentTosTimestamp, normalizedUsername]);
-
-  const formattedAcceptedDate = useMemo(() => {
-    if (!tosAcceptedAt) return null;
-    const date = new Date(tosAcceptedAt);
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }, [tosAcceptedAt]);
 
   const requiresTos = Boolean(normalizedUsername) && !currentTosTimestamp;
 
@@ -81,7 +67,6 @@ export default function LoginForm() {
       }
       return newMap;
     });
-    setTosAcceptedAt(acceptedAt);
     setTosAccepted(true);
   };
 
@@ -301,13 +286,6 @@ export default function LoginForm() {
                   .
                 </span>
               </label>
-            </div>
-          )}
-          {!requiresTos && formattedAcceptedDate && (
-            <div className="mt-6 rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
-              <p className="text-sm" style={{ color: 'var(--text-primary)', margin: 0 }}>
-                Terms accepted on {formattedAcceptedDate}
-              </p>
             </div>
           )}
           <p className="mt-6 text-xs text-center" style={{ color: 'var(--cui-secondary-color)' }}>
