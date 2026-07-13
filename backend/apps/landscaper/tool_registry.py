@@ -31,6 +31,9 @@ UNIVERSAL_TOOLS = [
     "get_document_assertions", "ingest_document", "get_document_media_summary",
     "get_extraction_results", "update_extraction_result",
     "get_extraction_corrections", "log_extraction_correction",
+    # DMS management (LSCMD-TOOLGATE-0712-VP1 — had executors but were ungated)
+    "rename_document", "update_document_profile",
+    "move_document_to_folder", "reprocess_document",
     # Document profiles (FB-281/FB-291 guard — list authoritative, add is explicit-consent)
     "list_project_profiles", "add_project_profile",
     # Extraction-mapping config visibility (FB-303 — read-only; edits stay on admin UI)
@@ -66,6 +69,11 @@ UNIVERSAL_TOOLS = [
     "get_loans", "update_loan", "delete_loan",
     "get_equity_structure", "update_equity_structure",
     "get_waterfall_tiers", "update_waterfall_tiers",
+    # Acquisition event ledger (LSCMD-TOOLGATE-0712-VP1 — had executors but were
+    # ungated). Gated UNIVERSAL per owner decision so land-dev also gets them;
+    # NOTE: parent get_acquisition/update_acquisition remain INCOME_PROPERTY-only,
+    # so on land-dev the events are exposed without the parent record read.
+    "get_acquisition_events", "create_acquisition_event", "delete_acquisition_event",
     # Draft analysis + project creation
     "create_project",
     "create_analysis_draft", "update_analysis_draft",
@@ -165,6 +173,11 @@ LAND_ONLY_TOOLS = [
     "get_absorption_schedule", "update_absorption_schedule", "delete_absorption_schedule",
     # Budget (land dev uses budget grid; income property uses opex)
     "get_budget_categories", "update_budget_category",
+    # Budget-category delete + lifecycle stages (LSCMD-TOOLGATE-0712-VP1 —
+    # had executors but were ungated; gated LAND_ONLY to match the budget-
+    # category siblings above).
+    "delete_budget_category",
+    "get_category_lifecycle_stages", "update_category_lifecycle_stages",
     "get_budget_items", "update_budget_item", "delete_budget_item",
     # Land planning
     "configure_project_hierarchy", "create_land_dev_containers",
@@ -207,6 +220,9 @@ INCOME_PROPERTY_TOOLS = [
     "get_vacancy_assumptions", "update_vacancy_assumptions",
     "analyze_loss_to_lease", "calculate_year1_buyer_noi",
     "check_income_analysis_availability",
+    # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
+    # had executors but were ungated; income-property scoped, not land dev).
+    "get_expense_comparables", "update_expense_comparable", "delete_expense_comparable",
 ]
 
 # CRE-specific tools — tenants, spaces, leases for Office + Retail + Industrial.
