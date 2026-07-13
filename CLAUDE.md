@@ -533,7 +533,7 @@ Django uses DRF serializers with consistent envelope:
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ✅ WORKS | Geo auto-seeding for US cities (Mar 2026), on-demand state-level demographics loading, μSA support, location brief tool. Caveat: ACS data lags 2–3 years and underreports in resort/luxury markets |
 | 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); new `get_operating_statement` Landscaper tool renders P&L as an artifact |
-| 7 | Landscaper Chat | ✅ WORKS | ~268 tools (artifacts system + get_operating_statement added Apr 25–30); thread-based with unassigned (pre-project) threads, tightened firing discipline, cross-property fabrication blocked |
+| 7 | Landscaper Chat | ✅ WORKS | 273 tools (master list refreshed 2026-07-13; 13 previously-ungated tools attached to their property-type gates this session); thread-based with unassigned (pre-project) threads, tightened firing discipline, cross-property fabrication blocked |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
@@ -860,7 +860,7 @@ Two distinct failure modes — treat separately:
 | Frontend (React pages) | ✅ | — | All UI rendering |
 | Legacy API routes (`src/app/api/dms/`, etc.) | ✅ | — | Direct Neon DB queries |
 | Django REST API (`/api/projects/`, `/api/containers/`, etc.) | — | ✅ | Primary API target |
-| Landscaper chat | — | ✅ | 220 tools, Claude AI |
+| Landscaper chat | — | ✅ | 273 tools, Claude AI |
 | Knowledge/extraction pipeline | — | ✅ | Document processing |
 | Ingestion Workbench API | — | ✅ | `workbench_views.py` |
 | Financial engine (IRR/NPV/DSCR) | — | ✅ | Python calculations |
@@ -1063,7 +1063,8 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-06-26 — Renovation per-slice fabrication arc closed. (1) Figure-level provenance in the reply-assembly fabrication guard (`reply_states_unsourced_financials` now takes the turn's tool outputs; every $/%/x figure must trace to a returned number — closes "ran one real tool then invented the rest"; PR #136). (2) New `get_renovation_breakdown` tool gives the model real per-bedroom renovation numbers tied exactly to the Renovation page, so the "1BR renovation budget" card is sourced, not invented (PR #139). Also: financial artifact creation guard (`financial_artifact_guard.py`) + prompt three-way routing; studio shell promoted to primary project surface (funnels `/w/` project routes).*
+*Last audit: 2026-07-13 — Tool-registry gate fix (LSCMD-TOOLGATE-0712-VP1): 13 Landscaper tools that had executors + schemas but were absent from every gate list in `tool_registry.py` (so they only reached the model via the unknown-project-type fallback) were attached to their property-type gates — 4 DMS + 3 acquisition-event tools → `UNIVERSAL_TOOLS`; `delete_budget_category` + 2 category-lifecycle tools → `LAND_ONLY_TOOLS`; 3 expense-comparable tools → `INCOME_PROPERTY_TOOLS`. Master list is **273 advertised** unique tools (288 registered executors). No tool added/removed — registration-oversight fix only; additive, no schema/DB change.*
+*Prior audit: 2026-06-26 — Renovation per-slice fabrication arc closed. (1) Figure-level provenance in the reply-assembly fabrication guard (`reply_states_unsourced_financials` now takes the turn's tool outputs; every $/%/x figure must trace to a returned number — closes "ran one real tool then invented the rest"; PR #136). (2) New `get_renovation_breakdown` tool gives the model real per-bedroom renovation numbers tied exactly to the Renovation page, so the "1BR renovation budget" card is sourced, not invented (PR #139). Also: financial artifact creation guard (`financial_artifact_guard.py`) + prompt three-way routing; studio shell promoted to primary project surface (funnels `/w/` project routes).*
 *Prior audit: 2026-06-24 — Studio shell initial build: `/studio/[projectId]` route with `StudioShell.tsx` + `StudioSidebar.tsx`, chat-driven `navigate_to_screen` tool, generalized no-fabrication guard for all financial figures (IRR/NPV/equity/waterfall/returns/cash flow), S17 budget-fabrication regression test. 7 commits, +1,374 lines.*
 *Prior audit: 2026-06-17 — Dual-modality classic view shipped end-to-end: classic-view toggle (#88), legacy auth header fixes across 13 files (#89), equity partner + sales phase/override save paths verified + wired (Phase 2 Part B, +474 lines). All legacy `/projects/[id]` tabs now read and save correctly when accessed via `?mode=classic`.*
 *Prior audit: 2026-06-16 — Rent comp mapping overhaul (#85/#86/#87): `geocode_rent_comps` tool reads `tbl_rent_comp` (not unit types), offer-gated geocoding for missing coords; `generate_map_artifact` now persists interactive maps as durable artifacts; one-pin-per-property dedup + honest counts in map tool output. Classic view toggle (`ClassicViewToggle.tsx`, `uiMode.ts`, middleware cookie) — conditional `/projects/[id]` access behind `?mode=classic` with legacy backend audit doc. CLAUDE_MODEL env-driven (#84, default Sonnet 4.5). Dark theme first-paint flash fix (`CoreUIThemeProvider` + `layout.tsx`).*
