@@ -120,6 +120,45 @@ export function calculateIRR(
 /**
  * Calculate NPV at a given discount rate
  */
+/**
+ * Convert a per-period rate to an annual rate.
+ *
+ * A per-period rate is what calculateIRR returns. On a monthly series that is a
+ * MONTHLY rate — reporting it as annual understates the true return by roughly
+ * 12x (a 9% IRR reads as ~0.72%).
+ *
+ * NOTE: an equivalent helper already exists at
+ * src/lib/financial-engine/cashflow/metrics.ts:177 (`annualizeIRR`). It is not
+ * imported here because that module carries its own PeriodType enum and a
+ * different IRR implementation, and cross-importing would entangle two engines
+ * that are already scheduled for consolidation. When they merge, collapse these.
+ */
+export function annualizePeriodicRate(periodicRate: number, periodsPerYear: number): number {
+  if (!Number.isFinite(periodicRate)) return periodicRate;
+  if (periodsPerYear === 1) return periodicRate;
+  return Math.pow(1 + periodicRate, periodsPerYear) - 1;
+}
+
+/**
+ * Convert an annual rate to a per-period rate.
+ *
+ * Uses geometric (compounding) conversion — (1+annual)^(1/n) - 1 — NOT the
+ * naive annual/n. The naive form overstates the periodic rate and will not tie
+ * to the Python engine, which compounds.
+ */
+export function toPeriodicRate(annualRate: number, periodsPerYear: number): number {
+  if (!Number.isFinite(annualRate)) return annualRate;
+  if (periodsPerYear === 1) return annualRate;
+  return Math.pow(1 + annualRate, 1 / periodsPerYear) - 1;
+}
+
+/**
+ * Calculate Net Present Value.
+ *
+ * ⚠️ `discountRate` must be expressed in the SAME PERIOD as `cashFlows`.
+ * Pass a monthly series → pass a monthly rate. Use toPeriodicRate() to convert.
+ * Passing an annual rate against a monthly series discounts 12x too fast.
+ */
 export function calculateNPV(
   initialInvestment: number,
   cashFlows: number[],
@@ -236,16 +275,49 @@ export function calculateLeveredIRR(
 /**
  * Calculate comprehensive investment metrics
  */
+/**
+ * Calculate comprehensive investment metrics.
+ *
+ * PERIOD CONVENTION — read this before changing anything here.
+ * ------------------------------------------------------------
+ * `cashFlows` is a PERIODIC series whose period length is declared by
+ * `periodsPerYear`. Every caller in this repo passes MONTHLY flows
+ * (see /api/cre/properties/[property_id]/metrics/route.ts, which builds
+ * `numPeriods = holdPeriodYears * 12` and calls calculateMultiPeriodCashFlow
+ * with 'monthly'), so the default is 12.
+ *
+ * Two things MUST be period-aware and were previously not (fixed
+ * TB12-METRICSPERIOD-0714):
+ *   1. IRR — calculateIRR returns a PER-PERIOD rate. On a monthly series that
+ *      is a monthly rate. It must be annualised: (1 + r)^periodsPerYear - 1.
+ *      Un-annualised, a true 9% IRR reported as ~0.72%.
+ *   2. NPV — `discountRate` is an ANNUAL rate. Discounting a monthly series at
+ *      an annual rate compounds it 12x too fast; over a 5-year hold the
+ *      reversion was discounted by 1.10^60 (~304x) instead of 1.10^5 (~1.6x),
+ *      driving NPV to roughly -equityInvested regardless of the deal.
+ *
+ * `calculateAverageDSCR` was already period-aware (it groups by 12 explicitly)
+ * and is left alone. That asymmetry — one function in this file handling the
+ * monthly convention correctly while its neighbours did not — is precisely the
+ * drift this comment exists to prevent.
+ *
+ * @param periodsPerYear 12 = monthly (default, matches all current callers),
+ *                       4 = quarterly, 1 = annual.
+ */
 export function calculateInvestmentMetrics(
   cashFlows: CashFlowPeriod[],
   acquisitionPrice: number,
   exitCapRate: number,
   debtAssumptions?: DebtAssumptions,
   discountRate: number = 0.10,
-  sellingCostsPct: number = 0.03
+  sellingCostsPct: number = 0.03,
+  periodsPerYear: number = 12
 ): InvestmentMetrics {
   if (cashFlows.length === 0) {
     throw new Error('Cash flows array is empty');
+  }
+  if (!Number.isFinite(periodsPerYear) || periodsPerYear <= 0) {
+    throw new Error(`periodsPerYear must be a positive number, got ${periodsPerYear}`);
   }
 
   // Calculate terminal NOI (last 12 months)
@@ -273,12 +345,31 @@ export function calculateInvestmentMetrics(
   // DSCR
   const avgDSCR = annualDebtService > 0 ? calculateAverageDSCR(cashFlows, annualDebtService) : 0;
 
-  // IRR calculations
-  const leveredIRR = calculateLeveredIRR(equityInvested, cashFlows, netReversion, debtAmount);
-  const unleveredIRR = calculateUnleveredIRR(acquisitionPrice, cashFlows, exitValue);
+  // IRR calculations.
+  // Both bases are now netReversion. Previously unlevered was passed the GROSS
+  // exitValue while levered was passed netReversion — adjacent lines, two
+  // different reversion bases. That overstated unlevered IRR by the PV of
+  // selling costs and made the unlevered-vs-levered spread meaningless.
+  // Unlevered = whole-project return before financing, but you still don't
+  // receive the selling costs, so it nets them the same as levered does.
+  const leveredPeriodicIRR = calculateLeveredIRR(equityInvested, cashFlows, netReversion, debtAmount);
+  const unleveredPeriodicIRR = calculateUnleveredIRR(acquisitionPrice, cashFlows, netReversion);
 
-  // NPV
-  const npv = calculateNPV(equityInvested, cashFlows.map(cf => cf.net_cash_flow), netReversion - debtAmount, discountRate);
+  // calculateIRR returns a PER-PERIOD rate — annualise it. See the period
+  // convention note on this function.
+  const leveredIRR = annualizePeriodicRate(leveredPeriodicIRR, periodsPerYear);
+  const unleveredIRR = annualizePeriodicRate(unleveredPeriodicIRR, periodsPerYear);
+
+  // NPV — convert the ANNUAL discount rate to this series' period before
+  // discounting. Passing an annual rate against a monthly series compounds it
+  // 12x too fast.
+  const periodicDiscountRate = toPeriodicRate(discountRate, periodsPerYear);
+  const npv = calculateNPV(
+    equityInvested,
+    cashFlows.map(cf => cf.net_cash_flow),
+    netReversion - debtAmount,
+    periodicDiscountRate
+  );
 
   // Equity multiple
   const equityMultiple = calculateEquityMultiple(equityInvested, totalCashDistributed, netReversion - debtAmount);
