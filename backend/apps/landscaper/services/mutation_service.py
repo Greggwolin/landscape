@@ -69,6 +69,54 @@ def _normalize_unit_number(raw: str) -> str:
     return s.upper()
 
 
+def apply_phantom_unit_guard(normalized, existing_unit_numbers):
+    """
+    Phase 1c phantom-unit guard for the rent_roll_batch (tbl_multifamily_unit) path.
+
+    Given the normalized incoming unit records (each carrying a ``_provided_fields``
+    set and a ``_unit_number_canonical`` string) and the set of canonical unit
+    numbers that already exist in the project, decide whether this batch is an
+    UPDATE-ONLY operation and, if so, filter out records for units that don't
+    already exist (phantoms) — matching on the CANONICAL unit number so that
+    "Unit 101" / "101-a" resolve to the same existing "101" / "101-A".
+
+    Two triggers put the batch into UPDATE-ONLY mode:
+      (a) Narrow field update — the widest record provides ≤2 data fields
+          (e.g. only market_rent). Always update-only, zero INSERTs.
+      (b) Majority exist — the project already has more than half as many units
+          as the request (``len(existing) > len(request) * 0.5``).
+
+    Returns ``(kept, skipped, is_narrow_update, is_majority_existing)``:
+      - ``kept``    — records to upsert (all records when neither trigger fires)
+      - ``skipped`` — phantom records filtered out (``[]`` when neither fires)
+      - ``is_narrow_update`` / ``is_majority_existing`` — the two trigger flags
+
+    Pure function: no DB access, no mutation of the input records.
+    """
+    existing_unit_numbers = set(existing_unit_numbers)
+    total_in_request = len(normalized)
+    existing_count = len(existing_unit_numbers)
+
+    # Detect narrow field updates: if the widest record provides ≤2 data fields,
+    # this is a targeted update (e.g., "set market_rent for these units"),
+    # not a bulk import. Block ALL inserts unconditionally.
+    all_provided = [r["_provided_fields"] for r in normalized]
+    max_fields_provided = max((len(pf) for pf in all_provided), default=0)
+    is_narrow_update = max_fields_provided <= 2
+
+    # Also trigger update-only if >50% of units already exist (original heuristic)
+    is_majority_existing = existing_count > total_in_request * 0.5
+
+    if is_narrow_update or is_majority_existing:
+        kept = [r for r in normalized if r["_unit_number_canonical"] in existing_unit_numbers]
+        skipped = [r for r in normalized if r["_unit_number_canonical"] not in existing_unit_numbers]
+    else:
+        kept = list(normalized)
+        skipped = []
+
+    return kept, skipped, is_narrow_update, is_majority_existing
+
+
 # =============================================================================
 # Schema Configuration - Verified against actual database 2026-01-08
 # =============================================================================
@@ -1524,33 +1572,21 @@ class MutationService:
                         logger.info(f"[Mutation] Merged with {len(existing_map)} existing units (has_partial={has_partial})")
 
                         # Phase 1c: Reject records for non-existent units when this is
-                        # clearly an update operation (not a bulk import).
-                        # Two triggers for UPDATE-ONLY mode:
-                        #   (a) Narrow field update: provided_fields is a small subset of all fields
-                        #       (e.g., only market_rent) — this is ALWAYS update-only, zero INSERTs
-                        #   (b) Majority exist: >50% of requested units already in DB
+                        # clearly an update operation (not a bulk import). The two
+                        # UPDATE-ONLY triggers (narrow field update / majority exist)
+                        # and the canonical-match filtering live in
+                        # apply_phantom_unit_guard (module-level, unit-tested).
                         existing_unit_numbers = set(existing_map.keys())
-                        total_in_request = len(normalized)
-                        existing_count = len(existing_unit_numbers)
-
-                        # Detect narrow field updates: if ALL records provide ≤2 data fields,
-                        # this is a targeted update (e.g., "set market_rent for these units"),
-                        # not a bulk import. Block ALL inserts unconditionally.
-                        all_provided = [r["_provided_fields"] for r in normalized]
-                        max_fields_provided = max((len(pf) for pf in all_provided), default=0)
-                        is_narrow_update = max_fields_provided <= 2
-
-                        # Also trigger update-only if >50% of units already exist (original heuristic)
-                        is_majority_existing = existing_count > total_in_request * 0.5
+                        kept, skipped, is_narrow_update, is_majority_existing = apply_phantom_unit_guard(
+                            normalized, existing_unit_numbers
+                        )
 
                         not_found_units = []
-                        if is_narrow_update or is_majority_existing:
-                            new_units = [r for r in normalized if r["_unit_number_canonical"] not in existing_unit_numbers]
-                            if new_units:
-                                not_found_units = [r["unit_number"] for r in new_units]
-                                reason = "narrow field update" if is_narrow_update else "majority exist"
-                                logger.warning(f"[Mutation] UPDATE-ONLY mode ({reason}): skipping {len(new_units)} non-existent units: {not_found_units[:10]}")
-                                normalized = [r for r in normalized if r["_unit_number_canonical"] in existing_unit_numbers]
+                        if skipped:
+                            not_found_units = [r["unit_number"] for r in skipped]
+                            reason = "narrow field update" if is_narrow_update else "majority exist"
+                            logger.warning(f"[Mutation] UPDATE-ONLY mode ({reason}): skipping {len(skipped)} non-existent units: {not_found_units[:10]}")
+                            normalized = kept
 
                         if not normalized:
                             logger.warning(f"[Mutation] No valid units to upsert after filtering")
