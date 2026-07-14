@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.6.2
-**Last Updated:** May 19, 2026
-**Supersedes:** v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.7.0
+**Last Updated:** July 14, 2026
+**Supersedes:** v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -28,7 +28,18 @@ When any of the three drift, the master copy in the project files wins. When a r
 
 **0.3 Capability differences.** Different Claude systems have different powers. See §1.2. When a rule references a capability a given system doesn't have, that rule is a no-op for that system.
 
-**0.4 Sync discipline.** When this file is edited, the editor must also update the Cowork project instructions and the Claude project's instructions. Drift between the three is the failure mode this rule prevents.
+**0.4 Sync discipline — TWO copies, not three.** This text lives in exactly **two** places:
+
+1. **The repo master** — `docs/PROJECT_INSTRUCTIONS.md` (this file). Source of truth.
+2. **The project instructions field** — a single object shared by the Cowork project and the Claude.ai project. Saving it in one surfaces it in the other; they are linked, not independent.
+
+Verified 2026-07-14 (chat VA): §4.9 was pasted into the Cowork project instructions and appeared immediately in the Claude.ai project instructions, and the cached Claude project (`Landscape [chat]`) was confirmed to hold both §4.9 and §23. **Earlier versions of this rule claimed three separate copies. That was wrong** — it caused §4.9 to be mirrored twice and made the drift look worse than it was.
+
+**One paste is sufficient.** When this file is edited, paste the result into the project instructions field once.
+
+**Do not conflate this with §23.** §23 (Sync Bridge) governs *conversation memory* between the chat project and Cowork — genuinely separate memory spaces, relayed manually via `seq`-stamped files. The *instructions field* is shared; *memory* is not. Different things.
+
+**Drift is still possible and has happened.** v4.6.3 was authored directly into the project field and never mirrored back here, so the master sat behind for a month while carrying detail the project copy had condensed away — neither side a superset. When the two disagree, the master wins **only if the master is current**; verify that first. If a change was authored into the project field, port it here before relying on §0.4's precedence. Never blind-merge: a naive sync silently deletes whatever the losing side held.
 
 ---
 
@@ -241,6 +252,22 @@ Branch tracking applies to every CC prompt without exception — including small
 
 The DOWNSTREAM IMPACT section (§17.4) and SUCCESS CRITERIA section continue to live separately from branch tracking; this rule doesn't replace them.
 
+**4.9 Handoff body scales to risk; safety rails never scale.** The BODY of a CC handoff is sized to the risk of the change. The safety rails are not. Two different things, and conflating them is what this rule prevents.
+
+**4.9.1 Never scales — applies to every handoff without exception.** §4.6 (pre-flight verification), §4.7 (session ID + echo-back), and §4.8 (explicit branch naming + parallel-session collision check). These cost seconds and protect against expensive, real failures. §4.8 already states the point directly: the day Gregg lost was a "quick" task treated as too small to warrant the check. Nothing in §4.9 licenses skipping them. A handoff that drops a safety rail because the change "felt small" is a §4.8 violation, not a §4.9 optimization.
+
+**4.9.2 Scales with risk.** Everything else in the body — verification depth, number of success criteria, DOWNSTREAM IMPACT breadth, restatement of context, proof commands:
+
+| Change profile | Body shape |
+|---|---|
+| **Low risk** — few files, mechanical/uniform edit, no schema/DB/API-shape change, no financial-engine input change, and Cowork already ran the type check clean | Short body. State what changed and why, name the files to stage by explicit path, one authoritative gate (CI), and the one user-visible check that actually matters. Do not restate the diff. Do not re-specify checks Cowork already ran and reported. Three to five success criteria. |
+| **Medium risk** — multiple modules, API response shape, type definitions, or a high-risk zone from §17.3 | Full DOWNSTREAM IMPACT with traced consumers, explicit post-change verification per consumer, full success-criteria checklist. |
+| **High risk** — schema/migration, financial-engine inputs, `ALLOWED_UPDATES` mappings, anything touching money math | Everything in medium, plus database-level verification (§15.2, §17.4) and a discovery-first read-only pass where consumers can't be confidently traced (§17.5). |
+
+**4.9.3 Do not re-specify what Cowork already verified.** When Cowork has run a check and reported the result (a clean type check, a call-site coverage count, a grep proving no stragglers), the handoff states the result as an established fact — it does not instruct CC to re-derive it. Re-running it as a redundant gate is the caller paying twice for the same information. If the check is cheap and CI runs it anyway, let CI be the gate and say so.
+
+**4.9.4 Failure mode this closes.** VA1 (2026-07-14) — a three-file, 35-call-site mechanical fix (adding an auth header to API clients), already type-checked clean by Cowork, was handed off with a ~200-line body: nine success criteria, redundant type/build/lint gates, curl proofs, and a full restatement of the diff. The work was four lines of plumbing; the handoff was sized for a schema migration. CC then spent most of its execution satisfying the checklist rather than shipping, and Gregg waited. The ceremony bought no safety that the change's own profile didn't already provide. Over-sizing a handoff is a defect the same way under-sizing one is — it just fails as latency instead of breakage.
+
 ---
 
 ## 5.0 COMMUNICATION STYLE
@@ -350,6 +377,7 @@ This is a hard rule. Same severity tier as plain-English chat (§5.7) and brevit
 - Volunteering explanatory rationale in chat that Gregg did not ask for, especially when the rationale contains technical terms (§5.7.1). Action first; rationale only when asked.
 - Sending Gregg a handoff link without a plain-English statement of which step Cowork did and which step the coding assistant needs to do next (§1.2.1). The boundary is restated every time, not assumed.
 - Drafting a CC prompt without explicit branch naming and a parallel-session collision check in Step 0 (§4.8). "Quick" tasks need the check; the day lost on Au7 was a "quick" task without it.
+- Sizing a handoff body to the ceremony rather than to the risk (§4.9). A verified, low-risk, mechanical change does not need nine success criteria, redundant gates Cowork already ran, and a restatement of the diff — that spends Gregg's time to buy nothing. The inverse of §4.8: under-sizing fails as breakage, over-sizing fails as latency. Both are defects. Note the boundary — §4.9 never licenses dropping the §4.6/§4.7/§4.8 safety rails.
 
 ---
 
@@ -525,7 +553,7 @@ Rendered as a styled HTML file using a clean neutral palette (or CoreUI tokens w
 
 **10.5.3 Delivery rule.** Both files are shared in the same chat response. Never deliver the technical version alone — that forces Gregg to read material written for a different audience and buries the decisions he owns.
 
-**10.5.4 Scope triggers.** This rule fires any time the deliverable is called a spec, design doc, scoping doc, implementation plan, PRD, or architecture doc, OR will be used as input to a CC prompt. Short technical Q&A, bug-fix write-ups, and conversational answers do not trigger the dual-output requirement.
+**10.5.4 Scope triggers.** This rule fires any time the deliverable is called a spec, design doc, scoping doc, implementation plan, PRD, or architecture doc, OR will be used as input to a CC prompt. Short technical Q&A, bug-fix write-ups, conversational answers, and **instruction-file edits** do not trigger the dual-output requirement.
 
 **10.6 HTML-first for initial renderings.** First drafts of docs/specs/scripts go out as HTML artifacts for Gregg's review before being converted to docx or pdf. This applies to anything Gregg will need to mark up before it goes anywhere else.
 
@@ -677,6 +705,7 @@ WHERE id = [test_id];
 | Financial engine inputs | IRR/NPV/DSCR/cash flow calcs depend on specific data shapes; upstream changes produce wrong numbers without errors |
 | Landscaper tool field mappings (`ALLOWED_UPDATES`) | Must match actual DB columns exactly or writes silently fail (§15.1) |
 | SQL queries with JOINs | Adding/removing columns or changing WHERE clauses can break aggregation logic |
+| `tbl_operating_expenses.statement_discriminator` + `tbl_project.active_opex_discriminator` | Operating-statement classification (T3_ANNUALIZED / T12 / T-12 / CURRENT_PRO_FORMA / BROKER_PRO_FORMA / year strings). Tools that render operating statements MUST be discriminator-aware — labeling DB data as "T-12" when the discriminator is `CURRENT_PRO_FORMA` is a content error, not just a naming one. The legacy folder/tab UI exposes a scenario switcher; the chat-first `/w/` layer does not yet. |
 
 **17.4 CC prompt integration.** Every implementation or fix/debug CC prompt MUST include a DOWNSTREAM IMPACT section that lists files/endpoints being modified, lists known consumers of those files/endpoints, specifies verification commands for downstream features, and includes at least one database-level check if financial data is involved.
 
@@ -720,11 +749,7 @@ Example:
 
 **Direct loss event 2026-05-01 (chat hx)** — F-12 server-derivation was built across two sessions and one full commit (`fae31fe`) as "T-12 × growth," only discovering on follow-up that the schema already encodes a `statement_discriminator` taxonomy (`T3_ANNUALIZED` / `T12` / `T-12` / `CURRENT_PRO_FORMA` / `BROKER_PRO_FORMA` / year strings) plus an `active_opex_discriminator` switcher on `tbl_project`. The discriminator code was in a file already opened during the work. Skipping the audit produced an artifact tool that conflicted with the existing scenario architecture and would have shipped misleading labels on real data.
 
-**17.8 New high-risk zone discovered.** Add to §17.3:
-
-| Zone | What Breaks |
-|---|---|
-| `tbl_operating_expenses.statement_discriminator` + `tbl_project.active_opex_discriminator` | Operating-statement classification (T3_ANNUALIZED / T12 / T-12 / CURRENT_PRO_FORMA / BROKER_PRO_FORMA / year strings). Tools that render operating statements MUST be discriminator-aware — labeling DB data as "T-12" when the discriminator is `CURRENT_PRO_FORMA` is a content error, not just a naming one. The legacy folder/tab UI exposes a scenario switcher; the chat-first `/w/` layer does not yet. |
+**17.8 New high-risk zone discovered.** Folded into the §17.3 table above (`tbl_operating_expenses.statement_discriminator` + `tbl_project.active_opex_discriminator`). New zones discovered in future sessions go straight into §17.3 — do not re-open a parallel list here.
 
 ---
 
@@ -778,6 +803,9 @@ Sync triggers:
 - When tied to a feedback item, Cowork maintains `working_summary` silently and never narrates the append (§21)
 - Chat replies cut to roughly half the first-pass length without losing content; bloat patterns (restated context, meta-commentary, victory laps, hedge adverbs) get caught and trimmed before sending (§5.11)
 - Every new branch or worktree starts on a clean foundation; pending commits get plain-English descriptions to Gregg, never bare hashes (§22.6)
+- The chat project reads the coding side's status file at session start and produces an outbound file when work warrants it; staleness is flagged, not assumed (§23)
+- Handoff bodies are sized to the change's risk; the §4.6/§4.7/§4.8 safety rails are present in every handoff regardless (§4.9)
+- The two instruction copies (repo master + the shared project field) stay in sync via one paste; drift is flagged, never blind-merged (§0.4)
 
 ---
 
@@ -917,7 +945,52 @@ This section closes the recurring "stale items pile up across sessions" failure 
 
 ---
 
+## 23.0 SYNC BRIDGE — CHAT PROJECT ↔ COWORK [CLAUDE.AI + COWORK]
+
+This section establishes the manual two-way handoff between the Claude.ai chat project (strategy, architecture, documents, pitch framing) and the Cowork coding instance. The two are separate **memory** spaces — nothing remembered in one reaches the other. Two files in OneDrive keep both sides informed. This is a manual relay by design, not a live sync.
+
+**Not to be confused with §0.4.** The *instructions field* is a single shared object across Cowork and Claude.ai (one paste updates both). *Memory* is not shared, which is why this bridge exists. Instructions: shared. Memory: relayed.
+
+**23.1 Location.** Both files live in: `OneDrive-CrescentBayHoldings / 2Pursuit / 3LandscapeApp / Landscape app`. The chat project reaches this folder read-only through the Microsoft 365 connector, by search (filename / content / folder), not by fixed path. File names must therefore stay distinctive and stable so search resolves them reliably.
+
+**23.2 Inbound — chat project reads at session start [CLAUDE.AI].**
+
+- File to find: `CW_TO_CHAT_SYNC.md` (search by that exact name).
+- Contents: the coding side's current state — what's being built, decisions locked, open items, recent changes.
+- Read it at the start of every Landscape session.
+- Read-only. The chat project cannot write it. Cowork writes it straight to OneDrive, so inbound requires no manual relay.
+
+**23.3 Outbound — chat project produces when work warrants it [CLAUDE.AI].**
+
+- File to produce: a downloadable artifact named `CHAT_TO_CW_SYNC.md`.
+- Gregg saves it into the same `Landscape app` folder, replacing any prior copy. Cowork reads it at its next session start. This single hop is the only manual step in the whole bridge.
+- Use the same section shape as the inbound file so the coding side can ingest it without translation. Required structure: a header block with `SYNC` / `seq` / `generated_at` / `source`, then six sections — (1) Current focus, (2) Work state (plain English), (3) Decisions locked, (4) Open items / waiting on, (5) Recent changes (newest first), (6) Handoff notes for the coding side.
+
+**23.4 Staleness convention (both directions).** Every sync file carries a `seq` (a counter that only goes up) and a `generated_at` date. Each side tracks the last `seq` it has seen from the other. Reading the same or a lower `seq` means "nothing new since last sync" — say so and don't re-litigate settled decisions. A `generated_at` older than ~10 days gets flagged out loud before being relied on.
+
+**23.5 Independent seq counters.** The chat side keeps its own outbound `seq` (start at 1, +1 each produce); the coding side keeps its own inbound `seq`. Do not cross them.
+
+**23.6 Why manual.** Inbound is automatic for the chat side because Cowork writes straight to OneDrive. Outbound is manual because the chat project cannot write to OneDrive — it can only produce a downloadable file that Gregg drops into the folder once. Both sides treat "did the sync file actually get updated?" as an explicit step, never an assumption; the staleness convention (§23.4) is the backstop when it doesn't.
+
+---
+
 ## CHANGELOG
+
+**v4.7.0 (2026-07-14) — RECONCILIATION. The two copies are now identical; this file is a true superset of everything that existed on either side.** Source: chat VA5. Minor-version bump (not a patch) because this retires a month-long two-way drift and changes §0.4's model of the world.
+
+*Background.* v4.6.3 was authored directly into the project instructions field and never mirrored back to this master, while this master carried detail the project copy had condensed away. Neither side was a superset, so version numbers had become misleading on both — this file said 4.6.4 with no §23; the project field said 4.6.3 while already carrying §4.9. Merged by union: the project field's **new content and structure** were brought in; this master's **fuller detail** was kept everywhere the two said the same thing at different depth.
+
+*Brought in from the project copy (4.6.3):* (1) **§23 Sync Bridge** — the manual chat-project ↔ Cowork memory relay via two `seq`-stamped OneDrive files, with the ~10-day staleness convention. Absent from this master entirely; now restored, with an added note distinguishing it from §0.4 (instructions are shared; memory is not). (2) **§17.8 folded into the §17.3 table** — the operating-statement discriminator zone now lives as a row in the canonical high-risk table; §17.8 is a pointer, and future zones go straight into §17.3. (3) **§10.5.4** — instruction-file edits named as exempt from dual-output. (4) **§20** — the §23 success metric.
+
+*Kept from this master (condensed away in the project copy, restored to both):* §7.1/§7.2/§7.4 CSS-variable and button code examples; the §9.4 handoff table and §9.4.1 template; the §15.2 tool-write verification SQL; §17.2's numbered pre-change protocol; §14.1/§14.2 command blocks; §4.4's verification example; the fuller §21.x and §22.1 numbered forms.
+
+*New this session:* (5) **§0.4 rewritten — TWO copies, not three.** The old rule asserted three independent copies (repo / Cowork / Claude.ai). **That was false.** The Cowork and Claude.ai project instructions are one shared object: Gregg pasted §4.9 into the Cowork field and it appeared in the Claude.ai field, and the cached Claude project (`Landscape [chat]`) was confirmed holding both §4.9 and §23. One paste now suffices. The rule also records that master-wins-on-conflict only holds *if the master is current* — it wasn't — and bans blind-merging. (6) **§4.9 + its §6 anti-pattern bullet** (handoff body scales to risk; §4.6/§4.7/§4.8 never scale away) carried forward from v4.6.4, plus two matching §20 metrics.
+
+*Nothing was dropped from either side.* Every section present in either copy is present here at the greater of the two detail levels.
+
+**Per §0.4 (as revised): paste this file into the project instructions field ONCE. Both surfaces update together. Do not paste twice.**
+
+**v4.6.4 (2026-07-14 — repo-only, superseded same day by v4.7.0)** — One add, one anti-pattern bullet, one drift flag. Source: chat VA1/VA2 (valuation auth-header fix, 2026-07-14). (1) Added §4.9 (Handoff body scales to risk; safety rails never scale) — the BODY of a CC handoff is sized to the change's risk profile, with an explicit three-tier table (low / medium / high). §4.9.1 states hard that §4.6, §4.7 and §4.8 NEVER scale away — §4.9 is not a license to skip the collision check on "quick" tasks, which is the §4.8 / Au7 failure mode running in reverse. §4.9.3 bars re-specifying checks Cowork already ran and reported. §4.9.4 records the VA1 loss event: a three-file mechanical auth-header fix, already type-checked clean, shipped with a ~200-line body and nine success criteria; CC spent its execution satisfying the checklist while Gregg waited. (2) Matching anti-pattern bullet added to §6 naming over-sizing as a defect in the same tier as under-sizing — under-sizing fails as breakage, over-sizing fails as latency. (3) **DRIFT FLAG — this repo master was still at v4.6.2 while the Cowork and Claude project copies carry v4.6.3.** The v4.6.3 changes (§23 Sync Bridge — chat project ↔ Cowork; §17.8 folded into the §17.3 table; §10.5.4 instruction-file-edit exemption; matching §20 metric) are NOT in this file, and the v4.6.3 copy is a condensed variant that also dropped detail this master still holds (§7.1 code examples, the §9.4.1 handoff template). Neither copy is a clean superset, so this patch did NOT attempt a silent merge — the reconciliation is a separate, deliberate pass. Per §0.4 the master wins on conflict, but that rule assumes the master is current; it isn't. **Mirror §4.9 + the §6 bullet to Cowork project settings and Claude project knowledge per §0.4, and schedule the v4.6.3 reconciliation.**
 
 **v4.6.2 (2026-05-19)** — Three consolidated adds, no consolidations, no cuts. Source: this session is Au9 (LSCMD-CW-V462CONSOL-0519-Au9), drafted against the v4.6.1 baseline produced in Au3. Two earlier prompts — Au5 (LSCMD-CW-V462PATCH-0519-Au5) and Au7 (LSCMD-CW-V463PATCH-0519-Au7) — were superseded without execution; their content folded into this single patch. Patches: (1) §1.2.1 (Capability boundary statement in every handoff — HARD RULE) — Cowork must include a one-line plain-English statement of the boundary before every handoff link, naming what Cowork did and what the coding assistant needs to do next, with the plain-English reason. Same severity tier as §5.7. (2) §5.7.1 (No unsolicited explanations) — default to action, not explanation; volunteer rationale only when asked, and pass the §5.7 plain-English test more strictly than any other content. Same severity tier as §5.7. (3) §4.8 (Branch tracking and parallel-session collision check) — every CC prompt names the target branch explicitly, and Step 0 echo-back is extended with a four-part collision check (commits / stashes / uncommitted-or-untracked / push activity) against the existing session ID audit trail. Halt-and-report if any check finds activity from another session. Three optional anti-pattern bullets added to §6 reinforcing the new rules; none duplicated existing bullets. Consolidation work the Au2 audit recommended (§5 communication-style sections, §22 working-tree hygiene sections, §10.5 dual-output softening) remains intentionally deferred. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
@@ -931,4 +1004,4 @@ Prior versions: see `docs/PROJECT_INSTRUCTIONS_CHANGELOG.md`.
 
 ---
 
-End of Landscape Project Instructions v4.6.2
+End of Landscape Project Instructions v4.7.0
