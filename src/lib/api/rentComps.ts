@@ -6,7 +6,15 @@
  *   GET/PUT/PATCH/DELETE  /api/projects/<project_pk>/comparables/<pk>/
  */
 
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+/** JSON + bearer token. Django defaults to IsAuthenticated; omitting the token 401s. */
+const jsonHeaders = (): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  ...getAuthHeaders(),
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -82,7 +90,7 @@ function normalizePayload(payload: unknown): RentComparable[] {
 export async function getRentComparables(projectId: number): Promise<RentComparable[]> {
   const response = await fetch(
     `${DJANGO_API_BASE}/api/projects/${projectId}/comparables/`,
-    { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+    { method: 'GET', headers: jsonHeaders() }
   );
   if (!response.ok) throw new Error(`Failed to fetch rent comparables: ${response.statusText}`);
   const payload = await response.json();
@@ -92,7 +100,7 @@ export async function getRentComparables(projectId: number): Promise<RentCompara
 export async function getRentComparable(projectId: number, comparableId: number): Promise<RentComparable> {
   const response = await fetch(
     `${DJANGO_API_BASE}/api/projects/${projectId}/comparables/${comparableId}/`,
-    { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+    { method: 'GET', headers: jsonHeaders() }
   );
   if (!response.ok) throw new Error(`Failed to fetch rent comparable: ${response.statusText}`);
   return response.json();
@@ -103,7 +111,7 @@ export async function createRentComparable(projectId: number, data: RentComparab
     `${DJANGO_API_BASE}/api/projects/${projectId}/comparables/`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -123,7 +131,7 @@ export async function updateRentComparable(
     `${DJANGO_API_BASE}/api/projects/${projectId}/comparables/${comparableId}/`,
     {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -137,7 +145,7 @@ export async function updateRentComparable(
 export async function deleteRentComparable(projectId: number, comparableId: number): Promise<void> {
   const response = await fetch(
     `${DJANGO_API_BASE}/api/projects/${projectId}/comparables/${comparableId}/`,
-    { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
+    { method: 'DELETE', headers: jsonHeaders() }
   );
   if (!response.ok) throw new Error(`Failed to delete rent comparable: ${response.statusText}`);
 }

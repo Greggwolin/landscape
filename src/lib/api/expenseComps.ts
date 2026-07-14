@@ -6,7 +6,15 @@
  *   GET/PUT/PATCH/DELETE  /api/projects/<project_pk>/expense-comps/<pk>/
  */
 
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+/** JSON + bearer token. Django defaults to IsAuthenticated; omitting the token 401s. */
+const jsonHeaders = (): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  ...getAuthHeaders(),
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -72,7 +80,7 @@ function normalizePayload(payload: unknown): ExpenseComparable[] {
 export async function getExpenseComparables(projectId: number): Promise<ExpenseComparable[]> {
   const response = await fetch(
     `${DJANGO_API_BASE}/api/projects/${projectId}/expense-comps/`,
-    { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+    { method: 'GET', headers: jsonHeaders() }
   );
   if (!response.ok) throw new Error(`Failed to fetch expense comparables: ${response.statusText}`);
   const payload = await response.json();
@@ -82,7 +90,7 @@ export async function getExpenseComparables(projectId: number): Promise<ExpenseC
 export async function getExpenseComparable(projectId: number, comparableId: number): Promise<ExpenseComparable> {
   const response = await fetch(
     `${DJANGO_API_BASE}/api/projects/${projectId}/expense-comps/${comparableId}/`,
-    { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+    { method: 'GET', headers: jsonHeaders() }
   );
   if (!response.ok) throw new Error(`Failed to fetch expense comparable: ${response.statusText}`);
   return response.json();
@@ -93,7 +101,7 @@ export async function createExpenseComparable(projectId: number, data: ExpenseCo
     `${DJANGO_API_BASE}/api/projects/${projectId}/expense-comps/`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -113,7 +121,7 @@ export async function updateExpenseComparable(
     `${DJANGO_API_BASE}/api/projects/${projectId}/expense-comps/${comparableId}/`,
     {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -127,7 +135,7 @@ export async function updateExpenseComparable(
 export async function deleteExpenseComparable(projectId: number, comparableId: number): Promise<void> {
   const response = await fetch(
     `${DJANGO_API_BASE}/api/projects/${projectId}/expense-comps/${comparableId}/`,
-    { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
+    { method: 'DELETE', headers: jsonHeaders() }
   );
   if (!response.ok) throw new Error(`Failed to delete expense comparable: ${response.statusText}`);
 }
