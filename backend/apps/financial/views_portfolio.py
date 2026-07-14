@@ -1,4 +1,9 @@
 """
+PARKED 2026-07-14 (CU5). These ViewSets are no longer registered in urls.py —
+the tbl_portfolio* tables were never created, so every request 500'd. Do NOT
+re-register these routes until the migrations exist and the tables are live.
+See models_portfolio.py header. Design is retained for a clean restart.
+
 Portfolio views for fund-level analysis.
 
 Provides CRUD for portfolios, members, waterfall tiers, and cached results.
