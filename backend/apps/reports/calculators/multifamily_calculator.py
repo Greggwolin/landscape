@@ -215,15 +215,14 @@ class MultifamilyCalculator:
             cursor.execute("""
                 SELECT
                     oe.expense_category,
-                    oa.account_name,
+                    oe.expense_type,
                     oe.annual_amount,
                     oe.escalation_rate,
                     oe.escalation_type
                 FROM landscape.tbl_operating_expenses oe
-                LEFT JOIN landscape.tbl_opex_accounts oa ON oe.account_id = oa.account_id
                 WHERE oe.project_id = %s
                   AND oe.statement_discriminator = %s
-                ORDER BY oe.expense_category, oa.account_name
+                ORDER BY oe.expense_category, oe.expense_type
             """, [self.project_id, discriminator])
 
             expenses = cursor.fetchall()
