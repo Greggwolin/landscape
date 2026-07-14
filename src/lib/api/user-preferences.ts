@@ -3,7 +3,23 @@
  * Provides type-safe methods for interacting with user preference endpoints
  */
 
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || process.env.DJANGO_API_URL || 'http://localhost:8000';
+
+/**
+ * JSON + bearer token.
+ *
+ * UserPreferenceViewSet declares permission_classes = [IsAuthenticated]
+ * (backend/apps/projects/views_preferences.py), and Django authenticates via
+ * JWT only — `credentials: 'include'` sends cookies that DRF never reads. With
+ * no token these calls 401, and the handlers below swallow it and fall back to
+ * defaults, so preferences appear to work but silently never persist.
+ */
+const jsonHeaders = (): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  ...getAuthHeaders(),
+});
 
 export type ScopeType = 'global' | 'project' | 'organization';
 
@@ -54,7 +70,7 @@ export async function getUserPreferences(query?: PreferenceQuery): Promise<UserP
   const url = `${DJANGO_API_URL}/api/user-preferences/?${params.toString()}`;
   const response = await fetch(url, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' }
+    headers: jsonHeaders()
   });
 
   if (!response.ok) {
@@ -85,7 +101,7 @@ export async function getPreference<T = any>(
   try {
     const response = await fetch(url, {
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }
+      headers: jsonHeaders()
     });
 
     if (!response.ok) {
@@ -113,7 +129,7 @@ export async function setPreference(params: SetPreferenceParams): Promise<UserPr
   const response = await fetch(url, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonHeaders(),
     body: JSON.stringify(params)
   });
 
@@ -139,7 +155,7 @@ export async function setBulkPreferences(params: BulkPreferenceParams): Promise<
   const response = await fetch(url, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonHeaders(),
     body: JSON.stringify(params)
   });
 
@@ -162,7 +178,7 @@ export async function getAllForScope(
   const url = `${DJANGO_API_URL}/api/user-preferences/all_for_scope/?${params.toString()}`;
   const response = await fetch(url, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' }
+    headers: jsonHeaders()
   });
 
   if (!response.ok) {
@@ -180,7 +196,8 @@ export async function deletePreference(id: number): Promise<void> {
   const url = `${DJANGO_API_URL}/api/user-preferences/${id}/`;
   const response = await fetch(url, {
     method: 'DELETE',
-    credentials: 'include'
+    credentials: 'include',
+    headers: jsonHeaders()
   });
 
   if (!response.ok) {
@@ -199,7 +216,8 @@ export async function clearScope(scope_type: ScopeType, scope_id?: number): Prom
   const url = `${DJANGO_API_URL}/api/user-preferences/clear_scope/?${params.toString()}`;
   const response = await fetch(url, {
     method: 'DELETE',
-    credentials: 'include'
+    credentials: 'include',
+    headers: jsonHeaders()
   });
 
   if (!response.ok) {
