@@ -26,7 +26,15 @@
 #   scripts/nightly/commit-generated-docs.sh             # stage + commit scoped docs
 #   scripts/nightly/commit-generated-docs.sh --dry-run   # show what WOULD commit; commit nothing
 #
-# Exit codes: 0 = committed or nothing to do; 1 = guard abort (code detected).
+# Exit codes:
+#   0 = committed, or nothing to commit
+#   1 = refused/failed LOUDLY — one of: stale or held .git/index.lock, a path
+#       that looked like source code, a git add/commit error, or a postcondition
+#       check finding the files still uncommitted after a "successful" commit.
+#       Every non-zero exit prints a specific FB-304 message on stderr so the
+#       calling skill can surface it instead of reporting a false success.
+#       (TB25-NIGHTLY-COMMITTER-STALLED-0714: this job silently no-op'd for 19
+#       days when git died on a stale index.lock and the caller read it as pass.)
 
 set -euo pipefail
 shopt -s nullglob
@@ -38,6 +46,25 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
+
+# ── Pre-flight: a stale .git/index.lock blocks every git write. That is exactly
+#    how this job failed unnoticed for 19 days (TB25): git died with a bare
+#    "Unable to create '.git/index.lock'" fatal that the caller swallowed as a
+#    success. Detect it up front and fail LOUDLY and specifically, rather than
+#    let a git write die mid-run with a message nobody surfaces. Runs before the
+#    --dry-run path too, since that also writes the index.
+INDEX_LOCK="$REPO_ROOT/.git/index.lock"
+if [ -e "$INDEX_LOCK" ]; then
+  if pgrep -x git >/dev/null 2>&1; then
+    echo "FB-304 ABORT: $INDEX_LOCK is held by a running git process — not stale." >&2
+    echo "  A real git operation is in progress; re-run once it completes." >&2
+  else
+    echo "FB-304 ABORT: stale git index lock is blocking all git writes:" >&2
+    echo "    $INDEX_LOCK  (no git process is running, so this lock is stale)" >&2
+    echo "  Clear it and re-run:  rm -f .git/index.lock" >&2
+  fi
+  exit 1
+fi
 
 # ── Allowlist: purely-generated artifacts the nightly job legitimately produces.
 #    Globs are expanded against the working tree (nullglob → empty if no match).
@@ -98,7 +125,33 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # Commit ONLY the allowlisted pathspecs. Other staged/unstaged changes (e.g.
-# in-flight code) are not part of this commit.
-git add -- "${changed[@]}"
-git commit -m "docs: nightly health check $(date +%Y-%m-%d)" -- "${changed[@]}"
-echo "FB-304 committer: committed ${#changed[@]} generated-doc file(s)." >&2
+# in-flight code) are not part of this commit. Any git failure exits non-zero
+# with a distinct message — `set -e` would already abort, but a bare git fatal
+# is exactly what went unnoticed for 19 days, so name it.
+if ! git add -- "${changed[@]}"; then
+  echo "FB-304 COMMIT FAILED: 'git add' returned non-zero (see git output above)." >&2
+  exit 1
+fi
+if ! git commit -m "docs: nightly health check $(date +%Y-%m-%d)" -- "${changed[@]}"; then
+  echo "FB-304 COMMIT FAILED: 'git commit' returned non-zero (see git output above)." >&2
+  exit 1
+fi
+
+# ── Postcondition: trust the world, not the exit code. If the commit really
+#    happened, none of these paths are still reported by `git status`. A commit
+#    that returns 0 while the files remain untracked is precisely the silent
+#    failure this guard exists to catch — so verify it, and fail LOUDLY if not.
+still_uncommitted=()
+for path in "${changed[@]}"; do
+  if [ -n "$(git status --porcelain -- "$path" 2>/dev/null)" ]; then
+    still_uncommitted+=("$path")
+  fi
+done
+if [ "${#still_uncommitted[@]}" -gt 0 ]; then
+  echo "FB-304 POSTCONDITION FAILED: git reported success but these remain uncommitted:" >&2
+  printf '   ! %s\n' "${still_uncommitted[@]}" >&2
+  echo "  The commit did NOT take. Do not treat this run as successful." >&2
+  exit 1
+fi
+
+echo "FB-304 committer: committed ${#changed[@]} generated-doc file(s); postcondition verified." >&2
