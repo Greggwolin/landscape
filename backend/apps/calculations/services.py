@@ -19,6 +19,7 @@ from .converters import (
     convert_budget_items_to_cashflows,
     convert_multifamily_to_income_property,
 )
+from .series_metrics import irr_from_series, npv_from_series
 
 # Import Python financial engine
 try:
@@ -355,35 +356,38 @@ class CalculationService:
         actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
         
         data = prepare_irr_calculation_data(project, list(budget_items), list(actual_items))
-        
-        if PYTHON_ENGINE_AVAILABLE:
-            try:
-                metrics = InvestmentMetrics()
-                irr = metrics.calculate_irr(data['cash_flows'])
-                
-                return {
-                    'project_id': project_id,
-                    'project_name': project.project_name,
-                    'irr': float(irr) if irr is not None else None,
-                    'periods': len(data['cash_flows']),
-                    'total_investment': sum(cf for cf in data['cash_flows'] if cf < 0),
-                    'total_return': sum(cf for cf in data['cash_flows'] if cf > 0),
-                    'engine': 'python',
-                }
-            except Exception as e:
-                return {
-                    'error': str(e),
-                    'project_id': project_id,
-                    'engine': 'python',
-                }
-        else:
-            # Fallback calculation
+
+        # prepare_irr_calculation_data returns an already-signed series (Shape B).
+        # Do NOT route this through InvestmentMetrics.calculate_irr, which expects
+        # decomposed (initial_investment, cash_flows, reversion_value) inputs —
+        # that mismatch was the LSCMD-IRRWIRE-0714-TB defect. See series_metrics.
+        try:
+            irr = irr_from_series(data['cash_flows'])
+
+            return {
+                'project_id': project_id,
+                'project_name': project.project_name,
+                'irr': float(irr) if irr is not None else None,
+                'periods': len(data['cash_flows']),
+                'total_investment': sum(cf for cf in data['cash_flows'] if cf < 0),
+                'total_return': sum(cf for cf in data['cash_flows'] if cf > 0),
+                'engine': 'python',
+            }
+        except ImportError:
             return {
                 'project_id': project_id,
                 'project_name': project.project_name,
                 'irr': None,
                 'error': 'Python calculation engine not available',
                 'engine': 'fallback',
+            }
+        except Exception as e:
+            return {
+                'project_id': project_id,
+                'project_name': project.project_name,
+                'irr': None,
+                'error': str(e),
+                'engine': 'python',
             }
     
     @staticmethod
@@ -402,33 +406,38 @@ class CalculationService:
         budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
         
         data = prepare_npv_calculation_data(project, list(budget_items), discount_rate)
-        
-        if PYTHON_ENGINE_AVAILABLE:
-            try:
-                metrics = InvestmentMetrics()
-                npv = metrics.calculate_npv(data['cash_flows'], data['discount_rate'])
-                
-                return {
-                    'project_id': project_id,
-                    'project_name': project.project_name,
-                    'npv': float(npv) if npv is not None else None,
-                    'discount_rate': data['discount_rate'],
-                    'periods': len(data['cash_flows']),
-                    'engine': 'python',
-                }
-            except Exception as e:
-                return {
-                    'error': str(e),
-                    'project_id': project_id,
-                    'engine': 'python',
-                }
-        else:
+
+        # Same Shape-B series as calculate_irr above — InvestmentMetrics.calculate_npv
+        # expects (discount_rate, initial_investment, cash_flows, reversion_value).
+        # The prior call passed (cash_flows, discount_rate): wrong arity AND reversed.
+        try:
+            npv = npv_from_series(data['discount_rate'], data['cash_flows'])
+
+            return {
+                'project_id': project_id,
+                'project_name': project.project_name,
+                'npv': float(npv) if npv is not None else None,
+                'discount_rate': data['discount_rate'],
+                'periods': len(data['cash_flows']),
+                'engine': 'python',
+            }
+        except ImportError:
             return {
                 'project_id': project_id,
                 'project_name': project.project_name,
                 'npv': None,
+                'discount_rate': data['discount_rate'],
                 'error': 'Python calculation engine not available',
                 'engine': 'fallback',
+            }
+        except Exception as e:
+            return {
+                'project_id': project_id,
+                'project_name': project.project_name,
+                'npv': None,
+                'discount_rate': data['discount_rate'],
+                'error': str(e),
+                'engine': 'python',
             }
     
     @staticmethod
@@ -454,7 +463,19 @@ class CalculationService:
         # Calculate IRR and NPV
         irr_result = CalculationService.calculate_irr(project_id)
         npv_result = CalculationService.calculate_npv(project_id)
-        
+
+        # Propagate failures instead of swallowing them. Previously this method
+        # called .get('irr') on an error dict that carried no 'irr' key, silently
+        # produced None, and still reported status 'complete' — so a broken
+        # calculation was indistinguishable from a genuinely null result all the
+        # way up to the Landscaper tool. That is the silent-failure class
+        # CLAUDE.md warns about; do not reintroduce it.
+        metric_errors = {}
+        if irr_result.get('error'):
+            metric_errors['irr'] = irr_result['error']
+        if npv_result.get('error'):
+            metric_errors['npv'] = npv_result['error']
+
         return {
             'project_id': project_id,
             'project_name': project.project_name,
@@ -469,7 +490,8 @@ class CalculationService:
                 'npv': npv_result.get('npv'),
                 'discount_rate': float(project.discount_rate_pct or 0.10),
             },
-            'status': 'complete',
+            'status': 'partial' if metric_errors else 'complete',
+            'errors': metric_errors or None,
         }
     
     @staticmethod
