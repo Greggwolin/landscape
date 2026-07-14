@@ -72,7 +72,6 @@ INSTALLED_APPS = [
     "apps.sales_absorption",
     "apps.calculations",
     "apps.multifamily",
-    "apps.commercial",
     "apps.landuse",
     "apps.gis",
     "apps.documents.apps.DocumentsConfig",

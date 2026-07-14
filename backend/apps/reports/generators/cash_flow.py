@@ -21,7 +21,7 @@ class CashFlowReport(BaseReport):
                     p.project_name,
                     cp.property_name
                 FROM landscape.tbl_project p
-                LEFT JOIN landscape.tbl_cre_property cp ON p.project_id = cp.project_id
+                LEFT JOIN landscape.tbl_multifamily_property cp ON p.project_id = cp.project_id
                 WHERE p.project_id = %s
             """, [self.project_id])
 

@@ -21,13 +21,13 @@ class PropertySummaryReport(BaseReport):
                     p.project_name,
                     cp.property_name,
                     cp.year_built,
-                    cp.number_of_units as total_units,
-                    cp.rentable_sf,
+                    cp.total_units,
+                    NULL AS rentable_sf,  -- tbl_multifamily_property has no rentable_sf column; preserves prior (always-NULL) output
                     cp.acquisition_price,
                     cp.acquisition_date,
                     p.project_address
                 FROM landscape.tbl_project p
-                LEFT JOIN landscape.tbl_cre_property cp ON p.project_id = cp.project_id
+                LEFT JOIN landscape.tbl_multifamily_property cp ON p.project_id = cp.project_id
                 WHERE p.project_id = %s
             """, [self.project_id])
 

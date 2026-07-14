@@ -1,7 +1,7 @@
 // app/components/Navigation.tsx
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
@@ -24,7 +24,6 @@ import {
   cilDescription
 } from '@coreui/icons';
 
-import { getAuthHeaders } from '@/lib/authHeaders';
 // Icon map for dynamic icon lookup
 const ICON_MAP: Record<string, any> = {
   cilChartPie,
@@ -65,7 +64,6 @@ interface NavItem {
 
 const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const [analysisLoading, setAnalysisLoading] = useState(false);
   const { activeProject } = useProjectContext()
   const projectId = activeProject?.project_id
   const router = useRouter();
@@ -127,48 +125,12 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     }
   ], [projectId])
 
-  const navigateToAnalysis = useCallback(async () => {
-    if (analysisLoading) return;
-    if (!projectId) {
-      alert('Select a project to open financial analysis.');
-      return;
-    }
-
-    setAnalysisLoading(true);
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/property`, { headers: getAuthHeaders(), cache: 'no-store'
-      });
-      const data = await response.json();
-
-      if (response.ok && data?.property_id) {
-        router.push(`/properties/${data.property_id}/analysis`);
-      } else {
-        const message =
-          data?.error ||
-          'This project is not linked to a property record. Please complete property setup first.';
-        alert(message);
-      }
-    } catch (error) {
-      console.error('Failed to open financial analysis interface:', error);
-      alert('Failed to open analysis. Please try again.');
-    } finally {
-      setAnalysisLoading(false);
-    }
-  }, [analysisLoading, projectId, router]);
 
   // Legacy section - placed at bottom, separate from main navigation
   const legacySection: NavSection = useMemo(() => ({
     title: 'Legacy',
     items: [
       { id: 'assumptions', label: 'Assumptions & Factors', href: projectId ? `/projects/${projectId}/assumptions` : '/projects/17/assumptions', icon: 'cilSettings' },
-      {
-        id: 'financial-analysis',
-        label: analysisLoading ? 'Opening Analysis...' : 'Financial Analysis',
-        icon: 'cilChartPie',
-        onClick: navigateToAnalysis,
-        disabled: analysisLoading || !projectId
-      },
       { id: 'market-intel-legacy', label: 'Market Intel (Old)', href: '/market', icon: 'cilGraph' },
       { id: 'project-overview-legacy', label: 'Project Overview (Old)', href: projectId ? `/projects/${projectId}/overview` : '/projects/11/overview', icon: 'cilFile' },
       { id: 'test-coreui', label: 'Theme Demo', href: '/test-coreui', icon: 'cilPaint' },
@@ -176,7 +138,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
       { id: 'documentation', label: 'Documentation', href: '/documentation', icon: 'cilNotes' }
     ],
     isCollapsible: true
-  }), [analysisLoading, navigateToAnalysis, projectId])
+  }), [projectId])
 
   const toggleSection = (sectionTitle: string) => {
     setCollapsedSections(prev => ({
