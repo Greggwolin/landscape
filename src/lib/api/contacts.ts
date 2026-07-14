@@ -26,6 +26,8 @@ import type {
   RoleCategory,
 } from '@/types/contacts';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 // ============================================================================
@@ -41,6 +43,9 @@ async function fetchApi<T>(
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      // Django defaults to IsAuthenticated; without a bearer token every
+      // contacts/cabinet call 401s. See src/lib/authHeaders.ts.
+      ...getAuthHeaders(),
       ...options.headers,
     },
   });
