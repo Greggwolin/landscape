@@ -1,8 +1,40 @@
+> # ⛔ SUPERSEDED — DO NOT TRUST THE NUMBERS BELOW
+>
+> **Retired 2026-07-14** by **[`ARGUS_PARITY_2026.md`](./ARGUS_PARITY_2026.md)** — same folder —
+> which re-reviewed all three ARGUS programs (1,714 pages) against live code.
+> A plain-English companion for non-technical readers lives at
+> `Landscape app/ARGUS_PARITY_2026.html` in the OneDrive workspace folder.
+>
+> **This file is kept for history only. Do not update it. Update the 2026 document.**
+>
+> ### Why it was retired — the specific errors, so they aren't repeated
+>
+> | This file claims | Actually |
+> |---|---|
+> | "Current Parity Status: **75%**" | **Unfounded.** No verification method was ever recorded. |
+> | "**full data model parity** with ARGUS Enterprise" | The tables exist. **Six are read by exactly ONE file** (`src/lib/financial-engine/db.ts`); `tbl_waterfall` has **zero** readers. |
+> | "Schema: **100%**" | True but meaningless — **a column is not a calculation.** |
+> | "Calculation Engine: 30%" | Never re-measured after 2025-10. |
+>
+> **The methodological error:** this document graded **storage**, not **computation**, then
+> reported the result as parity. Same failure class as a test that asserts response shape but
+> never the value.
+>
+> **What it got right:** line 58 — Residual Land Value marked "⧗ Planned". That was honest and
+> still is.
+>
+> **Also note:** the whole "ARGUS Enterprise — Income Property" section below grades the
+> **lease-level model**, which has been **dormant since roughly the week this file was written**.
+> Confirmed intentional 2026-07-14: lease-level is for office/retail/industrial (deferred);
+> multifamily runs on the unit-level model. This file grades a branch that isn't the live one.
+
+---
+
 # ARGUS Parity Checklist
 
 This document tracks feature parity between Landscape Financial Engine and ARGUS Enterprise/Developer.
 
-**Last Updated:** 2025-10-13
+**Last Updated:** 2025-10-13 — **STALE. See the superseded notice above.**
 **Schema Version:** 1.0
 
 ---

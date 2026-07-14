@@ -1,8 +1,41 @@
+> # ⛔ OBSOLETE — EVERY FILE PATH IN THIS DOCUMENT IS DEAD
+>
+> **Retired 2026-07-14.** Verified against the working tree the same day.
+>
+> This is not "stale but useful." It is a map to a place that **no longer exists**.
+> Kept for history only. **Do not update it. Do not work from it.**
+>
+> ### Verified 2026-07-14 — every premise below is void
+>
+> | This file says | Actually |
+> |---|---|
+> | 4 form components at `src/app/prototypes/multifam/rent-roll-inputs/components/` | **All five files DELETED**, including `CapitalizationTab.tsx`. Confirmed by `find`. |
+> | Fields respect "**basic/standard/advanced modes**" | **Progressive complexity modes were removed from the UI.** Landscaper manages complexity contextually now. See `CLAUDE.md`. |
+> | Phase 4: expand Next.js `fieldMapping` from 8 → 34 fields per route | **Structurally moot.** `src/app/api/capitalization/debt/[facility_id]/route.ts` is now a **thin proxy to Django** — it spreads `...payload` and forwards everything. There is no field mapping left to expand. |
+> | "Overall Progress: **40% Complete**" | **Misleading.** Phases 3–5 were not *stalled* — the plan was **abandoned** in favour of a different architecture. 40% of a discontinued plan is 0% of anything. |
+> | Live capitalization lives in `/prototypes/` | It was **rebuilt** at `src/components/capitalization/` (`LoanCard`, `EquityPartnerModal`, `EquityPartnersTable`, `LeveragedCashFlow`, `LoanBudgetModal`). |
+>
+> ### Where the real status lives
+>
+> - **Capitalization feature status** → `/landscape/CLAUDE.md` (Alpha Readiness, row 12: "✅ WORKS —
+>   waterfall calc endpoint wired, Next.js proxy → Django → Python engine")
+> - **ARGUS parity** → **[`docs/02-features/financial-engine/ARGUS_PARITY_2026.md`](../02-features/financial-engine/ARGUS_PARITY_2026.md)**
+>   (plain-English companion: `Landscape app/ARGUS_PARITY_2026.html`, OneDrive workspace folder)
+>
+> ### One live risk this document accidentally points at
+>
+> The proxy forwards `...payload` **blindly** to Django. Per `CLAUDE.md` §15.1, Landscaper tool
+> writes fail **silently** when `ALLOWED_UPDATES` field names don't match actual DB columns — the
+> API returns 200 while nothing saves. A blind-forwarding proxy inherits that exposure. Worth a
+> targeted audit of the loan/equity write path; **not** worth resurrecting anything in this file.
+
+---
+
 # Full ARGUS Parity Implementation Status
 
-**Date:** October 23, 2025
+**Date:** October 23, 2025 — **OBSOLETE. See the notice above.**
 **Session:** Continued from previous context
-**Status:** Phase 1 Complete (Form Components), Phase 2 In Progress
+**Status:** ~~Phase 1 Complete (Form Components), Phase 2 In Progress~~ — **plan abandoned; components deleted**
 
 ---
 
