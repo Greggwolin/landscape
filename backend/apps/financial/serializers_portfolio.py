@@ -1,4 +1,9 @@
 """
+PARKED 2026-07-14 (CU5). Consumed only by the parked Portfolio ViewSets, which
+are no longer registered in urls.py — the tbl_portfolio* tables were never
+created. Do NOT re-register the routes until the migrations exist and the tables
+are live. See models_portfolio.py header. Design is retained for a clean restart.
+
 Serializers for Portfolio models.
 
 Provides serialization for portfolio CRUD, member management,

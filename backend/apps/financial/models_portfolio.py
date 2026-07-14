@@ -1,4 +1,9 @@
 """
+PARKED 2026-07-14 (CU5). The tbl_portfolio* tables were never created in any
+environment, so these models have no backing tables. The API is unregistered
+(routes removed from urls.py). Do NOT re-register the ViewSets until the
+migrations exist and the tables are live. Design is retained for a clean restart.
+
 Portfolio models for fund-level analysis.
 
 Supports Landscaper-driven portfolio creation: clone a project N times with

@@ -797,7 +797,7 @@ Two distinct failure modes — treat separately:
 - **Reconciliation:** Complete — weights, narrative versioning, IndicatedValueSummary panel
 - **Financial Engine:** `services/financial_engine_py/` with IRR/NPV/DSCR/waterfall tests
 - **Construction Loan Engine:** Phase 6A complete (draw-repay-redraw validated); Phase 6B land dev conversational parsing complete
-- **Portfolio Analysis:** (WIP) Django models scaffolded — `Portfolio`, `PortfolioMember`, `PortfolioWaterfallTier`, `PortfolioResult` in `models_portfolio.py`. ViewSets + serializers + URL registration complete. Underwriting mode only.
+- **Portfolio Analysis:** PARKED 2026-07-14 — API unregistered; tables never created (CU5). Django models/serializers/ViewSets retained in `models_portfolio.py` / `serializers_portfolio.py` / `views_portfolio.py` (design kept for a clean restart), but the routes are removed from `urls.py` because `tbl_portfolio*` was never created in any environment (every request 500'd). Do not re-register until migrations exist and the tables are live.
 
 ---
 
