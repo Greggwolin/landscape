@@ -211,7 +211,7 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
             own per-section card stack inside .artifacts-panel-body. */}
       {projectRightPanelView === 'documents' ? (
         <div className="project-right-panel-body project-right-panel-body--documents">
-          <ProjectDocumentsBody />
+          <ProjectDocumentsBody projectId={projectId} />
         </div>
       ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} takeoverMode />

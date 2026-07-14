@@ -65,14 +65,15 @@ interface ProjectContextValue {
 /**
  * Fetcher that includes auth token for user-scoped project filtering.
  * Token is passed via the key to ensure SWR refetches when auth changes.
+ *
+ * The token is non-nullable: the SWR key is null until a token exists, so this
+ * never runs unauthenticated. Typing it that way keeps the guard from eroding
+ * back into a silent 401.
  */
-const fetcher = async ([url, accessToken]: [string, string | null]): Promise<ProjectSummary[]> => {
+const fetcher = async ([url, accessToken]: [string, string]): Promise<ProjectSummary[]> => {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
-  }
-
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`
+    Authorization: `Bearer ${accessToken}`,
   }
 
   const response = await fetch(url, { headers })
@@ -95,9 +96,14 @@ const ProjectContext = createContext<ProjectContextValue | undefined>(undefined)
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { tokens, isLoading: authLoading } = useAuth()
 
-  // Use token in key so SWR refetches when auth changes (login/logout)
-  // Wait for auth to initialize before fetching
-  const swrKey = authLoading ? null : ['/api/projects', tokens?.access || null] as [string, string | null]
+  // Use token in key so SWR refetches when auth changes (login/logout).
+  // Gate on the token itself, not just authLoading: once loading settled with
+  // no token, the old key still fired the request, the fetcher omitted the
+  // Authorization header, and /api/projects answered 401 by design. Null key =
+  // SWR skips the fetch entirely and refires when a token arrives.
+  const swrKey = !authLoading && tokens?.access
+    ? (['/api/projects', tokens.access] as [string, string])
+    : null
 
   const { data, error, isLoading, mutate } = useSWR<ProjectSummary[]>(
     swrKey,
