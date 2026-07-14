@@ -21,8 +21,22 @@ import type {
   ValuationReconciliationForm,
   ValuationSummary,
 } from '@/types/valuation';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+/**
+ * Standard JSON + auth headers for Django REST calls.
+ *
+ * Django defaults to IsAuthenticated (settings.py REST_FRAMEWORK) and the
+ * valuation app declares no per-view override, so every endpoint in this module
+ * requires a bearer token. Omitting it returns 401 "Authentication credentials
+ * were not provided" and the valuation tabs render an error card.
+ */
+const jsonHeaders = (): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  ...getAuthHeaders(),
+});
 
 const normalizeComparablesPayload = (payload: unknown): SalesComparable[] => {
   if (Array.isArray(payload)) {
@@ -56,9 +70,7 @@ export async function getSalesComparables(
     `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${query}`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -81,9 +93,7 @@ export async function getSalesComparable(
     `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -106,9 +116,7 @@ export async function createSalesComparable(
     `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(payload),
     }
   );
@@ -134,9 +142,7 @@ export async function updateSalesComparable(
     `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/`,
     {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(payload),
     }
   );
@@ -157,9 +163,7 @@ export async function deleteSalesComparable(projectId: number, comparableId: num
     `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/`,
     {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -180,9 +184,7 @@ export async function addAdjustment(
     `${DJANGO_API_BASE}/api/projects/${projectId}/sales-comparables/${comparableId}/add_adjustment/`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -203,9 +205,7 @@ export async function deleteAdjustment(adjustmentId: number): Promise<void> {
     `${DJANGO_API_BASE}/api/valuation/adjustments/${adjustmentId}/`,
     {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -226,9 +226,7 @@ export async function getCostApproach(projectId: number): Promise<CostApproach |
     `${DJANGO_API_BASE}/api/valuation/cost-approach/by_project/${projectId}/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -259,9 +257,7 @@ export async function saveCostApproach(
       `${DJANGO_API_BASE}/api/valuation/cost-approach/${existing.cost_approach_id}/`,
       {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: jsonHeaders(),
         body: JSON.stringify(data),
       }
     );
@@ -278,9 +274,7 @@ export async function saveCostApproach(
       `${DJANGO_API_BASE}/api/valuation/cost-approach/`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: jsonHeaders(),
         body: JSON.stringify({ project_id: projectId, ...data }),
       }
     );
@@ -330,9 +324,7 @@ export async function getContainerCostMetadata(containerId: number): Promise<Con
     `${DJANGO_API_BASE}/api/containers/${containerId}/cost-metadata/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -351,9 +343,7 @@ export async function saveContainerCostMetadata(
     `${DJANGO_API_BASE}/api/containers/${containerId}/cost-metadata/`,
     {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -377,9 +367,7 @@ export async function getProjectDepreciation(
     `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/depreciation/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -402,9 +390,7 @@ export async function saveProjectDepreciation(
     `${DJANGO_API_BASE}/api/projects/${projectId}/valuation/depreciation/`,
     {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -429,9 +415,7 @@ export async function getIncomeApproach(projectId: number): Promise<IncomeApproa
     `${DJANGO_API_BASE}/api/valuation/income-approach/by_project/${projectId}/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -461,9 +445,7 @@ export async function saveIncomeApproach(
       `${DJANGO_API_BASE}/api/valuation/income-approach/${existing.income_approach_id}/`,
       {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: jsonHeaders(),
         body: JSON.stringify(data),
       }
     );
@@ -480,9 +462,7 @@ export async function saveIncomeApproach(
       `${DJANGO_API_BASE}/api/valuation/income-approach/`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: jsonHeaders(),
         body: JSON.stringify({ project_id: projectId, ...data }),
       }
     );
@@ -510,9 +490,7 @@ export async function getValuationReconciliation(
     `${DJANGO_API_BASE}/api/valuation/reconciliation/by_project/${projectId}/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -542,9 +520,7 @@ export async function saveValuationReconciliation(
       `${DJANGO_API_BASE}/api/valuation/reconciliation/${existing.reconciliation_id}/`,
       {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: jsonHeaders(),
         body: JSON.stringify(data),
       }
     );
@@ -561,9 +537,7 @@ export async function saveValuationReconciliation(
       `${DJANGO_API_BASE}/api/valuation/reconciliation/`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: jsonHeaders(),
         body: JSON.stringify({ project_id: projectId, ...data }),
       }
     );
@@ -591,9 +565,7 @@ export async function getValuationSummary(projectId: number): Promise<ValuationS
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       mode: 'cors',
       credentials: 'include',
     });
@@ -627,9 +599,7 @@ export async function getAISuggestions(comparableId: number): Promise<AIAdjustme
     `${DJANGO_API_BASE}/api/valuation/ai-suggestions/by_comp/${comparableId}/`,
     {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -651,9 +621,7 @@ export async function acceptAISuggestion(suggestionId: number): Promise<{
     `${DJANGO_API_BASE}/api/valuation/ai-suggestions/${suggestionId}/accept/`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
     }
   );
 
@@ -680,9 +648,7 @@ export async function updateUserAdjustment(
     `${DJANGO_API_BASE}/api/valuation/adjustments/${adjustmentId}/`,
     {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
@@ -705,9 +671,7 @@ export async function saveAISuggestion(
     `${DJANGO_API_BASE}/api/valuation/ai-suggestions/`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: jsonHeaders(),
       body: JSON.stringify(data),
     }
   );
