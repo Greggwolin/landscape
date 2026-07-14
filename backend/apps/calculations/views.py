@@ -11,31 +11,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers
 from .services import CalculationService
+from .series_metrics import irr_from_series, npv_from_series
 
-
-def _irr_from_series(cash_flows):
-    """IRR of a signed cash-flow series (period 0 first).
-
-    Returns None when no real IRR solution exists (NaN). Raises ImportError
-    when numpy-financial is unavailable so callers can degrade to 503.
-    """
-    import math
-    import numpy_financial as npf
-    irr = npf.irr(cash_flows)
-    if irr is None or (isinstance(irr, float) and math.isnan(irr)):
-        return None
-    irr = float(irr)
-    return None if math.isnan(irr) else irr
-
-
-def _npv_from_series(discount_rate, cash_flows):
-    """NPV of a signed cash-flow series at a period-0-anchored discount rate.
-
-    Raises ImportError when numpy-financial is unavailable so callers can
-    degrade to 503.
-    """
-    import numpy_financial as npf
-    return float(npf.npv(discount_rate, cash_flows))
+# These were previously defined here as private helpers, duplicating the same
+# math the service layer needed. They now live in series_metrics so both layers
+# share one implementation. Aliased rather than renamed at every call site to
+# keep this change reviewable.
+_irr_from_series = irr_from_series
+_npv_from_series = npv_from_series
 logger = logging.getLogger(__name__)
 
 
