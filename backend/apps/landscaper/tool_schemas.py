@@ -2276,11 +2276,12 @@ LANDSCAPER_TOOLS = [
     # delete_cre_tenant / get_cre_spaces / update_cre_space / delete_cre_space /
     # get_cre_leases / update_cre_lease / delete_cre_lease / get_cre_properties /
     # update_cre_property / get_cre_rent_roll) referenced tbl_cre_* tables that
-    # do not exist in the current schema. Tool implementations in tool_executor.py
-    # are retained for revival when the commercial-property feature is rebuilt
-    # against the live schema. The schemas were removed here so Landscaper does
-    # not advertise tools that fail on use, including via the all-tools fallback
-    # in tool_registry.get_tools_for_page() when project_type_code is unknown.
+    # do not exist in the current schema. The schemas were removed here so
+    # Landscaper does not advertise tools that fail on use, including via the
+    # all-tools fallback in tool_registry.get_tools_for_page() when
+    # project_type_code is unknown. The tool_executor.py implementations were
+    # also removed 2026-07-14 (CU6) when the phantom tbl_cre_* system was
+    # deleted; rebuild against the live schema if commercial property is revived.
     # ------------------------------------------------------------------
     {
         "name": "get_competitive_projects",

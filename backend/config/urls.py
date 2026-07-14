@@ -43,7 +43,6 @@ urlpatterns = [
     path("api/", include('apps.sales_absorption.urls')),
     path("api/", include('apps.calculations.urls')),
     path("api/multifamily/", include('apps.multifamily.urls')),
-    path("api/commercial/", include('apps.commercial.urls')),
     path("api/landuse/", include('apps.landuse.urls')),
     path("api/gis/", include('apps.gis.urls')),
     path("api/dms/", include('apps.documents.urls')),

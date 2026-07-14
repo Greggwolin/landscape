@@ -387,7 +387,7 @@ class ExtractionWriter:
                     # Check if we used ON CONFLICT
                     if 'ON CONFLICT' not in sql:
                         return False, f"No rows updated for {table}.{column}"
-                if table in ('tbl_project', 'tbl_multifamily_property', 'tbl_cre_property'):
+                if table in ('tbl_project', 'tbl_multifamily_property'):
                     sync_primary_measure_on_legacy_update(
                         project_id=self.project_id,
                         table=table,

@@ -63,14 +63,6 @@ def sync_primary_measure_on_legacy_update(
                 updates['primary_area'] = value
                 updates['primary_area_type'] = 'gross_acres'
 
-        if table == 'tbl_cre_property':
-            if column == 'rentable_sf':
-                updates['primary_area'] = value
-                updates['primary_area_type'] = 'rentable_sf'
-            if column == 'number_of_units':
-                updates['primary_count'] = value
-                updates['primary_count_type'] = 'suites'
-
         _apply_updates(cur, updates)
 
     if cursor is not None:

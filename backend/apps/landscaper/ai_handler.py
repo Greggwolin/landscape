@@ -3723,7 +3723,7 @@ _NUMBERS_PRODUCING_PREFIXES = (
     'get_project_assumptions_detail', 'render_report_as_artifact',
     'generate_report_preview', 'export_report', 'get_sales_comp', 'get_rental_comp',
     'get_expense_comparables', 'get_land_comp_detail', 'get_revenue_rent',
-    'get_cre_rent_roll', 'get_unit', 'get_demographics', 'get_benchmark',
+    'get_unit', 'get_demographics', 'get_benchmark',
     'get_renovation_breakdown',
     'get_absorption_benchmarks', 'search_irem_benchmarks', 'store_appraisal_valuation',
     'store_construction_benchmarks', 'scenario_', 'whatif_',
