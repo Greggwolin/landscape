@@ -3,7 +3,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { DocumentsPanel } from '@/components/wrapper/documents/DocumentsPanel';
 import { MediaPanel } from '@/components/wrapper/documents/MediaPanel';
-import { useWrapperProject } from '@/contexts/WrapperProjectContext';
 import {
   UploadStagingProvider,
   useUploadStaging,
@@ -25,35 +24,44 @@ import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
  *   - MediaPanel (project images/charts/renders)
  *   - StagingTray + IntakeChoiceModal (upload flow)
  *   - Upload toolbar with "Upload New" entry point
+ *
+ * Takes `projectId` as a prop rather than reading WrapperProjectContext: this
+ * panel mounts inside ProjectArtifactsPanel, which renders on the /w/ routes
+ * where no WrapperProjectProvider exists (only /studio/[projectId] mounts one).
+ * Reading the context here threw on every Documents click from /w/.
  */
-export function ProjectDocumentsBody() {
-  const project = useWrapperProject();
+export function ProjectDocumentsBody({ projectId }: { projectId: number }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  // key={project_id} forces remount when the active project changes so the
+  // key={projectId} forces remount when the active project changes so the
   // x-project-id header captured at first mount of UploadStagingProvider's
   // useUploadThing hook stays in sync. Mirrors the legacy DMSView guard.
   return (
     <UploadStagingProvider
-      key={project.project_id}
-      projectId={project.project_id}
+      key={projectId}
+      projectId={projectId}
       workspaceId={1}
       onUploadComplete={bumpRefresh}
     >
-      <ProjectDocumentsBodyInner refreshKey={refreshKey} onChange={bumpRefresh} />
+      <ProjectDocumentsBodyInner
+        projectId={projectId}
+        refreshKey={refreshKey}
+        onChange={bumpRefresh}
+      />
     </UploadStagingProvider>
   );
 }
 
 function ProjectDocumentsBodyInner({
+  projectId,
   refreshKey,
   onChange,
 }: {
+  projectId: number;
   refreshKey: number;
   onChange: () => void;
 }) {
-  const project = useWrapperProject();
   const { stageFiles, pendingIntakeDocs, clearPendingIntakeDocs } = useUploadStaging();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -95,15 +103,15 @@ function ProjectDocumentsBodyInner({
       </div>
 
       <div className="project-docs-body">
-        <DocumentsPanel refreshKey={refreshKey} onChange={onChange} />
-        <MediaPanel projectId={project.project_id} />
+        <DocumentsPanel projectId={projectId} refreshKey={refreshKey} onChange={onChange} />
+        <MediaPanel projectId={projectId} />
       </div>
 
       <StagingTray />
 
       <IntakeChoiceModal
         visible={pendingIntakeDocs.length > 0}
-        projectId={project.project_id}
+        projectId={projectId}
         docs={pendingIntakeDocs}
         onClose={() => {
           clearPendingIntakeDocs();

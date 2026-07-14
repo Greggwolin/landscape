@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWrapperProject } from '@/contexts/WrapperProjectContext';
 import { useUploadStaging } from '@/contexts/UploadStagingContext';
 import { DocumentDetailPanel, DocumentDetailDoc } from './DocumentDetailPanel';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
@@ -39,12 +38,15 @@ interface DMSDoc extends DocumentDetailDoc {
 }
 
 interface DocumentsPanelProps {
+  /** Owning project. Passed as a prop, not read from WrapperProjectContext —
+   *  this panel mounts on the /w/ routes, which have no WrapperProjectProvider. */
+  projectId: number;
   refreshKey?: number;
   onChange?: () => void;
 }
 
-export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps = {}) {
-  const { project_id } = useWrapperProject();
+export function DocumentsPanel({ projectId, refreshKey = 0, onChange }: DocumentsPanelProps) {
+  const project_id = projectId;
   const { setDocTypes: setStagingDocTypes } = useUploadStaging();
 
   // ── Doc-type + doc state ───────────────────────────────────
