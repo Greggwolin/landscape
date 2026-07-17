@@ -45,8 +45,11 @@ export default function NavigationLayout({
   // legacy TopNavigationBar chrome. Additive: only adds /studio to the
   // chrome-free set; no effect on existing routes.
   const isStudioRoute = pathname?.startsWith('/studio');
+  // The /design shell is a visual restyle of /studio — same self-contained
+  // 3-zone frame, same chrome-free treatment. Additive.
+  const isDesignRoute = pathname?.startsWith('/design');
 
-  if (hideNavigation || isAuthRoute || isWrapperRoute || isStudioRoute) {
+  if (hideNavigation || isAuthRoute || isWrapperRoute || isStudioRoute || isDesignRoute) {
     return <>{children}</>;
   }
 
