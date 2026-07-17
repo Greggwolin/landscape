@@ -1,0 +1,212 @@
+/**
+ * Design Shell — visual restyle of the Studio shell (/design/[id]) — Stage A.
+ *
+ *   LEFT  : DesignSidebar → the real unified-UI `WrapperSidebar` (wrapper.css)
+ *   CENTER: .wrapper-chat-center (CenterChatPanel)
+ *   RIGHT : .wrapper-right-panel (RightContentPanel → ProjectContentRouter / artifact)
+ *
+ * All three zones bring their structure and behavior from wrapper.css; this
+ * file changes ONLY presentation, by re-declaring the `--w-*` and key `--cui-*`
+ * custom properties under `.design-shell` (custom properties inherit, so every
+ * descendant resolves these values instead of the :root ones) plus a small set
+ * of structural visual deltas. Nothing here touches /w/, /studio, or classic.
+ *
+ * Visual language (per the Slice 1 reference): Nocturne-adjacent dark — one
+ * steel-blue accent on neutral (non-blue-tinted) dark surfaces, 8px radii,
+ * badges are rounded rectangles never pills, flush-left density.
+ *
+ * NOTE: token VALUES below are placeholders faithful to the written spec; when
+ * the reference file's exact inline tokens are available, swap the values in
+ * this one block — no component changes needed.
+ */
+
+/* ── 1. Token re-declarations ──────────────────────────────────────────── */
+
+.design-shell {
+  /* Neutral dark surfaces (no blue tint) */
+  --w-bg-body: #131417;
+  --w-bg-sidebar: #101114;
+  --w-header-bg: #0a0b0d;
+  --w-panel-bg: #16171b;
+  --w-card-bg: #1b1d22;
+  --w-bg-surface: rgba(255, 255, 255, 0.04);
+  --w-bg-surface-hover: rgba(255, 255, 255, 0.07);
+  --w-bg-input: rgba(255, 255, 255, 0.05);
+  --w-border: #2a2d34;
+  --w-border-hover: #3d414b;
+  --w-border-subtle: rgba(255, 255, 255, 0.06);
+  --w-border-subtle-dark: rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --w-text-primary: rgba(235, 238, 242, 0.92);
+  --w-text-secondary: rgba(235, 238, 242, 0.62);
+  --w-text-tertiary: rgba(235, 238, 242, 0.4);
+  --w-text-muted: rgba(235, 238, 242, 0.22);
+
+  /* THE one steel-blue accent */
+  --w-accent: #5e8cb8;
+  --w-accent-hover: #4f7ca6;
+  --w-accent-dim: rgba(94, 140, 184, 0.16);
+  --w-accent-text: #93b8da;
+
+  /* Status hues, muted for neutral-dark surfaces */
+  --w-success: #5fa97f;
+  --w-success-dim: rgba(95, 169, 127, 0.15);
+  --w-success-text: #8cc7a5;
+  --w-warning: #c9a15e;
+  --w-warning-dim: rgba(201, 161, 94, 0.15);
+  --w-warning-text: #dfc08a;
+  --w-danger: #c96a6a;
+  --w-danger-dim: rgba(201, 106, 106, 0.15);
+  --w-danger-text: #de9494;
+  --w-info: #5e8cb8;
+  --w-info-dim: rgba(94, 140, 184, 0.16);
+  --w-info-text: #93b8da;
+
+  /* Geometry */
+  --w-card-radius: 8px;
+  --w-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+
+  /* CoreUI tokens consumed by the routed screens inside the right panel.
+     The design shell is dark regardless of the app theme toggle. */
+  --cui-body-bg: #16171b;
+  --cui-body-color: rgba(235, 238, 242, 0.92);
+  --cui-secondary-bg: #1b1d22;
+  --cui-tertiary-bg: #202329;
+  --cui-secondary-color: rgba(235, 238, 242, 0.62);
+  --cui-tertiary-color: rgba(235, 238, 242, 0.4);
+  --cui-border-color: #2a2d34;
+  --cui-primary: #5e8cb8;
+  --cui-primary-rgb: 94, 140, 184;
+  --cui-link-color: #93b8da;
+  --cui-border-radius: 8px;
+  --cui-border-radius-sm: 6px;
+  --cui-border-radius-lg: 8px;
+
+  display: flex;
+  position: relative; /* anchor for the ephemeral screen-router toast (JB43) */
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--w-bg-body);
+  color: var(--w-text-primary);
+}
+
+/* ── 2. Structural rules carried over from studio.css (renamed) ────────── */
+
+/* RIGHT — content collapsed strip (chat takes full width). */
+.design-content-collapsed {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  border-left: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+.design-content-expand {
+  background: none;
+  border: none;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px;
+  border-radius: 8px;
+}
+.design-content-expand:hover {
+  color: var(--cui-body-color);
+  background: var(--cui-secondary-bg);
+}
+
+/* Folder/tab content components were authored for a wide container; keep the
+   placeholder/empty states comfortable inside the right panel body. */
+.design-shell .wrapper-right-body .folder-content-placeholder {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--cui-secondary-color);
+}
+
+/* Pop-out overlay (right-panel reflow, Phase 1): the routed screen promoted to
+   the full window. Rendered inside .design-shell, so the token re-declarations
+   above still apply (position: fixed does not break custom-property inheritance). */
+.design-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: var(--cui-body-bg);
+}
+.design-screen-overlay .wrapper-right-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── 3. Visual deltas (the restyle) ────────────────────────────────────── */
+
+/* 8px radii across interactive elements. */
+.design-shell .w-btn,
+.design-shell .w-btn-icon,
+.design-shell .w-btn-ghost,
+.design-shell button.btn,
+.design-shell input,
+.design-shell select,
+.design-shell textarea,
+.design-shell .card,
+.design-shell .w-rail-card,
+.design-shell .w-placeholder-card {
+  border-radius: 8px;
+}
+
+/* Badges are rounded rectangles — NEVER pills. Covers CoreUI badges, the
+   Bootstrap pill utility (which carries !important), and wrapper pill chips. */
+.design-shell .badge,
+.design-shell [class*='-pill'],
+.design-shell .rounded-pill {
+  border-radius: 4px !important;
+}
+
+/* Flush-left density: tighter right-panel header, no centered flourish. */
+.design-shell .wrapper-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.design-shell .wrapper-header-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.design-shell .wrapper-header-subtitle {
+  font-size: 12px;
+  color: var(--w-text-tertiary);
+}
+
+/* Accent discipline: focus rings and active states use the steel blue only. */
+.design-shell input:focus,
+.design-shell select:focus,
+.design-shell textarea:focus {
+  border-color: var(--w-accent);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--w-accent-dim);
+}
+.design-shell .sb-nav-item.active .sb-nav-icon {
+  color: var(--w-accent-text);
+}
+
+/* Scrollbars, kept quiet on the neutral surfaces. */
+.design-shell ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.design-shell ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+.design-shell ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.design-shell ::-webkit-scrollbar-track {
+  background: transparent;
+}
