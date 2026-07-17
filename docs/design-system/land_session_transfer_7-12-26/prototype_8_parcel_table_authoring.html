@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype 8 — Building the Parcel Table from the Map</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --good:#2E7D52; --good-soft:#E7F3EC;
+    --unset:#D7DBDF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:18px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  header .t{font-size:16px;font-weight:600;}
+  header .s{font-size:12px;color:var(--muted);}
+  .meter-wrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .meter-label{font-size:12px;color:var(--muted);}
+  .meter{width:170px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .meter>div{height:100%;width:0%;background:var(--accent);transition:width .5s ease;}
+  #meterPct{font-size:13px;font-weight:600;width:52px;}
+
+  .modebar{display:flex;align-items:center;gap:14px;padding:8px 20px;background:#FBFCFD;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .tgl{display:inline-flex;border:1.5px solid var(--accent);border-radius:8px;overflow:hidden;}
+  .tgl button{border:none;background:var(--panel);color:var(--accent);font-size:12.5px;font-weight:700;padding:6px 15px;cursor:pointer;}
+  .tgl button.on{background:var(--accent);color:#fff;}
+  .brushes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .brush{display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:14px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;background:var(--panel);}
+  .brush .sw{width:12px;height:12px;border-radius:3px;}
+  .brush.on{border-color:var(--ink);background:#F1F3F5;}
+  .hint{font-size:12px;color:var(--muted);}
+
+  .main{flex:1;display:flex;min-height:0;}
+  .mapwrap{flex:1;min-width:0;position:relative;background:#E9E4D8;}
+  svg{width:100%;height:100%;display:block;}
+  .parcel{stroke:#FFFFFF;stroke-width:2;cursor:pointer;transition:filter .12s,opacity .12s;}
+  .parcel:hover{filter:brightness(1.1);}
+  .parcel.sel{stroke:#1B2530;stroke-width:3;stroke-dasharray:none;}
+  .parcel.hl{filter:brightness(1.18);stroke:#1B2530;stroke-width:2.5;}
+  .plabel{font-size:11px;font-weight:700;fill:#1B2530;pointer-events:none;}
+  .plabel.inv{fill:#fff;}
+  .plabel2{font-size:9px;fill:#1B2530;opacity:.75;pointer-events:none;}
+  .plabel2.inv{fill:#fff;}
+
+  .info{width:330px;min-width:330px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:16px;}
+  .info h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .empty{color:#B9C0C7;font-size:13.5px;font-style:italic;margin-top:8px;line-height:1.6;}
+  .selsum{font-size:13.5px;margin-bottom:4px;}
+  .selsum b{font-size:18px;}
+  .selids{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:10px;}
+  .frm label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px;}
+  .frm select,.frm input{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:13px;background:#FAFBFC;font-weight:600;}
+  .frm .row2{display:flex;gap:10px;}
+  .frm .row2>div{flex:1;}
+  .applyb{margin-top:16px;width:100%;background:var(--accent);color:#fff;border:none;font-size:13.5px;font-weight:700;padding:11px 0;border-radius:8px;cursor:pointer;opacity:.4;pointer-events:none;}
+  .applyb.ready{opacity:1;pointer-events:auto;}
+  .clearb{margin-top:8px;width:100%;background:var(--panel);color:var(--muted);border:1.5px solid var(--line);font-size:12.5px;font-weight:600;padding:8px 0;border-radius:8px;cursor:pointer;}
+  .note{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.5;}
+  .attrchip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:9px;padding:2px 8px;color:#fff;margin-bottom:8px;}
+
+  .strip{background:var(--panel);border-top:1px solid var(--line);padding:10px 18px;display:flex;gap:10px;align-items:stretch;overflow-x:auto;min-height:66px;}
+  .strip .lbl{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;}
+  .ptile{border:1px solid var(--line);border-radius:9px;padding:7px 12px;min-width:132px;background:#FBFCFD;flex:none;cursor:default;}
+  .ptile:hover{border-color:var(--accent);}
+  .ptile .q{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .ptile .q .sw{width:11px;height:11px;border-radius:3px;}
+  .ptile .d{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .stripempty{font-size:12.5px;color:#B9C0C7;font-style:italic;align-self:center;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 8</span>
+  <div>
+    <div class="t">Peoria 1600 — Building the Parcel Table</div>
+    <div class="s">Geometry came from the exhibit. Attributes don't exist yet — that's today's work.</div>
+  </div>
+  <div class="meter-wrap">
+    <span class="meter-label">Parcels attributed</span>
+    <div class="meter"><div id="meterBar"></div></div>
+    <span id="meterPct">0 / 42</span>
+  </div>
+</header>
+
+<div class="modebar">
+  <div class="tgl">
+    <button id="mSelect" class="on" onclick="setMode('select')">Select &amp; Edit</button>
+    <button id="mPaint" onclick="setMode('paint')">Paint</button>
+  </div>
+  <div class="brushes" id="brushes" style="display:none;"></div>
+  <span class="hint" id="hint">Click parcels to add them to a selection (click again to remove), then assign attributes on the right — one form fills many parcels.</span>
+</div>
+
+<div class="main">
+  <div class="mapwrap"><svg id="map" viewBox="0 0 760 900" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <div class="info" id="info">
+    <h2>Attribute Entry</h2>
+    <div class="empty">No parcels selected.<br><br>Click one parcel or ten — the form applies to everything selected. This is how a 42-row table gets built in minutes instead of an afternoon.</div>
+  </div>
+</div>
+
+<div class="strip" id="strip"><div class="lbl">Program</div><span class="stripempty">The program builds here as parcels get attributed…</span></div>
+
+<script>
+/* ---------------- taxonomy ---------------- */
+const TAX={
+  'Residential':{
+    'Single-Family Detached':{
+      "42' Conventional":{dens:5.0,color:'#D99A2B'},
+      "50' Conventional":{dens:4.2,color:'#C98A25'},
+      "55' Conventional":{dens:3.5,color:'#E4B45A'},
+      "65' Estate":{dens:2.5,color:'#EFE3C0',darkText:true}
+    },
+    'Single-Family Attached':{
+      "24' Townhome":{dens:9.0,color:'#B97E4A'}
+    },
+    'Multifamily':{
+      'Garden Apartments':{dens:18.0,color:'#6E4A2A'}
+    }
+  },
+  'Commercial':{
+    'Superpad':{
+      'Superpad Sale':{dens:0,color:'#B0356B'}
+    }
+  },
+  'Mixed Use':{
+    'Flex / TBD':{
+      'Hold — no units':{dens:0,color:'#2C5488'}
+    }
+  },
+  'Open Space':{
+    'Drainage / Park':{
+      'Common area (HOA)':{dens:0,color:'#7DAF3F'}
+    }
+  }
+};
+const DARKBG={'#6E4A2A':1,'#B0356B':1,'#2C5488':1,'#B97E4A':1,'#C98A25':1};
+
+/* ---------------- parcels: geometry only ---------------- */
+const P=[
+ ['3.201',45,[20,15,150,92]],['3.202',60,[20,112,172,100]],['3.103',39,[230,15,132,96]],
+ ['3.102',34,[368,15,122,96]],['3.101',64,[560,15,182,112]],
+ ['2.112',56,[196,220,96,228]],
+ ['2.101',18,[300,150,86,71]],['2.102',17,[391,150,80,71]],['2.103',16,[476,150,76,71]],
+ ['2.104',21,[300,226,86,75]],['2.105',21,[391,226,80,75]],['2.106',21,[476,226,76,75]],
+ ['2.107',16,[300,306,81,65]],['2.108',13,[386,306,70,65]],['2.109',19,[461,306,80,65]],
+ ['2.110',23,[300,376,111,70]],['2.111',19,[416,376,96,70]],
+ ['1.101',32,[586,135,156,81]],['1.102',25,[600,221,142,75]],['1.103',21,[600,301,142,65]],
+ ['1.104',26,[616,371,126,70]],['1.201',27,[630,446,112,96]],['1.202',19,[546,446,80,71]],
+ ['1.203',16,[530,522,86,60]],['1.204',20,[546,587,90,66]],['1.205',36,[430,621,111,95]],
+ ['1.206',29,[430,721,106,85]],
+ ['2.201',28,[390,461,131,75]],['2.202',21,[300,471,86,70]],['2.203',33,[196,461,100,110]],
+ ['2.204',41,[300,546,121,116]],
+ ['4.105',22,[256,626,96,70]],['4.101',9,[60,641,61,51]],['4.102',23,[60,696,111,75]],
+ ['4.103',10,[176,661,60,56]],['4.104',19,[231,701,96,70]],
+ ['4.201',17,[40,776,81,60]],['4.203',20,[126,776,91,60]],['4.202',26,[40,841,111,55]],
+ ['4.204',23,[161,841,111,55]],['4.205',27,[276,801,111,70]],['4.206',18,[396,816,81,60]]
+];
+/* attrs[i] = {fam,type,prod,dens} or null */
+const attrs=P.map(()=>null);
+
+/* ---------------- draw ---------------- */
+const svg=document.getElementById('map');const NS='http://www.w3.org/2000/svg';
+const rects=[],labels=[],labels2=[];
+P.forEach((p,i)=>{
+  const g=p[2];
+  const r=document.createElementNS(NS,'rect');
+  r.setAttribute('x',g[0]);r.setAttribute('y',g[1]);r.setAttribute('width',g[2]);r.setAttribute('height',g[3]);
+  r.setAttribute('rx',3);r.setAttribute('fill','var(--unset)');
+  r.setAttribute('class','parcel');r.dataset.i=i;
+  r.addEventListener('click',()=>clickParcel(i));
+  svg.appendChild(r);rects.push(r);
+  const t=document.createElementNS(NS,'text');
+  t.setAttribute('x',g[0]+g[2]/2);t.setAttribute('y',g[1]+g[3]/2-2);
+  t.setAttribute('text-anchor','middle');t.setAttribute('class','plabel');
+  t.textContent=p[0];svg.appendChild(t);labels.push(t);
+  const t2=document.createElementNS(NS,'text');
+  t2.setAttribute('x',g[0]+g[2]/2);t2.setAttribute('y',g[1]+g[3]/2+11);
+  t2.setAttribute('text-anchor','middle');t2.setAttribute('class','plabel2');
+  t2.textContent=p[1]+' ac';svg.appendChild(t2);labels2.push(t2);
+});
+
+/* ---------------- modes ---------------- */
+let mode='select', brush=null;
+const selection=new Set();
+function setMode(m){
+  mode=m;
+  document.getElementById('mSelect').classList.toggle('on',m==='select');
+  document.getElementById('mPaint').classList.toggle('on',m==='paint');
+  document.getElementById('brushes').style.display=m==='paint'?'flex':'none';
+  document.getElementById('hint').textContent=m==='select'
+    ?'Click parcels to add them to a selection (click again to remove), then assign attributes on the right — one form fills many parcels.'
+    :'Pick a product brush, then click parcels to paint the full taxonomy onto them in one touch. Fastest way to rough in a program.';
+  clearSelection();
+}
+function clearSelection(){selection.clear();rects.forEach(r=>r.classList.remove('sel'));renderPanel();}
+
+/* brushes */
+const brushBar=document.getElementById('brushes');
+Object.entries(TAX).forEach(([fam,types])=>{
+  Object.entries(types).forEach(([type,prods])=>{
+    Object.entries(prods).forEach(([prod,def])=>{
+      const b=document.createElement('div');b.className='brush';
+      b.innerHTML=`<span class="sw" style="background:${def.color}"></span>${prod}`;
+      b.onclick=()=>{document.querySelectorAll('.brush').forEach(x=>x.classList.remove('on'));b.classList.add('on');brush={fam,type,prod,dens:def.dens,color:def.color};};
+      brushBar.appendChild(b);
+    });
+  });
+});
+
+function clickParcel(i){
+  if(mode==='paint'){
+    if(!brush){document.getElementById('hint').textContent='Pick a brush first — then click parcels to paint.';return;}
+    attrs[i]={...brush};
+    paintParcel(i);updateMeter();renderStrip();
+    return;
+  }
+  if(selection.has(i)){selection.delete(i);rects[i].classList.remove('sel');}
+  else{selection.add(i);rects[i].classList.add('sel');}
+  renderPanel();
+}
+function paintParcel(i){
+  const a=attrs[i];
+  rects[i].setAttribute('fill',a.color);
+  const inv=DARKBG[a.color];
+  labels[i].setAttribute('class','plabel'+(inv?' inv':''));
+  labels2[i].setAttribute('class','plabel2'+(inv?' inv':''));
+}
+
+/* ---------------- panel ---------------- */
+const info=document.getElementById('info');
+function renderPanel(){
+  if(mode==='paint'){info.innerHTML='<h2>Paint Mode</h2><div class="empty">Attributes flow from the active brush. Switch to Select &amp; Edit to fine-tune any parcel — density overrides, product swaps, notes.</div>';return;}
+  if(selection.size===0){
+    info.innerHTML='<h2>Attribute Entry</h2><div class="empty">No parcels selected.<br><br>Click one parcel or ten — the form applies to everything selected. This is how a 42-row table gets built in minutes instead of an afternoon.</div>';
+    return;
+  }
+  const idxs=[...selection];
+  const ac=idxs.reduce((a,i)=>a+P[i][1],0);
+  const single=idxs.length===1?attrs[idxs[0]]:null;
+  const famOpts=Object.keys(TAX);
+  info.innerHTML=`<h2>Attribute Entry</h2>
+    <div class="selsum"><b>${idxs.length}</b> parcel${idxs.length>1?'s':''} selected · <b>${ac}</b> acres</div>
+    <div class="selids">${idxs.map(i=>P[i][0]).join(' · ')}</div>
+    ${single?`<span class="attrchip" style="background:${single.color};${single.color==='#EFE3C0'?'color:#6b5b1f;':''}">${single.prod}</span>`:''}
+    <div class="frm">
+      <label>Land use family</label>
+      <select id="fFam"><option value="">— choose —</option>${famOpts.map(f=>`<option ${single&&single.fam===f?'selected':''}>${f}</option>`).join('')}</select>
+      <label>Use type</label>
+      <select id="fType" ${single?'':'disabled'}></select>
+      <label>Product</label>
+      <select id="fProd" disabled></select>
+      <div class="row2">
+        <div><label>Density (/ac)</label><input id="fDens" type="number" step="0.1" ${single?`value="${single.dens}"`:''}></div>
+        <div><label>Yield (calc)</label><input id="fYield" disabled></div>
+      </div>
+      <button class="applyb" id="fApply" onclick="applyAttrs()">Apply to ${idxs.length} parcel${idxs.length>1?'s':''}</button>
+      <button class="clearb" onclick="clearSelection()">Clear selection</button>
+    </div>
+    <div class="note">Family narrows type, type narrows product, product defaults the density — you override only when a parcel is special. Everything you set here is one row of the parcel table; select five parcels and you've written five rows.</div>`;
+  const fFam=document.getElementById('fFam'),fType=document.getElementById('fType'),fProd=document.getElementById('fProd'),fDens=document.getElementById('fDens'),fYield=document.getElementById('fYield'),fApply=document.getElementById('fApply');
+  function loadTypes(){
+    const fam=fFam.value;fType.innerHTML='<option value="">— choose —</option>';fProd.innerHTML='';fProd.disabled=true;
+    if(!fam){fType.disabled=true;return;}
+    fType.disabled=false;
+    Object.keys(TAX[fam]).forEach(t=>{const o=document.createElement('option');o.textContent=t;if(single&&single.type===t)o.selected=true;fType.appendChild(o);});
+    if(single&&single.fam===fam)loadProds();
+  }
+  function loadProds(){
+    const fam=fFam.value,type=fType.value;fProd.innerHTML='<option value="">— choose —</option>';
+    if(!type){fProd.disabled=true;return;}
+    fProd.disabled=false;
+    Object.keys(TAX[fam][type]).forEach(p=>{const o=document.createElement('option');o.textContent=p;if(single&&single.prod===p)o.selected=true;fProd.appendChild(o);});
+    if(single&&single.type===type)prodPicked();
+  }
+  function prodPicked(){
+    const fam=fFam.value,type=fType.value,prod=fProd.value;
+    if(!prod){fApply.classList.remove('ready');return;}
+    const def=TAX[fam][type][prod];
+    fDens.value=def.dens;
+    calcYield();
+    fApply.classList.add('ready');
+  }
+  function calcYield(){
+    const d=parseFloat(fDens.value)||0;
+    fYield.value=d>0?('~'+Math.round(ac*d)+' units'):'—';
+  }
+  fFam.onchange=()=>{loadTypes();fApply.classList.remove('ready');};
+  fType.onchange=()=>{loadProds();fApply.classList.remove('ready');};
+  fProd.onchange=prodPicked;
+  fDens.oninput=calcYield;
+  loadTypes();
+  if(single){calcYield();if(single.prod)fApply.classList.add('ready');}
+}
+function applyAttrs(){
+  const fam=document.getElementById('fFam').value,
+        type=document.getElementById('fType').value,
+        prod=document.getElementById('fProd').value,
+        dens=parseFloat(document.getElementById('fDens').value)||0;
+  if(!fam||!type||!prod)return;
+  const color=TAX[fam][type][prod].color;
+  [...selection].forEach(i=>{attrs[i]={fam,type,prod,dens,color};paintParcel(i);});
+  clearSelection();updateMeter();renderStrip();
+}
+
+/* ---------------- meter + strip ---------------- */
+function updateMeter(){
+  const n=attrs.filter(Boolean).length;
+  document.getElementById('meterBar').style.width=(n/42*100)+'%';
+  document.getElementById('meterPct').textContent=n+' / 42';
+}
+function renderStrip(){
+  const strip=document.getElementById('strip');strip.innerHTML='<div class="lbl">Program</div>';
+  const groups={};
+  attrs.forEach((a,i)=>{if(a){(groups[a.prod]=groups[a.prod]||{color:a.color,dens:a.dens,idx:[]}).idx.push(i);}});
+  const keys=Object.keys(groups);
+  if(!keys.length){strip.insertAdjacentHTML('beforeend','<span class="stripempty">The program builds here as parcels get attributed…</span>');return;}
+  let totU=0,totAc=0,resAc=0;
+  keys.forEach(k=>{
+    const g=groups[k];
+    const ac=g.idx.reduce((a,i)=>a+P[i][1],0);
+    const u=g.idx.reduce((a,i)=>a+Math.round(P[i][1]*(attrs[i].dens||0)),0);
+    totU+=u;totAc+=ac;if(g.dens>0)resAc+=ac;
+    const d=document.createElement('div');d.className='ptile';
+    d.innerHTML=`<div class="q"><span class="sw" style="background:${g.color}"></span>${k}</div><div class="d">${g.idx.length} parcels · ${ac} ac${u?' · '+u.toLocaleString()+' u':''}</div>`;
+    d.onmouseenter=()=>g.idx.forEach(i=>rects[i].classList.add('hl'));
+    d.onmouseleave=()=>g.idx.forEach(i=>rects[i].classList.remove('hl'));
+    strip.appendChild(d);
+  });
+  const tot=document.createElement('div');tot.className='ptile';tot.style.background='var(--accent-soft)';
+  tot.innerHTML=`<div class="q">Program total</div><div class="d">${totAc} ac attributed · ~${totU.toLocaleString()} units</div>`;
+  strip.appendChild(tot);
+}
+renderPanel();
+</script>
+</body>
+</html>

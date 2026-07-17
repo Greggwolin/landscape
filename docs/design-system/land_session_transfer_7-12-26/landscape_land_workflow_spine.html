@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landscape Land — Workflow Spine & Decision Register</title>
+<style>
+  :root{--ink:#1B2530;--paper:#FBFAF6;--card:#fff;--accent:#2E6E5E;--accent-soft:#E8F1EE;--line:#DDD8CC;--muted:#5C6670;--warn:#B07A1E;--warn-soft:#FBF3E2;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:Georgia,'Times New Roman',serif;line-height:1.55;padding:44px 20px 70px;}
+  .page{max-width:880px;margin:0 auto;}
+  .eyebrow{font-family:Verdana,Arial,sans-serif;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
+  h1{font-size:31px;font-weight:normal;line-height:1.2;margin-bottom:10px;}
+  .lede{font-size:16.5px;color:var(--muted);max-width:720px;margin-bottom:8px;}
+  .premise{border-left:4px solid var(--accent);background:var(--accent-soft);padding:14px 20px;margin:24px 0 34px;font-size:16px;font-style:italic;}
+
+  h2{font-family:Verdana,Arial,sans-serif;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:8px;margin:38px 0 18px;}
+
+  .stage{display:flex;gap:16px;margin-bottom:18px;}
+  .stage .n{font-family:Verdana,Arial,sans-serif;font-size:13px;font-weight:bold;color:#fff;background:var(--accent);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px;}
+  .stage h3{font-size:18px;margin-bottom:3px;}
+  .stage p{font-size:14.5px;color:#333;max-width:680px;}
+  .stage .proto{font-family:Verdana,Arial,sans-serif;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+  .stage .proto b{color:var(--accent);}
+
+  .dec{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin-bottom:12px;}
+  .dec h3{font-size:16px;margin-bottom:5px;}
+  .dec h3 .dn{font-family:Verdana,Arial,sans-serif;font-size:12px;color:var(--warn);font-weight:bold;margin-right:8px;}
+  .dec p{font-size:14px;color:#333;margin-bottom:6px;}
+  .dec .opts{font-size:13.5px;color:#333;margin-left:4px;}
+  .dec .opts span{display:block;margin-bottom:3px;}
+  .dec .rec{font-family:Verdana,Arial,sans-serif;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:1px 8px;margin-left:6px;}
+
+  .outbox{background:var(--warn-soft);border:1px solid var(--line);border-radius:8px;padding:14px 18px;font-size:14px;}
+  .outbox b{display:block;margin-bottom:6px;}
+  .foot{font-size:13px;color:var(--muted);margin-top:28px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Landscape Land · Workflow Spine · July 2026</div>
+  <h1>The land development product, end to end</h1>
+  <p class="lede">One page. Six stages, each already de-risked by a working prototype. Below them, the eight decisions that lock the design before anything goes to the coding side.</p>
+
+  <div class="premise">Design rule: land is the only property type this product knows. Every screen gets to be exactly what land work needs — no compromises borrowed from income property. The engines, database, documents, knowledge, and map machinery underneath are shared Landscape infrastructure, untouched.</div>
+
+  <h2>The spine — six stages</h2>
+
+  <div class="stage"><div class="n">0</div><div>
+    <h3>Find &amp; create</h3>
+    <p>A workspace map that belongs to the app, not to any project. A new deal starts here: search or click county tax parcels, or draw a boundary — and that act creates the project, with geometry, acreage, and parcel numbers already filled in before the first document drops.</p>
+    <div class="proto">Grounded in: your live map engine + the boundary/overlay tools it already has · <b>new scope, existing machinery</b></div>
+  </div></div>
+
+  <div class="stage"><div class="n">1</div><div>
+    <h3>Intake</h3>
+    <p>Drop what exists — one colored exhibit or a full entitlement folder. The system reads what it can, tags every value as read / assumed / your call, respects document precedence (recorded beats approved beats proposed), tracks entitlement clocks as risk items, and is honest about scanned files it can't read. Judgment calls queue in a decision docket: blockers versus pre-answered defaults, each with in-tile Q&amp;A.</p>
+    <div class="proto">Proven in: <b>prototypes 3–6</b> (decision tiles, docket at scale, Peoria exhibit read, Red Valley entitlement chain)</div>
+  </div></div>
+
+  <div class="stage"><div class="n">2</div><div>
+    <h3>Structure &amp; parcel table</h3>
+    <p>The Area → Phase → Parcel spine gets decoded from the documents and confirmed by you — never silently assumed. Then the parcel table is authored: on the map by multi-select or paint, or row by row in the table, with the canonical land use library (families → types → products, customizable) validating every entry and defaulting densities. Grouped and flat table views stay in sync.</p>
+    <div class="proto">Proven in: <b>prototypes 5b–5i, 8</b> (taxonomy confirm, toggleable table, paint/select authoring)</div>
+  </div></div>
+
+  <div class="stage"><div class="n">3</div><div>
+    <h3>Site systems &amp; quantities</h3>
+    <p>Streets, tracts, and channels become first-class map objects with their own spec panels — class from a standards library, lengths measured from the plans, widths from standard sections, quantities derived per segment. Everything tagged by method, everything reconciled line-by-line against the engineer's tabulations when they arrive. Native CAD/GIS deliverables, when requested up front, make this exact instead of estimated.</p>
+    <div class="proto">Proven in: <b>prototypes 9, 10, 10b</b> (derivation worksheet, clickable streets, class symbology)</div>
+  </div></div>
+
+  <div class="stage"><div class="n">4</div><div>
+    <h3>Economics</h3>
+    <p>Quantities meet unit costs to become phase budgets; products meet lot pricing to become revenue; parcels get takedown dates that roll up into schedule tiles linked both ways to the map. Change one parcel's date or one street's class and everything downstream re-derives.</p>
+    <div class="proto">Interaction proven in: <b>prototype 7</b> (takedown tiles) · engines already live in Landscape</div>
+  </div></div>
+
+  <div class="stage"><div class="n">5</div><div>
+    <h3>Analysis &amp; outputs</h3>
+    <p>Cash flows, returns, sensitivities — the calculation engines you already trust — plus the standard and custom output artifacts, every number tracing back through the chain: output → assumption → decision → document. This stage is deliberately last to design; it inherits everything above it.</p>
+    <div class="proto">Engines: existing · output workflow: <b>the second design exercise</b>, after intake ships</div>
+  </div></div>
+
+  <h2>Decision register — your calls, before anything gets built</h2>
+
+  <div class="dec"><h3><span class="dn">D1</span>First slice to build</h3>
+    <p>The thinnest end-to-end piece that touches the real engine and gets used on a real deal.</p>
+    <div class="opts">
+      <span>a. App-level map + boundary-first project creation + parcel table authoring <span class="rec">Recommended</span></span>
+      <span>b. Intake pipeline first (exhibit → parcel table), map creation later</span>
+      <span>c. Streets &amp; quantities first (Red Valley budget need drives it)</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D2</span>Where the conversation lives</h3>
+    <p>The prototypes ran chat as a left rail during intake and dropped it entirely for map work.</p>
+    <div class="opts">
+      <span>a. Chat rail during intake; summonable elsewhere <span class="rec">Recommended</span></span>
+      <span>b. Chat rail always present</span>
+      <span>c. Chat summonable only, everywhere</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D3</span>Decision docket as the standard pattern</h3>
+    <p>Blockers versus pre-applied defaults, in-tile Q&amp;A, accept-all — adopt as the product-wide way judgment calls are surfaced, or reserve for intake only.</p>
+    <div class="opts">
+      <span>a. Product-wide standard <span class="rec">Recommended</span></span>
+      <span>b. Intake only for now</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D4</span>Geometry sources, in order</h3>
+    <p>What v1 accepts for parcel/street shapes.</p>
+    <div class="opts">
+      <span>a. Tax parcels + hand-drawn + engineer CAD/GIS files; exhibit vectorization deferred <span class="rec">Recommended</span></span>
+      <span>b. Include exhibit vectorization in v1 (the hardest extraction problem, up front)</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D5</span>Streets &amp; quantities timing</h3>
+    <div class="opts">
+      <span>a. v1.5 — after parcel workflow is in daily use <span class="rec">Recommended</span></span>
+      <span>b. v1 — Red Valley's budget need justifies it now</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D6</span>Pilot project</h3>
+    <div class="opts">
+      <span>a. Red Valley Ranch — real documents, real budget, your own money <span class="rec">Recommended</span></span>
+      <span>b. Peoria 1600 — richer geometry, earlier stage</span>
+      <span>c. Both, Red Valley leading</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D7</span>Design kit</h3>
+    <p>The prototypes used a throwaway palette on purpose.</p>
+    <div class="opts">
+      <span>a. Build on the app's existing component kit and color tokens <span class="rec">Recommended</span></span>
+      <span>b. New visual identity for the land product (invites drift)</span>
+    </div>
+  </div>
+
+  <div class="dec"><h3><span class="dn">D8</span>Explicitly out of scope for v1</h3>
+    <p>Named now so nothing sneaks in: automated takeoff from linework · exhibit vectorization (per D4) · mixed-use vertical modeling · offsite/regional infrastructure cost sharing · multi-project portfolio views · any income-property workflow.</p>
+    <div class="opts"><span>a. Confirm the exclusion list as written</span><span>b. Edit the list</span></div>
+  </div>
+
+  <h2>What happens after the register is locked</h2>
+  <div class="outbox">
+    <b>Decision-first, then handoff.</b>
+    Each locked decision flows into a phased implementation spec with explicit human gates — the coding side gets instructions, not open questions. First slice ships to you, you run it on the pilot project, and the next slice is chosen from what the real workflow demands. No stage gets gold-plated in the dark.
+  </div>
+
+  <div class="foot">Prototypes referenced (all disposable, all in this chat): 1–4 intake paradigms · 5 series MPC intake &amp; parcel table · 6 Red Valley entitlement chain · 7 map navigation &amp; takedowns · 8 parcel authoring · 9 street derivation · 10/10b clickable streets. The technical spec companion to this page is deliberately not written yet — it exists only after the register above is locked.</div>
+</div>
+</body>
+</html>

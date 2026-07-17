@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype 7 — Map-Driven Navigation (Peoria 1600)</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --good:#2E7D52; --good-soft:#E7F3EC;
+    --mldr:#EFE3C0; --mdr:#D99A2B; --mhdr:#B97E4A; --hdr:#6E4A2A; --mu:#2C5488; --com:#B0356B; --os:#7DAF3F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:18px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  header .t{font-size:16px;font-weight:600;}
+  header .s{font-size:12px;color:var(--muted);}
+  .tgl{display:inline-flex;border:1.5px solid var(--accent);border-radius:8px;overflow:hidden;margin-left:auto;}
+  .tgl button{border:none;background:var(--panel);color:var(--accent);font-size:12.5px;font-weight:700;padding:7px 16px;cursor:pointer;}
+  .tgl button.on{background:var(--accent);color:#fff;}
+  .hintbar{font-size:12px;color:var(--muted);padding:7px 20px;background:#FBFCFD;border-bottom:1px solid var(--line);}
+
+  .main{flex:1;display:flex;min-height:0;}
+  .mapwrap{flex:1;min-width:0;position:relative;background:#E9E4D8;}
+  svg{width:100%;height:100%;display:block;}
+  .parcel{stroke:#FFFFFF;stroke-width:2;cursor:pointer;transition:filter .12s, opacity .12s;}
+  .parcel:hover{filter:brightness(1.12);}
+  .parcel.sel{stroke:#1B2530;stroke-width:3;}
+  .parcel.dim{opacity:.35;}
+  .parcel.hl{filter:brightness(1.18);stroke:#1B2530;stroke-width:2.5;}
+  .plabel{font-size:11px;font-weight:700;fill:#1B2530;pointer-events:none;}
+  .plabel.inv{fill:#fff;}
+  .plabel2{font-size:9px;fill:#1B2530;opacity:.75;pointer-events:none;}
+  .plabel2.inv{fill:#fff;}
+  .grpline{fill:none;stroke:#1B2530;stroke-width:2.5;stroke-dasharray:7 5;pointer-events:none;opacity:0;transition:opacity .15s;}
+  .grpline.show{opacity:.85;}
+
+  /* right info panel */
+  .info{width:340px;min-width:340px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:16px;}
+  .info h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .empty{color:#B9C0C7;font-size:13.5px;font-style:italic;margin-top:8px;line-height:1.6;}
+  .ihead{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+  .ihead .big{font-size:22px;font-weight:700;}
+  .usechip{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:10px;padding:2px 9px;color:#fff;}
+  .irow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #EEF1F3;font-size:13.5px;}
+  .irow .k{color:var(--muted);}
+  .irow .v{font-weight:600;}
+  .isec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;}
+  select.qsel{border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:13px;background:#FAFBFC;font-weight:600;}
+  .plist{font-size:12.5px;line-height:1.7;color:#3C4954;}
+  .plist b{color:var(--ink);}
+  .note{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.5;}
+
+  /* takedown strip */
+  .strip{background:var(--panel);border-top:1px solid var(--line);padding:10px 18px;display:flex;gap:10px;align-items:stretch;overflow-x:auto;}
+  .strip .lbl{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;}
+  .ttile2{border:1px solid var(--line);border-radius:9px;padding:8px 13px;min-width:128px;background:#FBFCFD;cursor:pointer;flex:none;}
+  .ttile2:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .ttile2 .q{font-size:12.5px;font-weight:700;}
+  .ttile2 .d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 7</span>
+  <div>
+    <div class="t">Peoria 1600 / Simpatico — Site Plan Navigation</div>
+    <div class="s">The plan below was generated from your uploaded exhibit — every shape is a live object</div>
+  </div>
+  <div class="tgl">
+    <button id="mParcel" class="on" onclick="setSel('parcel')">Parcel</button>
+    <button id="mPhase" onclick="setSel('phase')">Phase</button>
+    <button id="mArea" onclick="setSel('area')">Area</button>
+  </div>
+</header>
+<div class="hintbar" id="hint">Click any parcel to open its assumptions. Switch to Phase or Area mode to select whole groups and see rollups. Hover a takedown tile below to light up its parcels on the plan.</div>
+
+<div class="main">
+  <div class="mapwrap">
+    <svg id="map" viewBox="0 0 760 900" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+  <div class="info" id="info">
+    <h2>Selection</h2>
+    <div class="empty">Nothing selected yet.<br><br>In Parcel mode, click a shape.<br>In Phase mode, one click grabs the whole phase.<br>In Area mode, one click grabs everything sharing that area's infrastructure.</div>
+  </div>
+</div>
+
+<div class="strip" id="strip"></div>
+
+<script>
+/* ---------------- data ---------------- */
+const DENS={MLDR:2.5,MDR:5.0,MHDR:10.0,HDR:18.0};
+const SW={MLDR:'#EFE3C0',MDR:'#D99A2B',MHDR:'#B97E4A',HDR:'#6E4A2A',MU:'#2C5488',C:'#B0356B',OS:'#7DAF3F'};
+const DARK={HDR:1,MU:1,C:1};
+const USE_NAME={MLDR:'Low density res.',MDR:'Medium density res.',MHDR:'Med-high density res.',HDR:'High density res.',MU:'Mixed use',C:'Commercial',OS:'Open space'};
+
+/* id, area, phase, use, acres, saleQ, geometry [x,y,w,h] */
+const P=[
+ ['3.201',3,'3.2','C',45,'2030+',[20,15,150,92]],
+ ['3.202',3,'3.2','C',60,'2030+',[20,112,172,100]],
+ ['3.103',3,'3.1','C',39,'2030+',[230,15,132,96]],
+ ['3.102',3,'3.1','C',34,'2030+',[368,15,122,96]],
+ ['3.101',3,'3.1','C',64,'2030+',[560,15,182,112]],
+ ['2.112',2,'2.1','OS',56,null,[196,220,96,228]],
+ ['2.101',2,'2.1','MDR',18,'Q1 2028',[300,150,86,71]],
+ ['2.102',2,'2.1','MDR',17,'Q1 2028',[391,150,80,71]],
+ ['2.103',2,'2.1','MDR',16,'Q2 2028',[476,150,76,71]],
+ ['2.104',2,'2.1','MDR',21,'Q2 2028',[300,226,86,75]],
+ ['2.105',2,'2.1','MDR',21,'Q3 2028',[391,226,80,75]],
+ ['2.106',2,'2.1','MDR',21,'Q3 2028',[476,226,76,75]],
+ ['2.107',2,'2.1','MHDR',16,'Q4 2028',[300,306,81,65]],
+ ['2.108',2,'2.1','MHDR',13,'Q4 2028',[386,306,70,65]],
+ ['2.109',2,'2.1','MHDR',19,'Q1 2029',[461,306,80,65]],
+ ['2.110',2,'2.1','MHDR',23,'Q1 2029',[300,376,111,70]],
+ ['2.111',2,'2.1','HDR',19,'Q2 2029',[416,376,96,70]],
+ ['1.101',1,'1.1','MDR',32,'Q3 2027',[586,135,156,81]],
+ ['1.102',1,'1.1','MDR',25,'Q3 2027',[600,221,142,75]],
+ ['1.103',1,'1.1','MDR',21,'Q4 2027',[600,301,142,65]],
+ ['1.104',1,'1.1','MU',26,'2030+',[616,371,126,70]],
+ ['1.201',1,'1.2','MU',27,'2030+',[630,446,112,96]],
+ ['1.202',1,'1.2','HDR',19,'Q2 2029',[546,446,80,71]],
+ ['1.203',1,'1.2','MHDR',16,'Q1 2029',[530,522,86,60]],
+ ['1.204',1,'1.2','MDR',20,'Q4 2027',[546,587,90,66]],
+ ['1.205',1,'1.2','MDR',36,'Q1 2028',[430,621,111,95]],
+ ['1.206',1,'1.2','MDR',29,'Q2 2028',[430,721,106,85]],
+ ['2.201',2,'2.2','MDR',28,'Q3 2029',[390,461,131,75]],
+ ['2.202',2,'2.2','MDR',21,'Q3 2029',[300,471,86,70]],
+ ['2.203',2,'2.2','OS',33,null,[196,461,100,110]],
+ ['2.204',2,'2.2','OS',41,null,[300,546,121,116]],
+ ['4.105',4,'4.1','MDR',22,'Q4 2029',[256,626,96,70]],
+ ['4.101',4,'4.1','OS',9,null,[60,641,61,51]],
+ ['4.102',4,'4.1','MDR',23,'Q4 2029',[60,696,111,75]],
+ ['4.103',4,'4.1','OS',10,null,[176,661,60,56]],
+ ['4.104',4,'4.1','MDR',19,'Q4 2029',[231,701,96,70]],
+ ['4.201',4,'4.2','MLDR',17,'Q1 2030',[40,776,81,60]],
+ ['4.203',4,'4.2','MLDR',20,'Q1 2030',[126,776,91,60]],
+ ['4.202',4,'4.2','MLDR',26,'Q2 2030',[40,841,111,55]],
+ ['4.204',4,'4.2','MLDR',23,'Q2 2030',[161,841,111,55]],
+ ['4.205',4,'4.2','MLDR',27,'Q2 2030',[276,801,111,70]],
+ ['4.206',4,'4.2','C',18,'2030+',[396,816,81,60]]
+];
+const units=p=>DENS[p[3]]?Math.round(p[4]*DENS[p[3]]):0;
+
+/* ---------------- draw map ---------------- */
+const svg=document.getElementById('map');
+const NS='http://www.w3.org/2000/svg';
+P.forEach((p,i)=>{
+  const[id,area,phase,use,ac,q,g]=p;
+  const r=document.createElementNS(NS,'rect');
+  r.setAttribute('x',g[0]);r.setAttribute('y',g[1]);r.setAttribute('width',g[2]);r.setAttribute('height',g[3]);
+  r.setAttribute('rx',3);r.setAttribute('fill',SW[use]);
+  r.setAttribute('class','parcel');r.dataset.i=i;
+  r.addEventListener('click',()=>clickParcel(i));
+  svg.appendChild(r);
+  const t=document.createElementNS(NS,'text');
+  t.setAttribute('x',g[0]+g[2]/2);t.setAttribute('y',g[1]+g[3]/2-2);
+  t.setAttribute('text-anchor','middle');t.setAttribute('class','plabel'+(DARK[use]?' inv':''));
+  t.textContent=id;svg.appendChild(t);
+  const t2=document.createElementNS(NS,'text');
+  t2.setAttribute('x',g[0]+g[2]/2);t2.setAttribute('y',g[1]+g[3]/2+11);
+  t2.setAttribute('text-anchor','middle');t2.setAttribute('class','plabel2'+(DARK[use]?' inv':''));
+  t2.textContent=ac+' ac';svg.appendChild(t2);
+});
+
+/* group outlines (phase + area) */
+function bbox(members){
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  members.forEach(p=>{const g=p[6];x1=Math.min(x1,g[0]);y1=Math.min(y1,g[1]);x2=Math.max(x2,g[0]+g[2]);y2=Math.max(y2,g[1]+g[3]);});
+  return[x1-6,y1-6,x2-x1+12,y2-y1+12];
+}
+const phases=[...new Set(P.map(p=>p[2]))], areas=[...new Set(P.map(p=>p[1]))];
+const grpEls={};
+phases.forEach(ph=>{
+  const b=bbox(P.filter(p=>p[2]===ph));
+  const r=document.createElementNS(NS,'rect');
+  r.setAttribute('x',b[0]);r.setAttribute('y',b[1]);r.setAttribute('width',b[2]);r.setAttribute('height',b[3]);
+  r.setAttribute('rx',8);r.setAttribute('class','grpline');grpEls['ph'+ph]=r;svg.appendChild(r);
+});
+areas.forEach(a=>{
+  const b=bbox(P.filter(p=>p[1]===a));
+  const r=document.createElementNS(NS,'rect');
+  r.setAttribute('x',b[0]);r.setAttribute('y',b[1]);r.setAttribute('width',b[2]);r.setAttribute('height',b[3]);
+  r.setAttribute('rx',10);r.setAttribute('class','grpline');grpEls['ar'+a]=r;svg.appendChild(r);
+});
+
+/* ---------------- selection ---------------- */
+let selMode='parcel';
+function setSel(m){
+  selMode=m;
+  ['mParcel','mPhase','mArea'].forEach(id=>document.getElementById(id).classList.remove('on'));
+  document.getElementById('m'+m[0].toUpperCase()+m.slice(1)).classList.add('on');
+  document.getElementById('hint').textContent=
+    m==='parcel'?'Click any parcel to open its assumptions. Hover a takedown tile below to light up its parcels.':
+    m==='phase'?'Phase mode — one click selects every parcel sharing that phase\'s common infrastructure.':
+    'Area mode — one click selects the whole area: all phases behind its discrete infrastructure and access.';
+  clearSel();
+}
+function clearSel(){
+  document.querySelectorAll('.parcel').forEach(el=>el.classList.remove('sel','dim','hl'));
+  Object.values(grpEls).forEach(el=>el.classList.remove('show'));
+}
+function clickParcel(i){
+  clearSel();
+  const p=P[i];
+  if(selMode==='parcel'){
+    document.querySelector(`.parcel[data-i="${i}"]`).classList.add('sel');
+    showParcel(i);
+  }else if(selMode==='phase'){
+    const ph=p[2];
+    P.forEach((x,j)=>{if(x[2]!==ph)document.querySelector(`.parcel[data-i="${j}"]`).classList.add('dim');});
+    grpEls['ph'+ph].classList.add('show');
+    showGroup('Phase '+ph,P.filter(x=>x[2]===ph),'Common infrastructure serves every parcel inside this outline. Budgets for that shared work live at this level and allocate down.');
+  }else{
+    const a=p[1];
+    P.forEach((x,j)=>{if(x[1]!==a)document.querySelector(`.parcel[data-i="${j}"]`).classList.add('dim');});
+    grpEls['ar'+a].classList.add('show');
+    showGroup('Area '+a,P.filter(x=>x[1]===a),'Discrete infrastructure and access define this area. It rolls up '+[...new Set(P.filter(x=>x[1]===a).map(x=>x[2]))].length+' phases.');
+  }
+}
+
+/* ---------------- info panel ---------------- */
+const info=document.getElementById('info');
+function showParcel(i){
+  const p=P[i];const[id,area,phase,use,ac,q]=p;
+  const u=units(p);
+  const isRes=!!DENS[use];
+  info.innerHTML=`<h2>Parcel</h2>
+    <div class="ihead"><span class="big">${id}</span><span class="usechip" style="background:${SW[use]};${use==='MLDR'?'color:#6b5b1f;':''}">${USE_NAME[use]}</span></div>
+    <div class="irow"><span class="k">Area / Phase</span><span class="v">Area ${area} · Phase ${phase}</span></div>
+    <div class="irow"><span class="k">Acres</span><span class="v">${ac}</span></div>
+    ${isRes?`<div class="irow"><span class="k">Density (assumed)</span><span class="v">${DENS[use].toFixed(1)} /ac</span></div>
+    <div class="irow"><span class="k">Yield</span><span class="v">${u} units</span></div>`:''}
+    ${use==='C'?`<div class="irow"><span class="k">Disposition</span><span class="v">Superpad sale</span></div>`:''}
+    ${use==='OS'?`<div class="irow"><span class="k">Role</span><span class="v">Open space / drainage</span></div>`:''}
+    ${isRes||use==='C'?`
+    <div class="isec">Assumptions — this parcel</div>
+    ${isRes?`<div class="irow"><span class="k">Finished lot value</span><span class="v">$${use==='MLDR'?'128,000':use==='MDR'?'95,000':use==='MHDR'?'71,000':'54,000'} /lot</span></div>`:
+    `<div class="irow"><span class="k">Land value</span><span class="v">$9.50 /sf</span></div>`}
+    <div class="irow"><span class="k">Sale / takedown</span><span class="v"><select class="qsel" onchange="setQ(${i},this.value)">
+      ${['Q3 2027','Q4 2027','Q1 2028','Q2 2028','Q3 2028','Q4 2028','Q1 2029','Q2 2029','Q3 2029','Q4 2029','Q1 2030','Q2 2030','2030+'].map(x=>`<option ${x===q?'selected':''}>${x}</option>`).join('')}
+    </select></span></div>
+    <div class="note">Change the takedown quarter and watch the schedule tiles below regroup — the same rollup as the sales input page, but driven from the plan.</div>`:
+    `<div class="note">Open space carries no sale — its cost lives in the phase budget and allocates across the phase's sellable parcels.</div>`}`;
+}
+function showGroup(title,members,blurb){
+  const ac=members.reduce((a,p)=>a+p[4],0);
+  const u=members.reduce((a,p)=>a+units(p),0);
+  const res=members.filter(p=>DENS[p[3]]);
+  const osAc=members.filter(p=>p[3]==='OS').reduce((a,p)=>a+p[4],0);
+  const cAc=members.filter(p=>p[3]==='C').reduce((a,p)=>a+p[4],0);
+  info.innerHTML=`<h2>${title.startsWith('Phase')?'Phase rollup':'Area rollup'}</h2>
+    <div class="ihead"><span class="big">${title}</span></div>
+    <div class="irow"><span class="k">Parcels</span><span class="v">${members.length}</span></div>
+    <div class="irow"><span class="k">Acres</span><span class="v">${ac}</span></div>
+    <div class="irow"><span class="k">Residential yield</span><span class="v">${u?('~'+u.toLocaleString()+' units'):'—'}</span></div>
+    ${res.length?`<div class="irow"><span class="k">Blended density (res. ac)</span><span class="v">${(u/res.reduce((a,p)=>a+p[4],0)).toFixed(2)} /ac</span></div>`:''}
+    ${cAc?`<div class="irow"><span class="k">Commercial</span><span class="v">${cAc} ac (superpads)</span></div>`:''}
+    ${osAc?`<div class="irow"><span class="k">Open space</span><span class="v">${osAc} ac</span></div>`:''}
+    <div class="isec">Parcels in this ${title.startsWith('Phase')?'phase':'area'}</div>
+    <div class="plist">${members.map(p=>`<b>${p[0]}</b> · ${p[3]} · ${p[4]} ac${DENS[p[3]]?' · '+units(p)+' u':''}`).join('<br>')}</div>
+    <div class="note">${blurb}</div>`;
+}
+function setQ(i,v){P[i][5]=v;renderStrip();showParcel(i);}
+
+/* ---------------- takedown strip ---------------- */
+function renderStrip(){
+  const strip=document.getElementById('strip');strip.innerHTML='<div class="lbl">Takedowns</div>';
+  const groups={};
+  P.forEach((p,i)=>{if(p[5]&&(DENS[p[3]]||p[3]==='C')){(groups[p[5]]=groups[p[5]]||[]).push(i);}});
+  const order=['Q3 2027','Q4 2027','Q1 2028','Q2 2028','Q3 2028','Q4 2028','Q1 2029','Q2 2029','Q3 2029','Q4 2029','Q1 2030','Q2 2030','2030+'];
+  order.filter(q=>groups[q]).forEach(q=>{
+    const idx=groups[q];
+    const lots=idx.reduce((a,i)=>a+units(P[i]),0);
+    const ac=idx.reduce((a,i)=>a+P[i][4],0);
+    const d=document.createElement('div');d.className='ttile2';
+    d.innerHTML=`<div class="q">${q}</div><div class="d">${idx.length} parcel${idx.length>1?'s':''} · ${ac} ac${lots?' · '+lots+' lots':' · superpads'}</div>`;
+    d.onmouseenter=()=>{idx.forEach(i=>document.querySelector(`.parcel[data-i="${i}"]`).classList.add('hl'));};
+    d.onmouseleave=()=>{idx.forEach(i=>document.querySelector(`.parcel[data-i="${i}"]`).classList.remove('hl'));};
+    d.onclick=()=>{clearSel();idx.forEach(i=>document.querySelector(`.parcel[data-i="${i}"]`).classList.add('sel'));
+      showGroup(q+' takedown',idx.map(i=>P[i]),'Every parcel scheduled for this window. Click a parcel in Parcel mode to change its date and this tile updates.');};
+    strip.appendChild(d);
+  });
+}
+renderStrip();
+</script>
+</body>
+</html>

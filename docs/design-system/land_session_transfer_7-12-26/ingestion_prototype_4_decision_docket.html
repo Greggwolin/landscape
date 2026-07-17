@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Prototype 4 — Messy Deal, Decision Docket</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --warn:#B07A1E; --warn-soft:#FBF3E2; --block:#A34A2A; --block-soft:#FBEDE7;
+    --good:#2E7D52; --good-soft:#E7F3EC; --new:#DFF0E9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  #projName{font-size:16px;font-weight:600;}
+  #projSub{font-size:12px;color:var(--muted);}
+  .meter-wrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .meter-label{font-size:12px;color:var(--muted);}
+  .meter{width:170px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .meter>div{height:100%;width:0%;background:var(--accent);transition:width .8s ease;}
+  #meterPct{font-size:13px;font-weight:600;width:40px;}
+
+  .main{flex:1;display:flex;min-height:0;}
+
+  /* chat */
+  .chat{width:400px;min-width:400px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .chat-log{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:94%;padding:10px 13px;border-radius:10px;font-size:13.5px;line-height:1.45;animation:pop .25s ease;}
+  .msg.ai{background:#F1F3F5;align-self:flex-start;border-top-left-radius:3px;}
+  .msg.sys{background:none;color:var(--muted);font-size:12px;align-self:center;font-style:italic;padding:2px;}
+  .msg ul{margin:6px 0 2px 16px;}
+  .msg li{margin-bottom:3px;}
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start;animation:pop .25s ease;}
+  .chip{background:var(--panel);border:1.5px solid var(--accent);color:var(--accent);font-size:13px;font-weight:600;padding:7px 14px;border-radius:18px;cursor:pointer;}
+  .chip:hover{background:var(--accent-soft);}
+  .chat-input{border-top:1px solid var(--line);padding:12px 14px;}
+  .chat-input input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13.5px;background:#FAFBFC;}
+
+  /* right side */
+  .right{flex:1;overflow-y:auto;padding:18px 22px 40px;}
+
+  .dropzone{border:2px dashed #B7C0CB;border-radius:14px;background:var(--panel);padding:52px 20px;text-align:center;cursor:pointer;margin-top:30px;}
+  .dropzone:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone .big{font-size:32px;margin-bottom:8px;}
+  .dropzone .t1{font-size:16px;font-weight:600;}
+  .dropzone .t2{font-size:12.5px;color:var(--muted);margin-top:4px;}
+
+  /* docket */
+  #docket{display:none;margin-bottom:18px;}
+  .dock-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .dock-head h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+  .dock-count{font-size:12px;font-weight:700;background:var(--block-soft);color:var(--block);border-radius:12px;padding:3px 10px;}
+  .dock-count.clear{background:var(--good-soft);color:var(--good);}
+  .group-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:12px 0 8px;display:flex;align-items:center;gap:10px;}
+  .acceptall{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent);border:1.5px solid var(--accent);background:var(--panel);border-radius:14px;padding:4px 12px;cursor:pointer;}
+  .acceptall:hover{background:var(--accent-soft);}
+  .ditem{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--block);border-radius:9px;margin-bottom:8px;overflow:hidden;}
+  .ditem.soft{border-left-color:var(--warn);}
+  .ditem.resolved{border-left-color:var(--good);}
+  .drow{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13.5px;}
+  .drow .t{font-weight:600;}
+  .drow .st{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .ditem.resolved .drow .st{color:var(--good);font-weight:600;}
+  .dbody{display:none;border-top:1px dashed var(--line);padding:13px 14px;background:#FDFDFB;}
+  .ditem.open .dbody{display:block;}
+  .dbody .why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:11px;}
+  .opt{display:flex;align-items:flex-start;gap:9px;border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12.5px;background:var(--panel);margin-bottom:7px;}
+  .opt:hover{border-color:var(--accent);}
+  .opt.picked{border-color:var(--good);background:var(--good-soft);}
+  .opt .radio{width:15px;height:15px;border:2px solid #B7C0CB;border-radius:50%;margin-top:1px;flex:none;}
+  .opt.picked .radio{border-color:var(--good);background:radial-gradient(circle at center,var(--good) 45%,transparent 50%);}
+  .opt b{display:block;font-size:12.5px;}
+  .opt small{color:var(--muted);font-size:11.5px;line-height:1.4;display:block;}
+  .rec{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:1px 7px;margin-left:6px;}
+  .qa-row{display:flex;gap:7px;margin-top:6px;}
+  .qa-row input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;background:var(--panel);}
+  .qa-row button{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:0 13px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .qa-thread{margin-top:8px;display:flex;flex-direction:column;gap:7px;}
+  .qa-q{font-size:12.5px;background:var(--accent);color:#fff;border-radius:8px;padding:7px 10px;align-self:flex-end;max-width:90%;}
+  .qa-a{font-size:12.5px;background:#F1F3F5;border-radius:8px;padding:8px 10px;align-self:flex-start;max-width:95%;line-height:1.5;}
+
+  /* fact sheet */
+  #sheet{display:none;}
+  .sheet-head{display:flex;align-items:baseline;gap:12px;margin:6px 0 12px;}
+  .sheet-head h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 15px;}
+  .card h3{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;}
+  .frow{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #EEF1F3;font-size:13px;}
+  .frow:last-child{border-bottom:none;}
+  .frow .k{color:var(--muted);}
+  .frow .v{font-weight:600;text-align:right;}
+  .frow .v.pend{color:#B9C0C7;font-weight:400;font-style:italic;}
+  .frow .v.warn{color:var(--warn);}
+  .frow.flash{animation:flash 1.6s ease;}
+  @keyframes flash{0%{background:var(--new);}100%{background:transparent;}}
+
+  .ctabar{position:fixed;bottom:0;left:400px;right:0;background:var(--panel);border-top:1px solid var(--line);padding:11px 22px;display:none;align-items:center;gap:14px;}
+  .ctabar .status{font-size:13px;color:var(--muted);}
+  .ctabar button{margin-left:auto;background:var(--accent);color:#fff;border:none;font-size:13.5px;font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer;opacity:.4;pointer-events:none;}
+  .ctabar button.ready{opacity:1;pointer-events:auto;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 4 of N</span>
+  <div>
+    <div id="projName">Untitled Project</div>
+    <div id="projSub">Multifamily · Value-Add · drop the deal folder to begin</div>
+  </div>
+  <div class="meter-wrap">
+    <span class="meter-label">Underwriting readiness</span>
+    <div class="meter"><div id="meterBar"></div></div>
+    <span id="meterPct">0%</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="chat">
+    <div class="chat-log" id="log">
+      <div class="msg ai">This one's built for a messy deal. Drop the whole folder — contradictions, stale documents, duplicates and all. I'll sort what's fact from what's in dispute, and queue anything that needs your judgment on the right. You work the queue in any order, or tell me to walk you through it.</div>
+      <div class="msg sys">Click the drop zone to simulate a 9-file deal folder</div>
+    </div>
+    <div class="chat-input"><input placeholder="Message Landscaper… (disabled in prototype)" disabled></div>
+  </div>
+
+  <div class="right" id="right">
+    <div class="dropzone" id="dz" onclick="startBatch()">
+      <div class="big">📁</div>
+      <div class="t1">Drop the deal folder</div>
+      <div class="t2">9 files — two rent rolls, T-12, T-3, broker pro-forma, tax bill, expired insurance quote, contractor bid, old survey</div>
+    </div>
+
+    <div id="docket">
+      <div class="dock-head"><h2>Needs Your Judgment</h2><span class="dock-count" id="dockCount">7 open</span></div>
+
+      <div class="group-label">Blockers — must be answered before assumptions <span style="font-weight:400;text-transform:none;letter-spacing:0;">(3)</span></div>
+      <div id="blockers"></div>
+
+      <div class="group-label">Judgment calls — recommendation pre-applied, override if you disagree <span style="font-weight:400;text-transform:none;letter-spacing:0;">(4)</span>
+        <button class="acceptall" id="acceptAll">Accept all 4 recommendations</button>
+      </div>
+      <div id="softs"></div>
+    </div>
+
+    <div id="sheet">
+      <div class="sheet-head"><h2>Project Fact Sheet</h2></div>
+      <div class="grid">
+        <div class="card">
+          <h3>Identity &amp; Physical</h3>
+          <div class="frow"><span class="k">Property</span><span class="v">Copper Junction</span></div>
+          <div class="frow"><span class="k">Location</span><span class="v">Mesa, AZ</span></div>
+          <div class="frow"><span class="k">Units / vintage</span><span class="v">156 · built 1986</span></div>
+          <div class="frow" data-f="acres"><span class="k">Site</span><span class="v pend">awaiting decision 7</span></div>
+          <div class="frow"><span class="k">Asking price</span><span class="v">$29,900,000</span></div>
+        </div>
+        <div class="card">
+          <h3>Income</h3>
+          <div class="frow" data-f="rentbasis"><span class="k">Rent basis</span><span class="v pend">awaiting decision 2</span></div>
+          <div class="frow"><span class="k">Occupancy (May roll)</span><span class="v">88.5%</span></div>
+          <div class="frow" data-f="rubs"><span class="k">Utility reimbursements</span><span class="v pend">awaiting decision 6</span></div>
+        </div>
+        <div class="card">
+          <h3>Operating Expenses</h3>
+          <div class="frow" data-f="opbasis"><span class="k">Expense basis</span><span class="v pend">awaiting decision 1</span></div>
+          <div class="frow" data-f="tax"><span class="k">Property taxes (fwd)</span><span class="v pend">awaiting decision 3</span></div>
+          <div class="frow" data-f="ins"><span class="k">Insurance</span><span class="v pend">awaiting decision 4</span></div>
+        </div>
+        <div class="card">
+          <h3>Capital Plan</h3>
+          <div class="frow" data-f="capex"><span class="k">Renovation budget</span><span class="v pend">awaiting decision 5</span></div>
+          <div class="frow"><span class="k">Scope</span><span class="v">104 classic units + exteriors</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ctabar" id="ctabar">
+  <span class="status" id="ctastatus">7 decisions open — 3 blockers</span>
+  <button id="cta" onclick="alert('End of prototype — assumptions workflow is the next design exercise.')">Open assumptions →</button>
+</div>
+
+<script>
+const log=document.getElementById('log');
+function say(html,cls='ai',delay=0){
+  return new Promise(res=>{setTimeout(()=>{
+    const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;
+    log.appendChild(d);log.scrollTop=log.scrollHeight;res(d);
+  },delay);});
+}
+function chips(opts){
+  return new Promise(res=>{
+    const w=document.createElement('div');w.className='chips';
+    opts.forEach(o=>{
+      const c=document.createElement('button');c.className='chip';c.textContent=o;
+      c.onclick=()=>{w.remove();res(o);};
+      w.appendChild(c);
+    });
+    log.appendChild(w);log.scrollTop=log.scrollHeight;
+  });
+}
+function setMeter(n){document.getElementById('meterBar').style.width=n+'%';document.getElementById('meterPct').textContent=n+'%';}
+function fill(f,val,warn=false){
+  const row=document.querySelector(`[data-f="${f}"]`);if(!row)return;
+  const v=row.querySelector('.v');v.textContent=val;v.classList.remove('pend');
+  if(warn)v.classList.add('warn');
+  row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1700);
+}
+
+/* ---------------- decisions data ---------------- */
+const DECISIONS=[
+ {id:1,hard:true,fact:'opbasis',title:'Expense basis: T-12 or T-3 annualized?',
+  why:'The trailing twelve shows $6,180/unit in expenses, but the last three months annualize to $7,340/unit — repairs and payroll are running hot. One of these has to anchor the forward year.',
+  options:[
+   {label:'T-12 with a flagged trend note',sub:'Full-year basis; the recent spike is noted for diligence rather than baked in.',rec:true,val:'T-12 · $6,180/unit'},
+   {label:'T-3 annualized',sub:'Assumes the recent run-rate is the new normal.',val:'T-3 ann. · $7,340/unit'}],
+  suggestions:['What\'s driving the spike?'],
+  answer:'The spike is concentrated in two lines: unit turns (11 in the last quarter vs. 5/quarter prior — consistent with the seller pushing renewals before sale) and a one-time roof repair in March. Strip the roof repair and T-3 annualizes to ~$6,900/unit. So the truth is likely between the two options — which is exactly why this is your call, not mine.'},
+ {id:2,hard:true,fact:'rentbasis',title:'Rent basis: gross scheduled or net effective?',
+  why:'The May rent roll shows 12 units on concessions averaging 6 weeks free. Gross scheduled rent is $1,412/unit; net effective is $1,377/unit. The broker pro-forma quotes gross.',
+  options:[
+   {label:'Net effective — $1,377',sub:'What the property actually collects. Concessions are real money.',rec:true,val:'Net effective · $1,377/unit'},
+   {label:'Gross scheduled — $1,412',sub:'Matches the broker package; overstates collections while concessions persist.',val:'Gross · $1,412/unit'}],
+  suggestions:['Are concessions burning off?'],
+  answer:'Comparing the two rent roll vintages: February had 19 units on concessions, May has 12. They\'re burning off at roughly 2-3 a month, so net effective converges toward gross by early next year. A reasonable middle path is to underwrite net effective today with concessions burning off over 9 months — if you pick net effective, I\'ll set that burn-off as the default trajectory.'},
+ {id:3,hard:true,fact:'tax',title:'Property taxes: broker pro-forma, trailing bill, or reassessed?',
+  why:'Three different numbers exist: the broker pro-forma carries $301K, the 2025 bill was $342K, and reassessment at the asking price pencils to ~$418K. They span $117K a year.',
+  options:[
+   {label:'Underwrite reassessed — ~$418K',sub:'Method-based: re-derives automatically if your assumed price changes.',rec:true,val:'~$418K (reassessed est.)'},
+   {label:'Keep trailing — $342K',sub:'Matches history, understates the forward year.',val:'$342K (trailing)'}],
+  suggestions:['Why is the broker number even lower than trailing?'],
+  answer:'The broker pro-forma appears to carry the assessed-value tax from two cycles ago — a common package trick that makes the expense load look lighter. It\'s not defensible on any basis. I didn\'t offer it as an option for that reason; it stays in the file as evidence of how the package was assembled.'},
+ {id:4,hard:false,fact:'ins',title:'Insurance: quote in folder expired 4 months ago',
+  why:'The folder contains a carrier quote of $248K, but it expired in March. Market for a 1986-vintage asset in this submarket runs ~$305K today.',
+  options:[
+   {label:'Carry market estimate — ~$305K, flagged',sub:'Replaced automatically when a live quote lands in the project.',rec:true,val:'~$305K (estimate)'},
+   {label:'Use the expired quote — $248K',sub:'Optimistic; carriers have moved since March.',val:'$248K (expired quote)'}],
+  suggestions:['How solid is the $305K figure?'],
+  answer:'It\'s built from current placements on comparable-vintage garden product in the East Valley — roughly $1,950/unit. It\'s an estimate and stays flagged as one. The moment your broker\'s live quote hits the project, it takes over and the flag clears.'},
+ {id:5,hard:false,fact:'capex',title:'Renovation budget: OM plan or contractor bid?',
+  why:'The OM sketches $9,500/unit for interior renovations. The contractor bid in your folder prices the same scope at $11,800/unit and adds $640K of exterior work the OM omits.',
+  options:[
+   {label:'Contractor bid — $11,800/unit + exteriors',sub:'Real pricing from a real bid beats a marketing estimate.',rec:true,val:'$11,800/unit + $640K ext.'},
+   {label:'OM plan — $9,500/unit',sub:'Lighter, but nobody has agreed to build it at that price.',val:'$9,500/unit (OM)'}],
+  suggestions:['Where\'s the $2,300/unit gap?'],
+  answer:'Mostly in three places: the bid carries current cabinet/counter pricing (the OM used a 2024 figure), includes in-unit electrical panel upgrades the OM scope skips, and carries a 10% contingency the OM plan doesn\'t. The OM number isn\'t wrong so much as it\'s a different, thinner scope priced in an older market.'},
+ {id:6,hard:false,fact:'rubs',title:'Utility reimbursements: gross up or leave netted?',
+  why:'The T-12 nets utility reimbursements against the utility expense line. Standard presentation shows reimbursements as other income and utilities at full cost.',
+  options:[
+   {label:'Gross up — income $186K, expense at full cost',sub:'Standard presentation; makes the deal comparable to everything else you underwrite.',rec:true,val:'$186K/yr (grossed up)'},
+   {label:'Leave netted',sub:'Matches the seller\'s books, hides the recovery ratio.',val:'netted (as booked)'}],
+  suggestions:[],
+  answer:'Grossing up doesn\'t change NOI — it moves the same dollars to both sides of the ledger so the recovery ratio is visible and the deal lines up with your other projects.'},
+ {id:7,hard:false,fact:'acres',title:'Site area: survey says 8.92 acres, county says 8.71',
+  why:'The survey in the folder is dated 2011. County parcel records show 8.71 acres today — a strip was likely dedicated for the road widening in 2016.',
+  options:[
+   {label:'County records — 8.71 acres',sub:'Current and authoritative; the 2011 survey predates the dedication.',rec:true,val:'8.71 acres (county)'},
+   {label:'2011 survey — 8.92 acres',sub:'Stale; keep only if you have reason to dispute the county.',val:'8.92 acres (survey)'}],
+  suggestions:[],
+  answer:'The delta is 0.21 acres along the Ray Road frontage, consistent with the 2016 widening project. It matters mostly for density math if you ever contemplate adding units.'}
+];
+
+/* ---------------- docket rendering ---------------- */
+const state={resolved:{},open:7};
+function buildDocket(){
+  const bl=document.getElementById('blockers'),so=document.getElementById('softs');
+  DECISIONS.forEach(d=>{
+    const el=document.createElement('div');
+    el.className='ditem'+(d.hard?'':' soft');el.id='dec'+d.id;
+    el.innerHTML=`
+      <div class="drow"><span class="t">${d.id}. ${d.title}</span><span class="st">${d.hard?'blocker':'default applied'}</span></div>
+      <div class="dbody">
+        <div class="why">${d.why}</div>
+        <div class="optwrap">${d.options.map((o,i)=>`
+          <div class="opt" data-i="${i}"><span class="radio"></span><span><b>${o.label}${o.rec?'<span class="rec">Recommended</span>':''}</b><small>${o.sub}</small></span></div>`).join('')}
+        </div>
+        ${d.suggestions.map(s=>`<span class="sugg" style="display:inline-block;font-size:11.5px;color:var(--accent);border:1px solid var(--accent);border-radius:12px;padding:3px 10px;margin:2px 5px 4px 0;cursor:pointer;background:var(--panel);">${s}</span>`).join('')}
+        <div class="qa-row"><input placeholder="Ask a question before deciding…"><button>Ask</button></div>
+        <div class="qa-thread"></div>
+      </div>`;
+    (d.hard?bl:so).appendChild(el);
+    el.querySelector('.drow').onclick=()=>{
+      document.querySelectorAll('.ditem.open').forEach(x=>{if(x!==el)x.classList.remove('open');});
+      el.classList.toggle('open');
+    };
+    function ans(q){
+      const th=el.querySelector('.qa-thread');
+      const uq=document.createElement('div');uq.className='qa-q';uq.textContent=q;th.appendChild(uq);
+      setTimeout(()=>{const a=document.createElement('div');a.className='qa-a';a.innerHTML=d.answer;th.appendChild(a);a.scrollIntoView({block:'nearest'});},700);
+    }
+    el.querySelectorAll('.sugg').forEach(s=>s.onclick=e=>{e.stopPropagation();ans(s.textContent);});
+    const inp=el.querySelector('.qa-row input');
+    el.querySelector('.qa-row button').onclick=()=>{if(inp.value.trim()){ans(inp.value.trim());inp.value='';}};
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){ans(inp.value.trim());inp.value='';}});
+    el.querySelectorAll('.opt').forEach(o=>{
+      o.onclick=e=>{e.stopPropagation();resolveDec(d,el,d.options[o.dataset.i],o);};
+    });
+  });
+}
+function resolveDec(d,el,opt,optEl){
+  if(state.resolved[d.id])return;
+  state.resolved[d.id]=true;state.open--;
+  el.classList.add('resolved');el.classList.remove('open');
+  el.querySelectorAll('.opt').forEach(o=>o.classList.remove('picked'));
+  if(optEl)optEl.classList.add('picked');
+  el.querySelector('.drow .st').textContent='✓ '+opt.label;
+  fill(d.fact,opt.val,!opt.rec);
+  updateCount();
+}
+function updateCount(){
+  const c=document.getElementById('dockCount');
+  const hardOpen=DECISIONS.filter(d=>d.hard&&!state.resolved[d.id]).length;
+  if(state.open===0){c.textContent='all resolved';c.classList.add('clear');}
+  else c.textContent=state.open+' open';
+  document.getElementById('ctastatus').textContent=state.open===0?'All decisions made — every value traces to a document or a recorded call':state.open+' decisions open — '+hardOpen+' blocker'+(hardOpen===1?'':'s');
+  setMeter(45+Math.round((7-state.open)/7*55));
+  if(state.open===0){
+    document.getElementById('cta').classList.add('ready');
+    say('That\'s all seven. Every contested number now carries either a source document or a decision with your reasoning attached. The broker pro-forma is filed as evidence, not as input. Ready for assumptions.','ai',400);
+  }
+}
+document.getElementById('acceptAll').onclick=()=>{
+  DECISIONS.filter(d=>!d.hard&&!state.resolved[d.id]).forEach((d,i)=>{
+    setTimeout(()=>{
+      const el=document.getElementById('dec'+d.id);
+      const recIdx=d.options.findIndex(o=>o.rec);
+      resolveDec(d,el,d.options[recIdx],el.querySelectorAll('.opt')[recIdx]);
+    },i*350);
+  });
+};
+
+/* ---------------- choreography ---------------- */
+async function startBatch(){
+  document.getElementById('dz').style.display='none';
+  await say('Reading 9 documents…','sys');
+  await say('Done. This is <b>Copper Junction</b> — 156 units in Mesa, built 1986, asking $29.9M. A value-add with a renovation plan attached.','ai',1400);
+  document.getElementById('projName').textContent='Copper Junction';
+  document.getElementById('projSub').textContent='Multifamily · Value-Add · Mesa, AZ';
+  await say(`Straight talk about this folder:<ul><li><b>34 facts</b> landed clean — identity, unit mix, occupancy, most income lines.</li><li><b>7 items are in dispute or need judgment</b> — the documents contradict each other more than usual. The broker pro-forma disagrees with the actuals on nearly every expense line.</li><li>Two files needed no decisions: the old survey is superseded, and the February rent roll is filed for trend context.</li></ul>The seven are queued on the right — <b>3 blockers</b> you must answer, and <b>4 judgment calls</b> where I've pre-applied a recommendation you can override or accept wholesale.`,'ai',1200);
+  document.getElementById('docket').style.display='block';
+  document.getElementById('sheet').style.display='block';
+  document.getElementById('ctabar').style.display='flex';
+  buildDocket();
+  setMeter(45);
+  const pick=await chips(['I\'ll work the queue myself','Walk me through the blockers']);
+  await say(pick,'msg user'.split(' ')[1]==='user'?'user':'user');
+  if(pick==='Walk me through the blockers'){
+    await say('First blocker is the expense basis — the recent months are running hot and the full year tells a calmer story. It\'s open on the right with the detail. Answer it there and I\'ll cue up the next one.','ai',600);
+    document.getElementById('dec1').classList.add('open');
+    document.getElementById('dec1').scrollIntoView({behavior:'smooth',block:'center'});
+  } else {
+    await say('All yours. Blockers first if you want the fastest path to a working model — the four defaults can be accepted in one click if my recommendations look right.','ai',600);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Prototype 6 — Red Valley Ranch, Entitlement-Driven Intake</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --warn:#B07A1E; --warn-soft:#FBF3E2; --good:#2E7D52; --good-soft:#E7F3EC; --new:#DFF0E9;
+    --hard:#A34A2A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  #projName{font-size:16px;font-weight:600;}
+  #projSub{font-size:12px;color:var(--muted);}
+  .meter-wrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .meter-label{font-size:12px;color:var(--muted);}
+  .meter{width:170px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .meter>div{height:100%;width:0%;background:var(--accent);transition:width .8s ease;}
+  #meterPct{font-size:13px;font-weight:600;width:40px;}
+
+  .main{flex:1;display:flex;min-height:0;}
+  .chat{width:410px;min-width:410px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .chat-log{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:94%;padding:10px 13px;border-radius:10px;font-size:13.5px;line-height:1.45;animation:pop .25s ease;}
+  .msg.ai{background:#F1F3F5;align-self:flex-start;border-top-left-radius:3px;}
+  .msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-top-right-radius:3px;}
+  .msg.sys{background:none;color:var(--muted);font-size:12px;align-self:center;font-style:italic;padding:2px;}
+  .msg ul{margin:6px 0 2px 16px;}
+  .msg li{margin-bottom:3px;}
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .chat-input{border-top:1px solid var(--line);padding:12px 14px;}
+  .chat-input input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13.5px;background:#FAFBFC;}
+
+  /* per-file status list inside chat */
+  .flist{align-self:stretch;border:1px solid var(--line);border-radius:9px;overflow:hidden;font-size:12.5px;animation:pop .25s ease;}
+  .frow2{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid #EEF1F3;background:var(--panel);}
+  .frow2:last-child{border-bottom:none;}
+  .frow2 .nm{font-weight:600;}
+  .frow2 .st{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:#EDEFF2;color:var(--muted);white-space:nowrap;}
+  .frow2 .st.ok{background:var(--good-soft);color:var(--good);}
+  .frow2 .st.scan{background:var(--warn-soft);color:var(--warn);}
+
+  .right{flex:1;overflow-y:auto;padding:12px 18px 60px;}
+  .dropzone{border:2px dashed #B7C0CB;border-radius:14px;background:var(--panel);padding:52px 20px;text-align:center;cursor:pointer;margin-top:30px;}
+  .dropzone:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone .big{font-size:32px;margin-bottom:8px;}
+  .dropzone .t1{font-size:16px;font-weight:600;}
+  .dropzone .t2{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:560px;margin-left:auto;margin-right:auto;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:10px;display:none;}
+  .card h3{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+  .stats{display:flex;gap:8px 26px;flex-wrap:wrap;}
+  .stat{display:flex;flex-direction:column;gap:1px;}
+  .stat .k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+  .stat .v{font-size:13.5px;font-weight:600;}
+  .stat .v.pend{color:#B9C0C7;font-weight:400;font-style:italic;}
+  .stat.flash{animation:flash 1.6s ease;}
+  @keyframes flash{0%{background:var(--new);}100%{background:transparent;}}
+
+  /* entitlement timeline */
+  .tl{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 0 2px;}
+  .tstep{position:relative;flex:1;min-width:118px;padding:8px 10px 8px 14px;border-left:3px solid var(--good);}
+  .tstep.future{border-left-color:#C3CAD1;}
+  .tstep.risk{border-left-color:var(--warn);}
+  .tstep .d{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .tstep .n{font-size:12.5px;font-weight:600;line-height:1.3;margin-top:1px;}
+  .tstep .s{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.35;}
+  .tstep .s b{color:var(--warn);}
+
+  /* parcel table */
+  table.pt{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.pt th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:normal;}
+  table.pt td{padding:5px 8px;border-bottom:1px dashed #EEF1F3;}
+  table.pt td:nth-child(n+4),table.pt th:nth-child(n+4){text-align:right;}
+  tr.sec td{background:#EFF3F1;font-weight:700;border-bottom:1px solid var(--line);}
+  tr.sec.warnrow td{background:var(--warn-soft);}
+  tr.total-row td{font-weight:700;border-top:2px solid var(--line);border-bottom:none;}
+  td .basis{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:9px;padding:1px 7px;margin-left:6px;}
+  td .basis.fp{background:var(--good-soft);color:var(--good);}
+  td .basis.pp{background:#EDEFF2;color:var(--muted);}
+  tr.flash td{animation:flash 1.6s ease;}
+  .tblnote{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:7px;line-height:1.45;}
+
+  /* docket */
+  .ditem{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:9px;margin-bottom:8px;overflow:hidden;}
+  .ditem.hard{border-left-color:var(--hard);}
+  .ditem.resolved{border-left-color:var(--good);}
+  .drow{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13.5px;}
+  .drow .t{font-weight:600;}
+  .drow .st{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .ditem.resolved .drow .st{color:var(--good);font-weight:600;}
+  .dbody{display:none;border-top:1px dashed var(--line);padding:13px 14px;background:#FDFDFB;}
+  .ditem.open .dbody{display:block;}
+  .dbody .why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:11px;}
+  .opt{display:flex;align-items:flex-start;gap:9px;border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12.5px;background:var(--panel);margin-bottom:7px;}
+  .opt:hover{border-color:var(--accent);}
+  .opt.picked{border-color:var(--good);background:var(--good-soft);}
+  .opt .radio{width:15px;height:15px;border:2px solid #B7C0CB;border-radius:50%;margin-top:1px;flex:none;}
+  .opt.picked .radio{border-color:var(--good);background:radial-gradient(circle at center,var(--good) 45%,transparent 50%);}
+  .opt b{display:block;font-size:12.5px;}
+  .opt small{color:var(--muted);font-size:11.5px;line-height:1.4;display:block;}
+  .rec{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:1px 7px;margin-left:6px;}
+  .sugg{display:inline-block;font-size:11.5px;color:var(--accent);border:1px solid var(--accent);border-radius:12px;padding:3px 10px;margin:2px 5px 4px 0;cursor:pointer;background:var(--panel);}
+  .sugg:hover{background:var(--accent-soft);}
+  .qa-row{display:flex;gap:7px;margin-top:6px;}
+  .qa-row input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;background:var(--panel);}
+  .qa-row button{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:0 13px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .qa-thread{margin-top:8px;display:flex;flex-direction:column;gap:7px;}
+  .qa-q{font-size:12.5px;background:var(--accent);color:#fff;border-radius:8px;padding:7px 10px;align-self:flex-end;max-width:90%;}
+  .qa-a{font-size:12.5px;background:#F1F3F5;border-radius:8px;padding:8px 10px;align-self:flex-start;max-width:95%;line-height:1.5;}
+
+  .ctabar{position:fixed;bottom:0;left:410px;right:0;background:var(--panel);border-top:1px solid var(--line);padding:11px 22px;display:none;align-items:center;gap:14px;}
+  .ctabar .status{font-size:13px;color:var(--muted);}
+  .ctabar button{margin-left:auto;background:var(--accent);color:#fff;border:none;font-size:13.5px;font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer;opacity:.4;pointer-events:none;}
+  .ctabar button.ready{opacity:1;pointer-events:auto;}
+  #docketWrap{display:none;}
+  #docketWrap h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 6</span>
+  <div>
+    <div id="projName">Untitled Project</div>
+    <div id="projSub">Land Development · drop the entitlement folder to begin</div>
+  </div>
+  <div class="meter-wrap">
+    <span class="meter-label">Parcel table readiness</span>
+    <div class="meter"><div id="meterBar"></div></div>
+    <span id="meterPct">0%</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="chat">
+    <div class="chat-log" id="log">
+      <div class="msg ai">This intake is built for an entitled or partially-entitled land deal. Entitlement documents don't just describe the project — they <b>govern</b> it, and later approvals supersede earlier ones. I'll read the chain, build the parcel table from the controlling documents, and flag every date that can kill value if it slips.</div>
+      <div class="msg sys">Click the drop zone to simulate dropping the Red Valley Ranch entitlement folder (5 documents)</div>
+    </div>
+    <div class="chat-input"><input placeholder="Message Landscaper… (disabled in prototype)" disabled></div>
+  </div>
+
+  <div class="right">
+    <div class="dropzone" id="dz" onclick="startRead()">
+      <div class="big">📁</div>
+      <div class="t1">Drop the entitlement folder</div>
+      <div class="t2">PAD amendment narrative · pre-plat narrative · preliminary plat staff report · plat extension memo · Phase 1 final plat package</div>
+    </div>
+
+    <div class="card" id="card-site">
+      <div class="stats">
+        <div class="stat" data-f="loc"><span class="k">Location</span><span class="v pend">—</span></div>
+        <div class="stat" data-f="apn"><span class="k">Parcel No.</span><span class="v pend">—</span></div>
+        <div class="stat" data-f="acres"><span class="k">Gross site</span><span class="v pend">—</span></div>
+        <div class="stat" data-f="zoning"><span class="k">Zoning</span><span class="v pend">—</span></div>
+        <div class="stat" data-f="owner"><span class="k">Owner</span><span class="v pend">—</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-tl">
+      <h3>Entitlement Chain — read from the documents</h3>
+      <div class="tl">
+        <div class="tstep"><div class="d">2004</div><div class="n">Original zoning approval</div><div class="s">Community first approved</div></div>
+        <div class="tstep"><div class="d">Dec 2010</div><div class="n">Major PAD Amendment</div><div class="s">PAD10-01 — sets max lots, density, open space</div></div>
+        <div class="tstep"><div class="d">Jun 2021</div><div class="n">Minor PAD Amendment</div><div class="s">PAD21-05 — lot widths &amp; product mix; min lot 5,000 sf / 42'</div></div>
+        <div class="tstep"><div class="d">Nov 2021</div><div class="n">Preliminary Plat approved</div><div class="s">SUB21-20 — 8 parcels · 544 lots · 164.34 ac</div></div>
+        <div class="tstep"><div class="d">2023</div><div class="n">Pre-plat extension</div><div class="s">PPE23-01 — <b>one-time</b>, two-year</div></div>
+        <div class="tstep risk"><div class="d">Feb 4, 2025</div><div class="n">Phase 1 Final Plat approved</div><div class="s">SUB24-09 — 287 lots · 72.35 ac · <b>12-month validity clock</b></div></div>
+        <div class="tstep future"><div class="d">Future</div><div class="n">Phase 2 Final Plat</div><div class="s">Not yet submitted</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="card-pt">
+      <h3>Parcel Table — assembled from the controlling documents</h3>
+      <table class="pt" id="ptable"></table>
+      <div class="tblnote" id="tnote"></div>
+    </div>
+
+    <div id="docketWrap">
+      <h3>Needs Your Judgment</h3>
+      <div id="docket"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ctabar" id="ctabar">
+  <span class="status" id="ctastatus">3 decisions open</span>
+  <button id="cta" onclick="alert('End of prototype — absorption, budgets, and lot pricing hang off this table next.')">Open development assumptions →</button>
+</div>
+
+<script>
+const log=document.getElementById('log');
+function say(html,cls='ai',delay=0){
+  return new Promise(res=>{setTimeout(()=>{
+    const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;
+    log.appendChild(d);log.scrollTop=log.scrollHeight;res(d);
+  },delay);});
+}
+function setMeter(n){document.getElementById('meterBar').style.width=n+'%';document.getElementById('meterPct').textContent=n+'%';}
+function fill(f,val,tip){
+  const row=document.querySelector(`[data-f="${f}"]`);if(!row)return;
+  const v=row.querySelector('.v');v.textContent=val;v.classList.remove('pend');
+  if(tip)v.title=tip;
+  row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1700);
+}
+function show(id){document.getElementById(id).style.display='block';}
+
+/* ---- real preplat parcel data (Pre-Plat Narrative, June 9 2021) ---- */
+const PP=[
+ ['1',"42'×120' + 1× 55'",83,20.19,4.11,'4.68 ac · 23%'],
+ ['2',"42'×120'",89,18.81,4.73,'3.66 ac · 19%'],
+ ['3',"55'×125'",52,18.66,2.79,'6.23 ac · 33%'],
+ ['4',"50'×120' + 2× 55'",66,24.51,2.69,'9.04 ac · 37%'],
+ ['5',"42'×120'",76,26.59,2.86,'12.18 ac · 46%'],
+ ['6',"42'×120'",73,19.99,3.65,'7.52 ac · 38%'],
+ ['7',"55'×125'",51,16.85,3.03,'5.34 ac · 32%'],
+ ['8',"50'×120' + 3× 55'",54,18.75,2.88,'6.78 ac · 36%']
+];
+let phaseResolved=false, precedenceResolved=false;
+
+function renderTable(){
+  const t=document.getElementById('ptable');t.innerHTML='';
+  t.insertAdjacentHTML('beforeend','<tr><th>Parcel</th><th>Lot size</th><th>Phase</th><th>Lots</th><th>Acres</th><th>Density</th><th>Open space</th></tr>');
+  if(precedenceResolved){
+    t.insertAdjacentHTML('beforeend',`<tr class="sec"><td colspan="2">Phase 1 — recorded basis <span class="basis fp">Final Plat governs</span></td><td>1</td><td>287</td><td>72.35</td><td>3.97</td><td>34 tracts (HOA)</td></tr>`);
+  }
+  PP.forEach(p=>{
+    const ph = precedenceResolved ? (phaseResolved?'2 †':'tbd') : '—';
+    t.insertAdjacentHTML('beforeend',
+      `<tr data-pid="${p[0]}"><td title="Pre-Plat Narrative, June 9 2021 — Parcel Data table">${p[0]} <span class="basis pp">preplat</span></td><td>${p[1]}</td><td>${ph}</td><td>${p[2]}</td><td>${p[3]}</td><td>${p[4]}</td><td>${p[5]}</td></tr>`);
+  });
+  t.insertAdjacentHTML('beforeend',`<tr class="total-row"><td colspan="3">Preplat program (SUB21-20)</td><td>544</td><td>164.34</td><td>3.31</td><td>55.42 ac · 34%</td></tr>`);
+  if(precedenceResolved){
+    t.insertAdjacentHTML('beforeend',`<tr class="total-row"><td colspan="3">Underwriting program — 287 recorded + 257 preplat balance</td><td>544</td><td>164.34</td><td></td><td></td></tr>`);
+  }
+  document.getElementById('tnote').innerHTML = precedenceResolved
+    ? (phaseResolved
+       ? '† The 8 preplat parcels span both phases; Phase 1 re-lotted them at final plat. Until the geometry trace maps preplat parcels to the recorded boundary, the balance of 257 lots is carried at preplat basis and tagged accordingly. Hover any parcel number for its source.'
+       : 'Phase assignment of preplat parcels pending — decision 2. Hover any parcel number for its source.')
+    : 'All rows from the approved Preliminary Plat (SUB21-20) per the Pre-Plat Narrative. Hover any parcel number for its source.';
+}
+
+/* ---------------- decisions ---------------- */
+const state={resolved:0,total:3};
+function updateStatus(){
+  document.getElementById('ctastatus').textContent=state.resolved===state.total?'Parcel table set — every row carries its governing document':(state.total-state.resolved)+' decisions open';
+  setMeter(40+Math.round(state.resolved/state.total*60));
+  if(state.resolved===state.total){
+    document.getElementById('cta').classList.add('ready');
+    say('Table is set on a defensible spine: <b>287 recorded lots</b> under the Phase 1 final plat, <b>257 lots at preplat basis</b> awaiting Phase 2, program capped by the PAD. The two entitlement clocks are tracked as critical-path items with the recording deadline flagged. Everything here cites its governing document — this isn\'t an assumption stack, it\'s the entitlement record organized for underwriting.','ai',500);
+  }
+}
+function makeTile(cfg,container){
+  const el=document.createElement('div');el.className='ditem'+(cfg.hard?' hard':'');
+  el.innerHTML=`
+    <div class="drow"><span class="t">${cfg.num}. ${cfg.title}</span><span class="st">${cfg.hard?'blocker':'default applied'}</span></div>
+    <div class="dbody">
+      <div class="why">${cfg.why}</div>
+      <div class="optwrap">${cfg.options.map((o,i)=>`
+        <div class="opt" data-i="${i}"><span class="radio"></span><span><b>${o.label}${o.rec?'<span class="rec">Recommended</span>':''}</b><small>${o.sub}</small></span></div>`).join('')}
+      </div>
+      ${cfg.suggestions.map(s=>`<span class="sugg">${s}</span>`).join('')}
+      <div class="qa-row"><input placeholder="Ask a question before deciding…"><button>Ask</button></div>
+      <div class="qa-thread"></div>
+    </div>`;
+  container.appendChild(el);
+  el.querySelector('.drow').onclick=()=>el.classList.toggle('open');
+  function ans(q){
+    const th=el.querySelector('.qa-thread');
+    const uq=document.createElement('div');uq.className='qa-q';uq.textContent=q;th.appendChild(uq);
+    setTimeout(()=>{const a=document.createElement('div');a.className='qa-a';a.innerHTML=cfg.answer;th.appendChild(a);a.scrollIntoView({block:'nearest'});},700);
+  }
+  el.querySelectorAll('.sugg').forEach(s=>s.onclick=e=>{e.stopPropagation();ans(s.textContent);});
+  const inp=el.querySelector('.qa-row input');
+  el.querySelector('.qa-row button').onclick=()=>{if(inp.value.trim()){ans(inp.value.trim());inp.value='';}};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){ans(inp.value.trim());inp.value='';}});
+  el.querySelectorAll('.opt').forEach(o=>{
+    o.onclick=e=>{
+      e.stopPropagation();
+      if(el.classList.contains('resolved'))return;
+      el.classList.add('resolved');el.classList.remove('open');
+      o.classList.add('picked');
+      el.querySelector('.drow .st').textContent='✓ '+cfg.options[o.dataset.i].label;
+      state.resolved++;
+      cfg.onResolve(cfg.options[o.dataset.i]);
+      updateStatus();
+    };
+  });
+}
+
+/* ---------------- choreography ---------------- */
+async function startRead(){
+  document.getElementById('dz').style.display='none';
+  await say('Reading 5 documents…','sys');
+
+  const fl=document.createElement('div');fl.className='flist';
+  fl.innerHTML=`
+    <div class="frow2" id="fx1"><span>📄</span><span class="nm">Minor PAD Narrative (PAD21-05)</span><span class="st">queued</span></div>
+    <div class="frow2" id="fx2"><span>📄</span><span class="nm">Pre-Plat Narrative (Jun 2021)</span><span class="st">queued</span></div>
+    <div class="frow2" id="fx3"><span>📄</span><span class="nm">Preliminary Plat Staff Report (SUB21-20)</span><span class="st">queued</span></div>
+    <div class="frow2" id="fx4"><span>📄</span><span class="nm">Pre-Plat Extension Memo (PPE23-01)</span><span class="st">queued</span></div>
+    <div class="frow2" id="fx5"><span>📄</span><span class="nm">Phase 1 Final Plat pkg (SUB24-09)</span><span class="st">queued</span></div>`;
+  log.appendChild(fl);log.scrollTop=log.scrollHeight;
+  const seq=[['fx1','read · governs lot standards',900],['fx2','read · parcel table source',1000],
+             ['fx3','scanned — no text layer',1100],['fx4','read · extension terms',800],['fx5','read · recorded basis',1100]];
+  let t=400;
+  seq.forEach(([id,label,ms])=>{
+    setTimeout(()=>{const r=document.getElementById(id);r.querySelector('.st').textContent='reading';},t);
+    t+=ms;
+    setTimeout(()=>{const r=document.getElementById(id);
+      const st=r.querySelector('.st');st.textContent=label;
+      st.className='st '+(label.startsWith('scanned')?'scan':'ok');
+    },t);
+  });
+  await new Promise(r=>setTimeout(r,t+400));
+
+  await say('One honest flag before anything else: the <b>Preliminary Plat staff report is a scanned image with no searchable text</b>. I can\'t read it without OCR preprocessing, and I won\'t pretend otherwise. Fortunately the Pre-Plat Narrative covers the same ground — the parcel data below comes from it — but the staff report stays flagged as unread until it\'s OCR\'d.','ai',400);
+
+  await say('This is <b>Red Valley Ranch</b> — a 164.34-acre community at the southwest corner of Farrell &amp; Anderson Roads, City of Maricopa. Owner of record: Crescent Bay Land Fund 1. The entitlement chain runs from the 2004 approval through a recorded-track Phase 1 final plat approved February 2025.','ai',1000);
+  document.getElementById('projName').textContent='Red Valley Ranch';
+  document.getElementById('projSub').textContent='Land Development · Entitled · Maricopa, AZ';
+  show('card-site');
+  fill('loc','SWC Farrell & Anderson Rds, Maricopa AZ','Pre-Plat Narrative §5');
+  setTimeout(()=>fill('apn','502-07-0010','Pre-Plat Narrative §5 — Pinal County'),300);
+  setTimeout(()=>fill('acres','164.34 ac','Pre-Plat Narrative, Parcel Data table'),600);
+  setTimeout(()=>fill('zoning','Red Valley Ranch PAD','SUB24-09 Staff Report, Project Data'),900);
+  setTimeout(()=>fill('owner','Crescent Bay Land Fund 1, LLC','Pre-Plat Narrative, Owner block'),1200);
+  setTimeout(()=>{show('card-tl');},1500);
+  await say('Here\'s the difference an entitlement folder makes: I\'m not assuming densities off a colored map this time. The parcel table below is <b>read directly from the approved preliminary plat</b> — 8 parcels, 544 lots, lot sizes, densities, and open space per parcel, all from the record.','ai',1900);
+  show('card-pt');renderTable();
+  setMeter(40);
+  await say('Three judgment calls, and they\'re different in kind from the Peoria exercise — these are about <b>which document governs</b> and <b>which dates bite</b>, not about guessing what a map doesn\'t say.','ai',1400);
+  show('docketWrap');document.getElementById('ctabar').style.display='flex';
+  const dock=document.getElementById('docket');
+
+  makeTile({num:1,hard:true,title:'Phase 1 is covered by two documents — which governs?',
+    why:'The 2021 preliminary plat lays out 8 parcels totaling 544 lots. The 2025 Phase 1 final plat re-lots part of the site into 287 recorded lots on 72.35 acres with 34 HOA tracts. Where both speak, one has to control.',
+    options:[
+      {label:'Final plat governs Phase 1 · preplat governs the balance',sub:'287 lots at recorded basis; remaining 257 lots carried at preplat basis until Phase 2 final plats. Standard precedence: recorded > approved > proposed.',rec:true},
+      {label:'Carry everything at preplat basis — 544 lots',sub:'Ignores the recorded instrument; overstates flexibility you no longer have in Phase 1.'}],
+    suggestions:['Why does the preplat area yield more lots than the final plat?'],
+    answer:'Comparing the two: the preplat parcels roughly covering Phase 1 penciled to ~290 lots, and the recorded plat landed at 287. Losing 2–3 lots between preliminary and final engineering is routine — drainage tracts grow, corner geometry tightens, a lot gets absorbed into a basin. It\'s also exactly why underwriting on preplat counts overstates a project: the preplat is a proposal, the final plat is the deed-level truth.',
+    onResolve:()=>{precedenceResolved=true;renderTable();
+      document.querySelectorAll('#ptable tr').forEach((tr,i)=>setTimeout(()=>tr.classList.add('flash'),i*35));}
+  },dock);
+
+  makeTile({num:2,hard:true,title:'Which preplat parcels fall inside Phase 1? The documents don\'t say.',
+    why:'The final plat defines Phase 1 by boundary, not by preplat parcel numbers — and no clean combination of the 8 parcels sums to 72.35 acres, which means Phase 1 re-lotted across old parcel lines. Mapping them requires tracing the plat geometry, not reading tables.',
+    options:[
+      {label:'Hold Phase 1 as its own recorded container · map parcels by geometry later',sub:'Underwriting proceeds now on defensible totals; the geometry trace is queued as a task, and the balance stays tagged "preplat basis."',rec:true},
+      {label:'Force-fit parcels to phases by acreage guess',sub:'Fabricates a mapping the record doesn\'t support. Every downstream number inherits the guess.'}],
+    suggestions:['What breaks if we skip the geometry trace entirely?'],
+    answer:'Nothing at the program level — totals are anchored by the recorded plat and the PAD cap either way. What you lose is parcel-level cost and revenue allocation for Phase 2: takedown sequencing, per-parcel infrastructure budgets, and lot-premium mapping all want to know which dirt is which. Fine to defer during acquisition screening; not fine to skip before development budgeting.',
+    onResolve:()=>{phaseResolved=true;renderTable();}
+  },dock);
+
+  makeTile({num:3,hard:false,title:'Two entitlement clocks are running — track as critical-path risk?',
+    why:'The final plat approval is valid 12 months from the February 4, 2025 council date unless the required improvement-plan work advances — and the preliminary plat already used its one-time extension (PPE23-01). If approvals lapse, the process starts over under whatever code exists then.',
+    options:[
+      {label:'Track both dates as flagged critical-path items',sub:'The project timeline pins the recording deadline and surfaces it in every schedule view; slippage alerts fire ahead of the cliff.',rec:true},
+      {label:'Note the dates and move on',sub:'They\'ll be invisible right up until they\'re expensive.'}],
+    suggestions:['What actually happens if the final plat lapses?'],
+    answer:'Approval becomes null and void — the plat requires a complete resubmittal, reviewed under current code and current fees. Given the preplat extension was explicitly one-time, a lapse likely cascades: you\'d be re-entitling in an environment where impact fees, drainage standards, and council appetite have all moved since 2021. For an entitled-land deal, these dates are as material as the purchase price — the entitlements <i>are</i> the asset.',
+    onResolve:()=>{}
+  },dock);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Prototype 5 — MPC Land Acquisition from a Single Exhibit</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --warn:#B07A1E; --warn-soft:#FBF3E2; --good:#2E7D52; --good-soft:#E7F3EC; --new:#DFF0E9;
+    --mldr:#EFE3C0; --mdr:#D99A2B; --mhdr:#B97E4A; --hdr:#6E4A2A; --mu:#2C5488; --com:#B0356B; --os:#7DAF3F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  #projName{font-size:16px;font-weight:600;}
+  #projSub{font-size:12px;color:var(--muted);}
+  .meter-wrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .meter-label{font-size:12px;color:var(--muted);}
+  .meter{width:170px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .meter>div{height:100%;width:0%;background:var(--accent);transition:width .8s ease;}
+  #meterPct{font-size:13px;font-weight:600;width:40px;}
+
+  .main{flex:1;display:flex;min-height:0;}
+  .chat{width:410px;min-width:410px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .chat-log{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:94%;padding:10px 13px;border-radius:10px;font-size:13.5px;line-height:1.45;animation:pop .25s ease;}
+  .msg.ai{background:#F1F3F5;align-self:flex-start;border-top-left-radius:3px;}
+  .msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-top-right-radius:3px;}
+  .msg.sys{background:none;color:var(--muted);font-size:12px;align-self:center;font-style:italic;padding:2px;}
+  .msg ul{margin:6px 0 2px 16px;}
+  .msg li{margin-bottom:3px;}
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start;animation:pop .25s ease;}
+  .chip{background:var(--panel);border:1.5px solid var(--accent);color:var(--accent);font-size:13px;font-weight:600;padding:7px 14px;border-radius:18px;cursor:pointer;}
+  .chip:hover{background:var(--accent-soft);}
+  .chat-input{border-top:1px solid var(--line);padding:12px 14px;}
+  .chat-input input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13.5px;background:#FAFBFC;}
+
+  .right{flex:1;overflow-y:auto;padding:18px 22px 50px;}
+  .dropzone{border:2px dashed #B7C0CB;border-radius:14px;background:var(--panel);padding:52px 20px;text-align:center;cursor:pointer;margin-top:30px;}
+  .dropzone:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone .big{font-size:32px;margin-bottom:8px;}
+  .dropzone .t1{font-size:16px;font-weight:600;}
+  .dropzone .t2{font-size:12.5px;color:var(--muted);margin-top:4px;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 17px;margin-bottom:14px;display:none;}
+  .card h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:11px;}
+  .frow{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #EEF1F3;font-size:13.5px;}
+  .frow:last-child{border-bottom:none;}
+  .frow .k{color:var(--muted);}
+  .frow .v{font-weight:600;text-align:right;}
+  .frow .v.pend{color:#B9C0C7;font-weight:400;font-style:italic;}
+  .frow.flash{animation:flash 1.6s ease;}
+  @keyframes flash{0%{background:var(--new);}100%{background:transparent;}}
+
+  /* stacked bar */
+  .stack{display:flex;height:26px;border-radius:6px;overflow:hidden;margin:4px 0 10px;}
+  .stack div{height:100%;}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 16px;font-size:11.5px;color:var(--muted);}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .sw{width:11px;height:11px;border-radius:2px;display:inline-block;}
+
+  /* program table */
+  table.prog{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.prog th{text-align:left;color:var(--muted);font-weight:600;padding:6px 7px;border-bottom:1px solid var(--line);white-space:normal;}
+  table.prog td{padding:6px 7px;border-bottom:1px dashed #EEF1F3;}
+  table.prog td:nth-child(n+3),table.prog th:nth-child(n+3){text-align:right;}
+  table.prog tr.total td{font-weight:700;border-top:2px solid var(--line);border-bottom:none;}
+  table.prog .yield{color:#B9C0C7;font-style:italic;}
+  table.prog .yield.set{color:var(--ink);font-style:normal;font-weight:600;}
+  tr.hidden-row{display:none;}
+
+  .village{display:flex;gap:8px;flex-wrap:wrap;}
+  .vpill{border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;background:#FBFCFD;}
+  .vpill b{display:block;font-size:13px;}
+  .vpill small{color:var(--muted);}
+
+  /* docket */
+  .ditem{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:9px;margin-bottom:8px;overflow:hidden;}
+  .ditem.hard{border-left-color:#A34A2A;}
+  .ditem.resolved{border-left-color:var(--good);}
+  .drow{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13.5px;}
+  .drow .t{font-weight:600;}
+  .drow .st{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .ditem.resolved .drow .st{color:var(--good);font-weight:600;}
+  .dbody{display:none;border-top:1px dashed var(--line);padding:13px 14px;background:#FDFDFB;}
+  .ditem.open .dbody{display:block;}
+  .dbody .why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:11px;}
+  .opt{display:flex;align-items:flex-start;gap:9px;border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12.5px;background:var(--panel);margin-bottom:7px;}
+  .opt:hover{border-color:var(--accent);}
+  .opt.picked{border-color:var(--good);background:var(--good-soft);}
+  .opt .radio{width:15px;height:15px;border:2px solid #B7C0CB;border-radius:50%;margin-top:1px;flex:none;}
+  .opt.picked .radio{border-color:var(--good);background:radial-gradient(circle at center,var(--good) 45%,transparent 50%);}
+  .opt b{display:block;font-size:12.5px;}
+  .opt small{color:var(--muted);font-size:11.5px;line-height:1.4;display:block;}
+  .rec{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:1px 7px;margin-left:6px;}
+  .sugg{display:inline-block;font-size:11.5px;color:var(--accent);border:1px solid var(--accent);border-radius:12px;padding:3px 10px;margin:2px 5px 4px 0;cursor:pointer;background:var(--panel);}
+  .sugg:hover{background:var(--accent-soft);}
+  .qa-row{display:flex;gap:7px;margin-top:6px;}
+  .qa-row input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;background:var(--panel);}
+  .qa-row button{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:0 13px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .qa-thread{margin-top:8px;display:flex;flex-direction:column;gap:7px;}
+  .qa-q{font-size:12.5px;background:var(--accent);color:#fff;border-radius:8px;padding:7px 10px;align-self:flex-end;max-width:90%;}
+  .qa-a{font-size:12.5px;background:#F1F3F5;border-radius:8px;padding:8px 10px;align-self:flex-start;max-width:95%;line-height:1.5;}
+
+  .ctabar{position:fixed;bottom:0;left:410px;right:0;background:var(--panel);border-top:1px solid var(--line);padding:11px 22px;display:none;align-items:center;gap:14px;}
+  .ctabar .status{font-size:13px;color:var(--muted);}
+  .ctabar button{margin-left:auto;background:var(--accent);color:#fff;border:none;font-size:13.5px;font-weight:600;padding:10px 20px;border-radius:8px;cursor:pointer;opacity:.4;pointer-events:none;}
+  .ctabar button.ready{opacity:1;pointer-events:auto;}
+  #docketWrap{display:none;}
+  #docketWrap h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 10px;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 5 of N</span>
+  <div>
+    <div id="projName">Untitled Project</div>
+    <div id="projSub">Land Development · MPC · drop what you have to begin</div>
+  </div>
+  <div class="meter-wrap">
+    <span class="meter-label">Program readiness</span>
+    <div class="meter"><div id="meterBar"></div></div>
+    <span id="meterPct">0%</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="chat">
+    <div class="chat-log" id="log">
+      <div class="msg ai">New land acquisition. A master-planned community can start from almost nothing — sometimes one exhibit is all that exists. Drop whatever you have and I'll pull a development program out of it, then tell you honestly what's real, what's assumed, and what's simply unknown at this stage.</div>
+      <div class="msg sys">Click the drop zone to simulate dropping the land plan exhibit</div>
+    </div>
+    <div class="chat-input"><input placeholder="Message Landscaper… (disabled in prototype)" disabled></div>
+  </div>
+
+  <div class="right">
+    <div class="dropzone" id="dz" onclick="startRead()">
+      <div class="big">🗺️</div>
+      <div class="t1">Drop your documents</div>
+      <div class="t2">You have exactly one: Parcels (8-24-2023).pdf — a colored land plan exhibit</div>
+    </div>
+
+    <div class="card" id="card-site">
+      <h3>Site</h3>
+      <div class="frow" data-f="loc"><span class="k">Location</span><span class="v pend">—</span></div>
+      <div class="frow" data-f="planacres"><span class="k">Planned area (from exhibit)</span><span class="v pend">—</span></div>
+      <div class="frow" data-f="grossacres"><span class="k">Gross site area</span><span class="v pend">awaiting decision 1</span></div>
+      <div class="frow" data-f="parcels"><span class="k">Planning areas</span><span class="v pend">—</span></div>
+      <div class="frow" data-f="frontage"><span class="k">Major frontage</span><span class="v pend">—</span></div>
+    </div>
+
+    <div class="card" id="card-prog">
+      <h3>Land Use Program — read from the exhibit</h3>
+      <div class="stack" id="stack"></div>
+      <div class="legend" id="legend"></div>
+      <table class="prog" style="margin-top:12px;">
+        <tr><th>Use</th><th>Parcels</th><th>Acres</th><th>Density assumption</th><th>Yield</th></tr>
+        <tr data-u="mldr"><td><span class="sw" style="background:var(--mldr)"></span> Low density (MLDR)</td><td>5</td><td>113</td><td class="yield">awaiting decision 2</td><td class="yield">—</td></tr>
+        <tr data-u="mdr"><td><span class="sw" style="background:var(--mdr)"></span> Medium density (MDR)</td><td>17</td><td>390</td><td class="yield">awaiting decision 2</td><td class="yield">—</td></tr>
+        <tr data-u="mhdr"><td><span class="sw" style="background:var(--mhdr)"></span> Med-high density (MHDR)</td><td>5</td><td>87</td><td class="yield">awaiting decision 2</td><td class="yield">—</td></tr>
+        <tr data-u="hdr"><td><span class="sw" style="background:var(--hdr)"></span> High density (HDR)</td><td>2</td><td>38</td><td class="yield">awaiting decision 2</td><td class="yield">—</td></tr>
+        <tr data-u="mu"><td><span class="sw" style="background:var(--mu)"></span> Mixed use (MU)</td><td>2</td><td>53</td><td class="yield">awaiting decision 3</td><td class="yield">—</td></tr>
+        <tr data-u="com"><td><span class="sw" style="background:var(--com)"></span> Commercial (C)</td><td>6</td><td>260</td><td class="yield">awaiting decision 4</td><td class="yield">—</td></tr>
+        <tr data-u="os"><td><span class="sw" style="background:var(--os)"></span> Open space (OS)</td><td>5</td><td>149</td><td>—</td><td>—</td></tr>
+        <tr class="total"><td>Total planned</td><td>42</td><td>1,090</td><td></td><td id="totYield">—</td></tr>
+      </table>
+    </div>
+
+    <div class="card" id="card-vill">
+      <h3>Structure — read from the parcel numbering</h3>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Parcel IDs follow a Village.Neighborhood.Parcel pattern (e.g., 2.107 = Village 2, Neighborhood 1, Parcel 07). The plan implies four villages:</div>
+      <div class="village">
+        <div class="vpill"><b>Village 1</b><small>10 parcels · 251 ac<br>residential + both MU sites</small></div>
+        <div class="vpill"><b>Village 2</b><small>16 parcels · 353 ac<br>residential core + most open space</small></div>
+        <div class="vpill"><b>Village 3</b><small>5 parcels · 242 ac<br>all commercial, fronting SR-303</small></div>
+        <div class="vpill"><b>Village 4</b><small>11 parcels · 214 ac<br>low-density edge + commercial corner</small></div>
+      </div>
+    </div>
+
+    <div id="docketWrap">
+      <h3>Needs Your Judgment</h3>
+      <div id="docket"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ctabar" id="ctabar">
+  <span class="status" id="ctastatus">4 decisions open</span>
+  <button id="cta" onclick="alert('End of prototype — absorption, budgets, and lot pricing are the next design exercise.')">Open development assumptions →</button>
+</div>
+
+<script>
+const log=document.getElementById('log');
+function say(html,cls='ai',delay=0){
+  return new Promise(res=>{setTimeout(()=>{
+    const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;
+    log.appendChild(d);log.scrollTop=log.scrollHeight;res(d);
+  },delay);});
+}
+function chips(opts){
+  return new Promise(res=>{
+    const w=document.createElement('div');w.className='chips';
+    opts.forEach(o=>{
+      const c=document.createElement('button');c.className='chip';c.textContent=o;
+      c.onclick=()=>{w.remove();say(o,'user');res(o);};
+      w.appendChild(c);
+    });
+    log.appendChild(w);log.scrollTop=log.scrollHeight;
+  });
+}
+function setMeter(n){document.getElementById('meterBar').style.width=n+'%';document.getElementById('meterPct').textContent=n+'%';}
+function fill(f,val){
+  const row=document.querySelector(`[data-f="${f}"]`);if(!row)return;
+  const v=row.querySelector('.v');v.textContent=val;v.classList.remove('pend');
+  row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1700);
+}
+function show(id){document.getElementById(id).style.display='block';}
+
+const USES=[
+  {k:'mldr',c:'var(--mldr)',ac:113,label:'MLDR'},
+  {k:'mdr',c:'var(--mdr)',ac:390,label:'MDR'},
+  {k:'mhdr',c:'var(--mhdr)',ac:87,label:'MHDR'},
+  {k:'hdr',c:'var(--hdr)',ac:38,label:'HDR'},
+  {k:'mu',c:'var(--mu)',ac:53,label:'MU'},
+  {k:'com',c:'var(--com)',ac:260,label:'C'},
+  {k:'os',c:'var(--os)',ac:149,label:'OS'}
+];
+function buildStack(){
+  const s=document.getElementById('stack'),l=document.getElementById('legend');
+  USES.forEach(u=>{
+    const d=document.createElement('div');d.style.background=u.c;d.style.width=(u.ac/1090*100)+'%';d.title=u.label+' — '+u.ac+' ac';s.appendChild(d);
+    const sp=document.createElement('span');sp.innerHTML=`<span class="sw" style="background:${u.c}"></span>${u.label} ${u.ac} ac`;l.appendChild(sp);
+  });
+}
+function setYield(use,dens,yld){
+  const row=document.querySelector(`tr[data-u="${use}"]`);
+  const tds=row.querySelectorAll('.yield');
+  tds[0].textContent=dens;tds[0].classList.add('set');
+  tds[1].textContent=yld;tds[1].classList.add('set');
+}
+
+/* ---------------- decisions ---------------- */
+const state={resolved:0,total:4};
+function updateStatus(msg){
+  document.getElementById('ctastatus').textContent=state.resolved===state.total?'Program set — every number is tagged as read, assumed, or your call':(state.total-state.resolved)+' decisions open';
+  setMeter(35+Math.round(state.resolved/state.total*65));
+  if(state.resolved===state.total){
+    document.getElementById('cta').classList.add('ready');
+    say('Program is set: <b>~3,790 units</b> across four villages, commercial land held for sale, everything density-driven so it re-derives the moment real planning numbers replace the assumptions. This is a defensible starting position built from one exhibit — and the model knows exactly which parts are read from paper versus assumed. Ready for absorption, budgets, and lot pricing.','ai',500);
+  }
+}
+function makeTile(cfg,container){
+  const el=document.createElement('div');el.className='ditem'+(cfg.hard?' hard':'');
+  el.innerHTML=`
+    <div class="drow"><span class="t">${cfg.num}. ${cfg.title}</span><span class="st">${cfg.hard?'blocker':'default applied'}</span></div>
+    <div class="dbody">
+      <div class="why">${cfg.why}</div>
+      <div class="optwrap">${cfg.options.map((o,i)=>`
+        <div class="opt" data-i="${i}"><span class="radio"></span><span><b>${o.label}${o.rec?'<span class="rec">Recommended</span>':''}</b><small>${o.sub}</small></span></div>`).join('')}
+      </div>
+      ${cfg.suggestions.map(s=>`<span class="sugg">${s}</span>`).join('')}
+      <div class="qa-row"><input placeholder="Ask a question before deciding…"><button>Ask</button></div>
+      <div class="qa-thread"></div>
+    </div>`;
+  container.appendChild(el);
+  el.querySelector('.drow').onclick=()=>el.classList.toggle('open');
+  function ans(q){
+    const th=el.querySelector('.qa-thread');
+    const uq=document.createElement('div');uq.className='qa-q';uq.textContent=q;th.appendChild(uq);
+    setTimeout(()=>{const a=document.createElement('div');a.className='qa-a';a.innerHTML=cfg.answer;th.appendChild(a);a.scrollIntoView({block:'nearest'});},700);
+  }
+  el.querySelectorAll('.sugg').forEach(s=>s.onclick=e=>{e.stopPropagation();ans(s.textContent);});
+  const inp=el.querySelector('.qa-row input');
+  el.querySelector('.qa-row button').onclick=()=>{if(inp.value.trim()){ans(inp.value.trim());inp.value='';}};
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){ans(inp.value.trim());inp.value='';}});
+  el.querySelectorAll('.opt').forEach(o=>{
+    o.onclick=e=>{
+      e.stopPropagation();
+      if(el.classList.contains('resolved'))return;
+      el.classList.add('resolved');el.classList.remove('open');
+      o.classList.add('picked');
+      el.querySelector('.drow .st').textContent='✓ '+cfg.options[o.dataset.i].label;
+      state.resolved++;
+      cfg.onResolve(cfg.options[o.dataset.i]);
+      updateStatus();
+    };
+  });
+  return el;
+}
+
+/* ---------------- choreography ---------------- */
+async function startRead(){
+  document.getElementById('dz').style.display='none';
+  await say('Reading <b>Parcels (8-24-2023).pdf</b>… this is a graphic exhibit, not a data file — I\'m reading the map itself.','sys');
+  await say('Got it. This is <b>Peoria 1600 / Simpatico</b> — Lake Pleasant Parkway at SR-303, Peoria, Arizona. A Crescent Bay Holdings land plan dated August 2023. I pulled <b>42 planning areas</b> off the exhibit with their acreages and color-coded land uses.','ai',1600);
+  document.getElementById('projName').textContent='Peoria 1600 / Simpatico';
+  document.getElementById('projSub').textContent='Land Development · MPC · Peoria, AZ';
+  show('card-site');
+  fill('loc','Lake Pleasant Pkwy & SR-303, Peoria AZ');
+  setTimeout(()=>fill('planacres','1,090 ac (sum of planning areas)'),400);
+  setTimeout(()=>fill('parcels','42 across 4 villages'),800);
+  setTimeout(()=>fill('frontage','SR-303 (north) · Lake Pleasant Pkwy (east) · Agua Fria River (west)'),1200);
+  await say('The land use program, straight off the map:','ai',1800);
+  show('card-prog');buildStack();
+  setTimeout(()=>show('card-vill'),700);
+  setMeter(35);
+  await say(`Now the honest part. One exhibit gives me geography and zoning intent — it does <b>not</b> give me unit counts, and the project name says "1600" while the planning areas only sum to 1,090 acres. Four things need your judgment before this becomes a program. They're queued below the plan.`,'ai',1500);
+  show('docketWrap');document.getElementById('ctabar').style.display='flex';
+  const dock=document.getElementById('docket');
+
+  makeTile({num:1,hard:true,title:'The name says 1,600 acres — the plan shows 1,090. Where\'s the rest?',
+    why:'Planning areas sum to 1,090 acres. If the gross site is ~1,600, roughly 510 acres are unaccounted — typically arterial rights-of-way, drainage, the Agua Fria frontage, or land simply not yet planned. The gap changes per-acre pricing math materially.',
+    options:[
+      {label:'Gross ≈ 1,600 · treat the ~510 ac gap as ROW / drainage / unplanned',sub:'Flagged as assumed until a title report or ALTA survey lands in the project.',rec:true},
+      {label:'Underwrite only the 1,090 planned acres',sub:'Conservative; ignores land you may be paying for.'}],
+    suggestions:['Why does the gap matter so much?'],
+    answer:'Because acquisition pricing is usually quoted per gross acre while revenue is generated per <b>net</b> acre. If you pay for 1,600 and can only sell product on ~630 residential acres, your true residential land basis is ~2.5× the headline per-acre price. Getting the denominator right early prevents the most common land-deal self-deception there is.',
+    onResolve:(o)=>{fill('grossacres',o.label.startsWith('Gross')?'~1,600 ac (assumed, flagged)':'1,090 ac (planned only)');}
+  },dock);
+
+  makeTile({num:2,hard:true,title:'Residential densities — the map gives acres, not units',
+    why:'The exhibit color-codes four residential density bands but states no unit counts. To get a yield, each band needs a density assumption. Typical Peoria ranges: MLDR 2–3, MDR 4–6, MHDR 8–12, HDR 15–22 units per acre.',
+    options:[
+      {label:'Apply midpoints — 2.5 / 5.0 / 10.0 / 18.0 per acre',sub:'Yields ~3,790 units. Every one tagged as assumed; re-derives when a real development agreement or plat replaces the assumption.',rec:true},
+      {label:'I\'ll set each band myself',sub:'Opens per-band entry (prototype applies midpoints either way).'}],
+    suggestions:['How sensitive is the deal to these picks?'],
+    answer:'Very — and that\'s the point of tagging them. Moving MDR alone from 4 to 6 units/acre swings the program by ±390 lots, which at a $90K finished-lot value is a ~$35M revenue swing. These four numbers deserve more diligence hours than almost anything else on the deal, and the model will show them as its top sensitivity drivers until real planning numbers replace them.',
+    onResolve:()=>{
+      setYield('mldr','2.5 /ac','~283');
+      setTimeout(()=>setYield('mdr','5.0 /ac','~1,950'),250);
+      setTimeout(()=>setYield('mhdr','10.0 /ac','~870'),500);
+      setTimeout(()=>setYield('hdr','18.0 /ac','~684'),750);
+      setTimeout(()=>{document.getElementById('totYield').textContent='~3,787 units';document.getElementById('totYield').style.fontWeight='700';},1000);
+    }
+  },dock);
+
+  makeTile({num:3,hard:false,title:'Mixed-use parcels (53 ac) — carry residential units or not?',
+    why:'Two MU parcels sit at the Lake Pleasant Parkway entries. MU could mean vertical residential over retail, or it could mean flex commercial. The exhibit doesn\'t say.',
+    options:[
+      {label:'Hold as commercial/flex — zero units for now',sub:'Conservative; any residential entitlement on these parcels becomes pure upside.',rec:true},
+      {label:'Assume partial residential — ~15 units/ac on half the area',sub:'Adds ~400 units of program risk before anything supports it.'}],
+    suggestions:[],
+    answer:'At this stage the conservative read wins: underwrite what the plan clearly supports, and let MU residential be found money. If the eventual zoning case lands residential here, the program updates in one place.',
+    onResolve:(o)=>{setYield('mu',o.rec?'held 0 units':'~15/ac × ½','—');}
+  },dock);
+
+  makeTile({num:4,hard:false,title:'Commercial land (260 ac) — develop or sell as superpads?',
+    why:'Six commercial parcels totaling 260 acres, with 242 of them fronting SR-303 in Village 3. For a land developer, the usual play is selling entitled superpads to commercial builders rather than developing vertical.',
+    options:[
+      {label:'Hold for sale as entitled superpads',sub:'Commercial acres become a land-sale revenue stream with its own absorption timeline.',rec:true},
+      {label:'Exclude from the program entirely',sub:'Treats commercial as zero value — unrealistically harsh for freeway frontage.'}],
+    suggestions:[],
+    answer:'The SR-303 frontage is the most valuable dirt on the plan on a per-acre basis. Carrying it as a superpad sale stream — with conservative pricing and a slow absorption tail — captures real value without pretending you\'re a retail developer.',
+    onResolve:()=>{setYield('com','superpad sales','260 ac');}
+  },dock);
+
+  await say('Note what just happened structurally: the map\'s own numbering gave me the skeleton — four villages, each with neighborhoods, each with parcels. That hierarchy is now the project\'s spine, and everything downstream (budgets, phasing, absorption) hangs off it.','ai',800);
+}
+</script>
+</body>
+</html>

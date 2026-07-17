@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Prototype 2 — Dump Everything, Get a Briefing</title>
+<style>
+  :root{
+    --bg:#EFF1F4; --paper:#FFFFFF; --ink:#1A222E; --muted:#66707C;
+    --line:#DFE3E8; --accent:#31517D; --accent-soft:#EAF0F7;
+    --good:#2E7D52; --good-soft:#E7F3EC;
+    --warn:#A9741B; --warn-soft:#FBF3DF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;}
+  .wrap{max-width:820px;margin:0 auto;padding:34px 20px 90px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;display:inline-block;margin-bottom:16px;}
+
+  /* ---- stage 1: drop ---- */
+  #stage-drop h1{font-size:26px;margin-bottom:8px;}
+  #stage-drop p{color:var(--muted);font-size:15px;margin-bottom:22px;max-width:560px;}
+  .dropzone{border:2px dashed #B7C0CB;border-radius:14px;background:var(--paper);padding:56px 20px;text-align:center;cursor:pointer;}
+  .dropzone:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone .big{font-size:34px;margin-bottom:10px;}
+  .dropzone .t1{font-size:17px;font-weight:600;margin-bottom:4px;}
+  .dropzone .t2{font-size:13px;color:var(--muted);}
+
+  /* ---- stage 2: processing ---- */
+  #stage-proc{display:none;}
+  #stage-proc h1{font-size:22px;margin-bottom:4px;}
+  #stage-proc .sub{color:var(--muted);font-size:14px;margin-bottom:18px;}
+  .file-list{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .frow{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line);font-size:14px;}
+  .frow:last-child{border-bottom:none;}
+  .frow .icon{font-size:17px;}
+  .frow .name{font-weight:600;}
+  .frow .what{margin-left:auto;font-size:12.5px;color:var(--muted);text-align:right;}
+  .frow .st{width:88px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 0;border-radius:12px;background:#EDEFF2;color:var(--muted);}
+  .frow .st.reading{background:var(--accent-soft);color:var(--accent);}
+  .frow .st.done{background:var(--good-soft);color:var(--good);}
+  .frow .st.filed{background:#EDEFF2;color:var(--muted);}
+  .note{margin-top:14px;font-size:13px;color:var(--muted);font-style:italic;}
+
+  /* ---- stage 3: briefing ---- */
+  #stage-brief{display:none;}
+  .brief-head{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:22px 26px;margin-bottom:18px;}
+  .brief-head .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:6px;}
+  .brief-head h1{font-size:24px;margin-bottom:6px;}
+  .brief-head .stats{display:flex;gap:26px;margin-top:14px;flex-wrap:wrap;}
+  .stat .n{font-size:22px;font-weight:700;}
+  .stat .l{font-size:12px;color:var(--muted);}
+  .stat .n.warn{color:var(--warn);}
+  section{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 26px;margin-bottom:18px;}
+  section h2{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:4px 34px;font-size:14px;}
+  .facts .fr{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #EDEFF2;}
+  .facts .k{color:var(--muted);}
+  .facts .v{font-weight:600;}
+  .facts .v small{font-weight:400;color:var(--muted);}
+
+  .decision{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:8px;padding:16px 18px;margin-bottom:14px;}
+  .decision.resolved{border-left-color:var(--good);}
+  .decision h3{font-size:15px;margin-bottom:5px;}
+  .decision p{font-size:13.5px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
+  .opts{display:flex;flex-direction:column;gap:8px;}
+  .opt{display:flex;align-items:flex-start;gap:10px;border:1.5px solid var(--line);border-radius:8px;padding:10px 13px;cursor:pointer;font-size:13.5px;background:#FBFCFD;}
+  .opt:hover{border-color:var(--accent);}
+  .opt.picked{border-color:var(--good);background:var(--good-soft);}
+  .opt .radio{width:16px;height:16px;border:2px solid #B7C0CB;border-radius:50%;margin-top:1px;flex:none;}
+  .opt.picked .radio{border-color:var(--good);background:radial-gradient(circle at center,var(--good) 45%,transparent 50%);}
+  .opt b{display:block;}
+  .opt small{color:var(--muted);}
+  .rec{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:10px;padding:2px 8px;margin-left:8px;}
+
+  .applybar{position:fixed;bottom:0;left:0;right:0;background:var(--paper);border-top:1px solid var(--line);padding:12px 20px;display:none;}
+  .applybar .inner{max-width:820px;margin:0 auto;display:flex;align-items:center;gap:14px;}
+  .applybar .status{font-size:13.5px;color:var(--muted);}
+  .applybar button{margin-left:auto;background:var(--accent);color:#fff;border:none;font-size:14px;font-weight:600;padding:11px 22px;border-radius:8px;cursor:pointer;opacity:.4;pointer-events:none;}
+  .applybar button.ready{opacity:1;pointer-events:auto;}
+
+  #stage-done{display:none;text-align:center;padding-top:60px;}
+  #stage-done .big{font-size:44px;margin-bottom:14px;}
+  #stage-done h1{font-size:24px;margin-bottom:10px;}
+  #stage-done p{color:var(--muted);font-size:15px;max-width:520px;margin:0 auto 22px;line-height:1.6;}
+  #stage-done .cta{background:var(--accent);color:#fff;border:none;font-size:14.5px;font-weight:600;padding:12px 24px;border-radius:8px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <span class="proto-tag">Prototype 2 of N</span>
+
+  <!-- STAGE 1 -->
+  <div id="stage-drop">
+    <h1>New Multifamily Project</h1>
+    <p>Drop everything at once — the whole deal folder. Nothing to classify, no questions asked up front. You'll get a briefing when the reading is done.</p>
+    <div class="dropzone" onclick="startProcessing()">
+      <div class="big">📁</div>
+      <div class="t1">Drop the deal folder here</div>
+      <div class="t2">(prototype: click to simulate dropping 6 files)</div>
+    </div>
+  </div>
+
+  <!-- STAGE 2 -->
+  <div id="stage-proc">
+    <h1>Reading 6 documents…</h1>
+    <div class="sub">Go get coffee. This screen is informational — nothing here needs you.</div>
+    <div class="file-list" id="flist">
+      <div class="frow" id="f1"><span class="icon">📕</span><span class="name">Offering Memorandum.pdf</span><span class="what"></span><span class="st">queued</span></div>
+      <div class="frow" id="f2"><span class="icon">📗</span><span class="name">Rent Roll (May 2026).xlsx</span><span class="what"></span><span class="st">queued</span></div>
+      <div class="frow" id="f3"><span class="icon">📗</span><span class="name">Rent Roll (Feb 2026).xlsx</span><span class="what"></span><span class="st">queued</span></div>
+      <div class="frow" id="f4"><span class="icon">📘</span><span class="name">T-12 Operating.xlsx</span><span class="what"></span><span class="st">queued</span></div>
+      <div class="frow" id="f5"><span class="icon">📄</span><span class="name">Property Tax Bill 2025.pdf</span><span class="what"></span><span class="st">queued</span></div>
+      <div class="frow" id="f6"><span class="icon">🖼️</span><span class="name">Site Photos.zip</span><span class="what"></span><span class="st">queued</span></div>
+    </div>
+    <div class="note">In the real app you could close this screen entirely — the briefing lands when it's ready.</div>
+  </div>
+
+  <!-- STAGE 3 -->
+  <div id="stage-brief">
+    <div class="brief-head">
+      <div class="eyebrow">Intake Briefing</div>
+      <h1>The Marlowe — Gilbert, AZ</h1>
+      <div style="font-size:13.5px;color:var(--muted);">208 units · garden-style · built 1999 · asking $54.6M</div>
+      <div class="stats">
+        <div class="stat"><div class="n">6</div><div class="l">documents read</div></div>
+        <div class="stat"><div class="n">47</div><div class="l">facts extracted</div></div>
+        <div class="stat"><div class="n warn">3</div><div class="l">decisions need you</div></div>
+        <div class="stat"><div class="n warn">1</div><div class="l">item missing</div></div>
+      </div>
+    </div>
+
+    <section>
+      <h2>What I found — highlights</h2>
+      <div class="facts">
+        <div class="fr"><span class="k">Occupancy (rent roll)</span><span class="v">91.8%</span></div>
+        <div class="fr"><span class="k">Avg in-place rent</span><span class="v">$1,706 <small>/unit</small></span></div>
+        <div class="fr"><span class="k">Gross potential rent</span><span class="v">$4.31M <small>/yr</small></span></div>
+        <div class="fr"><span class="k">Trailing NOI</span><span class="v">$2.41M</span></div>
+        <div class="fr"><span class="k">2025 property taxes</span><span class="v">$486,200</span></div>
+        <div class="fr"><span class="k">Unit mix</span><span class="v">96 × 1BR · 84 × 2BR · 28 × 3BR</span></div>
+      </div>
+      <div class="note" style="margin-top:10px;">Full fact sheet with sources sits behind this summary — every number traces to a document and line.</div>
+    </section>
+
+    <section>
+      <h2>Decisions that need you — 3</h2>
+
+      <div class="decision" id="dec1">
+        <h3>1. Two rent rolls in the folder — which is current?</h3>
+        <p>You dropped rent rolls dated February and May 2026. They differ: occupancy fell from 93.3% to 91.8% and average rent rose $22 between them.</p>
+        <div class="opts">
+          <div class="opt" onclick="pick(this,'dec1')"><span class="radio"></span><span><b>Use May 2026 <span class="rec">Recommended</span></b><small>Most recent. February is kept on file for trend context.</small></span></div>
+          <div class="opt" onclick="pick(this,'dec1')"><span class="radio"></span><span><b>Use February 2026</b><small>Only if May's roll is known to be flawed.</small></span></div>
+        </div>
+      </div>
+
+      <div class="decision" id="dec2">
+        <h3>2. Occupancy conflict — broker says 94%, rent roll says 91.8%</h3>
+        <p>The offering memo quotes 94% occupancy. Your actual May rent roll shows 191 of 208 occupied. These can't both drive the analysis.</p>
+        <div class="opts">
+          <div class="opt" onclick="pick(this,'dec2')"><span class="radio"></span><span><b>Trust the rent roll — 91.8% <span class="rec">Recommended</span></b><small>Actual document beats marketing material. The OM claim is noted for negotiation leverage.</small></span></div>
+          <div class="opt" onclick="pick(this,'dec2')"><span class="radio"></span><span><b>Use the OM figure — 94%</b><small>Not advised, but it's your call.</small></span></div>
+        </div>
+      </div>
+
+      <div class="decision" id="dec3">
+        <h3>3. Property taxes — trailing bill or reassessed estimate?</h3>
+        <p>The 2025 tax bill is $486,200, but Maricopa reassesses on sale. At the asking price, the forward bill lands near $612,000. Underwriting on the old number flatters the deal by ~$126K a year.</p>
+        <div class="opts">
+          <div class="opt" onclick="pick(this,'dec3')"><span class="radio"></span><span><b>Underwrite reassessed — ~$612K <span class="rec">Recommended</span></b><small>Marked as an estimate until a real post-sale bill exists.</small></span></div>
+          <div class="opt" onclick="pick(this,'dec3')"><span class="radio"></span><span><b>Keep trailing — $486K</b><small>Matches history, understates the forward year.</small></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>What I couldn't find — 1</h2>
+      <div class="decision" id="dec4" style="border-left-color:#8A94A0;">
+        <h3>Insurance renewal quote</h3>
+        <p>The T-12 shows $291K trailing, but that's roughly a third below current market for a 1999-vintage asset in this market. No quote was in the folder. I'll carry a market-based estimate of ~$437K, flagged as an estimate, until you drop a real quote in.</p>
+        <div class="opts">
+          <div class="opt picked"><span class="radio"></span><span><b>Carry the flagged estimate — no action needed</b><small>Drop the broker's quote into the project anytime and it replaces the estimate automatically.</small></span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- STAGE 4 -->
+  <div id="stage-done">
+    <div class="big">✓</div>
+    <h1>Project assembled</h1>
+    <p>Forty-seven facts committed, three decisions recorded with your reasoning attached, one estimate carried and flagged. Nothing was assumed silently. The February rent roll and site photos are filed with the project.</p>
+    <button class="cta" onclick="alert('End of prototype — assumptions workflow is the next design exercise.')">Open assumptions →</button>
+  </div>
+</div>
+
+<div class="applybar" id="applybar">
+  <div class="inner">
+    <span class="status" id="applystatus">0 of 3 decisions made</span>
+    <button id="applybtn" onclick="finish()">Apply &amp; build project</button>
+  </div>
+</div>
+
+<script>
+const FILES=[
+  {id:'f1',what:'Offering memo — property identity, physical, asking price',ms:1400},
+  {id:'f2',what:'Rent roll — 208 units, May 2026',ms:1100},
+  {id:'f3',what:'Rent roll — 208 units, February 2026 (older vintage)',ms:1000},
+  {id:'f4',what:'Operating actuals — 12 months through April 2026',ms:1300},
+  {id:'f5',what:'2025 tax bill — $486,200',ms:800},
+  {id:'f6',what:'No data — filed to project documents',ms:600,filed:true},
+];
+function startProcessing(){
+  document.getElementById('stage-drop').style.display='none';
+  document.getElementById('stage-proc').style.display='block';
+  let t=400;
+  FILES.forEach((f,i)=>{
+    setTimeout(()=>{
+      const row=document.getElementById(f.id);
+      row.querySelector('.st').textContent='reading';
+      row.querySelector('.st').className='st reading';
+    },t);
+    t+=f.ms;
+    setTimeout(()=>{
+      const row=document.getElementById(f.id);
+      row.querySelector('.what').textContent=f.what;
+      row.querySelector('.st').textContent=f.filed?'filed':'done';
+      row.querySelector('.st').className='st '+(f.filed?'filed':'done');
+      if(i===FILES.length-1) setTimeout(showBriefing,900);
+    },t);
+  });
+}
+function showBriefing(){
+  document.getElementById('stage-proc').style.display='none';
+  document.getElementById('stage-brief').style.display='block';
+  document.getElementById('applybar').style.display='block';
+  window.scrollTo(0,0);
+}
+const picked={};
+function pick(el,dec){
+  const d=document.getElementById(dec);
+  d.querySelectorAll('.opt').forEach(o=>o.classList.remove('picked'));
+  el.classList.add('picked');
+  d.classList.add('resolved');
+  picked[dec]=true;
+  const n=Object.keys(picked).length;
+  document.getElementById('applystatus').textContent=n+' of 3 decisions made';
+  if(n===3){
+    document.getElementById('applybtn').classList.add('ready');
+    document.getElementById('applystatus').textContent='All decisions made — ready to build';
+  }
+}
+function finish(){
+  document.getElementById('stage-brief').style.display='none';
+  document.getElementById('applybar').style.display='none';
+  document.getElementById('stage-done').style.display='block';
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engineering Deliverables Request — Machine-Readable Formats</title>
+<style>
+  :root{--ink:#1B2530;--paper:#FBFAF6;--card:#fff;--accent:#2E6E5E;--accent-soft:#E8F1EE;--line:#DDD8CC;--muted:#5C6670;--warn:#B07A1E;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:Georgia,'Times New Roman',serif;line-height:1.55;padding:44px 20px 64px;}
+  .page{max-width:820px;margin:0 auto;}
+  .eyebrow{font-family:Verdana,Arial,sans-serif;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
+  h1{font-size:32px;font-weight:normal;line-height:1.2;margin-bottom:12px;}
+  .lede{font-size:17px;color:var(--muted);max-width:660px;margin-bottom:30px;}
+  .tier{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:8px;padding:18px 22px;margin-bottom:16px;}
+  .tier.gold{border-left-color:#9A7B4F;}
+  .tier h2{font-family:Verdana,Arial,sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:4px;}
+  .tier.gold h2{color:#9A7B4F;}
+  .tier h3{font-size:19px;margin-bottom:6px;}
+  .tier p{font-size:14.5px;color:#333;margin-bottom:8px;}
+  .tier .use{font-size:13.5px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;font-style:italic;}
+  .ask{background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;padding:18px 22px;margin-top:28px;}
+  .ask h3{font-size:16px;margin-bottom:10px;}
+  .ask ol{margin-left:20px;font-size:14.5px;}
+  .ask li{margin-bottom:7px;}
+  .foot{font-size:13px;color:var(--muted);margin-top:26px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Landscape · Working Note</div>
+  <h1>What to ask the civil engineer for</h1>
+  <p class="lede">Plan sets printed to paper-style files make Landscape work for its dinner. The same information exported in the engineer's native formats arrives as ready-to-use data — shapes, attributes, and quantities included. Every item below takes the engineering team minutes to produce; the ask belongs in the deliverables list of the next work order.</p>
+
+  <div class="tier gold">
+    <h2>Best single ask</h2>
+    <h3>1. LandXML export</h3>
+    <p>The civil industry's open exchange format. One file can carry the parcels (boundaries with names and areas), road alignments, ground surfaces, and complete pipe networks — every water, sewer, and storm run with its size, material, length, and depths. It is, quite literally, the quantity table and the site geometry as structured data.</p>
+    <div class="use">What Landscape does with it: parcels become live map objects automatically; pipe networks become quantity lines in the phase budgets with zero manual takeoff.</div>
+  </div>
+
+  <div class="tier">
+    <h2>Geometry</h2>
+    <h3>2. CAD drawing files (DWG or DXF)</h3>
+    <p>The working drawings themselves rather than prints of them. Layered linework — parcel boundaries, rights-of-way, tracts, utilities — that can be read shape by shape. DXF is the open flavor; any CAD package exports it.</p>
+    <div class="use">What Landscape does with it: exact parcel and tract shapes for the clickable site plan — no approximation, no tracing.</div>
+  </div>
+
+  <div class="tier">
+    <h2>Geometry, mapping-ready</h2>
+    <h3>3. GIS parcel export (shapefile, GeoJSON, or KMZ)</h3>
+    <p>Parcel and tract polygons with a data table attached — each shape carrying its ID, area, and land use — positioned in real-world coordinates. Most civil shops can export this from the same model that produced the plat.</p>
+    <div class="use">What Landscape does with it: shapes drop straight onto the live map, aligned with aerials, county parcels, and flood layers — the full GIS-driven navigation, georeferenced.</div>
+  </div>
+
+  <div class="tier">
+    <h2>Quantities</h2>
+    <h3>4. Quantity and earthwork reports (spreadsheet, not PDF)</h3>
+    <p>Engineers already generate tabulated quantities — pipe schedules, pavement areas, cut/fill balances, plant schedules — for their own bidding process. Request them as spreadsheets rather than printed into the plan sheets.</p>
+    <div class="use">What Landscape does with it: quantity lines map to your cost codes and become the engineering-based project budget, phase by phase.</div>
+  </div>
+
+  <div class="tier">
+    <h2>Fallback</h2>
+    <h3>5. Vector PDFs, not scans</h3>
+    <p>When only PDFs are on offer, insist on files plotted directly from CAD — they keep the underlying linework and searchable text. A scanned or flattened plan set is a photograph; a plotted one is still data wearing a PDF costume.</p>
+    <div class="use">What Landscape does with it: readable quantity tables and recoverable geometry, versus the OCR slog.</div>
+  </div>
+
+  <div class="ask">
+    <h3>Copy-paste for the next engineering work order</h3>
+    <ol>
+      <li>LandXML export of parcels, alignments, surfaces, and all pipe networks — at each submittal milestone.</li>
+      <li>DWG/DXF of the plat and improvement plans, current revision.</li>
+      <li>GeoJSON or shapefile of parcel and tract polygons, in real-world coordinates.</li>
+      <li>All quantity, earthwork, and planting schedules as Excel/CSV, matching the stamped set.</li>
+      <li>All PDF plan sets plotted from CAD (vector), never scanned.</li>
+    </ol>
+  </div>
+
+  <div class="foot">None of these change the engineer's scope or liability — they're exports of work already done. Some shops charge a nominal fee for CAD releases and may ask for a standard file-transfer disclaimer; both are worth it.</div>
+</div>
+</body>
+</html>

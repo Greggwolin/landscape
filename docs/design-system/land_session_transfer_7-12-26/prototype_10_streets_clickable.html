@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototype 10 — Parcels + Streets, One Clickable Plan</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFF; --ink:#1B2530; --muted:#68737E; --line:#E2E6EA;
+    --accent:#2E6E5E; --accent-soft:#E8F1EE; --good:#2E7D52; --good-soft:#E7F3EC;
+    --warn:#B07A1E; --warn-soft:#FBF3E2;
+    --mldr:#EFE3C0; --mdr:#D99A2B; --mhdr:#B97E4A; --hdr:#6E4A2A; --mu:#2C5488; --com:#B0356B; --os:#7DAF3F;
+    --road:#4A5560; --roadhl:#1B2530;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:18px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  header .t{font-size:16px;font-weight:600;}
+  header .s{font-size:12px;color:var(--muted);}
+
+  .hintbar{font-size:12px;color:var(--muted);padding:7px 20px;background:#FBFCFD;border-bottom:1px solid var(--line);}
+
+  .main{flex:1;display:flex;min-height:0;}
+  .mapwrap{flex:1;min-width:0;background:#E9E4D8;}
+  svg{width:100%;height:100%;display:block;}
+  .parcel{stroke:#FFF;stroke-width:2;cursor:pointer;transition:filter .12s,opacity .12s;}
+  .parcel:hover{filter:brightness(1.1);}
+  .parcel.sel{stroke:#1B2530;stroke-width:3;}
+  .parcel.dim{opacity:.3;}
+  .plabel{font-size:10.5px;font-weight:700;fill:#1B2530;pointer-events:none;}
+  .plabel.inv{fill:#fff;}
+  .street{stroke:var(--road);fill:none;cursor:pointer;stroke-linecap:round;transition:stroke .12s;}
+  .street:hover{stroke:var(--roadhl);}
+  .street.sel{stroke:var(--roadhl);}
+  .street.selglow{filter:drop-shadow(0 0 4px rgba(27,37,48,.7));}
+  .street.hl{stroke:var(--roadhl);filter:drop-shadow(0 0 4px rgba(27,37,48,.6));}
+  .street.offsite{stroke-dasharray:10 7;opacity:.55;}
+  .sdash{stroke:#F4F5F7;stroke-width:1.4;stroke-dasharray:8 10;fill:none;pointer-events:none;}
+
+  .info{width:340px;min-width:340px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:16px;}
+  .info h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .empty{color:#B9C0C7;font-size:13.5px;font-style:italic;margin-top:8px;line-height:1.6;}
+  .ihead{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+  .ihead .big{font-size:20px;font-weight:700;}
+  .usechip{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:10px;padding:2px 9px;color:#fff;}
+  .irow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #EEF1F3;font-size:13.5px;align-items:center;}
+  .irow .k{color:var(--muted);}
+  .irow .v{font-weight:600;text-align:right;}
+  .isec{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:15px 0 6px;}
+  .tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:8px;padding:1px 7px;margin-left:6px;cursor:help;}
+  .tag.measured{background:var(--good-soft);color:var(--good);}
+  .tag.assumed{background:var(--warn-soft);color:var(--warn);}
+  .tag.derived{background:var(--accent-soft);color:var(--accent);}
+  select.fsel,input.fin{border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:13px;background:#FAFBFC;font-weight:600;max-width:170px;}
+  .note{font-size:11.5px;color:var(--muted);font-style:italic;margin-top:12px;line-height:1.5;}
+
+  .strip{background:var(--panel);border-top:1px solid var(--line);padding:10px 18px;display:flex;gap:10px;align-items:stretch;overflow-x:auto;}
+  .strip .lbl{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;}
+  .ntile{border:1px solid var(--line);border-radius:9px;padding:7px 13px;min-width:150px;background:#FBFCFD;flex:none;cursor:pointer;}
+  .ntile:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .ntile .q{font-size:12.5px;font-weight:700;}
+  .ntile .d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 10</span>
+  <div>
+    <div class="t">Peoria 1600 — Parcels and Streets, One Plan</div>
+    <div class="s">The rights-of-way came from the same document read that produced the parcels. Everything is clickable.</div>
+  </div>
+</header>
+<div class="hintbar">Click a <b>parcel</b> for its land use and yield. Click a <b>street segment</b> (the gray lines) for its specs — class, section, measured length, and the quantities that fall out. Hover a network tile below to trace its segments on the plan. Dashed streets are existing/offsite — visible, not in your budget.</div>
+
+<div class="main">
+  <div class="mapwrap"><svg id="map" viewBox="0 0 760 900" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <div class="info" id="info">
+    <h2>Selection</h2>
+    <div class="empty">Nothing selected.<br><br>Parcels answer "what gets built here."<br>Streets answer "what it costs to get there."<br><br>Same plan, both questions.</div>
+  </div>
+</div>
+
+<div class="strip" id="strip"></div>
+
+<script>
+/* ---------------- scale ---------------- */
+const FT_PER_UNIT=11.7; // viewBox unit → feet (site ≈ 2 miles tall over 900 units)
+
+/* ---------------- street standards library (canonical, customizable) ---------------- */
+const STD={
+  'Local':{row:50,pav:32,walk:5,note:'City standard local section'},
+  'Collector':{row:60,pav:40,walk:5,note:'City standard collector section'},
+  'Entry / Minor Collector':{row:55,pav:36,walk:5,note:'Entry throat section'},
+  'Arterial (existing)':{row:110,pav:0,walk:0,note:'Existing public arterial — no project cost'}
+};
+
+/* ---------------- parcels (attributed) ---------------- */
+const DENS={MLDR:2.5,MDR:5.0,MHDR:10.0,HDR:18.0};
+const SW={MLDR:'#EFE3C0',MDR:'#D99A2B',MHDR:'#B97E4A',HDR:'#6E4A2A',MU:'#2C5488',C:'#B0356B',OS:'#7DAF3F'};
+const DARK={HDR:1,MU:1,C:1};
+const USE_NAME={MLDR:'Low density res.',MDR:'Medium density res.',MHDR:'Med-high density res.',HDR:'High density res.',MU:'Mixed use',C:'Commercial',OS:'Open space'};
+const P=[
+ ['3.201',3,'3.2','C',45,[20,15,150,92]],['3.202',3,'3.2','C',60,[20,112,172,100]],
+ ['3.103',3,'3.1','C',39,[230,15,132,96]],['3.102',3,'3.1','C',34,[368,15,122,96]],['3.101',3,'3.1','C',64,[560,15,182,112]],
+ ['2.112',2,'2.1','OS',56,[196,220,96,228]],
+ ['2.101',2,'2.1','MDR',18,[300,150,86,71]],['2.102',2,'2.1','MDR',17,[391,150,80,71]],['2.103',2,'2.1','MDR',16,[476,150,76,71]],
+ ['2.104',2,'2.1','MDR',21,[300,226,86,75]],['2.105',2,'2.1','MDR',21,[391,226,80,75]],['2.106',2,'2.1','MDR',21,[476,226,76,75]],
+ ['2.107',2,'2.1','MHDR',16,[300,306,81,65]],['2.108',2,'2.1','MHDR',13,[386,306,70,65]],['2.109',2,'2.1','MHDR',19,[461,306,80,65]],
+ ['2.110',2,'2.1','MHDR',23,[300,376,111,70]],['2.111',2,'2.1','HDR',19,[416,376,96,70]],
+ ['1.101',1,'1.1','MDR',32,[586,135,156,81]],['1.102',1,'1.1','MDR',25,[600,221,142,75]],['1.103',1,'1.1','MDR',21,[600,301,142,65]],
+ ['1.104',1,'1.1','MU',26,[616,371,126,70]],['1.201',1,'1.2','MU',27,[630,446,112,96]],['1.202',1,'1.2','HDR',19,[546,446,80,71]],
+ ['1.203',1,'1.2','MHDR',16,[530,522,86,60]],['1.204',1,'1.2','MDR',20,[546,587,90,66]],['1.205',1,'1.2','MDR',36,[430,621,111,95]],
+ ['1.206',1,'1.2','MDR',29,[430,721,106,85]],
+ ['2.201',2,'2.2','MDR',28,[390,461,131,75]],['2.202',2,'2.2','MDR',21,[300,471,86,70]],
+ ['2.203',2,'2.2','OS',33,[196,461,100,110]],['2.204',2,'2.2','OS',41,[300,546,121,116]],
+ ['4.105',4,'4.1','MDR',22,[256,626,96,70]],['4.101',4,'4.1','OS',9,[60,641,61,51]],['4.102',4,'4.1','MDR',23,[60,696,111,75]],
+ ['4.103',4,'4.1','OS',10,[176,661,60,56]],['4.104',4,'4.1','MDR',19,[231,701,96,70]],
+ ['4.201',4,'4.2','MLDR',17,[40,776,81,60]],['4.203',4,'4.2','MLDR',20,[126,776,91,60]],['4.202',4,'4.2','MLDR',26,[40,841,111,55]],
+ ['4.204',4,'4.2','MLDR',23,[161,841,111,55]],['4.205',4,'4.2','MLDR',27,[276,801,111,70]],['4.206',4,'4.2','C',18,[396,816,81,60]]
+];
+const units=p=>DENS[p[3]]?Math.round(p[4]*DENS[p[3]]):0;
+
+/* ---------------- streets: id, name, class, offsite?, polyline points ---------------- */
+const S=[
+ ['st1','Collector A (spine)','Collector',false,[[388,148],[388,455]]],
+ ['st2','Local A-1','Local',false,[[298,224],[554,224]]],
+ ['st3','Local A-2','Local',false,[[298,304],[554,304]]],
+ ['st4','Local A-3','Local',false,[[298,374],[554,374]]],
+ ['st5','Collector B (south)','Collector',false,[[196,458],[630,458]]],
+ ['st6','Collector C (east)','Collector',false,[[543,135],[543,455],[543,618]]],
+ ['st7','Entry — Village 4','Entry / Minor Collector',false,[[40,698],[352,698]]],
+ ['st8','Local D-1','Local',false,[[40,838],[390,838]]],
+ ['st9','Lake Pleasant Pkwy','Arterial (existing)',true,[[750,15],[750,860]]],
+ ['st10','SR-303 frontage','Arterial (existing)',true,[[20,8],[745,8]]]
+];
+/* mutable street state: class + name editable */
+const sState=S.map(s=>({name:s[1],cls:s[2]}));
+function segLen(pts){let L=0;for(let i=1;i<pts.length;i++){L+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);}return Math.round(L*FT_PER_UNIT/10)*10;}
+
+/* ---------------- draw ---------------- */
+const svg=document.getElementById('map');const NS='http://www.w3.org/2000/svg';
+const pRects=[];
+P.forEach((p,i)=>{
+  const g=p[5];
+  const r=document.createElementNS(NS,'rect');
+  r.setAttribute('x',g[0]);r.setAttribute('y',g[1]);r.setAttribute('width',g[2]);r.setAttribute('height',g[3]);
+  r.setAttribute('rx',3);r.setAttribute('fill',SW[p[3]]);r.setAttribute('class','parcel');r.dataset.i=i;
+  r.addEventListener('click',()=>{clearSel();r.classList.add('sel');showParcel(i);});
+  svg.appendChild(r);pRects.push(r);
+  const t=document.createElementNS(NS,'text');
+  t.setAttribute('x',g[0]+g[2]/2);t.setAttribute('y',g[1]+g[3]/2+3);
+  t.setAttribute('text-anchor','middle');t.setAttribute('class','plabel'+(DARK[p[3]]?' inv':''));
+  t.textContent=p[0];svg.appendChild(t);
+});
+const sPaths=[];
+S.forEach((s,i)=>{
+  const d='M '+s[4].map(pt=>pt.join(' ')).join(' L ');
+  const w=STD[s[2]].pav?Math.max(6,STD[s[2]].pav/5):9;
+  const path=document.createElementNS(NS,'path');
+  path.setAttribute('d',d);path.setAttribute('stroke-width',w);
+  path.setAttribute('class','street'+(s[3]?' offsite':''));path.dataset.i=i;
+  path.addEventListener('click',()=>{clearSel();path.classList.add('sel','selglow');showStreet(i);});
+  svg.appendChild(path);sPaths.push(path);
+  if(!s[3]){const dash=document.createElementNS(NS,'path');dash.setAttribute('d',d);dash.setAttribute('class','sdash');svg.appendChild(dash);}
+});
+function clearSel(){pRects.forEach(r=>r.classList.remove('sel'));sPaths.forEach(p=>p.classList.remove('sel','selglow','hl'));}
+
+/* ---------------- panels ---------------- */
+const info=document.getElementById('info');
+function showParcel(i){
+  const p=P[i];const u=units(p);
+  info.innerHTML=`<h2>Parcel</h2>
+    <div class="ihead"><span class="big">${p[0]}</span><span class="usechip" style="background:${SW[p[3]]};${p[3]==='MLDR'?'color:#6b5b1f;':''}">${USE_NAME[p[3]]}</span></div>
+    <div class="irow"><span class="k">Area / Phase</span><span class="v">Area ${p[1]} · Phase ${p[2]}</span></div>
+    <div class="irow"><span class="k">Acres</span><span class="v">${p[4]}</span></div>
+    ${DENS[p[3]]?`<div class="irow"><span class="k">Density</span><span class="v">${DENS[p[3]].toFixed(1)} /ac</span></div>
+    <div class="irow"><span class="k">Yield</span><span class="v">${u} units</span></div>`:''}
+    <div class="note">In production this panel reads and writes the same parcel record as the table view — the map is just another door into it. The land use choices come from your canonical library of families, types, and products, including your customizations.</div>`;
+}
+function showStreet(i){
+  const st=sState[i];const base=S[i];
+  const L=segLen(base[4]);
+  const std=STD[st.cls];
+  const off=base[3];
+  const sy=std.pav?Math.round(L*std.pav/9):0;
+  const curb=std.pav?L*2:0;
+  const walk=std.walk?L*2*std.walk:0;
+  info.innerHTML=`<h2>Street Segment</h2>
+    <div class="ihead"><input class="fin" style="max-width:100%;font-size:16px;" value="${st.name}" onchange="renameStreet(${i},this.value)"></div>
+    <div class="irow"><span class="k">Class</span><span class="v"><select class="fsel" onchange="reclassStreet(${i},this.value)">
+      ${Object.keys(STD).map(c=>`<option ${c===st.cls?'selected':''}>${c}</option>`).join('')}
+    </select></span></div>
+    <div class="irow"><span class="k">Centerline</span><span class="v">${L.toLocaleString()} LF<span class="tag measured" title="Traced from the plan geometry at the exhibit's scale — replaced by exact CAD linework when the engineer's files arrive">measured</span></span></div>
+    <div class="irow"><span class="k">Right-of-way</span><span class="v">${std.row}'<span class="tag assumed" title="${std.note} — confirm on typical section sheet">assumed</span></span></div>
+    <div class="irow"><span class="k">Pavement width</span><span class="v">${std.pav?std.pav+"'":'—'}${std.pav?'<span class="tag assumed" title="'+std.note+'">assumed</span>':''}</span></div>
+    ${off?`<div class="irow"><span class="k">Status</span><span class="v">Existing / offsite — excluded from budget</span></div>`:`
+    <div class="isec">Quantities — this segment</div>
+    <div class="irow"><span class="k">Asphalt paving</span><span class="v">${sy.toLocaleString()} SY<span class="tag derived" title="LF × pavement width ÷ 9">derived</span></span></div>
+    <div class="irow"><span class="k">Curb &amp; gutter</span><span class="v">${curb.toLocaleString()} LF<span class="tag derived" title="2 × centerline LF">derived</span></span></div>
+    <div class="irow"><span class="k">Sidewalk</span><span class="v">${walk.toLocaleString()} SF<span class="tag derived" title="2 sides × LF × walk width">derived</span></span></div>`}
+    <div class="note">Change the class and every number re-derives from the standards library — right-of-way, pavement, and the quantities. When the engineer's quantity tabs arrive, these derived values reconcile against them line by line.</div>`;
+}
+function renameStreet(i,v){sState[i].name=v;renderStrip();}
+function reclassStreet(i,v){sState[i].cls=v;showStreet(i);renderStrip();}
+
+/* ---------------- network strip ---------------- */
+function renderStrip(){
+  const strip=document.getElementById('strip');strip.innerHTML='<div class="lbl">Network</div>';
+  const groups={};
+  S.forEach((s,i)=>{
+    if(s[3])return;
+    const cls=sState[i].cls;
+    (groups[cls]=groups[cls]||{idx:[],lf:0,sy:0}).idx.push(i);
+    const L=segLen(s[4]);groups[cls].lf+=L;
+    groups[cls].sy+=Math.round(L*STD[cls].pav/9);
+  });
+  let totLF=0,totSY=0;
+  Object.entries(groups).forEach(([cls,g])=>{
+    totLF+=g.lf;totSY+=g.sy;
+    const d=document.createElement('div');d.className='ntile';
+    d.innerHTML=`<div class="q">${cls}</div><div class="d">${g.idx.length} segments · ${g.lf.toLocaleString()} LF · ${g.sy.toLocaleString()} SY paving</div>`;
+    d.onmouseenter=()=>g.idx.forEach(i=>sPaths[i].classList.add('hl'));
+    d.onmouseleave=()=>g.idx.forEach(i=>sPaths[i].classList.remove('hl'));
+    d.onclick=()=>{clearSel();g.idx.forEach(i=>sPaths[i].classList.add('sel','selglow'));};
+    strip.appendChild(d);
+  });
+  const tot=document.createElement('div');tot.className='ntile';tot.style.background='var(--accent-soft)';
+  tot.innerHTML=`<div class="q">Onsite network total</div><div class="d">${totLF.toLocaleString()} LF · ${totSY.toLocaleString()} SY · feeds the phase budgets</div>`;
+  strip.appendChild(tot);
+}
+renderStrip();
+</script>
+</body>
+</html>

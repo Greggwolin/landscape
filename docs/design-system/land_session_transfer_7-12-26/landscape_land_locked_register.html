@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landscape Land — Locked Decision Register</title>
+<style>
+  :root{--ink:#1B2530;--paper:#FBFAF6;--card:#fff;--accent:#2E6E5E;--accent-soft:#E8F1EE;--line:#DDD8CC;--muted:#5C6670;--good:#2E7D52;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:Georgia,'Times New Roman',serif;line-height:1.55;padding:44px 20px 70px;}
+  .page{max-width:840px;margin:0 auto;}
+  .eyebrow{font-family:Verdana,Arial,sans-serif;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;}
+  h1{font-size:30px;font-weight:normal;margin-bottom:8px;}
+  .lede{font-size:16px;color:var(--muted);margin-bottom:28px;max-width:700px;}
+  table{width:100%;border-collapse:collapse;background:var(--card);font-size:14.5px;margin-bottom:30px;}
+  th{font-family:Verdana,Arial,sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;text-align:left;padding:11px 14px;border-bottom:2px solid var(--ink);}
+  td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top;}
+  td:first-child{font-family:Verdana,Arial,sans-serif;font-size:12px;font-weight:bold;color:var(--accent);width:52px;}
+  td b{display:block;margin-bottom:2px;}
+  td small{color:var(--muted);font-size:13px;}
+  h2{font-family:Verdana,Arial,sans-serif;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--line);padding-bottom:8px;margin:34px 0 16px;}
+  .slice{background:var(--accent-soft);border-left:4px solid var(--accent);padding:16px 20px;font-size:15px;margin-bottom:22px;}
+  .slice b{display:block;margin-bottom:6px;font-size:16px;}
+  ol{margin-left:22px;font-size:14.5px;}
+  li{margin-bottom:8px;}
+  .foot{font-size:13px;color:var(--muted);margin-top:26px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Landscape Land · Decision Register · Locked July 11, 2026</div>
+  <h1>Eight decisions, locked</h1>
+  <p class="lede">The design foundation for the standalone land development product. Everything below was decided in one working session on July 11, 2026, with prototypes 1–10b as the evidence base. These calls don't get re-litigated; changing one requires changing it here first.</p>
+
+  <table>
+    <tr><th></th><th>Decision</th><th>Locked answer</th></tr>
+    <tr><td>D1</td><td><b>First slice</b><small>The thinnest end-to-end piece built and used first</small></td><td>App-level map + boundary-first project creation + parcel table authoring</td></tr>
+    <tr><td>D2</td><td><b>Where conversation lives</b></td><td>The workspace owns the center, always. Chat is a side rail during intake, summonable everywhere else. The docket — not the chat scroll — is the persistent home of open questions.</td></tr>
+    <tr><td>D3</td><td><b>Decision docket</b></td><td>Product-wide standard. Any judgment call at any stage files a docket tile: blockers vs. pre-answered defaults, in-tile Q&amp;A, accept-all, every answer recorded with reasoning.</td></tr>
+    <tr><td>D4</td><td><b>Geometry sources for v1</b></td><td>Existing Landscape machinery only — county tax parcels, the drawing tools, and the overlay engine with control-point fitting — promoted to app-level scope, with drawn shapes elevated from annotations to records. Engineer CAD/GIS files accepted when available. Automatic shape extraction from exhibit images: deferred.</td></tr>
+    <tr><td>D5</td><td><b>Streets &amp; quantities</b></td><td>v1.5 — designed after the parcel workflow is in daily use on the pilot.</td></tr>
+    <tr><td>D6</td><td><b>Pilot project</b></td><td>Red Valley Ranch — real entitlement record, real budget pressure, own capital.</td></tr>
+    <tr><td>D7</td><td><b>Design kit</b></td><td>The app's existing component kit and color tokens. Doors share parts, not floor plans.</td></tr>
+    <tr><td>D8</td><td><b>Out of scope, v1</b></td><td>Automated takeoff from drawing linework · exhibit-image shape extraction · mixed-use vertical modeling · offsite/regional cost sharing · multi-project portfolio views · any income-property workflow.</td></tr>
+  </table>
+
+  <h2>The first slice, in one paragraph</h2>
+  <div class="slice">
+    <b>Slice 1 — "A land deal is born on the map."</b>
+    A workspace map that belongs to the app rather than any project. A new deal starts by selecting county tax parcels or drawing a boundary; that act creates the project with geometry, acreage, and parcel identity pre-filled. Inside the project, the parcel table is authored spatially — multi-select or paint on the plan, attributes validated by the canonical land use library, grouped/flat table views in sync — with the docket handling every judgment call. Pilot: recreate Red Valley Ranch from scratch in it.
+  </div>
+
+  <h2>What happens next, in order</h2>
+  <ol>
+    <li>The locked register goes to the coding side as a briefing — along with the instruction that their first move is an audit of the existing map, overlay, and parcel machinery, so the slice is specified against what actually exists rather than what anyone remembers.</li>
+    <li>The coding side returns a phased implementation plan with explicit approval gates. Nothing is built before you approve the phasing.</li>
+    <li>Slice 1 ships to you; you run Red Valley Ranch through it for real. What the workflow demands next — streets, intake, outputs — gets chosen from that experience, not from a roadmap written in the dark.</li>
+  </ol>
+
+  <div class="foot">Companion documents produced with this register: a technical briefing for the coding side, and the first sync-bridge file carrying this direction to the Cowork project. Prototype references: 1–4 (intake paradigms) · 5 series (MPC intake, parcel table) · 6 (Red Valley entitlement chain) · 7 (map navigation) · 8 (parcel authoring) · 9 (street derivation) · 10/10b (clickable streets).</div>
+</div>
+</body>
+</html>

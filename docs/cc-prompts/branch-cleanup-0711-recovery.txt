@@ -1,0 +1,46 @@
+# Branch Cleanup Recovery Snapshot — 2026-07-11
+# Session: LSCMD-BRANCHCLEANUP-0711-LN6
+# Recreate any branch with:  git branch <name> <sha>   (then: git push origin <name>)
+# origin/main at time of cleanup: 0297eda040974c15da13eef9d5b298aad0049ffc
+#
+# NOTE: At cleanup time, 15 of these 20 were ALREADY deleted from origin
+# (PR-merge auto-delete / prior session). SHAs below were captured from local
+# remote-tracking refs immediately before final prune. 5 were still live and
+# deleted by this session (marked LIVE->DELETED).
+
+## Group A — merged (14) [safe: all PRs confirmed MERGED via gh]
+feature/studio-nav-flyout          8caf001cba74a3edaad753476a840bde5333e1fc  PR#152 MERGED  LIVE->DELETED
+fix/studio-rail-collapse           3fc09821f935d4589a93925f9e8b1f5bc8b56e3a  PR#153 MERGED  LIVE->DELETED
+fix/sidebar-projects-flyout        b9173c1db4e7f85e96ab12cb8b1ccbb8811720e7  PR#154 MERGED  already-gone
+fix/studio-media-poll-churn        3e22e75c94b3250e1fdc127d5ee3921b53ab1044  PR#155 MERGED  LIVE->DELETED
+feature/map-legend-terrain         e84af0a10dfba7d59ccf0702d8e8838e913680b3  PR#146 MERGED  already-gone
+feature/legend-annotations-fix     89d1e87e43dc84003fe73dfc871b58ef0d998ba5  PR#147 MERGED  already-gone
+feature/ci-jwt-signing-key         c7445a9a178f05394d82be9ba7f152f8d7c6052b  PR#148 MERGED  already-gone
+feature/map-panel-layout           41e26457febc68f98c23d4d43427abfd8e81f498  PR#149 MERGED  already-gone
+feature/parcel-outline-minzoom     700d56bea7840be8128964a74544a621848e2daa  PR#150 MERGED  already-gone
+feature/map-tilt-groups            08f188ffeb19cafd6b463de6ed92f75436896225  PR#151 MERGED  already-gone
+feature/renovation-breakdown-tool  10f49edc38d8e2c2c618949698dea36eb72db4e4  PR#139 MERGED  already-gone
+feature/studio-primary-shell       c14ac6b653358abff3291a1a0574a9df8ef037a0  PR#135 MERGED  LIVE->DELETED
+fix/landscaper-fab-provenance      02bcdc3a0b6d0d439eae3966fdaa8f2165aabe1e  PR#136 MERGED  already-gone
+revert/studio-reno-slice-route     762f36d112b95f5fa7c1895965fa6359cdea7d9c  PR#138 MERGED  already-gone
+
+## Group B — dead/superseded (2)
+docs/claudemd-sync-0626            ac48e869e95a60c6dd439e3f45f341f869cf7d84  already-gone
+fix/studio-reno-slice-route        beb8f1c81b380eaecb2b3b24e38e8b9df3a226ba  already-gone
+
+## Group E — discards (4) [Gregg approved discarding unmerged work]
+feat/spec-hidden-and-header-align  0848ed5be974e94388782a6805226246524af9b8  LIVE->DELETED
+feature/overlay-annotations        0614819bb8717e67e10b111df562fd013c054eea  already-gone
+feature/siteplan-picker-zorder     f13439b70d06deaf5a3c1a21a9775d322fdc0ec4  already-gone
+fix/project-tile-canonical-badges  d130105b5d78b957860d23074beb97ba3ae823c4  already-gone
+
+## KEEP (do NOT delete) — confirmed present on origin at cleanup time
+feature/map-sales-match-market     3217b0c1753e0f9a1ea9ae614a2db12d58bc2d92
+feature/dms-previewer              c974f3ac9449cabf6836de0d49d9bc648dab0356
+fix/retire-budget-category-deadpath a1e0f4408972e9035ac54b7c28923db19bc7c12e
+
+# LN7 local-only branches deleted 2026-07-11T19:19:43Z
+fix/location-map-pin-behavior ab8286db04d4b1e4fd0ee66e85aa982d3de543e4 fix(map): retarget landing-map fix to ProjectTabMap (Hybrid + pan + drag-to-move pin)
+fix/overlay-durable-storage 09612a66b6b96717fde0d89d1c91915f45cc771b fix(map): store site-plan drapes durably on R2 so saved overlays don't 404
+fix/source-pointers-hide-empty 643e9fcaed06334640bd55273b5dcf6e5150d98d fix(artifacts): hide Source Pointers footer when artifact has no pointers
+wip/property-type-badge-0624 edfd3f720ae233eff1178bb3296bcea926abc283 wip: property-type-badge session checkpoint — parked for studio merge

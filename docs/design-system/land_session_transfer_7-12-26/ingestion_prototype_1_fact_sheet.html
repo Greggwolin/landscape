@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Prototype 1 — Conversational Intake / Live Fact Sheet</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --warn:#B07A1E; --warn-soft:#FBF3E2; --new:#DFF0E9;
+    --chip:#EEF1F4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  /* ---------- header ---------- */
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  #projName{font-size:16px;font-weight:600;}
+  #projSub{font-size:12px;color:var(--muted);}
+  .meter-wrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .meter-label{font-size:12px;color:var(--muted);}
+  .meter{width:160px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .meter>div{height:100%;width:0%;background:var(--accent);transition:width .8s ease;}
+  #meterPct{font-size:13px;font-weight:600;width:38px;}
+
+  /* ---------- layout ---------- */
+  .main{flex:1;display:flex;min-height:0;}
+
+  /* ---------- chat ---------- */
+  .chat{width:390px;min-width:390px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .chat-log{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:92%;padding:10px 13px;border-radius:10px;font-size:13.5px;line-height:1.45;animation:pop .25s ease;}
+  .msg.ai{background:#F1F3F5;align-self:flex-start;border-top-left-radius:3px;}
+  .msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-top-right-radius:3px;}
+  .msg.sys{background:none;color:var(--muted);font-size:12px;align-self:center;font-style:italic;padding:2px;}
+  .msg ul{margin:6px 0 2px 16px;}
+  .msg li{margin-bottom:3px;}
+  .msg .good{color:var(--accent);font-weight:600;}
+  .msg .need{color:var(--warn);font-weight:600;}
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;align-self:flex-start;animation:pop .25s ease;}
+  .chip{background:var(--panel);border:1.5px solid var(--accent);color:var(--accent);font-size:13px;font-weight:600;padding:7px 14px;border-radius:18px;cursor:pointer;}
+  .chip:hover{background:var(--accent-soft);}
+  .chat-input{border-top:1px solid var(--line);padding:12px 14px;}
+  .chat-input input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13.5px;background:#FAFBFC;}
+
+  /* ---------- fact sheet ---------- */
+  .sheet{flex:1;overflow-y:auto;padding:20px 24px 60px;}
+  .sheet-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;}
+  .sheet-head h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .sheet-head span{font-size:12px;color:var(--muted);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .card h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .card h3 .dot{width:8px;height:8px;border-radius:50%;background:var(--line);}
+  .card.done h3 .dot{background:var(--accent);}
+  .frow{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #EEF1F3;font-size:13.5px;}
+  .frow:last-child{border-bottom:none;}
+  .frow .k{color:var(--muted);}
+  .frow .v{font-weight:600;text-align:right;}
+  .frow .v.empty{color:#B9C0C7;font-weight:400;}
+  .frow .v.filled{cursor:pointer;border-bottom:1px dotted var(--accent);}
+  .frow.flash{animation:flash 1.6s ease;}
+  @keyframes flash{0%{background:var(--new);}100%{background:transparent;}}
+  .frow .v.warn{color:var(--warn);}
+  table.mix{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:2px;}
+  table.mix th{text-align:left;color:var(--muted);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line);}
+  table.mix td{padding:4px 6px;border-bottom:1px dashed #EEF1F3;}
+  table.mix td:nth-child(n+2),table.mix th:nth-child(n+2){text-align:right;}
+
+  /* ---------- doc tray (simulator) ---------- */
+  .tray{position:fixed;bottom:0;left:390px;right:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 24px;display:flex;align-items:center;gap:12px;}
+  .tray-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .doc{border:1.5px dashed #B9C0C7;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#FAFBFC;}
+  .doc:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .doc.used{opacity:.35;pointer-events:none;border-style:solid;}
+  .doc .icon{font-size:15px;}
+  .cta{margin-left:auto;background:var(--accent);color:#fff;border:none;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:8px;cursor:pointer;opacity:.35;pointer-events:none;}
+  .cta.ready{opacity:1;pointer-events:auto;}
+
+  /* ---------- provenance popover ---------- */
+  #pop{position:fixed;display:none;background:var(--ink);color:#fff;font-size:12px;line-height:1.5;padding:10px 12px;border-radius:8px;max-width:280px;z-index:50;}
+  #pop .src{color:#9FD4C4;font-weight:600;margin-bottom:4px;}
+  #pop .snip{font-style:italic;color:#D5DAE0;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 1 of N</span>
+  <div>
+    <div id="projName">Untitled Project</div>
+    <div id="projSub">Multifamily · Investment · drop documents to begin</div>
+  </div>
+  <div class="meter-wrap">
+    <span class="meter-label">Fact sheet</span>
+    <div class="meter"><div id="meterBar"></div></div>
+    <span id="meterPct">0%</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="chat">
+    <div class="chat-log" id="log">
+      <div class="msg ai">New multifamily project. Drop whatever you have — offering memo, rent roll, operating statements, in any order. I'll build the fact sheet as I read, and I'll only interrupt you when something genuinely needs your call.</div>
+      <div class="msg sys">Use the document tray below to simulate drops</div>
+    </div>
+    <div class="chat-input"><input placeholder="Message Landscaper… (disabled in prototype)" disabled></div>
+  </div>
+
+  <div class="sheet">
+    <div class="sheet-head"><h2>Project Fact Sheet</h2><span>fills automatically · tap any value to see its source</span></div>
+    <div class="grid">
+
+      <div class="card" id="card-id">
+        <h3><span class="dot"></span>Identity</h3>
+        <div class="frow" data-f="name"><span class="k">Property name</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="addr"><span class="k">Address</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="market"><span class="k">Market / submarket</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="ask"><span class="k">Asking price</span><span class="v empty">—</span></div>
+      </div>
+
+      <div class="card" id="card-phys">
+        <h3><span class="dot"></span>Physical</h3>
+        <div class="frow" data-f="units"><span class="k">Units</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="built"><span class="k">Year built</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="type"><span class="k">Style</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="acres"><span class="k">Site</span><span class="v empty">—</span></div>
+      </div>
+
+      <div class="card" id="card-mix">
+        <h3><span class="dot"></span>Unit Mix</h3>
+        <table class="mix">
+          <tr><th>Plan</th><th>Units</th><th>SF</th><th>In-place</th></tr>
+          <tr data-f="mix1"><td>1BR / 1BA</td><td class="m">—</td><td class="m">—</td><td class="m">—</td></tr>
+          <tr data-f="mix2"><td>2BR / 2BA</td><td class="m">—</td><td class="m">—</td><td class="m">—</td></tr>
+          <tr data-f="mix3"><td>3BR / 2BA</td><td class="m">—</td><td class="m">—</td><td class="m">—</td></tr>
+        </table>
+      </div>
+
+      <div class="card" id="card-inc">
+        <h3><span class="dot"></span>Income</h3>
+        <div class="frow" data-f="occ"><span class="k">Occupancy</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="aip"><span class="k">Avg in-place rent</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="gpr"><span class="k">Gross potential rent</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="other"><span class="k">Other income</span><span class="v empty">—</span></div>
+      </div>
+
+      <div class="card" id="card-exp">
+        <h3><span class="dot"></span>Operating Expenses</h3>
+        <div class="frow" data-f="tax"><span class="k">Property taxes</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="ins"><span class="k">Insurance</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="rm"><span class="k">Repairs &amp; maintenance</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="pay"><span class="k">Payroll</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="noi"><span class="k">Trailing NOI</span><span class="v empty">—</span></div>
+      </div>
+
+      <div class="card" id="card-open">
+        <h3><span class="dot"></span>Open Items</h3>
+        <div class="frow" data-f="oi1"><span class="k">Tax reassessment on sale</span><span class="v empty">not yet addressed</span></div>
+        <div class="frow" data-f="oi2"><span class="k">Insurance renewal quote</span><span class="v empty">not yet addressed</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="tray">
+  <span class="tray-label">Document tray</span>
+  <div class="doc" id="d1"><span class="icon">📕</span>Offering Memorandum.pdf</div>
+  <div class="doc" id="d2"><span class="icon">📗</span>Rent Roll (May 2026).xlsx</div>
+  <div class="doc" id="d3"><span class="icon">📘</span>T-12 Operating.xlsx</div>
+  <button class="cta" id="cta">Open assumptions →</button>
+</div>
+
+<div id="pop"></div>
+
+<script>
+const log = document.getElementById('log');
+const bar = document.getElementById('meterBar');
+const pct = document.getElementById('meterPct');
+let progress = 0;
+
+function say(html, cls='ai', delay=0){
+  return new Promise(res=>{
+    setTimeout(()=>{
+      const d=document.createElement('div');
+      d.className='msg '+cls; d.innerHTML=html;
+      log.appendChild(d); log.scrollTop=log.scrollHeight; res();
+    },delay);
+  });
+}
+function chips(opts){
+  return new Promise(res=>{
+    const w=document.createElement('div'); w.className='chips';
+    opts.forEach(o=>{
+      const c=document.createElement('button'); c.className='chip'; c.textContent=o;
+      c.onclick=()=>{ w.remove(); say(o,'user'); res(o); };
+      w.appendChild(c);
+    });
+    log.appendChild(w); log.scrollTop=log.scrollHeight;
+  });
+}
+function setMeter(n){ progress=n; bar.style.width=n+'%'; pct.textContent=n+'%'; }
+
+const SRC = {};
+function fill(f, val, src, snip, warn=false, delay=0){
+  setTimeout(()=>{
+    const row=document.querySelector(`[data-f="${f}"]`);
+    if(!row) return;
+    if(row.tagName==='TR'){
+      const cells=row.querySelectorAll('.m');
+      val.forEach((v,i)=>{ if(cells[i]){cells[i].textContent=v; cells[i].classList.add('filled');} });
+      row.classList.add('flash');
+    }else{
+      const v=row.querySelector('.v');
+      v.textContent=val; v.classList.remove('empty'); v.classList.add('filled');
+      if(warn) v.classList.add('warn');
+      row.classList.add('flash');
+      setTimeout(()=>row.classList.remove('flash'),1700);
+    }
+    if(src) SRC[f]={src,snip};
+  },delay);
+}
+function cardDone(id){ document.getElementById(id).classList.add('done'); }
+
+/* provenance popover */
+const pop=document.getElementById('pop');
+document.addEventListener('click',e=>{
+  const v=e.target.closest('.v.filled, td.filled');
+  if(v){
+    const row=e.target.closest('[data-f]');
+    const meta=SRC[row?.dataset.f];
+    if(meta){
+      pop.innerHTML=`<div class="src">${meta.src}</div><div class="snip">"${meta.snip}"</div>`;
+      pop.style.display='block';
+      pop.style.left=Math.min(e.clientX+10, window.innerWidth-300)+'px';
+      pop.style.top=(e.clientY+10)+'px';
+      return;
+    }
+  }
+  pop.style.display='none';
+});
+
+/* ---------------- choreography ---------------- */
+
+document.getElementById('d1').onclick=async function(){
+  this.classList.add('used');
+  await say('Reading <b>Offering Memorandum.pdf</b>…','sys');
+  await say(`This is <b>The Marlowe</b> — a 208-unit garden-style community in Gilbert, Arizona, built 1999. Asking <b>$54.6M</b>. I've started the fact sheet.`,'ai',900);
+  document.getElementById('projName').textContent='The Marlowe';
+  document.getElementById('projSub').textContent='Multifamily · Investment · Gilbert, AZ';
+  fill('name','The Marlowe','Offering Memorandum, p.1','The Marlowe Apartments — Gilbert, AZ',false,300);
+  fill('addr','2240 E Ray Rd, Gilbert AZ','Offering Memorandum, p.2','2240 East Ray Road, Gilbert, Arizona 85296',false,600);
+  fill('market','Phoenix / SE Valley','Offering Memorandum, p.4','…located in the Southeast Valley submarket…',false,900);
+  fill('ask','$54,600,000','Offering Memorandum, p.1','Offered at $54,600,000 ($262,500/unit)',false,1200);
+  fill('units','208','Offering Memorandum, p.3','208 total units across 13 buildings',false,1500);
+  fill('built','1999','Offering Memorandum, p.3','Constructed 1999',false,1700);
+  fill('type','Garden, 2-story','Offering Memorandum, p.3','Two-story garden-style community',false,1900);
+  fill('acres','11.4 acres','Offering Memorandum, p.3','Situated on approximately 11.4 acres',false,2100);
+  setTimeout(()=>{cardDone('card-id');cardDone('card-phys');setMeter(38);},2300);
+  await say(`Here's where we stand:<ul><li class="good">✓ Identity &amp; physical — complete</li><li class="need">Still need current rents and occupancy → rent roll</li><li class="need">Still need actual operating history → T-12</li></ul>The OM quotes pro-forma numbers, but I never treat broker pro-forma as fact — those wait for your real documents.`,'ai',2600);
+};
+
+document.getElementById('d2').onclick=async function(){
+  if(!SRC['name']){ await say('Drop the Offering Memorandum first (prototype runs in order).','sys'); this.classList.remove('used'); return; }
+  this.classList.add('used');
+  await say('Reading <b>Rent Roll (May 2026).xlsx</b>…','sys');
+  await say(`Rent roll parsed — 208 units, 3 floor plans, 191 occupied. Unit mix and income are filling in now.`,'ai',900);
+  fill('mix1',['96','742 sf','$1,486'],null,null,false,300);
+  fill('mix2',['84','1,058 sf','$1,812'],null,null,false,600);
+  fill('mix3',['28','1,290 sf','$2,145'],null,null,false,900);
+  fill('occ','91.8%','Rent Roll (May 2026), summary row','Total occupied: 191 of 208 (91.8%)',false,1200);
+  fill('aip','$1,706 / unit','Rent Roll (May 2026), summary row','Average in-place rent: $1,706',false,1500);
+  fill('gpr','$4.31M / yr','Calculated from rent roll','208 units × scheduled rents, annualized',false,1800);
+  setTimeout(()=>{cardDone('card-mix');setMeter(64);},2000);
+  await say(`One thing worth flagging early: the OM claims <b>94% occupancy</b>, but your rent roll shows <b>91.8%</b>. I'll trust the rent roll unless you tell me otherwise — it's the actual document.`,'ai',2400);
+};
+
+document.getElementById('d3').onclick=async function(){
+  if(!SRC['occ']){ await say('Drop the Rent Roll first (prototype runs in order).','sys'); this.classList.remove('used'); return; }
+  this.classList.add('used');
+  await say('Reading <b>T-12 Operating.xlsx</b>…','sys');
+  await say(`Twelve months of actuals, through April 2026. Expenses are filling in.`,'ai',900);
+  fill('tax','$486,200 / yr','T-12 Operating, tax line','Real estate taxes: 486,200 (trailing 12)',false,300);
+  fill('ins','$291,400 / yr','T-12 Operating, insurance line','Property insurance: 291,400 (trailing 12)',true,600);
+  fill('rm','$378,100 / yr','T-12 Operating, R&M rollup','Repairs & maintenance incl. turns: 378,100',false,900);
+  fill('pay','$512,700 / yr','T-12 Operating, payroll rollup','On-site payroll & benefits: 512,700',false,1200);
+  fill('other','$246,300 / yr','T-12 Operating, other income','Utility reimb., fees, laundry: 246,300',false,1500);
+  fill('noi','$2.41M','Calculated from T-12','Trailing NOI per actual operating history',false,1800);
+  setTimeout(()=>{cardDone('card-inc');cardDone('card-exp');setMeter(86);},2000);
+  await say(`Fact sheet is nearly complete. Two judgment calls I can't make for you:<ul><li><b>Property taxes</b> — Maricopa will reassess on sale. The T-12 figure understates your forward number.</li><li><b>Insurance</b> — trailing figure is 34% below current market quotes for this vintage. Flagged in amber on the sheet.</li></ul>How do you want to handle these?`,'ai',2400);
+  const a = await chips(['Use market-based estimates','Enter my own numbers','Deal with it later']);
+  if(a==='Use market-based estimates'){
+    fill('oi1','Est. reassessed: $612K / yr','Landscape estimate','Maricopa 2026 ratio applied to asking price',false,300);
+    fill('oi2','Est. renewal: $437K / yr','Landscape estimate','$2,100/unit — 2026 SE Valley vintage-1999 average',false,600);
+    setTimeout(()=>{cardDone('card-open');setMeter(100);},900);
+    await say(`Done — both estimates applied and <b>marked as estimates</b>, not facts. They'll stay flagged until a real tax bill or quote replaces them. The fact sheet is complete and every number on it traces to a source. Ready to move to assumptions.`,'ai',1200);
+  } else if(a==='Enter my own numbers'){
+    fill('oi1','Awaiting your input','—','',true,300);
+    fill('oi2','Awaiting your input','—','',true,500);
+    setTimeout(()=>setMeter(94),700);
+    await say(`Both items are held open on the sheet and will nag politely until filled. Everything else is done — ready to move to assumptions.`,'ai',1000);
+  } else {
+    setTimeout(()=>setMeter(90),300);
+    await say(`Parked. Both stay visible under Open Items so nothing silently defaults. Everything else is done — ready to move to assumptions.`,'ai',800);
+  }
+  document.getElementById('cta').classList.add('ready');
+  document.getElementById('cta').onclick=()=>say('End of prototype — the assumptions workflow is the next design exercise.','sys');
+};
+</script>
+</body>
+</html>

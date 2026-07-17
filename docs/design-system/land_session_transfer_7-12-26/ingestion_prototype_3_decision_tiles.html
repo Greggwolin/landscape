@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingestion Prototype 3 — Live Fact Sheet + Decision Tiles with Q&A</title>
+<style>
+  :root{
+    --bg:#F4F5F7; --panel:#FFFFFF; --ink:#1B2530; --muted:#68737E;
+    --line:#E2E6EA; --accent:#2E6E5E; --accent-soft:#E8F1EE;
+    --warn:#B07A1E; --warn-soft:#FBF3E2; --new:#DFF0E9; --good:#2E7D52;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;}
+  .proto-tag{font-size:10px;letter-spacing:.12em;text-transform:uppercase;background:var(--ink);color:#fff;padding:4px 8px;border-radius:3px;}
+  #projName{font-size:16px;font-weight:600;}
+  #projSub{font-size:12px;color:var(--muted);}
+  .meter-wrap{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .meter-label{font-size:12px;color:var(--muted);}
+  .meter{width:160px;height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .meter>div{height:100%;width:0%;background:var(--accent);transition:width .8s ease;}
+  #meterPct{font-size:13px;font-weight:600;width:38px;}
+
+  .main{flex:1;display:flex;min-height:0;}
+
+  /* chat */
+  .chat{width:440px;min-width:440px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;}
+  .chat-log{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:94%;padding:10px 13px;border-radius:10px;font-size:13.5px;line-height:1.45;animation:pop .25s ease;}
+  .msg.ai{background:#F1F3F5;align-self:flex-start;border-top-left-radius:3px;}
+  .msg.user{background:var(--accent);color:#fff;align-self:flex-end;border-top-right-radius:3px;}
+  .msg.sys{background:none;color:var(--muted);font-size:12px;align-self:center;font-style:italic;padding:2px;}
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .chat-input{border-top:1px solid var(--line);padding:12px 14px;}
+  .chat-input input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13.5px;background:#FAFBFC;}
+
+  /* decision tile */
+  .tile{align-self:stretch;border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;background:#FFFDF8;padding:14px 15px;animation:pop .3s ease;}
+  .tile.resolved{border-left-color:var(--good);background:#FAFDFB;}
+  .tile h4{font-size:14px;margin-bottom:4px;}
+  .tile .why{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:11px;}
+  .opt{display:flex;align-items:flex-start;gap:9px;border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12.5px;background:var(--panel);margin-bottom:7px;}
+  .opt:hover{border-color:var(--accent);}
+  .opt.picked{border-color:var(--good);background:var(--accent-soft);}
+  .opt.dim{opacity:.45;pointer-events:none;}
+  .opt .radio{width:15px;height:15px;border:2px solid #B7C0CB;border-radius:50%;margin-top:1px;flex:none;}
+  .opt.picked .radio{border-color:var(--good);background:radial-gradient(circle at center,var(--good) 45%,transparent 50%);}
+  .opt b{display:block;font-size:12.5px;}
+  .opt small{color:var(--muted);font-size:11.5px;line-height:1.4;display:block;}
+  .rec{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:1px 7px;margin-left:6px;}
+  .opt.reveal{border-style:dashed;border-color:var(--accent);animation:pop .3s ease;}
+
+  .tile-qa{margin-top:4px;border-top:1px dashed var(--line);padding-top:10px;}
+  .tile-qa .hint{font-size:11px;color:var(--muted);margin-bottom:6px;}
+  .sugg{display:inline-block;font-size:11.5px;color:var(--accent);border:1px solid var(--accent);border-radius:12px;padding:3px 10px;margin:0 5px 6px 0;cursor:pointer;background:var(--panel);}
+  .sugg:hover{background:var(--accent-soft);}
+  .qa-row{display:flex;gap:7px;}
+  .qa-row input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:12.5px;background:var(--panel);}
+  .qa-row button{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:0 13px;font-size:12.5px;font-weight:600;cursor:pointer;}
+  .qa-thread{margin-top:8px;display:flex;flex-direction:column;gap:7px;}
+  .qa-q{font-size:12.5px;background:var(--accent);color:#fff;border-radius:8px;padding:7px 10px;align-self:flex-end;max-width:90%;}
+  .qa-a{font-size:12.5px;background:#F1F3F5;border-radius:8px;padding:8px 10px;align-self:flex-start;max-width:95%;line-height:1.5;}
+
+  /* fact sheet */
+  .sheet{flex:1;overflow-y:auto;padding:20px 24px 70px;}
+  .sheet-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;}
+  .sheet-head h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .sheet-head span{font-size:12px;color:var(--muted);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .card h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .card h3 .dot{width:8px;height:8px;border-radius:50%;background:var(--line);}
+  .card.done h3 .dot{background:var(--accent);}
+  .frow{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #EEF1F3;font-size:13.5px;}
+  .frow:last-child{border-bottom:none;}
+  .frow .k{color:var(--muted);}
+  .frow .v{font-weight:600;text-align:right;}
+  .frow .v.empty{color:#B9C0C7;font-weight:400;}
+  .frow .v.warn{color:var(--warn);}
+  .frow.flash{animation:flash 1.6s ease;}
+  @keyframes flash{0%{background:var(--new);}100%{background:transparent;}}
+  table.mix{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:2px;}
+  table.mix th{text-align:left;color:var(--muted);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line);}
+  table.mix td{padding:4px 6px;border-bottom:1px dashed #EEF1F3;}
+  table.mix td:nth-child(n+2),table.mix th:nth-child(n+2){text-align:right;}
+
+  .tray{position:fixed;bottom:0;left:440px;right:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 24px;display:flex;align-items:center;gap:12px;}
+  .tray-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .doc{border:1.5px dashed #B9C0C7;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#FAFBFC;}
+  .doc:hover{border-color:var(--accent);background:var(--accent-soft);}
+  .doc.used{opacity:.35;pointer-events:none;border-style:solid;}
+  .cta{margin-left:auto;background:var(--accent);color:#fff;border:none;font-size:13.5px;font-weight:600;padding:10px 18px;border-radius:8px;cursor:pointer;opacity:.35;pointer-events:none;}
+  .cta.ready{opacity:1;pointer-events:auto;}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="proto-tag">Prototype 3 of N</span>
+  <div>
+    <div id="projName">Untitled Project</div>
+    <div id="projSub">Multifamily · Investment · drop documents to begin</div>
+  </div>
+  <div class="meter-wrap">
+    <span class="meter-label">Fact sheet</span>
+    <div class="meter"><div id="meterBar"></div></div>
+    <span id="meterPct">0%</span>
+  </div>
+</header>
+
+<div class="main">
+  <div class="chat">
+    <div class="chat-log" id="log">
+      <div class="msg ai">New multifamily project. Drop whatever you have, in any order. I'll build the fact sheet as I read. When something needs your judgment, I'll frame it as a decision — you can pick an answer, or question me first. Your call is never rushed.</div>
+      <div class="msg sys">Use the document tray below to simulate drops</div>
+    </div>
+    <div class="chat-input"><input placeholder="Message Landscaper… (main input disabled — use the boxes inside decisions)" disabled></div>
+  </div>
+
+  <div class="sheet">
+    <div class="sheet-head"><h2>Project Fact Sheet</h2><span>fills automatically as documents are read</span></div>
+    <div class="grid">
+      <div class="card" id="card-id">
+        <h3><span class="dot"></span>Identity</h3>
+        <div class="frow" data-f="name"><span class="k">Property name</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="addr"><span class="k">Address</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="ask"><span class="k">Asking price</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="units"><span class="k">Units / vintage</span><span class="v empty">—</span></div>
+      </div>
+      <div class="card" id="card-mix">
+        <h3><span class="dot"></span>Unit Mix</h3>
+        <table class="mix">
+          <tr><th>Plan</th><th>Units</th><th>SF</th><th>In-place</th></tr>
+          <tr data-f="mix1"><td>1BR / 1BA</td><td class="m">—</td><td class="m">—</td><td class="m">—</td></tr>
+          <tr data-f="mix2"><td>2BR / 2BA</td><td class="m">—</td><td class="m">—</td><td class="m">—</td></tr>
+          <tr data-f="mix3"><td>3BR / 2BA</td><td class="m">—</td><td class="m">—</td><td class="m">—</td></tr>
+        </table>
+      </div>
+      <div class="card" id="card-inc">
+        <h3><span class="dot"></span>Income</h3>
+        <div class="frow" data-f="occ"><span class="k">Occupancy basis</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="aip"><span class="k">Avg in-place rent</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="gpr"><span class="k">Gross potential rent</span><span class="v empty">—</span></div>
+      </div>
+      <div class="card" id="card-exp">
+        <h3><span class="dot"></span>Operating Expenses</h3>
+        <div class="frow" data-f="tax"><span class="k">Property taxes (fwd)</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="ins"><span class="k">Insurance</span><span class="v empty">—</span></div>
+        <div class="frow" data-f="noi"><span class="k">Trailing NOI</span><span class="v empty">—</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tray">
+  <span class="tray-label">Document tray</span>
+  <div class="doc" id="d1">📕 Offering Memorandum.pdf</div>
+  <div class="doc" id="d2">📗 Rent Roll (May 2026).xlsx</div>
+  <div class="doc" id="d3">📘 T-12 Operating.xlsx</div>
+  <button class="cta" id="cta">Open assumptions →</button>
+</div>
+
+<script>
+const log=document.getElementById('log');
+function say(html,cls='ai',delay=0){
+  return new Promise(res=>{setTimeout(()=>{
+    const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;
+    log.appendChild(d);log.scrollTop=log.scrollHeight;res(d);
+  },delay);});
+}
+function setMeter(n){document.getElementById('meterBar').style.width=n+'%';document.getElementById('meterPct').textContent=n+'%';}
+function fill(f,val,warn=false,delay=0){
+  setTimeout(()=>{
+    const row=document.querySelector(`[data-f="${f}"]`);if(!row)return;
+    if(row.tagName==='TR'){
+      const cells=row.querySelectorAll('.m');
+      val.forEach((v,i)=>{if(cells[i])cells[i].textContent=v;});
+      row.classList.add('flash');
+    }else{
+      const v=row.querySelector('.v');v.textContent=val;v.classList.remove('empty');
+      if(warn)v.classList.add('warn');else v.classList.remove('warn');
+      row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1700);
+    }
+  },delay);
+}
+function cardDone(id){document.getElementById(id).classList.add('done');}
+
+/* ---------- decision tile builder ---------- */
+function tile(cfg){
+  return new Promise(resolve=>{
+    const t=document.createElement('div');t.className='tile';
+    let optsHtml=cfg.options.map((o,i)=>`
+      <div class="opt" data-i="${i}"><span class="radio"></span><span><b>${o.label}${o.rec?'<span class="rec">Recommended</span>':''}</b><small>${o.sub}</small></span></div>`).join('');
+    t.innerHTML=`<h4>${cfg.title}</h4><div class="why">${cfg.why}</div>
+      <div class="optwrap">${optsHtml}</div>
+      <div class="tile-qa">
+        <div class="hint">Not sure? Ask me anything about this before deciding:</div>
+        <div class="suggwrap">${cfg.suggestions.map(s=>`<span class="sugg">${s}</span>`).join('')}</div>
+        <div class="qa-row"><input placeholder="Ask a question or give direction…"><button>Ask</button></div>
+        <div class="qa-thread"></div>
+      </div>`;
+    log.appendChild(t);log.scrollTop=log.scrollHeight;
+
+    let asked=false;
+    function answer(q){
+      const th=t.querySelector('.qa-thread');
+      const uq=document.createElement('div');uq.className='qa-q';uq.textContent=q;th.appendChild(uq);
+      setTimeout(()=>{
+        const a=document.createElement('div');a.className='qa-a';a.innerHTML=cfg.answer;th.appendChild(a);
+        log.scrollTop=log.scrollHeight;
+        if(cfg.revealOption && !asked){
+          asked=true;
+          setTimeout(()=>{
+            const w=t.querySelector('.optwrap');
+            const d=document.createElement('div');d.className='opt reveal';d.dataset.i='r';
+            d.innerHTML=`<span class="radio"></span><span><b>${cfg.revealOption.label}<span class="rec">New option</span></b><small>${cfg.revealOption.sub}</small></span>`;
+            d.onclick=()=>pickOpt(d,cfg.revealOption);
+            w.appendChild(d);log.scrollTop=log.scrollHeight;
+          },700);
+        }
+      },800);
+      log.scrollTop=log.scrollHeight;
+    }
+    t.querySelectorAll('.sugg').forEach(s=>s.onclick=()=>answer(s.textContent));
+    const inp=t.querySelector('.qa-row input');
+    t.querySelector('.qa-row button').onclick=()=>{if(inp.value.trim()){answer(inp.value.trim());inp.value='';}};
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()){answer(inp.value.trim());inp.value='';}});
+
+    function pickOpt(el,opt){
+      t.querySelectorAll('.opt').forEach(o=>{o.classList.add('dim');o.classList.remove('picked');});
+      el.classList.remove('dim');el.classList.add('picked');
+      t.classList.add('resolved');
+      t.querySelector('.tile-qa').style.display='none';
+      resolve(opt);
+    }
+    t.querySelectorAll('.opt').forEach(el=>{
+      el.onclick=()=>pickOpt(el,cfg.options[el.dataset.i]);
+    });
+  });
+}
+
+/* ---------------- choreography ---------------- */
+document.getElementById('d1').onclick=async function(){
+  this.classList.add('used');
+  await say('Reading <b>Offering Memorandum.pdf</b>…','sys');
+  await say('This is <b>The Marlowe</b> — 208 units, garden-style, Gilbert AZ, built 1999. Asking <b>$54.6M</b>. Fact sheet started.','ai',900);
+  document.getElementById('projName').textContent='The Marlowe';
+  document.getElementById('projSub').textContent='Multifamily · Investment · Gilbert, AZ';
+  fill('name','The Marlowe',false,300);
+  fill('addr','2240 E Ray Rd, Gilbert AZ',false,600);
+  fill('ask','$54,600,000',false,900);
+  fill('units','208 · built 1999',false,1200);
+  setTimeout(()=>{cardDone('card-id');setMeter(30);},1400);
+  await say('The OM quotes pro-forma income and 94% occupancy — I hold broker claims aside until your actual documents confirm them. Rent roll next, whenever you\'re ready.','ai',1800);
+};
+
+document.getElementById('d2').onclick=async function(){
+  if(document.getElementById('projName').textContent==='Untitled Project'){await say('Drop the Offering Memorandum first (prototype runs in order).','sys');this.classList.remove('used');return;}
+  this.classList.add('used');
+  await say('Reading <b>Rent Roll (May 2026).xlsx</b>…','sys');
+  await say('208 units parsed, 3 floor plans. Mix and rents are on the sheet. One decision before income locks in:','ai',900);
+  fill('mix1',['96','742 sf','$1,486'],false,300);
+  fill('mix2',['84','1,058 sf','$1,812'],false,600);
+  fill('mix3',['28','1,290 sf','$2,145'],false,900);
+  fill('aip','$1,706 / unit',false,1200);
+  setTimeout(()=>{cardDone('card-mix');setMeter(52);},1300);
+
+  const choice=await tile({
+    title:'Occupancy: broker says 94% — rent roll shows 91.8%',
+    why:'The offering memo claims 94% occupancy. Your May rent roll shows 191 of 208 units occupied (91.8%). These can\'t both drive the underwriting.',
+    options:[
+      {label:'Trust the rent roll — 91.8%',sub:'Actual document beats marketing material. The OM claim gets noted for negotiation leverage.',rec:true,val:'91.8% (rent roll)'},
+      {label:'Use the OM figure — 94%',sub:'Not advised, but it\'s your call.',val:'94.0% (OM)'}
+    ],
+    suggestions:['Why the gap?','What\'s in the 17 vacant units?'],
+    answer:'Digging into the vacancy detail: of the 17 vacant units, <b>6 are marked "down" in the rent roll notes</b> — out of service for repairs, not on the market. So the leasable pool is really 202 units, and against that pool you\'re at <b>94.6% economic occupancy</b>. The broker\'s 94% isn\'t a lie — it\'s just measured against a smaller denominator without saying so. That distinction changes how you should underwrite it.',
+    revealOption:{label:'Underwrite 202 rentable · 6 down units as a capital item',sub:'94.6% economic occupancy on the leasable pool; the 6 down units move to the capital plan with a repair budget.',val:'94.6% econ. (202 rentable) · 6 down'}
+  });
+  fill('occ',choice.val,false,200);
+  fill('gpr','$4.31M / yr',false,500);
+  setTimeout(()=>{cardDone('card-inc');setMeter(72);},700);
+  await say('Locked in. That choice is recorded on the project with your reasoning attached — anyone reviewing this deal later sees exactly why the number is what it is.','ai',1000);
+};
+
+document.getElementById('d3').onclick=async function(){
+  const occ=document.querySelector('[data-f="occ"] .v');
+  if(occ.classList.contains('empty')){await say('Drop the Rent Roll first (prototype runs in order).','sys');this.classList.remove('used');return;}
+  this.classList.add('used');
+  await say('Reading <b>T-12 Operating.xlsx</b>…','sys');
+  await say('Twelve months of actuals through April. Trailing NOI is <b>$2.41M</b>. Insurance came in 34% under current market for this vintage — I\'ve carried a flagged estimate of ~$437K until you drop a real quote in. One decision on taxes:','ai',900);
+  fill('ins','~$437K (estimate)',true,300);
+  fill('noi','$2.41M',false,600);
+
+  const choice=await tile({
+    title:'Property taxes: trailing bill or reassessed estimate?',
+    why:'The 2025 bill is $486,200, but this county reassesses on sale. At the asking price the forward bill lands near $612,000 — underwriting the old number flatters the deal by ~$126K a year.',
+    options:[
+      {label:'Underwrite reassessed — ~$612K',sub:'Marked as an estimate until a real post-sale bill exists.',rec:true,val:'~$612K (reassessed est.)'},
+      {label:'Keep trailing — $486K',sub:'Matches history, understates the forward year.',val:'$486K (trailing)'}
+    ],
+    suggestions:['How solid is the $612K number?','What if I buy below ask?'],
+    answer:'The estimate applies the county\'s current assessment ratio and levy to the <b>purchase price</b>, so it moves with your basis: at $50M it\'s roughly $560K; at ask it\'s $612K. It stays tagged as an estimate on the sheet, and the model re-derives it automatically whenever your assumed price changes — you\'re choosing a method here, not a frozen number.'
+  });
+  fill('tax',choice.val,choice.val.includes('trailing'),200);
+  setTimeout(()=>{cardDone('card-exp');setMeter(100);},500);
+  await say('Fact sheet complete. Every number traces to a document, an estimate flag, or a decision you made with reasoning attached. Nothing was assumed silently. Ready for assumptions.','ai',900);
+  const cta=document.getElementById('cta');cta.classList.add('ready');
+  cta.onclick=()=>say('End of prototype — the assumptions workflow is the next design exercise.','sys');
+};
+</script>
+</body>
+</html>
