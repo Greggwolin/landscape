@@ -46,6 +46,18 @@ import { resolveScreenIntent } from '@/lib/studio/screenIntent';
 import { buildScreenManifest } from '@/lib/studio/screenManifest';
 import ProjectContentRouter from '@/app/projects/[projectId]/ProjectContentRouter';
 import { DesignSidebar } from './DesignSidebar';
+import { DesignProjectHome } from './DesignProjectHome';
+
+/**
+ * Stage B per-screen compositions (reference frames). A folder id present here
+ * renders the design composition instead of the routed legacy screen; every
+ * other screen falls through to ProjectContentRouter unchanged. Add one screen
+ * at a time — this map IS the per-screen flag.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const DESIGN_COMPOSITIONS: Record<string, React.ComponentType<{ project: any }>> = {
+  home: DesignProjectHome,
+};
 
 function DesignShellInner() {
   const params = useParams();
@@ -256,7 +268,13 @@ function DesignShellInner() {
     'navigate',
     useCallback((p: { target_url?: string }) => {
       if (p && typeof p.target_url === 'string' && p.target_url) {
-        router.push(p.target_url);
+        // Landscaper's navigate tool emits /studio/[id] (post-JB14) or
+        // /w/projects/[id] (which funnels into /studio). Rewrite project
+        // destinations onto /design so chat navigation stays in this shell.
+        const url = p.target_url
+          .replace(/^\/studio\//, '/design/')
+          .replace(/^\/w\/projects\/(\d+)/, '/design/$1');
+        router.push(url);
       }
     }, [router]),
   );
@@ -313,7 +331,12 @@ function DesignShellInner() {
   // screen mounts a single time. Toggling `expanded` remounts it in the other
   // host (an intentional, cheap refetch; Phase 3 summary cards rely on the
   // collapse-time refresh to round-trip edited inputs).
-  const screenRouter = (
+  // Stage B: a composed design screen when one exists for this folder;
+  // otherwise the same routed legacy screen studio renders.
+  const Composition = DESIGN_COMPOSITIONS[currentFolder];
+  const screenRouter = Composition ? (
+    <Composition project={routerProject} />
+  ) : (
     <ProjectContentRouter
       project={routerProject}
       currentFolder={currentFolder}

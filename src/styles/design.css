@@ -23,46 +23,50 @@
 /* ── 1. Token re-declarations ──────────────────────────────────────────── */
 
 .design-shell {
-  /* Neutral dark surfaces (no blue tint) — deliberately far from studio's
-     #1a1e28 family so the two shells are unmistakable side-by-side. */
-  --w-bg-body: #0e0f11;
-  --w-bg-sidebar: #0a0b0d;
-  --w-header-bg: #060708;
-  --w-panel-bg: #101216;
-  --w-card-bg: #16181d;
+  /* FORMAT SPEC zone colors (Cowork format spec §1 — exact, do not drift):
+     nav rail #08090A · Landscaper panel #2A2B31 · content #161826 ·
+     header strips + cards (surface) #232532 · borders #3f424d. */
+  --w-bg-body: #161826;
+  --w-bg-sidebar: #08090a;
+  --w-header-bg: #08090a;
+  --w-panel-bg: #2a2b31;
+  --w-card-bg: #232532;
   --w-bg-surface: rgba(255, 255, 255, 0.05);
   --w-bg-surface-hover: rgba(255, 255, 255, 0.09);
   --w-bg-input: rgba(255, 255, 255, 0.06);
-  --w-border: #2e333c;
-  --w-border-hover: #46506e;
+  --w-border: #3f424d;
+  --w-border-hover: #515560;
   --w-border-subtle: rgba(255, 255, 255, 0.07);
   --w-border-subtle-dark: rgba(255, 255, 255, 0.07);
 
-  /* Text */
-  --w-text-primary: rgba(235, 238, 242, 0.92);
-  --w-text-secondary: rgba(235, 238, 242, 0.62);
-  --w-text-tertiary: rgba(235, 238, 242, 0.4);
-  --w-text-muted: rgba(235, 238, 242, 0.22);
+  /* Text — neutral grays, hierarchy by size + space (spec §6) */
+  --w-text-primary: #ececf1;
+  --w-text-secondary: #a7a9b4;
+  --w-text-tertiary: #74767f;
+  --w-text-muted: #4c4e56;
 
-  /* THE one steel-blue accent */
-  --w-accent: #6d9ecb;
-  --w-accent-hover: #5a8bb8;
-  --w-accent-dim: rgba(109, 158, 203, 0.18);
-  --w-accent-text: #a3c4e2;
+  /* THE one accent — Nocturne current (spec §6): line/glow/small emphasis,
+     never a large flood. -700 is the dashed editable-underline shade (§4). */
+  --w-accent: #2f9dd3;
+  --w-accent-hover: #2a8cbd;
+  --w-accent-dim: rgba(47, 157, 211, 0.14);
+  --w-accent-text: #6fbde4;
+  --w-accent-700: #1f6a91;
 
-  /* Status hues, muted for neutral-dark surfaces */
-  --w-success: #5fa97f;
-  --w-success-dim: rgba(95, 169, 127, 0.15);
-  --w-success-text: #8cc7a5;
-  --w-warning: #c9a15e;
-  --w-warning-dim: rgba(201, 161, 94, 0.15);
-  --w-warning-text: #dfc08a;
-  --w-danger: #c96a6a;
-  --w-danger-dim: rgba(201, 106, 106, 0.15);
-  --w-danger-text: #de9494;
-  --w-info: #5e8cb8;
-  --w-info-dim: rgba(94, 140, 184, 0.16);
-  --w-info-text: #93b8da;
+  /* Status hues from the reference's chart/tag literals (sage green #7d9d66,
+     terracotta #b06a5a, ochre #c9a44a) — muted, never neon */
+  --w-success: #7d9d66;
+  --w-success-dim: rgba(125, 157, 102, 0.15);
+  --w-success-text: #a9c98f;
+  --w-warning: #c9a44a;
+  --w-warning-dim: rgba(201, 164, 74, 0.15);
+  --w-warning-text: #e0c98a;
+  --w-danger: #b06a5a;
+  --w-danger-dim: rgba(176, 106, 90, 0.15);
+  --w-danger-text: #e0a08f;
+  --w-info: #4a90c2;
+  --w-info-dim: rgba(74, 144, 194, 0.16);
+  --w-info-text: #7db4dd;
 
   /* Geometry */
   --w-card-radius: 8px;
@@ -70,19 +74,21 @@
 
   /* CoreUI tokens consumed by the routed screens inside the right panel.
      The design shell is dark regardless of the app theme toggle. */
-  --cui-body-bg: #101216;
-  --cui-body-color: rgba(235, 238, 242, 0.92);
-  --cui-secondary-bg: #16181d;
-  --cui-tertiary-bg: #1c1f25;
-  --cui-secondary-color: rgba(235, 238, 242, 0.62);
-  --cui-tertiary-color: rgba(235, 238, 242, 0.4);
-  --cui-border-color: #2e333c;
-  --cui-primary: #6d9ecb;
-  --cui-primary-rgb: 109, 158, 203;
-  --cui-link-color: #a3c4e2;
+  --cui-body-bg: #161826;
+  --cui-body-color: #ececf1;
+  --cui-secondary-bg: #232532;
+  --cui-tertiary-bg: #1b1e2b;
+  --cui-secondary-color: #a7a9b4;
+  --cui-tertiary-color: #74767f;
+  --cui-border-color: #3f424d;
+  --cui-primary: #2f9dd3;
+  --cui-primary-rgb: 47, 157, 211;
+  --cui-link-color: #6fbde4;
   --cui-border-radius: 8px;
   --cui-border-radius-sm: 6px;
   --cui-border-radius-lg: 8px;
+
+  font-family: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   display: flex;
   position: relative; /* anchor for the ephemeral screen-router toast (JB43) */
@@ -169,18 +175,20 @@
   border-radius: 4px !important;
 }
 
-/* Flush-left density: tighter right-panel header, no centered flourish.
-   The steel-blue rule under the header is the shell's visual signature —
-   an at-a-glance tell that you are in /design, not /studio. */
+/* Flush-left density: tight right-panel header in the reference's "quiet
+   chrome" voice — the panel title renders as a small uppercase letterspaced
+   label in the pale steel accent (like PROJECT PROFILE / LOCATION in the
+   mockup), over a plain 1px border. */
 .design-shell .wrapper-header {
   padding-top: 6px;
   padding-bottom: 6px;
-  border-bottom: 2px solid var(--w-accent);
+  border-bottom: 1px solid var(--w-border);
 }
 .design-shell .wrapper-header-title {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--w-accent-text);
 }
 .design-shell .wrapper-header-subtitle {
@@ -204,6 +212,210 @@
 }
 .design-shell .sb-nav-item.active .sb-nav-icon {
   color: var(--w-accent-text);
+}
+
+/* ── 4. Shell geometry (reference frame C1) ────────────────────────────
+   Locked shell convention: icon rail | Landscaper chat rail (~300px, full
+   height, THE one conversational surface) | workspace takes the rest. The
+   studio layout lets chat and content split 50/50; the design shell pins
+   chat to a rail. */
+.design-shell .wrapper-chat-center {
+  flex: 0 0 320px;
+  min-width: 300px;
+  max-width: 320px;
+  border-right: 1px solid var(--w-border);
+  background: var(--w-panel-bg); /* spec §1: the Landscaper panel is #2A2B31 */
+}
+
+/* Header strips / top bars are SURFACE (#232532), not the panel or rail
+   colors (spec §1, final paragraph). */
+.design-shell .wrapper-header {
+  background: var(--w-card-bg);
+}
+
+/* ── 5. Stage B compositions (.dh-* — Design Home, reference frame C1) ── */
+
+.design-shell .dh-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px;
+  overflow: auto;
+  height: 100%;
+  background: var(--w-bg-body);
+  font-size: 12.5px;
+}
+.design-shell .dh-top-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 440px) 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 1100px) {
+  .design-shell .dh-top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.design-shell .dh-card {
+  background: var(--w-card-bg);
+  border: 1px solid var(--w-border);
+  border-radius: 8px; /* spec §6: 8px cards, 6px chips */
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+.design-shell .dh-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.design-shell .dh-card-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--w-text-tertiary);
+  font-weight: 600;
+}
+.design-shell .dh-head-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--w-text-tertiary);
+}
+.design-shell .dh-section-label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--w-accent-text);
+  font-weight: 600;
+  padding: 12px 0 4px 0;
+}
+.design-shell .dh-row {
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 5.5px 0;
+  border-top: 1px solid var(--w-border-subtle);
+}
+.design-shell .dh-row-label {
+  font-size: 11px;
+  color: var(--w-text-tertiary);
+}
+.design-shell .dh-row-value {
+  font-size: 12.5px;
+  color: var(--w-text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.design-shell .dh-row-suffix {
+  color: var(--w-text-tertiary);
+  font-size: 11.5px;
+}
+.design-shell .dh-editable {
+  /* spec §4: dashed ACCENT-700 underline marks an editable value */
+  border-bottom: 1px dashed var(--w-accent-700);
+  padding-bottom: 1px;
+  cursor: text;
+}
+.design-shell .dh-editable:hover {
+  color: var(--w-accent-text);
+}
+.design-shell .dh-row-input {
+  width: 100%;
+  background: var(--w-bg-input);
+  border: 1px solid var(--w-accent);
+  border-radius: 6px;
+  color: var(--w-text-primary);
+  font-size: 12.5px;
+  padding: 2px 6px;
+}
+.design-shell .dh-save-error {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--w-danger-text);
+}
+.design-shell .dh-map {
+  padding: 14px 16px 0 16px;
+  overflow: hidden;
+  min-height: 480px;
+}
+.design-shell .dh-map-body {
+  flex: 1;
+  margin: 0 -16px;
+  min-height: 420px;
+  position: relative;
+}
+.design-shell .dh-map-body > * {
+  height: 100%;
+}
+.design-shell .dh-contacts {
+  width: 100%;
+}
+.design-shell .dh-contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+.design-shell .dh-contact-tile {
+  padding: 10px 12px;
+  gap: 0;
+}
+.design-shell .dh-contact-role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--w-text-tertiary);
+  font-weight: 600;
+}
+.design-shell .dh-contact-more {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 10.5px;
+  color: var(--w-text-muted);
+}
+.design-shell .dh-contact-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-top: 5px;
+  color: var(--w-text-primary);
+}
+.design-shell .dh-contact-title {
+  font-weight: 400;
+  color: var(--w-text-tertiary);
+  font-size: 11px;
+}
+.design-shell .dh-contact-company {
+  font-size: 11.5px;
+  color: var(--w-text-secondary);
+  margin-top: 1px;
+}
+.design-shell .dh-contact-meta {
+  font-size: 11px;
+  color: var(--w-text-tertiary);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.design-shell .dh-contact-add {
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--w-text-tertiary);
+  border-style: dashed;
+  background: transparent;
+}
+.design-shell .dh-contact-add:hover {
+  color: var(--w-accent-text);
+  border-color: var(--w-accent);
+}
+.design-shell .dh-contacts-manage {
+  margin-top: 10px;
 }
 
 /* Scrollbars, kept quiet on the neutral surfaces. */

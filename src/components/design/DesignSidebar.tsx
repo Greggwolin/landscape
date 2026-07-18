@@ -184,7 +184,9 @@ export function DesignSidebar({
       projectName: t.projectName ?? undefined,
       isArchived,
       onClick: () => {
-        if (t.projectId) router.push(`/w/projects/${t.projectId}?thread=${t.threadId}`);
+        // Project threads stay in the design shell (the /w/ route would funnel
+        // into /studio); unassigned threads keep the /w/ chat surface.
+        if (t.projectId) router.push(`/design/${t.projectId}?thread=${t.threadId}`);
         else router.push(`/w/chat/${t.threadId}`);
       },
     };
@@ -266,7 +268,9 @@ export function DesignSidebar({
       }
       const projectScoped = ['reports', 'map'];
       if (page === 'projects') router.push('/w/projects');
-      else if (projectScoped.includes(page)) router.push(`/w/projects/${projectId}/${page}`);
+      // Reports and Map are folder screens in this shell — open them in place
+      // instead of the /w/ project routes (which funnel into /studio).
+      else if (projectScoped.includes(page)) router.push(`/design/${projectId}?folder=${page}`);
       else if (page === 'admin-feedback') router.push('/admin/feedback');
       else {
         const map: Record<string, string> = {
