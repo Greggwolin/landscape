@@ -1,15 +1,13 @@
 'use client'
 
-import { getAuthHeaders } from './authHeaders'
+import { authFetch } from './authFetch'
 
 export async function fetchJson<T = unknown>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  // Inject the canonical auth header by default so SWR/React-Query callers that
-  // pass no init still authenticate. Caller-provided headers win (spread last),
-  // and getAuthHeaders() returns {} on the server, so SSR is unaffected.
-  const response = await fetch(input, {
-    ...init,
-    headers: { ...getAuthHeaders(), ...(init?.headers ?? {}) },
-  })
+  // authFetch injects the canonical auth header (caller-provided headers win)
+  // AND transparently refreshes an expired access token, retrying once — so
+  // SWR/React-Query callers survive sessions longer than the 1-hour token
+  // lifetime instead of 401ing (studio audit 2026-07-18, C2/C3 root cause).
+  const response = await authFetch(input, init)
   // const contentType = response.headers.get('content-type') ?? ''
   const raw = await response.text()
 

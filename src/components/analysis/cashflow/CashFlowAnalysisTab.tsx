@@ -18,7 +18,7 @@ import CashFlowSummaryMetrics from './CashFlowSummaryMetrics';
 import CollapsibleSection from '@/app/components/Planning/CollapsibleSection';
 import { useContainers } from '@/hooks/useContainers';
 import { useProjectConfig } from '@/hooks/useProjectConfig';
-import { getAuthHeaders } from '@/lib/authHeaders';
+import { authFetch } from '@/lib/authFetch';
 import {
   transformCashFlow,
   type TimeScale,
@@ -73,9 +73,9 @@ interface FetchOptions {
 }
 
 async function fetchCashFlow(url: string, options: FetchOptions = {}): Promise<CashFlowResponse> {
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       periodType: 'month',
       includeFinancing: false,

@@ -212,6 +212,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
   }, [fetchCurrentUser, refreshToken]);
 
+  // Keep the access token fresh for the life of the tab. Access tokens expire
+  // after 1 hour (SIMPLE_JWT), but historically we only refreshed during
+  // initialization — so any tab open longer than an hour sent stale tokens on
+  // every direct-to-Django call and 401'd (studio audit 2026-07-18, C2/C3).
+  // Refresh proactively every 45 minutes, and immediately when the tab
+  // returns to the foreground after being hidden (laptop sleep, tab switch).
+  useEffect(() => {
+    if (!tokens) return;
+
+    let lastRefresh = Date.now();
+    const doRefresh = () => {
+      lastRefresh = Date.now();
+      refreshToken();
+    };
+
+    const interval = setInterval(doRefresh, 45 * 60 * 1000);
+
+    // On tab-visible, only refresh if it's been a while — avoids a network
+    // call on every quick tab switch.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 5 * 60 * 1000) {
+        doRefresh();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [tokens, refreshToken]);
+
   // Login
   const login = async (data: LoginData) => {
     const response = await fetch(`${DJANGO_API_BASE}/api/auth/login/`, {
