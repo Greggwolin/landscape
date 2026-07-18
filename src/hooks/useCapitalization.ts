@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Loan } from '@/types/assumptions';
-import { getAuthHeaders } from '@/lib/authHeaders';
+import { authFetch } from '@/lib/authFetch';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 export function useLoans(projectId: string) {
   return useQuery({
     queryKey: ['loans', projectId],
-    queryFn: () => fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/`, { headers: getAuthHeaders() }).then((r) => r.json()),
+    queryFn: () => authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/`).then((r) => r.json()),
     enabled: !!projectId,
   });
 }
@@ -18,7 +18,7 @@ export function useLoanDraws(projectId: string, loanId: number) {
   return useQuery({
     queryKey: ['loan-draws', projectId, loanId],
     queryFn: () =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/draws/`, { headers: getAuthHeaders() }).then((r) => r.json()),
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/draws/`).then((r) => r.json()),
     enabled: !!projectId && !!loanId,
   });
 }
@@ -27,7 +27,7 @@ export function useLoanBalanceSummary(projectId: string, loanId: number) {
   return useQuery({
     queryKey: ['loan-balance-summary', projectId, loanId],
     queryFn: () =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/balance-summary/`, { headers: getAuthHeaders() }).then((r) => r.json()),
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/balance-summary/`).then((r) => r.json()),
     enabled: !!projectId && !!loanId,
   });
 }
@@ -36,9 +36,9 @@ export function useCreateLoan(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<Loan>) =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/`, {
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/`, {
         method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       }).then((r) => {
         if (!r.ok) throw r;
@@ -54,9 +54,9 @@ export function useUpdateLoan(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ loanId, data }: { loanId: number; data: Partial<Loan> }) =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/`, {
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/`, {
         method: 'PATCH',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       }).then((r) => {
         if (!r.ok) throw r;
@@ -72,7 +72,7 @@ export function useDeleteLoan(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (loanId: number) =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/`, { headers: getAuthHeaders(),
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/`, {
         method: 'DELETE',
       }).then((r) => {
         if (!r.ok) throw r;
@@ -87,7 +87,7 @@ export function useLoanSchedule(projectId: string, loanId: string | number | nul
   return useQuery({
     queryKey: ['loan-schedule', projectId, loanId],
     queryFn: () =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/debt-schedule/`, { headers: getAuthHeaders() }).then((r) =>
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/debt-schedule/`).then((r) =>
         r.json()
       ),
     enabled: !!projectId && !!loanId,
@@ -137,7 +137,7 @@ export function useLoanBudgetSummary(
   return useQuery({
     queryKey: ['loan-budget-summary', projectId, loanId],
     queryFn: async () => {
-      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/budget-summary/`, { headers: getAuthHeaders() });
+      const response = await authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/budget-summary/`);
       if (!response.ok) {
         throw new Error(`Failed to fetch loan budget summary: ${response.statusText}`);
       }
@@ -163,9 +163,9 @@ export function useCalculateInterestReserve(projectId: string, loanId: number | 
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/interest-reserve/calculate/`, {
+      const response = await authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/interest-reserve/calculate/`, {
           method: 'POST',
-          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         });
       if (!response.ok) {
@@ -187,9 +187,9 @@ export function useLeveragedCashFlow(
   return useQuery({
     queryKey: ['leveraged-cash-flow', projectId, containerIds ?? 'all'],
     queryFn: () =>
-      fetch(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, {
+      authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, {
         method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           includeFinancing: true,
           ...(containerIds && containerIds.length > 0 ? { containerIds } : {}),
@@ -203,7 +203,7 @@ export function useIncomeApproachMonthlyDCF(projectId: string, enabled: boolean 
   return useQuery({
     queryKey: ['income-approach-monthly-dcf', projectId],
     queryFn: async () => {
-      const response = await fetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/monthly/`, { headers: getAuthHeaders() });
+      const response = await authFetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/monthly/`);
       if (!response.ok) {
         throw new Error(`Failed to fetch monthly DCF data: ${response.statusText}`);
       }
@@ -227,7 +227,7 @@ export function useAcquisitionPriceSummary(projectId: string, enabled: boolean =
   return useQuery({
     queryKey: ['acquisition-price-summary', projectId],
     queryFn: async () => {
-      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`, { headers: getAuthHeaders() });
+      const response = await authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`);
       if (!response.ok) {
         throw new Error(`Failed to fetch acquisition price summary: ${response.statusText}`);
       }

@@ -27,7 +27,7 @@ import type { PricingAssumption } from '@/types/sales-absorption';
 import { formatMoney } from '@/utils/formatters/number';
 import { Trash2, Plus, Save, X } from 'lucide-react';
 import { SemanticButton } from '@/components/ui/landscape';
-import { getAuthHeaders } from '@/lib/authHeaders';
+import { authFetch } from '@/lib/authFetch';
 import './PricingTable.css';
 
 interface Props {
@@ -221,9 +221,9 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
     try {
       console.log(`[PricingTable] Applying benchmark growth_rate ${newRate} to all pricing assumptions`);
 
-      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/bulk-update-field/`, {
+      const response = await authFetch(`/api/projects/${projectId}/pricing-assumptions/bulk-update-field/`, {
         method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ field: 'growth_rate', value: newRate }),
       });
 
@@ -243,10 +243,10 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
       const typesCodes = [...new Set(editingRows.map(row => row.lu_type_code))];
       const typeCodesParam = typesCodes.join(',');
 
-      const recalcResponse = await fetch(
+      const recalcResponse = await authFetch(
         `/api/projects/${projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`, {
           method: 'POST',
-          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
         });
 
       if (recalcResponse.ok) {
