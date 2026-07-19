@@ -126,6 +126,11 @@ def _heartbeat_streaming_json(work, *, status_code=status.HTTP_201_CREATED):
     worker.start()
 
     def stream():
+        # Emit one byte immediately rather than waiting out the first interval.
+        # Measured in production: without this, first-byte was view-dispatch time
+        # PLUS the 5s tick (8.4s observed), which erodes the margin for no reason.
+        yield b' '
+
         while True:
             worker.join(timeout=HEARTBEAT_INTERVAL_SECONDS)
             if not worker.is_alive():

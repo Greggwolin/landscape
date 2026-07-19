@@ -86,13 +86,39 @@ def test_failure_is_reported_in_the_body_not_as_a_crash():
     assert 'boom' in payload['error']
 
 
-def test_fast_work_streams_the_payload_without_padding():
-    """Fast turns should behave exactly as before — no heartbeats needed."""
+def test_fast_work_still_parses_and_is_not_padded_further():
+    """
+    Fast turns carry the single opening heartbeat and nothing more, and still
+    parse identically for the client.
+    """
     def fast_work():
         return {'success': True, 'quick': True}
 
     response = _heartbeat_streaming_json(fast_work)
-    body = b''.join(chunk for _, chunk in _consume(response))
+    chunks = _consume(response)
+    body = b''.join(chunk for _, chunk in chunks)
 
-    assert not body.startswith(b' ')
+    # One opening heartbeat, then the payload — no interval ticks.
+    assert body.count(b' ') == 1
     assert json.loads(body) == {'success': True, 'quick': True}
+
+
+def test_opening_heartbeat_is_immediate():
+    """First byte must not wait out a full heartbeat interval."""
+    def slow_work():
+        time.sleep(7)
+        return {'success': True}
+
+    response = _heartbeat_streaming_json(slow_work)
+    stream = iter(response.streaming_content)
+
+    start = time.monotonic()
+    first = next(stream)
+    elapsed = time.monotonic() - start
+
+    assert first == b' '
+    assert elapsed < 1.0, f'opening heartbeat took {elapsed:.2f}s'
+
+    # Drain so the worker thread finishes before the test exits.
+    for _ in stream:
+        pass
