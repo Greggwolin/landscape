@@ -715,6 +715,7 @@ class DCFCalculationService:
         # Calculate month-by-month projections
         projections = []
         noi_series = []
+        cf_series = []  # NOI less value-add Cap-X — basis for IRR/PV
 
         for month in range(1, total_months + 1):
             # Period date
@@ -755,6 +756,15 @@ class DCFCalculationService:
             noi = egi - total_opex
             noi_series.append(noi)
 
+            # Period cash flow = NOI less value-add capital costs. Renovation
+            # Cap-X and relocation were previously display-only rows that never
+            # reduced total_cash_flow, pv_cash_flow, PV, or IRR — the grid
+            # showed "Cash Flow Before Debt" equal to NOI while listing Cap-X
+            # above it, and returns kept the renovated rent premium without
+            # the spend that buys it (audit C5-related).
+            period_cash_flow = noi - reno_capex - reno_reloc
+            cf_series.append(period_cash_flow)
+
             # Net reversion and total cash flow are populated AFTER the
             # exit analysis section below (back-patched into the last month).
             # PV factor for discounting (monthly)
@@ -778,9 +788,9 @@ class DCFCalculationService:
                 'total_opex': round(total_opex, 2),
                 'noi': round(noi, 2),
                 'net_reversion': 0.0,
-                'total_cash_flow': round(noi, 2),
+                'total_cash_flow': round(period_cash_flow, 2),
                 'pv_factor': round(pv_factor, 6),
-                'pv_cash_flow': round(noi * pv_factor, 2),
+                'pv_cash_flow': round(period_cash_flow * pv_factor, 2),
             }
 
             # Add renovation fields when value-add is active
@@ -886,10 +896,10 @@ class DCFCalculationService:
         # ================================================================
         last_proj = projections[-1]
         last_pv_factor = last_proj['pv_factor']
-        last_noi = last_proj['noi']
+        last_cf = cf_series[-1]
         last_proj['net_reversion'] = round(net_reversion, 2)
-        last_proj['total_cash_flow'] = round(last_noi + net_reversion, 2)
-        last_proj['pv_cash_flow'] = round((last_noi + net_reversion) * last_pv_factor, 2)
+        last_proj['total_cash_flow'] = round(last_cf + net_reversion, 2)
+        last_proj['pv_cash_flow'] = round((last_cf + net_reversion) * last_pv_factor, 2)
 
         # Calculate present value = sum of discounted total cash flows
         # (NOI for months 1..N-1, NOI + reversion for month N)
@@ -905,20 +915,22 @@ class DCFCalculationService:
 
         # Calculate IRR based on analysis_purpose
         if analysis_purpose == 'UNDERWRITING' and effective_acquisition_cost and effective_acquisition_cost > 0:
-            # UNDERWRITING: IRR against actual acquisition cost
+            # UNDERWRITING: IRR against actual acquisition cost.
+            # Uses cf_series (NOI less value-add Cap-X) so renovation spend
+            # actually reduces the return it buys.
             irr = self._calculate_monthly_irr(
-                noi_series, net_reversion, effective_acquisition_cost
+                cf_series, net_reversion, effective_acquisition_cost
             )
             # NPV = PV of cash flows - acquisition cost
             npv = round(present_value - effective_acquisition_cost, 2)
             # Equity multiple = total cash in / total cash out
-            total_cash_in = sum(noi_series) + net_reversion
+            total_cash_in = sum(cf_series) + net_reversion
             equity_multiple = round(
                 total_cash_in / effective_acquisition_cost, 4
             ) if effective_acquisition_cost > 0 else None
         else:
             # VALUATION: IRR is implied return at indicated value (PV as investment)
-            irr = self._calculate_monthly_irr(noi_series, net_reversion, present_value)
+            irr = self._calculate_monthly_irr(cf_series, net_reversion, present_value)
             npv = None
             equity_multiple = None
 

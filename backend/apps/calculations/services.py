@@ -88,8 +88,10 @@ class CalculationService:
 
         Non-LAND projects:
         - Use IncomePropertyCashFlowService
-        - net_cf = NOI - Debt Service
-        - Add net reversion in the final period
+        - net_cf = NOI + financing (signed: funding inflows, payments,
+          payoff balloon) + non-acquisition capex (e.g. value-add renovation)
+        - Add gross reversion in the final period (payoff is in financing)
+        - Period 0 = net equity at close (acquisition - loan funding)
 
         Returns list of (period_id, period_date, net_cash_flow) tuples.
         """
@@ -228,38 +230,49 @@ class CalculationService:
             if not periods:
                 return []
 
-            # Income-property levered CF for waterfall:
-            #   net_cf(period) = NOI - Debt Service
-            # Then add terminal reversion in the final hold period.
+            # Income-property levered EQUITY CF for waterfall:
+            #   net_cf(period) = NOI + financing (signed) + capex (negative)
+            # Financing is taken at its FULL SIGNED value: loan funding is a
+            # cash inflow that reduces the equity investors must contribute,
+            # scheduled payments and the payoff balloon are outflows. Dropping
+            # the funding inflow (the old behavior) charged the waterfall the
+            # entire purchase price as equity while keeping levered operating
+            # flows — deflating IRR/EM to nonsense (audit C5: 0.5%/1.03x).
+            # Terminal reversion (gross of payoff — the payoff balloon already
+            # lives in the financing section's final period) is added in the
+            # final hold period.
             # Acquisition cost at time=0 is a negative cash flow (initial investment).
             period_noi = defaultdict(float)
-            period_debt_service = defaultdict(float)
+            period_financing = defaultdict(float)
+            period_capex = defaultdict(float)
             acquisition_amount = 0.0
 
             for section in sections:
+                sid = section.get('sectionId', '') or ''
                 sname = section.get('sectionName', '').strip().lower()
 
-                if 'acquisition' in sname:
+                if sid == 'cost-acquisition' or 'acquisition' in sname:
                     # Acquisition section: sum subtotals (already negative)
                     for pv in section.get('subtotals', []):
                         acquisition_amount += float(pv.get('amount', 0) or 0)
+                    continue
 
-                if sname == 'net operating income':
-                    for pv in section.get('subtotals', []):
-                        ps = pv.get('periodSequence')
-                        if ps is None:
-                            continue
-                        period_noi[ps] += float(pv.get('amount', 0) or 0)
+                if sid == 'revenue-net' or sname == 'net operating income':
+                    bucket = period_noi
+                elif sid == 'financing' or sname == 'financing':
+                    bucket = period_financing
+                elif sid.startswith('cost-'):
+                    # Non-acquisition cost sections (e.g. cost-renovation
+                    # value-add Cap-X). Amounts are already negative.
+                    bucket = period_capex
+                else:
+                    continue
 
-                if sname == 'financing':
-                    for pv in section.get('subtotals', []):
-                        ps = pv.get('periodSequence')
-                        if ps is None:
-                            continue
-                        amt = float(pv.get('amount', 0) or 0)
-                        # Ignore loan funding inflows; debt service is cash out only.
-                        if amt < 0:
-                            period_debt_service[ps] += abs(amt)
+                for pv in section.get('subtotals', []):
+                    ps = pv.get('periodSequence')
+                    if ps is None:
+                        continue
+                    bucket[ps] += float(pv.get('amount', 0) or 0)
 
             # Fallback: if no acquisition section in cash flow, read from tbl_project
             if acquisition_amount == 0:
@@ -287,7 +300,8 @@ class CalculationService:
 
             max_period = max(
                 max(period_noi.keys()) if period_noi else 0,
-                max(period_debt_service.keys()) if period_debt_service else 0,
+                max(period_financing.keys()) if period_financing else 0,
+                max(period_capex.keys()) if period_capex else 0,
                 len(periods),
             )
             if max_period == 0:
@@ -295,9 +309,20 @@ class CalculationService:
 
             terminal_reversion = float(exit_analysis.get('netReversion', 0) or 0)
 
+            # Fold acquisition-month loan funding into the period-0 equity
+            # check. The financing section nets funding and the first payment
+            # into the acquisition month (period 1); leaving the inflow there
+            # would count borrowed money as a distribution and overstate
+            # contributions by the full loan amount. Day-one equity is
+            # price - loan proceeds, so move the net inflow to period 0.
+            initial_funding = period_financing.get(1, 0.0)
+            if initial_funding > 0 and acquisition_amount != 0:
+                acquisition_amount += initial_funding
+                period_financing[1] = 0.0
+
             rows = []
 
-            # Period 0: acquisition investment (negative cash flow)
+            # Period 0: net equity investment at close (negative cash flow)
             if acquisition_amount != 0:
                 from datetime import timedelta
                 if period_dates.get(1):
@@ -309,8 +334,9 @@ class CalculationService:
 
             for period_seq in range(1, max_period + 1):
                 noi = period_noi.get(period_seq, 0)
-                debt_service = period_debt_service.get(period_seq, 0)
-                net_cf = noi - debt_service
+                financing = period_financing.get(period_seq, 0)
+                capex = period_capex.get(period_seq, 0)
+                net_cf = noi + financing + capex
 
                 if period_seq == max_period and terminal_reversion:
                     net_cf += terminal_reversion
@@ -329,7 +355,8 @@ class CalculationService:
             print(
                 "[waterfall] Non-LAND parsed "
                 f"{len(rows)} periods: contributions=${abs(total_contrib):,.0f}, distributions=${total_dist:,.0f}, "
-                f"terminal_reversion=${terminal_reversion:,.0f}, acquisition=${acquisition_amount:,.0f}"
+                f"terminal_reversion=${terminal_reversion:,.0f}, net_equity_at_close=${acquisition_amount:,.0f}, "
+                f"initial_funding_folded=${initial_funding if initial_funding > 0 else 0:,.0f}"
             )
 
             return rows

@@ -255,7 +255,7 @@ export function DCFView({
             </div>
             {metrics.irr !== null && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--cui-secondary-color)' }}>IRR</span>
+                <span style={{ color: 'var(--cui-secondary-color)' }} title="Property-level return before debt. The Equity Waterfall shows the levered, investor-level return — the two measure different things.">Unlevered IRR (property)</span>
                 <span style={{ fontWeight: 600, color: dcfColors.text }}>
                   {formatPercent(metrics.irr)}
                 </span>

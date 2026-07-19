@@ -407,7 +407,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                       </td>
                     </tr>
                     <tr style={{ ...summaryRowStyle, color: 'var(--cui-secondary-color)' }}>
-                      <td style={{ ...summaryCell, textAlign: 'left' }}>IRR</td>
+                      <td style={{ ...summaryCell, textAlign: 'left' }} title="Levered, investor-level return on contributed equity after debt. The Income Approach DCF shows the unlevered property-level return — the two measure different things.">Levered IRR (equity)</td>
                       <td style={summaryCell}> </td>
                       <td style={{ ...summaryCell, textAlign: 'right' }}>{formatPct(projectSummary?.projectIrr)}</td>
                       <td style={{ ...summaryCell, textAlign: 'right' }}>
@@ -418,7 +418,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                       </td>
                     </tr>
                     <tr style={{ ...summaryRowStyle, color: 'var(--cui-secondary-color)' }}>
-                      <td style={{ ...summaryCell, textAlign: 'left' }}>Equity Multiple</td>
+                      <td style={{ ...summaryCell, textAlign: 'left' }} title="Total distributions over contributed equity (levered).">Equity Multiple (levered)</td>
                       <td style={summaryCell}> </td>
                       <td style={{ ...summaryCell, textAlign: 'right' }}>{formatMultiple(projectSummary?.equityMultiple)}</td>
                       <td style={{ ...summaryCell, textAlign: 'right' }}>

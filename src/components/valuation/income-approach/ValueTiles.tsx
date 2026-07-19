@@ -206,7 +206,7 @@ function DCFTile({ dcfData, isLoading, isSelected, onClick, theme }: DCFTileProp
         className="text-sm mb-2"
         style={{ color: dcfColors.text }}
       >
-        {metrics.irr !== null ? `${formatPercent(metrics.irr)} IRR` : '— IRR'}
+        {metrics.irr !== null ? `${formatPercent(metrics.irr)} Unlevered IRR` : '— Unlevered IRR'}
       </div>
 
       {/* Price per Unit */}
