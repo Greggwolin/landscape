@@ -1,54 +1,82 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useParams, usePathname, useRouter } from 'next/navigation';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { ProjectContextShell } from '@/components/wrapper/ProjectContextShell';
+import { WrapperChatProvider } from '@/contexts/WrapperChatContext';
+import { ModalRegistryProvider, type ModalProject } from '@/contexts/ModalRegistryContext';
+import { WrapperProjectProvider, type WrapperProject } from '@/contexts/WrapperProjectContext';
+import { LandscapeCommandSubscriber } from '@/components/wrapper/LandscapeCommandSubscriber';
+import { getAuthHeaders } from '@/lib/authHeaders';
+import '@/components/wrapper/modals'; // Side-effect: registers modal definitions
 
 /**
- * Funnel: the chat-first /w/ project route now redirects into the studio shell
- * (LSCMD-STUDIO-PRIMARY-SHELL-0624-JB14). The studio is THE place you work a
- * project; /w/ remains for global/no-project surfaces (dashboard, chat, tools,
- * admin) and classic /projects/[id] stays as the separate modality.
- *
- * One redirect funnels every /w/projects/[id]* route into /studio/[id]:
- *   /w/projects/[id]            → /studio/[id]
- *   /w/projects/[id]/map        → /studio/[id]?folder=map
- *   /w/projects/[id]/reports    → /studio/[id]?folder=reports
- *   /w/projects/[id]/documents  → /studio/[id]?folder=documents
- * Existing query params (?thread, ?folder, ?tab) are preserved (merged — a path
- * folder is only added when no explicit ?folder is present).
- *
- * The old /w/ project view (this route's page/components) is left in place but
- * unreachable behind the redirect — removed in a later dead-code pass.
+ * Project-scoped layout for the wrapper UI.
+ * Fetches project data and provides it via WrapperProjectContext to all sub-pages.
+ * Also wraps with ProjectContextShell, WrapperChatProvider, and ModalRegistryProvider.
  */
-const SUBPATH_TO_FOLDER: Record<string, string> = {
-  map: 'map',
-  reports: 'reports',
-  documents: 'documents',
-};
-
-export default function WrapperProjectLayout() {
+export default function WrapperProjectLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const params = useParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const projectId = params.projectId as string;
+  const projectId = parseInt(params.projectId as string);
+
+  const [project, setProject] = useState<WrapperProject>({
+    project_id: projectId,
+    project_name: '',
+  });
+
+  const fetchProject = useCallback(() => {
+    fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setProject({
+            project_id: data.project_id ?? projectId,
+            project_name: data.project_name ?? '',
+            project_type_code: data.project_type_code ?? undefined,
+            project_type: data.project_type ?? undefined,
+            property_subtype: data.property_subtype ?? undefined,
+            // Pass the saved location through so the Map tab centers on it
+            // (without these, hasResolvedCenter stays false → auto-fit zoom-out).
+            location_lat: data.location_lat ?? null,
+            location_lon: data.location_lon ?? null,
+            latitude: data.latitude ?? null,
+            longitude: data.longitude ?? null,
+            county: data.county ?? undefined,
+            state: data.state ?? undefined,
+            apn_primary: data.apn_primary ?? undefined,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [projectId]);
 
   useEffect(() => {
-    if (!pathname) return;
-    const m = pathname.match(/^\/w\/projects\/[^/]+\/?(.*)$/);
-    if (!m) return;
-    const sub = (m[1] || '').split('/')[0];
-    // Read the live query string directly (avoids a useSearchParams Suspense
-    // boundary in this client layout); preserve everything, merge in the folder.
-    const qp = new URLSearchParams(
-      typeof window !== 'undefined' ? window.location.search : '',
-    );
-    if (sub && SUBPATH_TO_FOLDER[sub] && !qp.get('folder')) {
-      qp.set('folder', SUBPATH_TO_FOLDER[sub]);
-    }
-    const qs = qp.toString();
-    router.replace(`/studio/${projectId}${qs ? `?${qs}` : ''}`);
-  }, [pathname, projectId, router]);
+    fetchProject();
+  }, [fetchProject]);
 
-  // Redirecting — never mount the old /w/ project view.
-  return null;
+  // ModalProject is structurally compatible with WrapperProject
+  const modalProject: ModalProject = project;
+
+  return (
+    <ProjectContextShell>
+      <WrapperChatProvider>
+        <WrapperProjectProvider project={project} onRefetch={fetchProject}>
+          <ModalRegistryProvider project={modalProject}>
+            {/* Bridges chat-panel command bus → project-scoped UI surfaces.
+                The chat panel lives in the outer /w/ layout shell, ABOVE
+                this provider in the React tree, so it can't reach the
+                modal registry via context. The subscriber listens on the
+                bus and dispatches commands to the registry locally.
+                See /src/lib/landscape-command-bus.ts. */}
+            <LandscapeCommandSubscriber />
+            {children}
+          </ModalRegistryProvider>
+        </WrapperProjectProvider>
+      </WrapperChatProvider>
+    </ProjectContextShell>
+  );
 }

@@ -63,7 +63,11 @@ class ThreadService:
         Uses SELECT ... FOR UPDATE to prevent race conditions where concurrent
         requests both see "no active thread" and both create new ones.
         """
-        lookup = {'is_active': True}
+        # is_archived=False keeps parity with the Universal Archive Pattern:
+        # the list/detail views hide archived threads, so reusing one here
+        # hands the client a thread id whose GET 404s — an unrecoverable
+        # "No active thread" state on the chat surface.
+        lookup = {'is_active': True, 'is_archived': False}
         if project_id is None:
             lookup['project_id__isnull'] = True
             # Scope unassigned thread reuse to the calling user — prevents
