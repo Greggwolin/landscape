@@ -351,11 +351,13 @@ function PropertyNarrative({ projectId, units, floorPlans }: {
       try {
         setLoading(true);
 
-        // Fetch project data (same source as PhysicalDescription)
+        // Fetch project data (same source as PhysicalDescription).
+        // Previously: bare fetch with no auth header (401) and a call to a
+        // Django documents route that doesn't exist (404) — audit DR follow-up.
         const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
         const [projectRes, docsRes] = await Promise.all([
-          fetch(`${djangoUrl}/api/projects/${projectId}/`),
-          fetch(`${djangoUrl}/api/documents/?project_id=${projectId}`),
+          authFetch(`${djangoUrl}/api/projects/${projectId}/`),
+          authFetch(`/api/projects/${projectId}/documents?limit=100`),
         ]);
 
         if (projectRes.ok) {
@@ -363,17 +365,27 @@ function PropertyNarrative({ projectId, units, floorPlans }: {
           setPropertyData(data);
         }
 
-        // Look for OM document with extracted text
+        // Look for an OM document, then pull its extracted text
         if (docsRes.ok) {
           const docsData = await docsRes.json();
-          const docs = docsData.results || docsData;
-          const omDoc = docs.find((d: Record<string, unknown>) =>
+          const docs: Record<string, unknown>[] = docsData.documents || [];
+          const omDoc = docs.find((d) =>
             d.doc_type === 'om' || d.doc_type === 'offering_memorandum' ||
             (typeof d.doc_name === 'string' && /\b(om|offering.memo)/i.test(d.doc_name))
           );
-          if (omDoc?.extracted_text) {
+          let omText: string | null = null;
+          if (omDoc?.doc_id) {
+            const contentRes = await authFetch(`/api/projects/${projectId}/documents/${omDoc.doc_id}/content`);
+            if (contentRes.ok) {
+              const contentData = await contentRes.json();
+              if (contentData.has_content && typeof contentData.full_text === 'string') {
+                omText = contentData.full_text;
+              }
+            }
+          }
+          if (omText) {
             // Extract property description section from OM text
-            const text = omDoc.extracted_text as string;
+            const text = omText;
             const descMatch = text.match(/(?:property\s+description|subject\s+property|physical\s+description|the\s+property\s+is)[:\s]*([^]*?)(?=\n\n[A-Z]|\n#{1,3}\s|$)/i);
             if (descMatch) {
               setOmNarrative(descMatch[1].trim().slice(0, 1500));
@@ -1841,19 +1853,31 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // only, showing a successful save that wrote nothing.
   const handlePlanEditSave = async () => {
     if (!planEditDraft) return;
+    // PATCH only fields the user actually changed. Sending the full draft
+    // overwrites server NULLs with display fallbacks (e.g. current_rent_avg
+    // NULL -> displayed market rent becomes a "real" in-place rent that feeds
+    // Operations and Direct Cap). Found in DR10 verification on project 42.
+    const original = floorPlans.find(p => p.id === planEditDraft.id);
+    const payload: Record<string, string | number> = {};
+    if (!original || planEditDraft.name !== original.name) payload.unit_type_code = planEditDraft.name;
+    if (!original || planEditDraft.bedrooms !== original.bedrooms) payload.bedrooms = planEditDraft.bedrooms;
+    if (!original || planEditDraft.bathrooms !== original.bathrooms) payload.bathrooms = planEditDraft.bathrooms;
+    if (!original || planEditDraft.sqft !== original.sqft) payload.avg_square_feet = planEditDraft.sqft;
+    if (!original || planEditDraft.unitCount !== original.unitCount) payload.unit_count = planEditDraft.unitCount;
+    if (!original || planEditDraft.currentRent !== original.currentRent) payload.current_rent_avg = planEditDraft.currentRent;
+    if (!original || planEditDraft.marketRent !== original.marketRent) payload.current_market_rent = planEditDraft.marketRent;
+
+    if (Object.keys(payload).length === 0) {
+      // Nothing changed — close the editor without a write.
+      setEditingPlanId(null);
+      setPlanEditDraft(null);
+      return;
+    }
     try {
       const response = await authFetch(`${backendUrl}/api/multifamily/unit-types/${planEditDraft.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          unit_type_code: planEditDraft.name,
-          bedrooms: planEditDraft.bedrooms,
-          bathrooms: planEditDraft.bathrooms,
-          avg_square_feet: planEditDraft.sqft,
-          unit_count: planEditDraft.unitCount,
-          current_rent_avg: planEditDraft.currentRent,
-          current_market_rent: planEditDraft.marketRent,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const detail = await response.text();
@@ -1886,21 +1910,33 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // live on lease records, not the unit, and are not written here.
   const handleEditSave = async () => {
     if (!editDraft) return;
+    // PATCH only changed fields. Several displayed values are fallback
+    // composites (currentRent may come from the lease, tenantName from the
+    // resident record) — writing them back unchanged would copy lease-derived
+    // values into the unit record. Same NULL/fallback-stomping class as the
+    // floor-plan save (DR10 follow-up).
+    const originalUnit = units.find(u => u.id === editDraft.id);
+    const payload: Record<string, string | number> = {};
+    if (!originalUnit || editDraft.unitNumber !== originalUnit.unitNumber) payload.unit_number = editDraft.unitNumber;
+    if (!originalUnit || editDraft.floorPlan !== originalUnit.floorPlan) payload.unit_type = editDraft.floorPlan;
+    if (!originalUnit || editDraft.bedrooms !== originalUnit.bedrooms) payload.bedrooms = editDraft.bedrooms;
+    if (!originalUnit || editDraft.bathrooms !== originalUnit.bathrooms) payload.bathrooms = editDraft.bathrooms;
+    if (!originalUnit || editDraft.sqft !== originalUnit.sqft) payload.square_feet = editDraft.sqft;
+    if (!originalUnit || editDraft.currentRent !== originalUnit.currentRent) payload.current_rent = editDraft.currentRent;
+    if (!originalUnit || editDraft.marketRent !== originalUnit.marketRent) payload.market_rent = editDraft.marketRent;
+    if (!originalUnit || editDraft.tenantName !== originalUnit.tenantName) payload.tenant_name = editDraft.tenantName;
+    if (!originalUnit || editDraft.notes !== originalUnit.notes) payload.other_features = editDraft.notes;
+
+    if (Object.keys(payload).length === 0) {
+      setEditingUnitId(null);
+      setEditDraft(null);
+      return;
+    }
     try {
       const response = await authFetch(`${backendUrl}/api/multifamily/units/${editDraft.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          unit_number: editDraft.unitNumber,
-          unit_type: editDraft.floorPlan,
-          bedrooms: editDraft.bedrooms,
-          bathrooms: editDraft.bathrooms,
-          square_feet: editDraft.sqft,
-          current_rent: editDraft.currentRent,
-          market_rent: editDraft.marketRent,
-          tenant_name: editDraft.tenantName,
-          other_features: editDraft.notes,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) {
         const detail = await response.text();
