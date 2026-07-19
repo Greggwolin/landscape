@@ -125,9 +125,9 @@ export function OperatingExpensesSection({
           <tr>
             <th style={{ width: '18%' }}>Expense Category</th>
             <th className="num" style={{ width: '6%' }}>Count</th>
-            <th className="num" style={{ width: '9%' }}>$/Unit</th>
-            <th className="num" style={{ width: '7%' }}>$/SF</th>
-            <th className="num" style={{ width: '10%' }}>Total</th>
+            <th className="num" style={{ width: '9%' }} title="Annual expense per unit — note: income rows above are monthly per unit">$/Unit/Yr</th>
+            <th className="num" style={{ width: '7%' }} title="Annual expense per square foot">$/SF/Yr</th>
+            <th className="num" style={{ width: '10%' }} title="Annual total">Annual</th>
             <th className="num" style={{ width: '8%' }}>Growth</th>
             {valueAddEnabled && (
               <>

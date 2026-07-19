@@ -30,7 +30,7 @@ const COLUMNS = [
   { key: 'tenant', label: 'Tenant', default: true },
   { key: 'bdBa', label: 'Bd/Ba', default: true },
   { key: 'sqft', label: 'Sq Ft', default: true },
-  { key: 'currentRent', label: 'Current Rent', default: true },
+  { key: 'currentRent', label: 'In-Place Rent', default: true },
   { key: 'rentPerSF', label: 'Rent/SF', default: true },
   { key: 'leaseStart', label: 'Lease Start', default: true },
   { key: 'leaseEnd', label: 'Lease End', default: true },
@@ -429,7 +429,7 @@ export default function RentRoll({ projectId }: RentRollProps) {
                     className="text-end"
                     style={{ cursor: 'pointer', color: 'var(--studio-text-secondary)' }}
                   >
-                    Current Rent {renderSortIndicator('currentRent')}
+                    In-Place Rent {renderSortIndicator('currentRent')}
                   </CTableHeaderCell>
                 )}
                 {isColumnVisible('rentPerSF') && (

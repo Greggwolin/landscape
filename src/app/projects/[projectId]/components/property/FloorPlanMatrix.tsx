@@ -260,7 +260,16 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
                 <CTableHeaderCell rowSpan={2} style={{ color: 'var(--studio-text-secondary)', verticalAlign: 'bottom' }}>Unit Type</CTableHeaderCell>
                 <CTableHeaderCell rowSpan={2} className="text-end" style={{ color: 'var(--studio-text-secondary)', verticalAlign: 'bottom' }}>Units</CTableHeaderCell>
                 <CTableHeaderCell rowSpan={2} className="text-end" style={{ color: 'var(--studio-text-secondary)', minWidth: '90px', verticalAlign: 'bottom' }}>Avg SF</CTableHeaderCell>
-                <CTableHeaderCell colSpan={3} className="text-center" style={{ color: 'var(--studio-text-secondary)', borderBottom: '1px solid var(--studio-border)' }}>Current Rent</CTableHeaderCell>
+                <CTableHeaderCell
+                  colSpan={3}
+                  className="text-center"
+                  style={{ color: 'var(--studio-text-secondary)', borderBottom: '1px solid var(--studio-border)' }}
+                  title={dataSource === 'rent_roll'
+                    ? 'Averaged from occupied-lease rents on the Rent Roll (source of truth when a rent roll exists)'
+                    : 'Manually entered per unit type — no occupied rent roll loaded'}
+                >
+                  {dataSource === 'rent_roll' ? 'In-Place Rent (avg from Rent Roll)' : 'Current Market Rent (manual)'}
+                </CTableHeaderCell>
                 <CTableHeaderCell rowSpan={2} className="text-end" style={{ color: 'var(--studio-text-secondary)', verticalAlign: 'bottom' }}>Monthly Income</CTableHeaderCell>
               </CTableRow>
               {/* Sub-header row for rent columns */}

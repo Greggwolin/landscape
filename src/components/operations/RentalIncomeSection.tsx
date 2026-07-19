@@ -104,13 +104,13 @@ export function RentalIncomeSection({
           <tr>
             <th style={{ width: '18%' }}>Unit Type</th>
             <th className="num" style={{ width: '8%' }}>Count</th>
-            <th className="num" style={{ width: '12%' }}>Current</th>
-            <th className="num" style={{ width: '10%' }}>$/SF</th>
+            <th className="num" style={{ width: '12%' }} title="Average in-place rent per unit, monthly">In-Place $/Mo</th>
+            <th className="num" style={{ width: '10%' }} title="Monthly rent per square foot">$/SF/Mo</th>
             <th className="num" style={{ width: '14%' }}>Annual</th>
             <th className="num" style={{ width: '14%' }}>Loss to Lease</th>
             {valueAddEnabled && (
               <>
-                <th className="num post-reno" style={{ width: '12%' }}>Post-Reno Rent</th>
+                <th className="num post-reno" style={{ width: '12%' }} title="Projected post-renovation rent per unit, monthly">Post-Reno $/Mo</th>
                 <th className="num post-reno" style={{ width: '12%' }}>Annual</th>
               </>
             )}
