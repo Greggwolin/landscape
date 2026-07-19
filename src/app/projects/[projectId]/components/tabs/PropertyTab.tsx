@@ -369,10 +369,14 @@ function PropertyNarrative({ projectId, units, floorPlans }: {
         if (docsRes.ok) {
           const docsData = await docsRes.json();
           const docs: Record<string, unknown>[] = docsData.documents || [];
-          const omDoc = docs.find((d) =>
-            d.doc_type === 'om' || d.doc_type === 'offering_memorandum' ||
-            (typeof d.doc_name === 'string' && /\b(om|offering.memo)/i.test(d.doc_name))
-          );
+          const omDoc = docs.find((d) => {
+            const docType = typeof d.doc_type === 'string' ? d.doc_type.toLowerCase() : '';
+            if (docType === 'om' || docType.includes('offering')) return true;
+            if (typeof d.doc_name !== 'string') return false;
+            // \b fails on names like "Ave_OM_2025" (underscore is a word
+            // character), so treat _ - . and spaces as delimiters explicitly.
+            return /(?:^|[\s_\-.(])om(?:[\s_\-.)]|$)|offering[\s_\-.]?mem/i.test(d.doc_name);
+          });
           let omText: string | null = null;
           if (omDoc?.doc_id) {
             const contentRes = await authFetch(`/api/projects/${projectId}/documents/${omDoc.doc_id}/content`);

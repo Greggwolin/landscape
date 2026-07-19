@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.7.0
-**Last Updated:** July 14, 2026
-**Supersedes:** v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.7.1
+**Last Updated:** July 19, 2026
+**Supersedes:** v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -234,6 +234,11 @@ The checks live in the prompt-drafting workflow, not in the prompt itself. §4.7
 The failure mode this closes: handoffs go out referencing branches that don't exist, project IDs that aren't owned by the user, or files the prompt says are present when they aren't. The audit (Au1, Au2) found this as the single most expensive recurring friction pattern in the chat sample — at least once per substantive session, sometimes twice.
 
 **4.7 Session ID + echo-back.** Every CC handoff prompt must include a distinctive session ID at the top, a Step 0 in the BEFORE YOU START block where CC echoes back the session ID and current branch before doing any work, and the same session ID baked into the commit message footer. This prevents prompts from being pasted into the wrong CC session and creates an audit trail across the toolchain.
+
+Two additions (Gregg, chat DR 2026-07-19):
+
+1. **Completion header.** Every CC prompt must instruct that the final completion response START with the prompt name/title, e.g. `Done — DR14 — OM document detection: match real naming conventions — merged and verified.` Gregg runs parallel sessions; the header matches a finished session to its chat at a glance.
+2. **Front-loaded title marker.** The prompt title's first words are the chat marker (e.g. "DR7 auth refresh: ..."), because Claude Code auto-summarizes the first message into the terminal tab title and a leading marker usually survives summarization. (Extends the existing title convention.)
 
 **4.8 Branch tracking and parallel-session collision check.** Every CC prompt MUST name the target branch explicitly in the prompt header — not implied, not "current branch," but the exact branch name. If the prompt's first action is to create a new branch, name both the source branch and the new branch.
 
@@ -975,6 +980,8 @@ This section establishes the manual two-way handoff between the Claude.ai chat p
 ---
 
 ## CHANGELOG
+
+**v4.7.1 (2026-07-19)** — One add. §4.7 extended with (1) a completion-header requirement — CC's final response starts with the prompt name/title ("Done — <prompt name> — merged and verified") so finished sessions match to chats at a glance across parallel terminals — and (2) front-loaded chat markers in prompt titles so the terminal tab's auto-summarized title keeps the marker. Source: chat DR. Also mirrored app-wide (all repos) via the global user-level instruction file for the coding assistant. **Per §0.4: paste this file into the project instructions field ONCE.**
 
 **v4.7.0 (2026-07-14) — RECONCILIATION. The two copies are now identical; this file is a true superset of everything that existed on either side.** Source: chat VA5. Minor-version bump (not a patch) because this retires a month-long two-way drift and changes §0.4's model of the world.
 
