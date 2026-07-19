@@ -10341,6 +10341,7 @@ def get_land_use_families(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve land use families (top-level classification)."""
     family_id = tool_input.get('family_id')
@@ -10382,6 +10383,7 @@ def update_land_use_family(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a land use family."""
     family_id = tool_input.get('family_id') or tool_input.get('id')
@@ -10463,6 +10465,7 @@ def get_land_use_types(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve land use types (mid-level classification)."""
     type_id = tool_input.get('type_id')
@@ -10514,6 +10517,7 @@ def update_land_use_type(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a land use type."""
     type_id = tool_input.get('type_id') or tool_input.get('id')
@@ -10594,6 +10598,7 @@ def get_residential_products(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve residential lot products (leaf-level classification)."""
     product_id = tool_input.get('product_id')
@@ -10652,6 +10657,7 @@ def update_residential_product(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a residential lot product."""
     product_id = tool_input.get('product_id') or tool_input.get('id')
@@ -10755,6 +10761,7 @@ def get_measures(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve measurement units (SF, AC, LF, EA, etc.)."""
     measure_id = tool_input.get('measure_id')
@@ -10802,6 +10809,7 @@ def update_measure(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a measurement unit."""
     measure_id = tool_input.get('measure_id') or tool_input.get('id')
@@ -10902,6 +10910,7 @@ def get_picklist_values(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve system picklist values."""
     picklist_name = tool_input.get('picklist_name') or tool_input.get('picklist_type')
@@ -10960,6 +10969,7 @@ def update_picklist_value(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a picklist value."""
     picklist_id = tool_input.get('picklist_id') or tool_input.get('id')
@@ -11051,6 +11061,7 @@ def delete_picklist_value(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Delete a picklist value."""
     picklist_id = tool_input.get('picklist_id') or tool_input.get('id')
@@ -11106,6 +11117,7 @@ def get_benchmarks(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve global benchmark values."""
     benchmark_id = tool_input.get('benchmark_id')
@@ -11172,6 +11184,7 @@ def update_benchmark(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a global benchmark value."""
     benchmark_id = tool_input.get('benchmark_id') or tool_input.get('id')
@@ -11271,6 +11284,7 @@ def delete_benchmark(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Delete a benchmark value."""
     benchmark_id = tool_input.get('benchmark_id') or tool_input.get('id')
@@ -11321,6 +11335,7 @@ def search_irem_benchmarks(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Search IREM expense benchmarks for multifamily operating expenses.
@@ -11412,6 +11427,7 @@ def query_platform_knowledge(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Query platform knowledge base (RAG) for real estate concepts and methodologies.
@@ -11641,6 +11657,7 @@ def get_cost_library_items(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve cost library items."""
     item_id = tool_input.get('item_id')
@@ -11706,6 +11723,7 @@ def update_cost_library_item(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a cost library item."""
     item_id = tool_input.get('item_id') or tool_input.get('id')
@@ -11797,6 +11815,7 @@ def delete_cost_library_item(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Delete a cost library item."""
     item_id = tool_input.get('item_id') or tool_input.get('id')
@@ -11851,6 +11870,7 @@ def get_report_templates(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve report templates."""
     template_id = tool_input.get('template_id')
@@ -11903,6 +11923,7 @@ def get_dms_templates(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Retrieve DMS templates."""
     template_id = tool_input.get('template_id')
@@ -11955,6 +11976,7 @@ def update_template(
     project_id: int,
     propose_only: bool = True,
     source_message_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """Create or update a template (report or DMS)."""
     template_type = tool_input.get('template_type', 'report')

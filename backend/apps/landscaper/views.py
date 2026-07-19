@@ -7,8 +7,10 @@ Provides:
 - Variance calculation between AI advice and actual values
 """
 
+import json
 import logging
 import re
+import threading
 
 from rest_framework import viewsets, status
 
@@ -75,6 +77,82 @@ def _require_project_access(user, project_id: int) -> Project:
 # ---------------------------------------------------------------------------
 # Tool-context-aware message history builder
 # ---------------------------------------------------------------------------
+
+#: How long the connection may stay silent before we emit a keep-alive byte.
+#: Railway's edge terminates connections that send zero bytes for ~30s; 5s
+#: leaves a wide margin and satisfies the <5s first-byte target.
+HEARTBEAT_INTERVAL_SECONDS = 5.0
+
+
+def _heartbeat_streaming_json(work, *, status_code=status.HTTP_201_CREATED):
+    """
+    Run ``work()`` on a worker thread while emitting whitespace heartbeats.
+
+    Why: the Landscaper message endpoint emitted zero bytes until its entire
+    tool loop finished. Railway's edge kills silent connections at ~30s, so
+    turns that ran 29.1s and 30.9s server-side were edge-503'd even though
+    Django completed them successfully (diagnosed in LP-CHAT503-0719-LP12 —
+    the logs showed no worker restart, ruling out OOM/worker death). Scenario
+    questions routinely cross 30s, so this sat directly on the demo path.
+
+    How: leading whitespace is legal JSON, so a client doing ``response.json()``
+    parses the trailing payload with no change at all. The heartbeats keep the
+    socket warm; the real payload is written last.
+
+    Caveat: a streaming response commits its status line before the work runs,
+    so failures come back as ``status_code`` with ``{"success": false, ...}``
+    in the body rather than a 5xx. Both frontends already branch on
+    ``data.success`` rather than ``response.ok``, so client behavior is
+    unchanged — but HTTP-status-based monitoring will no longer see a 500 here.
+    Failures are still logged at ERROR level below.
+    """
+    from django.db import connections
+    from django.http import StreamingHttpResponse
+    from rest_framework.renderers import JSONRenderer
+
+    outcome = {}
+
+    def runner():
+        try:
+            outcome['result'] = work()
+        except Exception as exc:  # mirrors the view's own except-block contract
+            logger.exception("Error in streamed message work: %s", exc)
+            outcome['result'] = {'success': False, 'error': str(exc)}
+        finally:
+            # This ran off the request thread, so Django won't tidy up for us.
+            connections.close_all()
+
+    worker = threading.Thread(target=runner, daemon=True)
+    worker.start()
+
+    def stream():
+        while True:
+            worker.join(timeout=HEARTBEAT_INTERVAL_SECONDS)
+            if not worker.is_alive():
+                break
+            yield b' '
+
+        result = outcome.get('result')
+        if result is None:
+            body = {'success': False, 'error': 'No response produced'}
+            yield json.dumps(body).encode()
+            return
+
+        # The wrapped view returns DRF Responses; render via DRF so Decimal,
+        # datetime and UUID values encode exactly as they did before.
+        if hasattr(result, 'data'):
+            yield JSONRenderer().render(result.data)
+        else:
+            yield JSONRenderer().render(result)
+
+    response = StreamingHttpResponse(
+        stream(), status=status_code, content_type='application/json'
+    )
+    # Discourage any intermediary from buffering the heartbeats away.
+    response['Cache-Control'] = 'no-cache, no-transform'
+    response['X-Accel-Buffering'] = 'no'
+    return response
+
 
 def _build_message_with_tool_context(msg, is_recent: bool = True) -> dict:
     """
@@ -2194,7 +2272,21 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             "user_message": {...},
             "assistant_message": {...}
         }
+
+        Delivered as a heartbeat-streamed response: tool-running turns regularly
+        exceed the ~30s the edge allows a silent connection, so the work runs on
+        a worker thread while whitespace keeps the socket alive. The payload and
+        its shape are unchanged. See _heartbeat_streaming_json.
+
+        DRF authentication and permission checks have already run by the time we
+        get here, so 401/403 still return normally and never reach the stream.
         """
+        return _heartbeat_streaming_json(
+            lambda: self._create_blocking(request, *args, **kwargs)
+        )
+
+    def _create_blocking(self, request, *args, **kwargs):
+        """The original synchronous body of create(); returns a DRF Response."""
         from .models import ThreadMessage
         from .serializers import ThreadMessageSerializer
         from .ai_handler import get_landscaper_response
