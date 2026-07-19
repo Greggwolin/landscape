@@ -31,7 +31,6 @@ export { AddButton } from './AddButton';
 export { RentalIncomeSection } from './RentalIncomeSection';
 export { VacancyDeductionsSection } from './VacancyDeductionsSection';
 export { OtherIncomeSection } from './OtherIncomeSection';
-export { OperatingExpensesSection } from './OperatingExpensesSection';
 export { DraggableOpexSection } from './DraggableOpexSection';
 export { OperatingIncomeCard } from './OperatingIncomeCard';
 export { OperatingStatement } from './OperatingStatement';
