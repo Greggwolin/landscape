@@ -686,7 +686,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'leaseEnd', label: 'Lease End', category: 'lease', visible: true, type: 'input', description: 'Lease expiration date' },
   { id: 'deposit', label: 'Deposit', category: 'lease', visible: false, type: 'input', description: 'Security deposit amount' },
   // Financial
-  { id: 'currentRent', label: 'Current Rent', category: 'financial', visible: true, type: 'input', description: 'Actual rent being collected today' },
+  { id: 'currentRent', label: 'In-Place Rent', category: 'financial', visible: true, type: 'input', description: 'Actual rent being collected today (in-place lease rent)' },
   { id: 'marketRent', label: 'Market Rent', category: 'financial', visible: true, type: 'input', description: 'Current market rent estimate' },
   { id: 'proformaRent', label: 'Proforma Rent', category: 'financial', visible: false, type: 'input', description: 'Projected future rent for underwriting' },
   { id: 'monthlyIncome', label: 'Monthly Income', category: 'financial', visible: false, type: 'calculated', description: 'Total monthly income (includes current rent + other fees)' },
@@ -2588,10 +2588,10 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             <div className="text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>{occupiedUnits} / {units.length} units</div>
           </div>
 
-          {/* Avg Current Rent */}
+          {/* Avg In-Place Rent */}
           <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Avg Current Rent</span>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Avg In-Place Rent</span>
               <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>

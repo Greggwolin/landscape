@@ -1019,6 +1019,12 @@ export default function ProjectTab({
                   <div style={{ fontSize: '0.75rem', color: 'var(--cui-body-color)' }}>
                     Current NOI
                   </div>
+                  <div
+                    title="As stated in the offering memorandum — seller-provided, not computed by Landscape. Computed bases (F-12 Current / F-12 Market) live on Valuation → Direct Cap."
+                    style={{ fontSize: '0.65rem', color: 'var(--cui-secondary-color)', border: '1px solid var(--cui-border-color)', borderRadius: '10px', display: 'inline-block', padding: '0 6px', marginTop: '2px' }}
+                  >
+                    Broker OM
+                  </div>
                 </div>
               </CCol>
               <CCol>
@@ -1028,6 +1034,12 @@ export default function ProjectTab({
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--cui-body-color)' }}>
                     Proforma NOI
+                  </div>
+                  <div
+                    title="As stated in the offering memorandum — seller's pro forma, not computed by Landscape. Computed bases (F-12 Current / F-12 Market) live on Valuation → Direct Cap."
+                    style={{ fontSize: '0.65rem', color: 'var(--cui-secondary-color)', border: '1px solid var(--cui-border-color)', borderRadius: '10px', display: 'inline-block', padding: '0 6px', marginTop: '2px' }}
+                  >
+                    Broker Pro Forma
                   </div>
                 </div>
               </CCol>

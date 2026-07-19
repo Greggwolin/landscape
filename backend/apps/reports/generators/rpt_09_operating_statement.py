@@ -8,6 +8,22 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
     report_code = 'RPT_09'
     report_name = 'Operating Statement'
 
+    def _active_discriminator(self) -> str:
+        """Resolve the project's active operating-statement scenario.
+
+        tbl_operating_expenses rows are tagged with statement_discriminator
+        (T12 / CURRENT_PRO_FORMA / BROKER_PRO_FORMA / 'default' / ...).
+        Summing across ALL discriminators double-counts expenses for any
+        project carrying more than one statement, so every expense query in
+        this generator must filter to the active one.
+        """
+        rows = self.execute_query("""
+            SELECT COALESCE(active_opex_discriminator, 'default') AS disc
+            FROM landscape.tbl_project
+            WHERE project_id = %s
+        """, [self.project_id])
+        return rows[0]['disc'] if rows else 'default'
+
     def generate_preview(self) -> dict:
         project = self.get_project()
         sections = []
@@ -57,16 +73,19 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
         credit = annual_gpr * credit_loss
         egi = annual_gpr - vacancy - credit
 
-        # Operating expenses from tbl_operating_expenses
+        # Operating expenses from tbl_operating_expenses — filtered to the
+        # active statement scenario (see _active_discriminator).
+        discriminator = self._active_discriminator()
         expense_rows = self.execute_query("""
             SELECT
                 expense_category AS category,
                 COALESCE(SUM(annual_amount), 0) AS annual_amount
             FROM landscape.tbl_operating_expenses
             WHERE project_id = %s
+              AND COALESCE(statement_discriminator, 'default') = %s
             GROUP BY expense_category
             ORDER BY SUM(annual_amount) DESC
-        """, [self.project_id])
+        """, [self.project_id, discriminator])
 
         total_opex = sum(float(r['annual_amount']) for r in expense_rows)
 
@@ -125,7 +144,10 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
 
         return {
             'title': 'Operating Statement',
-            'subtitle': project.get('project_name', ''),
+            'subtitle': (
+                f"{project.get('project_name', '')} — Basis: Market-Rent Pro Forma "
+                f"(unit inventory × market rents; expenses: {discriminator})"
+            ),
             'sections': sections,
         }
 
@@ -211,12 +233,16 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
 
         loss_to_lease = float(loss_data[0]['annual_loss_to_lease']) if loss_data else 0.0
 
+        # Resolve active statement scenario once for all expense queries
+        discriminator = self._active_discriminator()
+
         # Query 4: Get concessions (default to 1% of GPR if not in DB)
         conc_data = self.execute_query("""
             SELECT COALESCE(SUM(annual_amount), 0) AS total_concessions
             FROM landscape.tbl_operating_expenses
             WHERE project_id = %s AND expense_category = 'Concessions'
-        """, [self.project_id])
+              AND COALESCE(statement_discriminator, 'default') = %s
+        """, [self.project_id, discriminator])
 
         concessions = float(conc_data[0]['total_concessions']) if conc_data else (annual_gpr * 0.01)
 
@@ -230,6 +256,7 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
                 COALESCE(SUM(annual_amount), 0) AS annual_amount
             FROM landscape.tbl_operating_expenses
             WHERE project_id = %s
+              AND COALESCE(statement_discriminator, 'default') = %s
             GROUP BY expense_category
             ORDER BY
                 CASE expense_category
@@ -245,7 +272,7 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
                     ELSE 10
                 END,
                 SUM(annual_amount) DESC
-        """, [self.project_id])
+        """, [self.project_id, discriminator])
 
         opex_items = [(r['category'], float(r['annual_amount'])) for r in opex_data]
         total_opex = sum(amt for _, amt in opex_items)
@@ -263,7 +290,8 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
                 COALESCE(SUM(annual_amount), 0) AS capital_reserve
             FROM landscape.tbl_operating_expenses
             WHERE project_id = %s AND expense_category IN ('Capital Reserves', 'Replacement Reserve')
-        """, [self.project_id])
+              AND COALESCE(statement_discriminator, 'default') = %s
+        """, [self.project_id, discriminator])
 
         capital_reserve = float(capital_data[0]['capital_reserve']) if capital_data else 0.0
 
@@ -279,7 +307,10 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
 
         # Title block with subtitle including unit count
         date_str = datetime.now().strftime('%b %d, %Y')
-        subtitle = f"{project.get('project_name', 'Project')} | {total_units} Units | {date_str} | RPT-09 | Multifamily"
+        subtitle = (
+            f"{project.get('project_name', 'Project')} | {total_units} Units | {date_str} | RPT-09 | Multifamily | "
+            f"Basis: Market-Rent Pro Forma (expenses: {discriminator})"
+        )
         add_header(elements, 'Operating Statement (Pro Forma)', subtitle)
 
         # Build 5-column table data
