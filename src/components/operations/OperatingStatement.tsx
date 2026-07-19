@@ -1236,18 +1236,22 @@ export function OperatingStatement({
             <div className="ops-cell ops-section-cell">
               <span>Expenses and Reserves</span>
             </div>
+            {/* Expense columns carry ANNUAL per-unit dollars, unlike the
+                monthly Rent/Mo revenue column above — caption them so the
+                same visual column can't be read as two different time units
+                (audit H4). */}
+            <div className="ops-cell ops-section-fill num" style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }} title="Annual expense per unit — revenue rows above are monthly per unit">$/Unit/Yr</div>
             <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill num" style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }}>Annual</div>
+            <div className="ops-cell ops-section-fill num" style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }} title="Annual expense per square foot">$/SF/Yr</div>
             <div className="ops-cell ops-section-controls-cell ops-col-ltl">
               <div className="ops-section-controls">
                 <span className="ops-section-hint">Click rows to select, drag to recategorize</span>
                 <DetailSummaryToggle value={viewMode} onChange={setViewMode} />
               </div>
             </div>
-            <div className="ops-cell ops-section-fill ops-col-post"></div>
-            <div className="ops-cell ops-section-fill ops-col-reno"></div>
+            <div className="ops-cell ops-section-fill num ops-col-post" style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }} title="Post-renovation annual expense per unit">$/Unit/Yr</div>
+            <div className="ops-cell ops-section-fill num ops-col-reno" style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }}>Annual</div>
           </div>
 
           {displayOpexRows.map((row) => {
