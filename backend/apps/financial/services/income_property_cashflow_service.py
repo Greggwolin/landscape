@@ -528,6 +528,66 @@ class IncomePropertyCashFlowService:
             noi_items, period_count, sort_order=5,
         ))
 
+        # Section 5: Renovation Cap-X (value-add capital costs, below NOI).
+        # These were previously display-only in the DCF grid and absent from
+        # this envelope entirely, so every consumer (leveraged cash flow,
+        # waterfall equity series) ignored the renovation spend while keeping
+        # the renovated rent premium — overstating returns (audit C5-related:
+        # "Cash Flow Before Debt equals NOI"). Amounts are negative outflows.
+        reno_cost_periods = []
+        reloc_periods = []
+        total_reno_cost = 0.0
+        total_reloc = 0.0
+        for ms in monthly_summary:
+            period_idx = ms['month'] - 1
+            if period_idx >= period_count:
+                break
+            reno_cost = float(ms.get('reno_cost', 0) or 0)
+            reloc_cost = float(ms.get('relocation_cost', 0) or 0)
+            if reno_cost:
+                reno_cost_periods.append({
+                    'periodIndex': period_idx,
+                    'periodSequence': period_idx + 1,
+                    'amount': round(-reno_cost, 2),
+                    'source': 'renovation-schedule',
+                })
+                total_reno_cost += reno_cost
+            if reloc_cost:
+                reloc_periods.append({
+                    'periodIndex': period_idx,
+                    'periodSequence': period_idx + 1,
+                    'amount': round(-reloc_cost, 2),
+                    'source': 'renovation-schedule',
+                })
+                total_reloc += reloc_cost
+
+        if total_reno_cost or total_reloc:
+            capex_items = [
+                {
+                    'lineId': 'reno-capex',
+                    'category': 'Capital',
+                    'subcategory': '',
+                    'description': 'Renovation Costs',
+                    'periods': reno_cost_periods,
+                    'total': round(-total_reno_cost, 2),
+                    'sourceType': 'renovation-schedule',
+                },
+            ]
+            if reloc_periods:
+                capex_items.append({
+                    'lineId': 'reno-relocation',
+                    'category': 'Capital',
+                    'subcategory': '',
+                    'description': 'Tenant Relocation',
+                    'periods': reloc_periods,
+                    'total': round(-total_reloc, 2),
+                    'sourceType': 'renovation-schedule',
+                })
+            sections.append(self._make_section(
+                'cost-renovation', 'RENOVATION CAP-X',
+                capex_items, period_count, sort_order=6,
+            ))
+
         return sections
 
     def _calculate_value_add_reversion(
