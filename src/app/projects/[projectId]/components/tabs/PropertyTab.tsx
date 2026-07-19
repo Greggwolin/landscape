@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import LocationIntelligenceCard from './LocationIntelligenceCard';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { authFetch } from '@/lib/authFetch';
 interface Project {
   project_id: number;
   project_name: string;
@@ -1834,11 +1835,36 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setPlanEditDraft(null);
   };
 
-  const handlePlanEditSave = () => {
-    if (planEditDraft) {
+  // Persists to the unit-type record (SOT mode only — when a rent roll exists
+  // the matrix is a read-only roll-up and the Edit button is not rendered).
+  // Audit 2026-07-18 finding C1: this handler previously mutated React state
+  // only, showing a successful save that wrote nothing.
+  const handlePlanEditSave = async () => {
+    if (!planEditDraft) return;
+    try {
+      const response = await authFetch(`${backendUrl}/api/multifamily/unit-types/${planEditDraft.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit_type_code: planEditDraft.name,
+          bedrooms: planEditDraft.bedrooms,
+          bathrooms: planEditDraft.bathrooms,
+          avg_square_feet: planEditDraft.sqft,
+          unit_count: planEditDraft.unitCount,
+          current_rent_avg: planEditDraft.currentRent,
+          current_market_rent: planEditDraft.marketRent,
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(`Save failed (${response.status}): ${detail.slice(0, 160)}`);
+      }
       setFloorPlans(prev => prev.map(p => p.id === planEditDraft.id ? planEditDraft : p));
       setEditingPlanId(null);
       setPlanEditDraft(null);
+    } catch (err) {
+      // Keep the row in edit mode so nothing is silently lost.
+      alert(err instanceof Error ? err.message : 'Failed to save floor plan changes');
     }
   };
 
@@ -1855,11 +1881,37 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setEditDraft(null);
   };
 
-  const handleEditSave = () => {
-    if (editDraft) {
+  // Persists unit edits to the unit record. Audit 2026-07-18 finding C1
+  // (same class as the floor-plan save): previously state-only. Lease dates
+  // live on lease records, not the unit, and are not written here.
+  const handleEditSave = async () => {
+    if (!editDraft) return;
+    try {
+      const response = await authFetch(`${backendUrl}/api/multifamily/units/${editDraft.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit_number: editDraft.unitNumber,
+          unit_type: editDraft.floorPlan,
+          bedrooms: editDraft.bedrooms,
+          bathrooms: editDraft.bathrooms,
+          square_feet: editDraft.sqft,
+          current_rent: editDraft.currentRent,
+          market_rent: editDraft.marketRent,
+          tenant_name: editDraft.tenantName,
+          other_features: editDraft.notes,
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(`Save failed (${response.status}): ${detail.slice(0, 160)}`);
+      }
       setUnits(prev => prev.map(u => u.id === editDraft.id ? editDraft : u));
       setEditingUnitId(null);
       setEditDraft(null);
+    } catch (err) {
+      // Keep the row in edit mode so nothing is silently lost.
+      alert(err instanceof Error ? err.message : 'Failed to save unit changes');
     }
   };
 
@@ -2106,6 +2158,15 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                                 Cancel
                               </button>
                             </div>
+                          ) : units.length > 0 ? (
+                            // Rent roll populated — matrix is a read-only roll-up
+                            // of real units; rents are edited on the Rent Roll.
+                            <span
+                              style={{ color: 'var(--cui-secondary-color)' }}
+                              title="Calculated from the rent roll — edit units there"
+                            >
+                              —
+                            </span>
                           ) : (
                             <button
                               className="px-2 py-1 text-xs rounded"
