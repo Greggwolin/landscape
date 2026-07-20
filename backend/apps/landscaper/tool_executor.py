@@ -7172,11 +7172,28 @@ def handle_update_land_use_pricing(
 
                 factory = RequestFactory()
                 type_codes_csv = ','.join(type_codes_touched)
+                # Same bare-RequestFactory 401 class as get_operating_statement
+                # (fixed in #183): the target is an IsAuthenticated DRF view, so
+                # authenticate the in-process request as the requesting user via
+                # a short-lived JWT (the browser's own auth path). Flagged in
+                # #183's PR as the known sibling; fixed here (RF 2026-07-19).
+                _auth_headers = {}
+                _uid = kwargs.get('user_id')
+                if _uid:
+                    try:
+                        from django.contrib.auth import get_user_model
+                        from rest_framework_simplejwt.tokens import AccessToken
+                        _u = get_user_model().objects.filter(id=_uid).first()
+                        if _u is not None:
+                            _auth_headers['HTTP_AUTHORIZATION'] = f'Bearer {AccessToken.for_user(_u)}'
+                    except Exception:  # noqa: BLE001 — degrade to unauthenticated request
+                        logger.exception('update_land_use_pricing: recalc request auth failed')
                 # RequestFactory with query string; @api_view wraps into DRF Request
                 # which exposes request.query_params from the GET params
                 fake_request = factory.post(
                     f'/api/projects/{project_id}/recalculate-sfd/?type_codes={type_codes_csv}',
                     content_type='application/json',
+                    **_auth_headers,
                 )
 
                 response = recalculate_sfd_parcels(fake_request, project_id)
@@ -15119,6 +15136,14 @@ def execute_tool(
             'error': f"Unknown tool: {tool_name}",
             'available_tools': list(TOOL_REGISTRY.keys())
         }
+
+    # Stage-1 streaming (RF 2026-07-19): surface live progress in the chat
+    # panel while the turn runs. No-ops outside event-streamed requests.
+    try:
+        from .stream_events import emit_status, friendly_tool_label
+        emit_status(friendly_tool_label(tool_name))
+    except Exception:  # noqa: BLE001 — progress must never break execution
+        pass
 
     # Guard: block project-requiring tools when project_id is None (unassigned threads).
     #

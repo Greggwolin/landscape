@@ -18,6 +18,12 @@ const PROGRESS_STAGES = [
 interface LandscaperProgressProps {
   /** Whether Landscaper is actively processing a request */
   isProcessing: boolean;
+  /**
+   * REAL progress label from the server's event stream ("Reading the rent
+   * roll…"). When present it overrides the simulated stage labels below —
+   * actual activity beats invented activity (RF 2026-07-19).
+   */
+  statusLabel?: string | null;
   /** Callback when progress completes (optional) */
   onComplete?: () => void;
 }
@@ -31,6 +37,7 @@ interface LandscaperProgressProps {
  */
 export function LandscaperProgress({
   isProcessing,
+  statusLabel = null,
   onComplete,
 }: LandscaperProgressProps) {
   const [progress, setProgress] = useState(0);
@@ -189,7 +196,7 @@ export function LandscaperProgress({
               />
             </span>
           )}
-          {label}
+          {(isProcessing && statusLabel) || label}
         </span>
 
         {elapsedTime > 0 && (

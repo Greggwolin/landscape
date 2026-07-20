@@ -217,6 +217,9 @@ export function useLandscaperThreads({
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // Live progress label for the in-flight turn ("Reading the rent roll…"),
+  // fed by the Stage-1 event stream; null when idle or on legacy servers.
+  const [streamStatus, setStreamStatus] = useState<string | null>(null);
   const [isThreadLoading, setIsThreadLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /**
@@ -947,7 +950,11 @@ export function useLandscaperThreads({
           `${DJANGO_API_URL}/api/landscaper/threads/${threadToUse.threadId}/messages/`,
           {
             method: 'POST',
-            headers: getAuthHeaders(),
+            // Stage-1 streaming opt-in (RF 2026-07-19): server replies with
+            // NDJSON progress events + final payload instead of silent
+            // heartbeats. Older servers ignore the header — the content-type
+            // check below falls back to plain JSON parsing.
+            headers: { ...getAuthHeaders(), 'X-Landscape-Stream': 'events' },
             body: JSON.stringify({
               content: message,
               page_context: pageContext,  // Pass for context-aware tool filtering
@@ -969,7 +976,44 @@ export function useLandscaperThreads({
           return undefined;
         }
 
-        const data = await response.json();
+        // Event-stream aware parse (Stage-1 streaming). NDJSON bodies carry
+        // {"e":"status"|"hb"|"final"} lines; anything else is the legacy
+        // whitespace-heartbeat + JSON body.
+        let data: any;
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/x-ndjson') && response.body) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let finalPayload: any = undefined;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (value) buffer += decoder.decode(value, { stream: true });
+            let nl: number;
+            while ((nl = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, nl).trim();
+              buffer = buffer.slice(nl + 1);
+              if (!line) continue;
+              try {
+                const evt = JSON.parse(line);
+                if (evt.e === 'status' && typeof evt.label === 'string') {
+                  setStreamStatus(evt.label);
+                } else if (evt.e === 'final') {
+                  finalPayload = evt.payload;
+                }
+              } catch {
+                // Malformed line — ignore; the final event is what matters.
+              }
+            }
+            if (done) break;
+          }
+          if (finalPayload === undefined) {
+            throw new Error('Response stream ended without a final payload');
+          }
+          data = finalPayload;
+        } else {
+          data = await response.json();
+        }
 
         if (!data.success) {
           throw new Error(data.error || 'Failed to send message');
@@ -1041,6 +1085,7 @@ export function useLandscaperThreads({
         throw err;
       } finally {
         setIsLoading(false);
+        setStreamStatus(null);
         sendingRef.current = false;
       }
     },
@@ -1171,6 +1216,7 @@ export function useLandscaperThreads({
     activeThread,
     messages,
     isLoading,
+    streamStatus,
     isThreadLoading,
     error,
     /** True when URL-pinned thread fetch returned 404. Watch from layout/CenterChatPanel and redirect to /w/chat. */

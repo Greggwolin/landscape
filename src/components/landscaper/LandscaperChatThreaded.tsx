@@ -394,6 +394,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     activeThread,
     messages,
     isLoading,
+    streamStatus,
     isThreadLoading,
     error,
     threadNotFound,
@@ -963,7 +964,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       </div>
 
       {/* Progress indicator */}
-      <LandscaperProgress isProcessing={isLoading} />
+      <LandscaperProgress isProcessing={isLoading} statusLabel={streamStatus} />
 
       {/* Input */}
       <div
