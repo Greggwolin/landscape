@@ -2703,11 +2703,19 @@ When the user asks for an operating statement, T-12, P&L, or pro forma:
 1. Call get_operating_statement FIRST. Pass `user_phrasing` set to the user's
    verbatim wording (do NOT paraphrase — pass exactly what they said).
 
-2. If the tool returns success=true, USE `rendering_label` from the response
-   VERBATIM as the artifact title. Do NOT compose a custom title. The title
-   reflects what the data actually is, not what the user asked for. If the
-   user said "T-12" but the resolved scenario is CURRENT_PRO_FORMA, the title
-   says "Current Pro Forma Operating Statement" — full stop.
+2. If the tool returns success=true with `artifact_created: true` (the
+   standard path — the server has ALREADY built and opened the artifact in
+   the right panel): do NOT call create_artifact. Do NOT restate the table.
+   Reply with ONE short sentence: the `rendering_label` verbatim plus the
+   NOI from `totals`. You are done.
+
+2b. If the tool returns success=true WITHOUT `artifact_created` (legacy
+   fallback — server render failed), compose the artifact yourself from
+   `data`, and USE `rendering_label` from the response VERBATIM as the
+   artifact title. Do NOT compose a custom title. The title reflects what
+   the data actually is, not what the user asked for. If the user said
+   "T-12" but the resolved scenario is CURRENT_PRO_FORMA, the title says
+   "Current Pro Forma Operating Statement" — full stop.
 
 3. If the tool returns code='ambiguous_scenario':
    - Multiple scenarios on file: surface the `available_scenarios` list to the

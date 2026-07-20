@@ -406,7 +406,17 @@ export function useLandscaperThreads({
       // Drop stale response — only the most recent call wins.
       if (loadMsgsRequestIdRef.current !== requestId) return;
       if (data.success && data.messages) {
-        setMessages(data.messages);
+        if (sendingRef.current) {
+          // A send is in flight: the server list doesn't yet include the
+          // user's just-sent message. Merge it in so a racing reload can't
+          // blank the optimistic echo until the reply lands (RF, 2026-07-19).
+          setMessages((prev) => {
+            const temps = prev.filter((m) => String(m.messageId).startsWith('temp-'));
+            return [...data.messages, ...temps];
+          });
+        } else {
+          setMessages(data.messages);
+        }
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -780,6 +790,29 @@ export function useLandscaperThreads({
         return;
       }
 
+      // Optimistic echo FIRST — before any network work (RF chat, 2026-07-19).
+      // On new-thread sends the echo previously happened only after the
+      // thread-creation POST, so the user's own text didn't render until the
+      // network settled (and a racing message-list load could wipe it until
+      // the assistant reply arrived). The temp message is declared up here so
+      // every failure path below can remove it.
+      const isHidden = options?.hidden === true;
+      const tempUserMessage: ThreadMessage = {
+        messageId: `temp-${Date.now()}`,
+        role: 'user',
+        content: message,
+        createdAt: new Date().toISOString(),
+        ...(isHidden ? { metadata: { hidden: true } } : {}),
+      };
+      const removeTempMessage = () => {
+        if (!isHidden) {
+          setMessages((prev) => prev.filter((m) => m.messageId !== tempUserMessage.messageId));
+        }
+      };
+      if (!isHidden) {
+        setMessages((prev) => [...prev, tempUserMessage]);
+      }
+
       if (!activeThread) {
         setError(null);
 
@@ -818,14 +851,17 @@ export function useLandscaperThreads({
             if (data.success && data.thread) {
               setActiveThread(data.thread);
               activeThreadRef.current = data.thread;
-              setMessages([]);
+              // Preserve the optimistic echo; clear anything else.
+              setMessages((prev) => prev.filter((m) => String(m.messageId).startsWith('temp-')));
               // Don't await loadThreads here — it's non-blocking sidebar refresh
               loadThreads();
             } else {
+              removeTempMessage();
               setError(data.error || 'Failed to start new thread');
               return;
             }
           } catch (err) {
+            removeTempMessage();
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error('[LandscaperThreads] Failed to create thread on first send:', err);
             setError('Failed to start new thread');
@@ -859,13 +895,16 @@ export function useLandscaperThreads({
             if (data.success && data.thread) {
               setActiveThread(data.thread);
               activeThreadRef.current = data.thread;
-              setMessages([]);
+              // Preserve the optimistic echo; clear anything else.
+              setMessages((prev) => prev.filter((m) => String(m.messageId).startsWith('temp-')));
               loadThreads();
             } else {
+              removeTempMessage();
               setError(data.error || 'Failed to start new thread');
               return;
             }
           } catch (err) {
+            removeTempMessage();
             if (err instanceof DOMException && err.name === 'AbortError') return;
             console.error('[LandscaperThreads] Failed to create project thread on first send:', err);
             setError('Failed to start new thread');
@@ -882,6 +921,7 @@ export function useLandscaperThreads({
             // initializeThread sets its own error
           }
           if (!activeThreadRef.current) {
+            removeTempMessage();
             setError('No active thread — please try again');
             return;
           }
@@ -892,6 +932,7 @@ export function useLandscaperThreads({
       // Use ref for the thread ID in case we just recovered
       const threadToUse = activeThread || activeThreadRef.current;
       if (!threadToUse) {
+        removeTempMessage();
         setError('No active thread available');
         return;
       }
@@ -899,20 +940,7 @@ export function useLandscaperThreads({
       sendingRef.current = true;
       setIsLoading(true);
       setError(null);
-
-      const isHidden = options?.hidden === true;
-
-      // Optimistic update: show user message immediately (unless hidden)
-      const tempUserMessage: ThreadMessage = {
-        messageId: `temp-${Date.now()}`,
-        role: 'user',
-        content: message,
-        createdAt: new Date().toISOString(),
-        ...(isHidden ? { metadata: { hidden: true } } : {}),
-      };
-      if (!isHidden) {
-        setMessages((prev) => [...prev, tempUserMessage]);
-      }
+      // (Optimistic echo already appended at the top of sendMessage.)
 
       try {
         const response = await fetchWithTimeout(
