@@ -308,6 +308,16 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
       setOpenFlyout(null);
     }
   }, [collapsed]);
+  // ── Tooltip suppression after a click (H7 / RF100) ────────────────────────
+  // The collapsed-rail label tooltip is a pure-CSS `.sb-nav-item:hover::after`
+  // with no JS state to clear. A click that navigates without moving the pointer
+  // leaves the icon's `:hover` latched, so the tooltip stays painted over the
+  // newly-loaded content until the next mouse move. We stamp `.suppress-tooltip`
+  // on the rail root on any click (capture phase, so inner stopPropagation can't
+  // hide it) and drop it on the next real `mousemove` — exactly when the browser
+  // re-evaluates `:hover` anyway. The onMouseMove handler is only attached while
+  // suppressed, so there's no per-pixel render churn in the normal case.
+  const [suppressTooltip, setSuppressTooltip] = useState(false);
   // Thread "See more" state — capped at DEFAULT_THREAD_CAP by default.
   // If the active thread sits past the cap, expand automatically so the
   // user always sees the row that matches the URL they're on.
@@ -362,10 +372,12 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   return (
     <>
       <div
-        className={`wrapper-sidebar${collapsed ? ' collapsed' : ''}`}
+        className={`wrapper-sidebar${collapsed ? ' collapsed' : ''}${suppressTooltip ? ' suppress-tooltip' : ''}`}
         style={{ width: collapsed ? 48 : sidebarWidth }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
+        onClickCapture={() => setSuppressTooltip(true)}
+        onMouseMove={suppressTooltip ? () => setSuppressTooltip(false) : undefined}
       >
         {/* Header */}
         <div className="sb-header">
@@ -528,6 +540,11 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                       data-label={label}
                       title={label}
                       onClick={() => {
+                        // Dismiss this icon's flyout immediately on the navigating
+                        // click — don't wait for the 240ms leave-timer, which never
+                        // fires if the pointer doesn't move. H7 / RF100.
+                        cancelFlyoutClose();
+                        setOpenFlyout(null);
                         if (hasSub) toggleFolderExpanded(folder.id);
                         projectNav.onSelectFolder(folder.id);
                       }}
@@ -580,6 +597,9 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                               }`}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Close the flyout now, not on the leave-timer. H7 / RF100.
+                                cancelFlyoutClose();
+                                setOpenFlyout(null);
                                 projectNav.onSelectTab(folder.id, sub.id);
                               }}
                             >
