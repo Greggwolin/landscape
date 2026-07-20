@@ -239,6 +239,14 @@
   z-index: 100;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
+/* Suppress the label tooltip immediately after a click. Same latched-`:hover`
+   problem as the flyout, but the tooltip is a pure-CSS `::after` with no JS
+   state to clear — so instead we stamp `.suppress-tooltip` on the rail root on
+   click and drop it on the next real `mousemove` (see WrapperSidebar). That
+   matches the bug's own boundary: the tooltip should reappear only once genuine
+   pointer movement resumes, which is exactly when the browser re-checks `:hover`.
+   (H7 / RF100.) */
+.wrapper-sidebar.collapsed.suppress-tooltip .sb-nav-item:hover::after { content: none; }
 .wrapper-sidebar.collapsed .sb-footer { justify-content: center; padding: 10px 0; }
 .wrapper-sidebar.collapsed .sb-footer .sb-avatar { margin: 0 auto; }
 .wrapper-sidebar.collapsed .sb-footer-actions { display: none; }
@@ -252,12 +260,15 @@
 /* An icon with a flyout suppresses the name-only tooltip; the flyout's own
    title row carries the name instead. */
 .wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover::after { content: none; }
-/* The flyout shows on hover AND stays shown via the JS-set `.open` class during
-   a short close grace period (see WrapperSidebar), so the pointer can cross the
-   gap between the centered icon and the flyout (which starts at the 48px rail
-   edge) without :hover dropping and closing it. A pure-CSS hover-bridge proved
-   too pixel-fragile across shells/zoom levels. */
-.wrapper-sidebar.collapsed .sb-nav-item.has-flyout:hover > .sb-flyout,
+/* Visibility is driven SOLELY by the JS-set `.open` class (opened instantly on
+   icon mouse-enter, closed 240ms after the pointer leaves both icon and flyout,
+   or immediately on a navigating click). We deliberately do NOT include a plain
+   `:hover` selector here: because the flyout is a child of `.sb-nav-item` and is
+   painted over the center content, a CSS `:hover` path stays latched when a click
+   navigates without moving the pointer (browsers only re-evaluate `:hover` on
+   mouse movement), leaving the bubble stuck over newly-loaded content. The
+   `.open` class is fully controllable from JS, so it can be cleared on click.
+   (H7 / RF100 — see RF98-H7-FLYOUT-DISCOVERY-0720.) */
 .wrapper-sidebar.collapsed .sb-nav-item.has-flyout > .sb-flyout.open {
   display: block;
   position: absolute;
