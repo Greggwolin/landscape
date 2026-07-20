@@ -71,7 +71,19 @@
   font-family: var(--ls-grid-font-family);
   font-size: var(--ls-grid-font-size);
   border-collapse: collapse;
-  width: 100%;
+  /* H10 fix (2026-07-20): was width: 100%, which with table-layout:fixed
+     capped the table's total rendered width to the container — forcing
+     every column's explicit px width (set via TanStack column resize,
+     see header.getSize() in BudgetDataGrid.tsx) to be squeezed down to
+     fit, clipping the dollar columns on narrower panels. min-width:100%
+     lets the table grow to the sum of its real column widths when that's
+     wider than the container, so .ls-budget-grid-container's existing
+     overflow:auto produces an actual horizontal scrollbar instead of
+     silently shrinking columns. Sticky header/column positioning (below)
+     is unaffected — still fixed-layout, just no longer width-capped.
+  */
+  min-width: 100%;
+  width: max-content;
   background-color: var(--ls-grid-bg);
   color: var(--ls-grid-text);
 }

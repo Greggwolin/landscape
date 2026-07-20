@@ -2081,8 +2081,12 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 </div>
               </div>
             </div>
-            <div className="p-3">
-              <table className="w-full text-sm">
+            {/* H10 fix (2026-07-20): the table had no horizontal-scroll wrapper, so the
+                Actions column (Save/Cancel while editing) was clipped off-screen with no
+                way to reach it — not just hidden by a narrow column, genuinely unreachable.
+                overflow-x-auto here gives it a scrollbar instead of clipping content. */}
+            <div className="p-3" style={{ overflowX: 'auto' }}>
+              <table className="w-full text-sm" style={{ minWidth: 640 }}>
                 <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
                   <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
                     <th className="text-left px-2 py-2 font-medium whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Plan</th>
