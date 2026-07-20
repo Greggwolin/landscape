@@ -3972,7 +3972,22 @@ def handle_get_operating_statement(
 
     try:
         factory = RequestFactory()
-        req = factory.get(f'/api/projects/{int(project_id)}/operations/')
+        # operations_data is an IsAuthenticated DRF view. Called in-process the
+        # RequestFactory request carries no credentials, so authenticate it as
+        # the requesting user via a short-lived JWT — the same auth path the
+        # browser uses. Without this the view 401s, the model gets no data, and
+        # the server-side artifact render below never runs (RF 2026-07-19).
+        _auth_headers = {}
+        if user_id:
+            try:
+                from django.contrib.auth import get_user_model
+                from rest_framework_simplejwt.tokens import AccessToken
+                _u = get_user_model().objects.filter(id=user_id).first()
+                if _u is not None:
+                    _auth_headers['HTTP_AUTHORIZATION'] = f'Bearer {AccessToken.for_user(_u)}'
+            except Exception:  # noqa: BLE001 — degrade to unauthenticated request
+                logger.exception('get_operating_statement: request auth failed')
+        req = factory.get(f'/api/projects/{int(project_id)}/operations/', **_auth_headers)
         resp = operations_data(req, int(project_id))
     except Exception as exc:  # noqa: BLE001
         logger.exception('get_operating_statement: view call failed')
@@ -4101,6 +4116,54 @@ def handle_get_operating_statement(
     except Exception:  # pragma: no cover — defensive
         logger.exception('get_operating_statement: source_pointers build failed')
         source_pointers = []
+
+    # ── Server-side artifact render (perceived-speed fix #1, RF 2026-07-19) ──
+    # Previously the model received `data` and hand-composed the entire
+    # artifact table inside a create_artifact call — 60–83s turns in
+    # production, sometimes twice when the composition tripped the OS guard.
+    # Build + register the artifact here instead; the model just announces
+    # it. Any failure degrades to the legacy full-payload return so the
+    # model can fall back to composing — this path never blocks the data.
+    artifact_envelope = None
+    try:
+        from .tools.os_artifact_builder import create_os_artifact
+        candidate = create_os_artifact(
+            project_id=int(project_id),
+            payload=payload,
+            rendering_label=rendering_label,
+            scenario=resolved_scenario,
+            user_id=user_id,
+            thread_id=kwargs.get('thread_id'),
+        )
+        if candidate and candidate.get('success') is not False:
+            artifact_envelope = candidate
+    except Exception:  # noqa: BLE001 — degrade to legacy path
+        logger.exception('get_operating_statement: server-side artifact render failed')
+
+    if artifact_envelope is not None:
+        totals = payload.get('totals') or {}
+        return {
+            'success': True,
+            'scenario_resolved': resolved_scenario,
+            'scenario_resolution_source': resolution_source,
+            'rendering_label': rendering_label,
+            'available_scenarios': available_block,
+            'project_name': project_name,
+            'artifact_created': True,
+            'artifact': artifact_envelope,
+            'totals': {
+                'gross_potential_rent': totals.get('gross_potential_rent'),
+                'effective_gross_income': totals.get('effective_gross_income'),
+                'total_operating_expenses': totals.get('total_operating_expenses'),
+                'as_is_noi': totals.get('as_is_noi'),
+            },
+            'instruction': (
+                'The operating-statement artifact has ALREADY been created and '
+                'is open in the right panel. Do NOT call create_artifact. Reply '
+                'with one short sentence using rendering_label verbatim and the '
+                'NOI from totals.'
+            ),
+        }
 
     return {
         'success': True,
