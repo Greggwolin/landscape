@@ -8,6 +8,7 @@ Provides:
 """
 
 import json
+import queue
 import logging
 import re
 import threading
@@ -84,7 +85,7 @@ def _require_project_access(user, project_id: int) -> Project:
 HEARTBEAT_INTERVAL_SECONDS = 5.0
 
 
-def _heartbeat_streaming_json(work, *, status_code=status.HTTP_201_CREATED):
+def _heartbeat_streaming_json(work, *, status_code=status.HTTP_201_CREATED, events=False):
     """
     Run ``work()`` on a worker thread while emitting whitespace heartbeats.
 
@@ -112,18 +113,44 @@ def _heartbeat_streaming_json(work, *, status_code=status.HTTP_201_CREATED):
 
     outcome = {}
 
+    # Events mode (Stage 1 streaming, RF 2026-07-19): when the client opts in
+    # via the X-Landscape-Stream: events header, the body is NDJSON —
+    # {"e":"hb"} keepalives, {"e":"status","label":...} progress events
+    # emitted from deep call sites (tool dispatcher), and a final
+    # {"e":"final","payload":<the exact legacy payload>}. Legacy mode
+    # (whitespace heartbeats + trailing JSON) is byte-for-byte unchanged for
+    # clients that don't send the header. Stage 2 adds {"e":"delta"} model
+    # tokens through the same channel.
+    event_queue = queue.Queue() if events else None
+    # Sentinel the runner enqueues when the turn finishes, so the events
+    # generator wakes immediately instead of waiting out a join timeout.
+    done = object()
+
     def runner():
+        if events:
+            from .stream_events import register_status_emitter, clear_status_emitter
+            register_status_emitter(event_queue.put)
         try:
             outcome['result'] = work()
         except Exception as exc:  # mirrors the view's own except-block contract
             logger.exception("Error in streamed message work: %s", exc)
             outcome['result'] = {'success': False, 'error': str(exc)}
         finally:
+            if events:
+                clear_status_emitter()
+                event_queue.put(done)
             # This ran off the request thread, so Django won't tidy up for us.
             connections.close_all()
 
     worker = threading.Thread(target=runner, daemon=True)
     worker.start()
+
+    def _render(result):
+        # The wrapped view returns DRF Responses; render via DRF so Decimal,
+        # datetime and UUID values encode exactly as they did before.
+        if hasattr(result, 'data'):
+            return JSONRenderer().render(result.data)
+        return JSONRenderer().render(result)
 
     def stream():
         # Emit one byte immediately rather than waiting out the first interval.
@@ -142,16 +169,46 @@ def _heartbeat_streaming_json(work, *, status_code=status.HTTP_201_CREATED):
             body = {'success': False, 'error': 'No response produced'}
             yield json.dumps(body).encode()
             return
+        yield _render(result)
 
-        # The wrapped view returns DRF Responses; render via DRF so Decimal,
-        # datetime and UUID values encode exactly as they did before.
-        if hasattr(result, 'data'):
-            yield JSONRenderer().render(result.data)
-        else:
-            yield JSONRenderer().render(result)
+    def stream_events():
+        yield json.dumps({'e': 'status', 'label': 'Thinking…'}).encode() + b'\n'
+        # Blocking get so events reach the wire the moment they're emitted —
+        # a join(timeout) loop here was measured delaying labels up to a full
+        # heartbeat interval. The runner's `done` sentinel ends the loop; the
+        # worker.is_alive() check is the fallback if the sentinel is lost.
+        while True:
+            try:
+                evt = event_queue.get(timeout=HEARTBEAT_INTERVAL_SECONDS)
+            except queue.Empty:
+                if not worker.is_alive():
+                    break
+                yield b'{"e":"hb"}\n'
+                continue
+            if evt is done:
+                break
+            yield json.dumps(evt).encode() + b'\n'
+        # Flush any events emitted in the final moments.
+        try:
+            while True:
+                evt = event_queue.get_nowait()
+                if evt is not done:
+                    yield json.dumps(evt).encode() + b'\n'
+        except queue.Empty:
+            pass
+        # The sentinel is enqueued from runner's finally, so the result is
+        # already recorded — but join briefly anyway for the is_alive path.
+        worker.join(timeout=1.0)
+        result = outcome.get('result')
+        if result is None:
+            yield json.dumps({'e': 'final', 'payload': {'success': False, 'error': 'No response produced'}}).encode() + b'\n'
+            return
+        yield b'{"e":"final","payload":' + _render(result) + b'}\n'
 
     response = StreamingHttpResponse(
-        stream(), status=status_code, content_type='application/json'
+        stream_events() if events else stream(),
+        status=status_code,
+        content_type='application/x-ndjson' if events else 'application/json',
     )
     # Discourage any intermediary from buffering the heartbeats away.
     response['Cache-Control'] = 'no-cache, no-transform'
@@ -2287,7 +2344,8 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
         get here, so 401/403 still return normally and never reach the stream.
         """
         return _heartbeat_streaming_json(
-            lambda: self._create_blocking(request, *args, **kwargs)
+            lambda: self._create_blocking(request, *args, **kwargs),
+            events=request.headers.get('X-Landscape-Stream') == 'events',
         )
 
     def _create_blocking(self, request, *args, **kwargs):
