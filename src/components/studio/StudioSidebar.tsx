@@ -313,23 +313,21 @@ export function StudioSidebar({
     [setActiveArtifactId, setActiveLocationBrief, setActiveMapArtifact, setActiveExcelAudit],
   );
 
-  // Auto-collapse the rail when a click actually changes content: a sub-tab
-  // (always a leaf) or a folder with no sub-tabs. Expanding a parent folder to
-  // reveal its sub-tabs does NOT collapse (guarded by the subTabs length check).
+  // Auto-collapse on select DISABLED for now (RF, 2026-07-20) — was
+  // triggering right as the flyout close-timer/hover state was still
+  // resolving, which is the likely source of the stuck flyout artifacts
+  // (H7). Re-enable only after H7's root cause is confirmed and fixed.
   const handleSelectFolder = useCallback(
     (folderId: string) => {
       clearActiveArtifacts(); // selecting a screen replaces any open artifact
       onSelectFolder(folderId);
-      const f = folders.find((x) => x.id === folderId);
-      if (f && f.subTabs.length === 0) setCollapsed(true);
     },
-    [onSelectFolder, folders, clearActiveArtifacts],
+    [onSelectFolder, clearActiveArtifacts],
   );
   const handleSelectTab = useCallback(
     (folderId: string, tabId: string) => {
       clearActiveArtifacts();
       onSelectTab(folderId, tabId);
-      setCollapsed(true);
     },
     [onSelectTab, clearActiveArtifacts],
   );
