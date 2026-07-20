@@ -627,7 +627,15 @@
       "Bash(DJANGO_SETTINGS_MODULE=config.settings PYTHONPATH=. ./venv/bin/python -c \":*)",
       "Bash(export DATABASE_URL)",
       "Bash(./venv/bin/pip install:*)",
-      "Bash(./venv/bin/python -c \":*)"
+      "Bash(./venv/bin/python -c \":*)",
+      "Bash(node /private/tmp/claude-501/-Users-5150east-landscape/1bc2a8d6-35c1-47c0-8ff4-2905eebc453a/scratchpad/verify_dr14.mjs)",
+      "Bash(node /private/tmp/claude-501/-Users-5150east-landscape/dfe1e608-37bf-4eac-b787-94ddcd3b9d06/scratchpad/rf9-visual-check.mjs)",
+      "Read(//Users/5150east/Library/Caches/**)",
+      "Read(//Applications/**)",
+      "Bash(node /private/tmp/claude-501/-Users-5150east-landscape/dfe1e608-37bf-4eac-b787-94ddcd3b9d06/scratchpad/rf9-rentroll-check.mjs)",
+      "Bash(ls /Users/5150east/landscape/.git/*.lock 2>/dev/null; rm -f /Users/5150east/landscape/.git/*.lock; git fetch origin main 2>&1 | tail -2; git rev-parse main origin/main)",
+      "Bash(node /private/tmp/claude-501/-Users-5150east-landscape/d6de432e-fb8d-4102-a733-226071c195e2/scratchpad/rf17-visual-check.mjs)",
+      "Bash(ls /Users/5150east/landscape/.git/*.lock 2>/dev/null && rm -f /Users/5150east/landscape/.git/*.lock && echo \"locks cleared\" || echo \"no orphan locks\"; git -C /Users/5150east/landscape fetch origin main --quiet 2>&1; git -C /Users/5150east/landscape log --oneline -3 origin/main; git -C /Users/5150east/landscape branch -a | grep -i loan-tool || echo \"no existing loan-tool branch\"; git -C /Users/5150east/landscape log --oneline origin/main --grep=\"RF47\" | head -5 || true)"
     ],
     "deny": [],
     "ask": [],
