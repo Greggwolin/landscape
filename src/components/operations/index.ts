@@ -22,22 +22,14 @@ export type { GrowthBadgeType } from './GrowthBadge';
 // Layout Components
 export { SectionCard } from './SectionCard';
 export { DetailSummaryToggle } from './DetailSummaryToggle';
-export { ValueAddToggle } from './ValueAddToggle';
-export { ValueAddAccordion } from './ValueAddAccordion';
 export { ValueAddCard } from './ValueAddCard';
 export { AddButton } from './AddButton';
 
 // Section Components
 export { RentalIncomeSection } from './RentalIncomeSection';
-export { VacancyDeductionsSection } from './VacancyDeductionsSection';
-export { OtherIncomeSection } from './OtherIncomeSection';
-export { DraggableOpexSection } from './DraggableOpexSection';
-export { OperatingIncomeCard } from './OperatingIncomeCard';
 export { OperatingStatement } from './OperatingStatement';
 
 // Summary Components
-export { EGISubtotalBar } from './EGISubtotalBar';
-export { NOITotalBar } from './NOITotalBar';
 export { SummaryBar } from './SummaryBar';
 export { OperationsHeader } from './OperationsHeader';
 
