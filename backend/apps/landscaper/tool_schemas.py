@@ -1482,7 +1482,14 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "update_loan",
-        "description": "Create or update a loan record.",
+        "description": (
+            "Create or update a loan record (upsert). If loan_id is given, or loan_name "
+            "matches an existing loan on the project, that loan is updated; otherwise a NEW "
+            "loan is created (creation requires loan_name, loan_type, interest_rate_pct, and "
+            "commitment_amount or loan_amount). Use for any request to add, size, or modify "
+            "debt: 'add a senior loan', 'set the rate to 5.25%', 'size the loan at 65% LTV', "
+            "'add $150k of closing costs'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1511,6 +1518,17 @@ LANDSCAPER_TOOLS = [
                 "status": {"type": "string"},
                 "loan_start_date": {"type": "string"},
                 "loan_maturity_date": {"type": "string"},
+                "index_rate_pct": {"type": "number", "description": "Current index rate (e.g. SOFR) in percent, for floating-rate loans"},
+                "unused_fee_pct": {"type": "number"},
+                "interest_reserve_amount": {"type": "number"},
+                "interest_reserve_inflator": {"type": "number"},
+                "repayment_acceleration": {"type": "string"},
+                "draw_trigger_type": {"type": "string"},
+                "collateral_basis_type": {"type": "string"},
+                "closing_costs_appraisal": {"type": "number"},
+                "closing_costs_legal": {"type": "number"},
+                "closing_costs_other": {"type": "number"},
+                "recourse_type": {"type": "string", "description": "e.g. full recourse, non-recourse, partial"},
                 "notes": {"type": "string"},
                 "reason": {"type": "string"},
             },

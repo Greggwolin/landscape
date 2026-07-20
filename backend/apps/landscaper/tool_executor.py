@@ -7415,8 +7415,13 @@ LOAN_COLUMNS = [
     'origination_fee_pct', 'exit_fee_pct', 'unused_fee_pct',
     'commitment_fee_pct', 'extension_fee_bps', 'extension_fee_amount',
     'prepayment_penalty_years',
+    # Closing costs (added 2026-07-19 RF — field-coverage audit; verified vs live columns)
+    'closing_costs_appraisal', 'closing_costs_legal', 'closing_costs_other',
+    # Floating rate / structure (added 2026-07-19 RF; verified vs live columns)
+    'index_rate_pct', 'repayment_acceleration', 'collateral_basis_type', 'recourse_type',
     # Reserves
     'interest_reserve_amount', 'interest_reserve_funded_upfront',
+    'interest_reserve_inflator',
     'reserve_requirements', 'replacement_reserve_per_unit',
     'tax_insurance_escrow_months', 'initial_reserve_months',
     # Covenants
