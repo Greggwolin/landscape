@@ -33,6 +33,7 @@ RED_LATENCY_SECONDS = 90.0
 YELLOW_LATENCY_SECONDS = 30.0
 DEFAULT_TIMEOUT_SECONDS = 130.0
 DEFAULT_PAGE_CONTEXT = "home"
+DEFAULT_CLEANUP_ATTEMPTS = 5
 
 
 class BatteryError(RuntimeError):
@@ -579,14 +580,45 @@ def require_confirmation(args: argparse.Namespace, turns: int) -> None:
         raise BatteryError("Execution cancelled.")
 
 
-def cleanup_threads(client: ApiClient, thread_ids: list[str]) -> list[dict[str, Any]]:
+def cleanup_threads(
+    client: ApiClient,
+    thread_ids: list[str],
+    *,
+    attempts: int = DEFAULT_CLEANUP_ATTEMPTS,
+) -> list[dict[str, Any]]:
     cleanup: list[dict[str, Any]] = []
     for thread_id in list(dict.fromkeys(thread_ids)):
-        try:
-            status, data = client.archive_thread(thread_id)
-            cleanup.append({"thread_id": thread_id, "http_status": status, "response": data})
-        except Exception as exc:
-            cleanup.append({"thread_id": thread_id, "http_status": None, "error": str(exc)})
+        thread_attempts: list[dict[str, Any]] = []
+        final_status: int | None = None
+        final_response: dict[str, Any] | None = None
+        final_error: str | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                status, data = client.archive_thread(thread_id)
+                final_status = status
+                final_response = data
+                final_error = None
+                thread_attempts.append({"attempt": attempt, "http_status": status, "response": data})
+                if 200 <= status < 300:
+                    break
+            except Exception as exc:
+                final_status = None
+                final_response = None
+                final_error = str(exc)
+                thread_attempts.append({"attempt": attempt, "http_status": None, "error": final_error})
+            if attempt < attempts:
+                time.sleep(min(10.0, attempt * 2.0))
+
+        row: dict[str, Any] = {
+            "thread_id": thread_id,
+            "http_status": final_status,
+            "attempts": thread_attempts,
+        }
+        if final_response is not None:
+            row["response"] = final_response
+        if final_error is not None:
+            row["error"] = final_error
+        cleanup.append(row)
     return cleanup
 
 
