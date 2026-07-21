@@ -3849,6 +3849,27 @@ def _figure_magnitudes(text: str):
     return figs
 
 
+def _figure_occurrences(text: str, source: str, context_radius: int = 40) -> list:
+    """Figure occurrences with a bounded text window for guard instrumentation."""
+    out = []
+    text = text or ''
+    for m in _MONEY_OR_PCT_RE.finditer(text):
+        tok = m.group(0).strip()
+        is_pct = '%' in tok
+        start = max(0, m.start() - context_radius)
+        end = min(len(text), m.end() + context_radius)
+        window = re.sub(r'\s+', ' ', text[start:end]).strip()
+        for v in _num_magnitudes(tok):
+            out.append({
+                'magnitude': v,
+                'is_pct': is_pct,
+                'token': tok,
+                'context': window,
+                'source': source,
+            })
+    return out
+
+
 def _figure_is_sourced(mag: float, is_pct: bool, sourced: set) -> bool:
     """A reply figure is sourced if it (or, for a percent, its fraction) matches a
     returned number within rounding tolerance."""
@@ -3858,6 +3879,46 @@ def _figure_is_sourced(mag: float, is_pct: bool, sourced: set) -> bool:
             if math.isclose(c, s, rel_tol=0.02, abs_tol=0.5):
                 return True
     return False
+
+
+def _fabrication_guard_trace(content: str, tool_calls: list,
+                             tool_outputs: Optional[list] = None) -> Dict[str, Any]:
+    """Structured, bounded trace explaining which figures did not source.
+
+    Instrumentation only: this mirrors the existing figure matching logic but does
+    not decide whether the guard should block.
+    """
+    called = [_tool_name(tc) for tc in (tool_calls or [])]
+    sourced = _collect_sourced_numbers(tool_outputs) if tool_outputs is not None else set()
+    occurrences = []
+
+    if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
+        occurrences += _figure_occurrences(content, 'reply')
+
+    for tc in (tool_calls or []):
+        if not _tool_name(tc).startswith(_ARTIFACT_BODY_TOOLS):
+            continue
+        body = tc.get('input') if isinstance(tc, dict) else getattr(tc, 'input', None)
+        if body is None:
+            continue
+        body_str = str(body)
+        if _MONEY_OR_PCT_RE.search(body_str):
+            occurrences += _figure_occurrences(body_str, _tool_name(tc))
+
+    traced_count = 0
+    unsourced = []
+    for occ in occurrences:
+        if sourced and _figure_is_sourced(occ['magnitude'], occ['is_pct'], sourced):
+            traced_count += 1
+        else:
+            unsourced.append(occ)
+
+    return {
+        'tools': called,
+        'sourced_number_count': len(sourced),
+        'traced_count': traced_count,
+        'unsourced_figures': unsourced,
+    }
 
 
 def _has_unsourced_figure(content: str, tool_calls: list, sourced: set) -> bool:
@@ -5057,10 +5118,18 @@ def get_landscaper_response(
                     reply_states_unsourced_financials(
                         final_content, tool_calls_made,
                         tool_outputs=(tool_executions if _strict else None)):
+                guard_trace = _fabrication_guard_trace(
+                    final_content, tool_calls_made,
+                    tool_outputs=(tool_executions if _strict else None),
+                )
                 logger.warning(
                     "[FabricationGuard] Blocked unsourced financial figures — a stated "
-                    "figure did not trace to any tool output this turn. tools=%s",
-                    [tc.get('tool') for tc in (tool_calls_made or []) if isinstance(tc, dict)],
+                    "figure did not trace to any tool output this turn. "
+                    "tools=%s traced_count=%s sourced_number_count=%s unsourced_figures=%s",
+                    guard_trace['tools'],
+                    guard_trace['traced_count'],
+                    guard_trace['sourced_number_count'],
+                    guard_trace['unsourced_figures'],
                 )
                 # Mirror the operating_statement_guard envelope (JB50 slice 2) so a
                 # downstream/next turn can recover with a clean question instead of
@@ -5082,6 +5151,7 @@ def get_landscaper_response(
                         "I don't have those figures from the project's data yet — want me to open "
                         "the screen that shows them, or run the calculation? I won't estimate them."
                     ),
+                    'trace': guard_trace,
                 }
                 final_content = guard_envelope['suggested_user_question']
                 metadata['fabrication_guard_blocked'] = True
