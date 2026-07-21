@@ -1710,11 +1710,13 @@ LANDSCAPER_TOOLS = [
         "name": "get_budget_rollup",
         "description": (
             "Get a project-scoped budget category rollup: category names, row "
-            "counts, summed amounts, and grand total from core_fin_fact_budget "
-            "joined to core_unit_cost_category. Call this for asks like "
-            "'break down the budget', 'budget by category', 'biggest budget "
-            "categories', or 'cost buckets'. For individual line items, call "
-            "get_budget_items."
+            "counts, summed amounts, percent of total, top-two concentration, "
+            "and grand total from core_fin_fact_budget joined to "
+            "core_unit_cost_category. Call this for asks like 'break down the "
+            "budget', 'budget by category', 'biggest budget categories', "
+            "'biggest line items' in a high-level budget summary, or 'cost "
+            "buckets'. Only state percentage shares returned by this tool. For "
+            "raw individual line items, call get_budget_items."
         ),
         "input_schema": {
             "type": "object",

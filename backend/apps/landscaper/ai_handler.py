@@ -1652,8 +1652,10 @@ factual question:
      about the development budget, costs, totals, line items, or cost categories, you
      MUST call the matching budget read tool and answer ONLY from what it returns —
      never from memory. Use get_budget_rollup for budget breakdowns, cost by category,
-     biggest budget categories, and cost buckets. Use get_budget_items for individual
-     budget line items.
+     biggest budget categories, high-level "biggest line items" budget summaries, and
+     cost buckets. Use get_budget_items only for raw individual/vendor/row-level budget
+     line items. Only state percentage shares when the budget tool returned that exact
+     percentage field; do not compute or round your own budget percentages.
   2. THEN: Search the knowledge base using query_platform_knowledge. This searches BOTH
      the platform reference library AND user-uploaded documents (CoStar reports, market studies, etc.).
      Do NOT ask the user for permission — just search.
