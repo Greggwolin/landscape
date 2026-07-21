@@ -316,6 +316,18 @@ CORS_ALLOWED_ORIGINS = config(
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Custom request headers the browser must be allowed to send cross-origin.
+# The default django-cors-headers allow-list does not include our streaming
+# opt-in header, so the CORS preflight for the chat `messages/` POST fails
+# ("TypeError: Failed to fetch") until it is added here. Keep the default set
+# and extend it — do not replace it.
+from corsheaders.defaults import default_headers  # noqa: E402
+
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "x-landscape-stream",  # Stage-1 streaming opt-in (client: useLandscaperThreads.ts)
+)
+
 # ============================================================================
 # API DOCUMENTATION (drf-spectacular)
 # ============================================================================
