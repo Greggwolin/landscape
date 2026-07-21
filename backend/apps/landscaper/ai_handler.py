@@ -1070,6 +1070,7 @@ TOOL_DOMAIN_MAP = {
 
     # Budget
     'get_budget_items': 'budget',
+    'get_budget_rollup': 'budget',
     'update_budget_items': 'budget',
     'get_budget_summary': 'budget',
     'get_budget_categories': 'budget',
@@ -1647,9 +1648,12 @@ DATA LOOKUP PRIORITY (CRITICAL):
 When the user asks about property data, comps, market info, budget / development cost, or any
 factual question:
   1. FIRST: Check the project database using your tools (get_sales_comparables, get_units,
-     get_budget_items, get_budget_categories, etc.). For ANY question about the development
-     budget, costs, totals, line items, or cost categories, you MUST call get_budget_items
-     (and/or get_budget_categories) and answer ONLY from what it returns — never from memory.
+     get_budget_items, get_budget_rollup, get_budget_categories, etc.). For ANY question
+     about the development budget, costs, totals, line items, or cost categories, you
+     MUST call the matching budget read tool and answer ONLY from what it returns —
+     never from memory. Use get_budget_rollup for budget breakdowns, cost by category,
+     biggest budget categories, and cost buckets. Use get_budget_items for individual
+     budget line items.
   2. THEN: Search the knowledge base using query_platform_knowledge. This searches BOTH
      the platform reference library AND user-uploaded documents (CoStar reports, market studies, etc.).
      Do NOT ask the user for permission — just search.
@@ -1666,7 +1670,7 @@ This applies whether the number would come from the database OR a document. If y
 a read tool for the figure in THIS conversation, you do not have it — do not state it. NEVER
 produce a budget total, line-item count, category breakdown, or any project dollar figure or
 quantity from memory or by composing a plausible-looking answer. If you haven't called the
-relevant read tool (e.g. get_budget_items for budgets), call it first; if it returns nothing, say
+relevant read tool (e.g. get_budget_rollup for category totals or get_budget_items for line items), call it first; if it returns nothing, say
 you couldn't find the data — do not fill the gap with an invented number.
 
 This is NOT limited to budgets. It covers EVERY project financial figure — IRR, NPV, equity
@@ -2465,7 +2469,7 @@ Chain:
   4. update_category_lifecycle_stages → assign categories to activities
   5. get_cost_library_items(category_id) → check if template items exist
   6. update_budget_items → create budget line items from templates or user input
-  7. Verify: get_budget_summary → confirm totals
+  7. Verify: get_budget_rollup → confirm totals by category
 
 RECIPE 6 — KNOWLEDGE-FIRST RESEARCH (cost, market, or methodology questions)
 Trigger: "what does X cost", "what's the typical cap rate", "how should I handle..."

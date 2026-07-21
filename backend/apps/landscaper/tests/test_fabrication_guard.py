@@ -47,6 +47,11 @@ def test_passes_budget_answer_with_get_budget_categories():
     assert guard(content, [{'tool': 'get_budget_categories'}]) is False
 
 
+def test_passes_budget_answer_with_get_budget_rollup():
+    content = "Across categories the budget is $40,244,250."
+    assert guard(content, [{'tool': 'get_budget_rollup'}]) is False
+
+
 def test_passes_real_waterfall_with_calculate_waterfall():
     content = "Per the model, LP IRR is 18.2% with a 1.9x equity multiple."
     assert guard(content, [{'tool': 'calculate_waterfall'}]) is False
