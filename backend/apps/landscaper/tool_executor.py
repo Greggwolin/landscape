@@ -8634,6 +8634,65 @@ def handle_get_budget_items(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_budget_rollup')
+def handle_get_budget_rollup(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get project budget totals rolled up by category."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    f.category_id,
+                    COALESCE(c.category_name, '(uncategorized)') AS category_name,
+                    COUNT(*) AS row_count,
+                    COALESCE(SUM(f.amount), 0) AS total_amount
+                FROM landscape.core_fin_fact_budget f
+                LEFT JOIN landscape.core_unit_cost_category c
+                    ON f.category_id = c.category_id
+                WHERE f.project_id = %s
+                GROUP BY f.category_id, COALESCE(c.category_name, '(uncategorized)')
+                ORDER BY total_amount DESC, category_name ASC
+            """, [project_id])
+
+            columns = [col[0] for col in cursor.description]
+            records = []
+            grand_total = 0.0
+            line_item_count = 0
+
+            for row in cursor.fetchall():
+                record = dict(zip(columns, row))
+                record['row_count'] = int(record.get('row_count') or 0)
+                record['total_amount'] = float(record.get('total_amount') or 0)
+                grand_total += record['total_amount']
+                line_item_count += record['row_count']
+                records.append(record)
+
+            return {
+                'success': True,
+                'project_id': project_id,
+                'category_count': len(records),
+                'line_item_count': line_item_count,
+                'grand_total': grand_total,
+                'total_budget': grand_total,
+                'rollup': records,
+                'records': records,
+                'source': (
+                    'landscape.core_fin_fact_budget.category_id -> '
+                    'landscape.core_unit_cost_category.category_id'
+                ),
+            }
+
+    except Exception as e:
+        logger.error(f"Error fetching budget rollup: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('update_budget_item', is_mutation=True)
 def handle_update_budget_item(
     tool_input: Dict[str, Any],

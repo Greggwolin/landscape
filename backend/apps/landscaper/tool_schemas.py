@@ -1707,6 +1707,21 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_budget_rollup",
+        "description": (
+            "Get a project-scoped budget category rollup: category names, row "
+            "counts, summed amounts, and grand total from core_fin_fact_budget "
+            "joined to core_unit_cost_category. Call this for asks like "
+            "'break down the budget', 'budget by category', 'biggest budget "
+            "categories', or 'cost buckets'. For individual line items, call "
+            "get_budget_items."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_budget_item",
         "description": "Create or update a budget line item.",
         "input_schema": {
