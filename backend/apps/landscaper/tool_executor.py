@@ -12699,6 +12699,10 @@ def get_absorption_schedule(
                 query += " ORDER BY a.start_period, a.revenue_stream_name"
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
+                schedule = [
+                    {key: _serialize_db_value(value) for key, value in dict(row).items()}
+                    for row in rows
+                ]
 
                 # Calculate totals
                 total_units = sum(r['total_units'] or 0 for r in rows)
@@ -12706,10 +12710,10 @@ def get_absorption_schedule(
 
                 return {
                     'success': True,
-                    'schedule': [dict(r) for r in rows],
+                    'schedule': schedule,
                     'count': len(rows),
                     'summary': {
-                        'total_units': total_units,
+                        'total_units': _serialize_db_value(total_units),
                         'total_revenue': float(total_revenue)
                     }
                 }
@@ -13416,7 +13420,12 @@ def get_parcel_sale_events(
                     SELECT se.*,
                            pc.parcel_name AS parcel_alias, pc.parcel_name,
                            ph.phase_name,
-                           c.contact_name as buyer_contact_name
+                           COALESCE(
+                               c.display_name,
+                               c.name,
+                               NULLIF(CONCAT_WS(' ', c.first_name, c.last_name), ''),
+                               c.company_name
+                           ) AS buyer_contact_name
                     FROM landscape.tbl_parcel_sale_event se
                     LEFT JOIN landscape.tbl_parcel pc ON se.parcel_id = pc.parcel_id
                     LEFT JOIN landscape.tbl_phase ph ON se.phase_id = ph.phase_id
@@ -13444,6 +13453,10 @@ def get_parcel_sale_events(
                 query += " ORDER BY se.contract_date DESC"
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
+                sale_events = [
+                    {key: _serialize_db_value(value) for key, value in dict(row).items()}
+                    for row in rows
+                ]
 
                 # Calculate totals
                 total_lots = sum(r['total_lots_contracted'] or 0 for r in rows)
@@ -13454,10 +13467,10 @@ def get_parcel_sale_events(
 
                 return {
                     'success': True,
-                    'sale_events': [dict(r) for r in rows],
+                    'sale_events': sale_events,
                     'count': len(rows),
                     'summary': {
-                        'total_lots': total_lots,
+                        'total_lots': _serialize_db_value(total_lots),
                         'total_value': float(total_value)
                     }
                 }
