@@ -12674,7 +12674,7 @@ def get_absorption_schedule(
                 query = """
                     SELECT a.*,
                            ph.phase_name, ar.area_alias,
-                           pc.parcel_alias
+                           pc.parcel_name AS parcel_alias
                     FROM landscape.tbl_absorption_schedule a
                     LEFT JOIN landscape.tbl_phase ph ON a.phase_id = ph.phase_id
                     LEFT JOIN landscape.tbl_area ar ON a.area_id = ar.area_id
@@ -13414,7 +13414,7 @@ def get_parcel_sale_events(
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 query = """
                     SELECT se.*,
-                           pc.parcel_alias, pc.parcel_name,
+                           pc.parcel_name AS parcel_alias, pc.parcel_name,
                            ph.phase_name,
                            c.contact_name as buyer_contact_name
                     FROM landscape.tbl_parcel_sale_event se

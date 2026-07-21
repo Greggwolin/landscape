@@ -15,7 +15,7 @@ Tools:
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from django.db import connection
 from ..tool_executor import register_tool
 
@@ -36,11 +36,111 @@ def _safe_float(val):
         return None
 
 
+def _safe_int(val):
+    """Convert Decimal/int/float to int, None stays None."""
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def _safe_str(val):
     """Convert to string, None stays None."""
     if val is None:
         return None
     return str(val)
+
+
+def _landdev_parcel_takedown_absorption_summary(project_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Summarize LAND absorption from the parcel-takedown data used by
+    LandDevCashFlowService, not the legacy tbl_absorption_schedule stub.
+    """
+    try:
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+        service = LandDevCashFlowService(project_id)
+        project_config = service._get_project_config()
+        assumptions = service._get_dcf_assumptions()
+        period_count = service._determine_required_periods(None)
+        periods = service._generate_periods(project_config['start_date'], period_count)
+        schedule = service._generate_absorption_schedule(
+            project_config['start_date'],
+            None,
+            assumptions.get('price_growth_rate'),
+            assumptions.get('cost_inflation_rate'),
+        )
+
+        if not schedule or not (schedule.get('periodSales') or []):
+            return None
+
+        period_sales = schedule.get('periodSales') or []
+        period_sequences = sorted(
+            ps.get('periodSequence')
+            for ps in period_sales
+            if ps.get('periodSequence') is not None
+        )
+        period_by_sequence = {p.get('periodSequence'): p for p in periods}
+        start_period = period_sequences[0] if period_sequences else None
+        end_period = period_sequences[-1] if period_sequences else None
+        start_period_info = period_by_sequence.get(start_period, {}) if start_period is not None else {}
+        end_period_info = period_by_sequence.get(end_period, {}) if end_period is not None else {}
+        start_date = _safe_str(start_period_info.get('startDate'))
+        end_date = _safe_str(end_period_info.get('endDate'))
+
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    COUNT(*) AS dated_sale_assumptions,
+                    COUNT(DISTINCT p.parcel_id) AS total_parcels,
+                    COALESCE(SUM(p.units_total), 0) AS land_plan_units,
+                    MIN(psa.sale_date) AS first_sale_date,
+                    MAX(psa.sale_date) AS last_sale_date,
+                    COALESCE(SUM(psa.gross_sale_proceeds), 0) AS gross_sale_proceeds,
+                    COALESCE(SUM(psa.net_sale_proceeds), 0) AS net_sale_proceeds
+                FROM landscape.tbl_parcel p
+                JOIN landscape.tbl_parcel_sale_assumptions psa
+                  ON psa.parcel_id = p.parcel_id
+                WHERE p.project_id = %s
+                  AND psa.sale_date IS NOT NULL
+            """, [project_id])
+            raw_cols = [c[0] for c in cur.description]
+            raw = dict(zip(raw_cols, cur.fetchone()))
+
+        if not raw.get('dated_sale_assumptions'):
+            return None
+
+        return {
+            'summary_type': 'parcel_takedown',
+            'scenario_name': 'Parcel Takedown',
+            'scenario_count': 1,
+            'revenue_streams': _safe_int(raw.get('total_parcels')),
+            'total_units': _safe_int(raw.get('land_plan_units')),
+            'total_parcels': _safe_int(raw.get('total_parcels')),
+            'dated_sale_assumptions': _safe_int(raw.get('dated_sale_assumptions')),
+            'start_period': start_period,
+            'end_period': end_period,
+            'start_date': start_date,
+            'end_date': end_date,
+            'first_sale_date': _safe_str(raw.get('first_sale_date')),
+            'last_sale_date': _safe_str(raw.get('last_sale_date')),
+            'gross_sale_proceeds': _safe_float(raw.get('gross_sale_proceeds')),
+            'net_sale_proceeds': _safe_float(raw.get('net_sale_proceeds')),
+            'modeled_gross_revenue': _safe_float(schedule.get('totalGrossRevenue')),
+            'modeled_net_revenue': _safe_float(schedule.get('totalNetRevenue')),
+            'total_commissions': _safe_float(schedule.get('totalCommissions')),
+            'total_closing_costs': _safe_float(schedule.get('totalClosingCosts')),
+            'total_subdivision_costs': _safe_float(schedule.get('totalSubdivisionCosts')),
+            'source': (
+                'LandDevCashFlowService parcel takedown using '
+                'tbl_parcel + tbl_parcel_sale_assumptions'
+            ),
+        }
+    except Exception as exc:
+        logger.warning(f"landdev parcel takedown absorption failed p{project_id}: {exc}")
+        return None
 
 
 # =============================================================================
@@ -162,6 +262,7 @@ def handle_get_deal_summary(
 
             proj_cols = [c[0] for c in cur.description]
             proj = dict(zip(proj_cols, proj_row))
+            ptype = (proj.get('project_type') or '').upper()
 
             # Hold period lives on tbl_property_acquisition (not tbl_project).
             cur.execute("""
@@ -225,45 +326,48 @@ def handle_get_deal_summary(
             budget_line_count = budget_row[0] or 0
             budget_total = _safe_float(budget_row[1])
 
-            # ── Absorption summary (RF106) ──
-            # Sourced from tbl_absorption_schedule (this project's own schedule —
-            # NOT get_absorption_benchmarks, which is industry benchmark data). The
-            # table carries scenario discriminators, so pick ONE canonical scenario
-            # deterministically (prefer a "base"-named scenario, else the one with
-            # the most units) and aggregate it — never SUM across scenarios, which
-            # would double-count. `scenario_count` is surfaced so the model knows
-            # alternatives exist.
-            cur.execute("""
-                SELECT COUNT(DISTINCT COALESCE(scenario_name, 'Base Case'))
-                FROM landscape.tbl_absorption_schedule
-                WHERE project_id = %s
-            """, [project_id])
-            absorption_scenario_count = cur.fetchone()[0] or 0
-
-            cur.execute("""
-                SELECT
-                    COALESCE(scenario_name, 'Base Case')        AS scenario_name,
-                    COUNT(*)                                     AS revenue_streams,
-                    SUM(total_units)                             AS total_units,
-                    SUM(units_per_period)                        AS units_per_period,
-                    MIN(start_period)                            AS start_period,
-                    MAX(start_period + periods_to_complete)      AS end_period,
-                    SUM(total_units * base_price_per_unit)       AS est_gross_sales
-                FROM landscape.tbl_absorption_schedule
-                WHERE project_id = %s
-                GROUP BY COALESCE(scenario_name, 'Base Case')
-                ORDER BY
-                    (CASE WHEN COALESCE(scenario_name, 'Base Case') ILIKE '%%base%%'
-                          THEN 0 ELSE 1 END),
-                    SUM(total_units) DESC NULLS LAST
-                LIMIT 1
-            """, [project_id])
-            abs_row = cur.fetchone()
-            if abs_row:
-                abs_cols = [c[0] for c in cur.description]
-                absorption = dict(zip(abs_cols, abs_row))
+            # ── Absorption summary (RF106/QB8) ──
+            # LAND deals source absorption from parcel sale assumptions via the
+            # same takedown path used by LandDevCashFlowService. The legacy
+            # tbl_absorption_schedule rows can contain template/stub data and must
+            # not drive LAND deal summaries. Non-LAND projects keep the legacy
+            # summary for backward compatibility.
+            if ptype == 'LAND':
+                absorption = _landdev_parcel_takedown_absorption_summary(project_id)
             else:
-                absorption = None
+                cur.execute("""
+                    SELECT COUNT(DISTINCT COALESCE(scenario_name, 'Base Case'))
+                    FROM landscape.tbl_absorption_schedule
+                    WHERE project_id = %s
+                """, [project_id])
+                absorption_scenario_count = cur.fetchone()[0] or 0
+
+                cur.execute("""
+                    SELECT
+                        COALESCE(scenario_name, 'Base Case')        AS scenario_name,
+                        COUNT(*)                                     AS revenue_streams,
+                        SUM(total_units)                             AS total_units,
+                        SUM(units_per_period)                        AS units_per_period,
+                        MIN(start_period)                            AS start_period,
+                        MAX(start_period + periods_to_complete)      AS end_period,
+                        SUM(total_units * base_price_per_unit)       AS est_gross_sales
+                    FROM landscape.tbl_absorption_schedule
+                    WHERE project_id = %s
+                    GROUP BY COALESCE(scenario_name, 'Base Case')
+                    ORDER BY
+                        (CASE WHEN COALESCE(scenario_name, 'Base Case') ILIKE '%%base%%'
+                              THEN 0 ELSE 1 END),
+                        SUM(total_units) DESC NULLS LAST
+                    LIMIT 1
+                """, [project_id])
+                abs_row = cur.fetchone()
+                if abs_row:
+                    abs_cols = [c[0] for c in cur.description]
+                    absorption = dict(zip(abs_cols, abs_row))
+                    absorption['scenario_count'] = absorption_scenario_count
+                    absorption['source'] = 'tbl_absorption_schedule (this project\'s schedule, not benchmarks)'
+                else:
+                    absorption = None
 
         # ── Headline returns (RF106) ──
         # Reuse the working canonical cash-flow engine (LandDevCashFlowService for
@@ -279,7 +383,6 @@ def handle_get_deal_summary(
         returns = None
         if budget_total:  # no budget → no meaningful pro-forma to run
             try:
-                ptype = (proj.get('project_type') or '').upper()
                 if ptype == 'LAND':
                     from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
                     cf = LandDevCashFlowService(project_id).calculate(include_financing=False)
@@ -343,17 +446,7 @@ def handle_get_deal_summary(
                 'line_item_count': budget_line_count,
                 'source': 'core_fin_fact_budget (aggregate; call get_budget_items for line detail)',
             } if budget_total else None,
-            'absorption': ({
-                'scenario_name': absorption.get('scenario_name'),
-                'scenario_count': absorption_scenario_count,
-                'revenue_streams': absorption.get('revenue_streams'),
-                'total_units': absorption.get('total_units'),
-                'units_per_period': _safe_float(absorption.get('units_per_period')),
-                'start_period': absorption.get('start_period'),
-                'end_period': absorption.get('end_period'),
-                'est_gross_sales': _safe_float(absorption.get('est_gross_sales')),
-                'source': 'tbl_absorption_schedule (this project\'s schedule, not benchmarks)',
-            } if absorption else None),
+            'absorption': absorption,
             'returns': returns,
             'data_summary': {
                 'documents': doc_count,
