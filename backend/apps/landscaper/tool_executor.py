@@ -8673,6 +8673,13 @@ def handle_get_budget_rollup(
                 line_item_count += record['row_count']
                 records.append(record)
 
+            for record in records:
+                share = (record['total_amount'] / grand_total * 100) if grand_total else 0.0
+                record['percent_of_total'] = round(share, 1)
+
+            top_two_total = sum(record['total_amount'] for record in records[:2])
+            top_two_percent = round((top_two_total / grand_total * 100) if grand_total else 0.0, 1)
+
             return {
                 'success': True,
                 'project_id': project_id,
@@ -8680,6 +8687,8 @@ def handle_get_budget_rollup(
                 'line_item_count': line_item_count,
                 'grand_total': grand_total,
                 'total_budget': grand_total,
+                'top_two_total': top_two_total,
+                'top_two_percent_of_total': top_two_percent,
                 'rollup': records,
                 'records': records,
                 'source': (

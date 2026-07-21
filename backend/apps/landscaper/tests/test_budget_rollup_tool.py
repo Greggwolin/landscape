@@ -9,6 +9,8 @@ def test_budget_rollup_schema_advertises_category_breakdowns():
 
     assert "budget category rollup" in description
     assert "budget by category" in description
+    assert "percent of total" in description
+    assert "top-two concentration" in description
     assert "biggest budget categories" in description
     assert "get_budget_items" in description
 

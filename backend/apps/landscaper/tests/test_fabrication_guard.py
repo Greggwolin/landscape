@@ -188,6 +188,27 @@ def test_provenance_passes_when_reply_restates_returned_figures():
                  tool_outputs=_VA_OUTPUTS) is False
 
 
+def test_provenance_passes_budget_rollup_percentages_from_tool():
+    outputs = [{
+        'tool': 'get_budget_rollup',
+        'success': True,
+        'result': {
+            'grand_total': 40244250,
+            'top_two_total': 33331500,
+            'top_two_percent_of_total': 82.8,
+            'rollup': [
+                {'category_name': 'Onsite Improvements', 'total_amount': 22221000, 'percent_of_total': 55.2},
+                {'category_name': 'Offsite Improvements', 'total_amount': 11110500, 'percent_of_total': 27.6},
+            ],
+        },
+    }]
+    content = (
+        "The total development budget is $40,244,250. Onsite Improvements is "
+        "$22,221,000, or 55.2%; the top two categories total $33,331,500, or 82.8%."
+    )
+    assert guard(content, [{'tool': 'get_budget_rollup'}], tool_outputs=outputs) is False
+
+
 def test_provenance_passes_percent_against_fraction_in_output():
     outputs = [{'tool': 'calculate_project_metrics', 'result': {'cap_rate': 0.055}}]
     assert guard("The cap rate is 5.5%.", [{'tool': 'calculate_project_metrics'}],
