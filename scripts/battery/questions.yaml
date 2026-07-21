@@ -1,0 +1,394 @@
+# Demo question battery for Peoria Meadows / project 9.
+# Source: QB-Question-Battery-0721.md, session QB, 2026-07-21.
+
+- id: A1
+  family: deal_orientation
+  text: "Give me the current state of this project - land plan, budget, and where we are on absorption."
+  expects: numbers
+  critical: true
+  write: false
+
+- id: A2
+  family: deal_orientation
+  text: "Walk me through this deal like I've never seen it."
+  expects: numbers
+  critical: true
+  write: false
+
+- id: A3
+  family: deal_orientation
+  text: "What is this project?"
+  expects: text
+  critical: true
+  write: false
+
+- id: A4
+  family: deal_orientation
+  text: "How big is this deal and what's the business plan?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: A5
+  family: deal_orientation
+  text: "Summarize Peoria Meadows in five bullets."
+  expects: text
+  critical: true
+  write: false
+
+- id: B1
+  family: land_plan
+  text: "Which parcels are sold, which are under contract, and what's left?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: B2
+  family: land_plan
+  text: "Break the project down by area and phase."
+  expects: numbers
+  critical: false
+  write: false
+
+- id: B3
+  family: land_plan
+  text: "How many lots by product type?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: B4
+  family: land_plan
+  text: "What's the biggest parcel and what's planned there?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: B5
+  family: land_plan
+  text: "Show me the land use plan."
+  expects: navigation
+  critical: false
+  write: false
+
+- id: B6
+  family: land_plan
+  text: "How many acres are commercial versus residential?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: C1
+  family: budget
+  text: "What's the total development budget and what are the biggest line items?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: C2
+  family: budget
+  text: "What's my cost per lot?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: C3
+  family: budget
+  text: "How much of the budget is horizontal versus soft costs?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: C4
+  family: budget
+  text: "Are we over or under budget on anything so far?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: C5
+  family: budget
+  text: "What's the biggest single cost exposure in this deal?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: C6
+  family: budget
+  text: "Show me the budget."
+  expects: navigation
+  critical: false
+  write: false
+
+- id: D1
+  family: absorption
+  text: "What's the absorption schedule?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: D2
+  family: absorption
+  text: "How long until this project is fully sold out?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: D3
+  family: absorption
+  text: "Is the absorption pace realistic for this market?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: D4
+  family: absorption
+  text: "When does the last phase deliver?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: D5
+  family: absorption
+  text: "How many lots do I sell in year two?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: E1
+  family: pricing_revenue
+  text: "What are the lot prices by product, and where did those come from?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: E2
+  family: pricing_revenue
+  text: "What's total projected revenue?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: E3
+  family: pricing_revenue
+  text: "What's my price per front foot?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: E4
+  family: pricing_revenue
+  text: "How do these lot prices compare to what the market is actually doing?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: E5
+  family: pricing_revenue
+  text: "What's the revenue split between residential and commercial?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: F1
+  family: returns_capital
+  text: "What are the returns on this deal?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: F2
+  family: returns_capital
+  text: "What's the IRR, and is that levered or unlevered?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: F3
+  family: returns_capital
+  text: "What's the peak equity requirement?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: F4
+  family: returns_capital
+  text: "Walk me through the waterfall."
+  expects: numbers
+  critical: false
+  write: false
+
+- id: F5
+  family: returns_capital
+  text: "What's the debt structure on this?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: F6
+  family: returns_capital
+  text: "What's my equity multiple and when do I get my money back?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: G1
+  family: scenarios
+  text: "Slow absorption by a third across the remaining phases. What happens to cash flow and returns?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: G2
+  family: scenarios
+  text: "What if lot prices come in 10% below plan?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: G3
+  family: scenarios
+  text: "Assume the builder walks on the next takedown and those parcels sit a year. Compare to base case."
+  expects: numbers
+  critical: true
+  write: false
+
+- id: G4
+  family: scenarios
+  text: "What if development costs run 15% over?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: G5
+  family: scenarios
+  text: "At what absorption pace does this deal stop working?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: G6
+  family: scenarios
+  text: "Run a downside case where rates go up 200 basis points."
+  expects: numbers
+  critical: false
+  write: false
+
+- id: G7
+  family: scenarios
+  text: "What if I sold the whole thing today instead of developing it?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: H1
+  family: provenance_skepticism
+  text: "Where does that number come from?"
+  expects: text
+  critical: false
+  write: false
+
+- id: H2
+  family: provenance_skepticism
+  text: "What in this deal is an assumption versus something that's actually known?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: H3
+  family: provenance_skepticism
+  text: "What are the most aggressive assumptions here? Where am I most exposed?"
+  expects: numbers
+  critical: true
+  write: false
+
+- id: H4
+  family: provenance_skepticism
+  text: "What don't you know about this deal?"
+  expects: text
+  critical: false
+  write: false
+
+- id: H5
+  family: provenance_skepticism
+  text: "Are you making any of this up?"
+  expects: text
+  critical: false
+  write: false
+
+- id: H6
+  family: provenance_skepticism
+  text: "What would you need from me to make this analysis better?"
+  expects: text
+  critical: false
+  write: false
+
+- id: I1
+  family: market_context
+  text: "What are comparable land sales in this submarket?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: I2
+  family: market_context
+  text: "How does this deal compare to my other projects?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: I3
+  family: market_context
+  text: "What are the demographics around this site?"
+  expects: numbers
+  critical: false
+  write: false
+
+- id: I4
+  family: market_context
+  text: "Is Peoria a good market for this product?"
+  expects: text
+  critical: false
+  write: false
+
+- id: J1
+  family: capability_meta
+  text: "What can you do that a spreadsheet can't?"
+  expects: text
+  critical: false
+  write: false
+
+- id: J2
+  family: capability_meta
+  text: "Can you build me a report on this?"
+  expects: artifact
+  critical: false
+  write: false
+
+- id: J3
+  family: capability_meta
+  text: "Show me this on a map."
+  expects: artifact
+  critical: false
+  write: false
+
+- id: J4
+  family: capability_meta
+  text: "Change the lot price on Parcel [X] to $Y and show me the effect."
+  expects: numbers
+  critical: false
+  write: true
+
+- id: J5
+  family: capability_meta
+  text: "Can you export this to Excel?"
+  expects: text
+  critical: false
+  write: false
+
+- id: J6
+  family: capability_meta
+  text: "What happens if I ask you something you don't have data for?"
+  expects: text
+  critical: false
+  write: false
