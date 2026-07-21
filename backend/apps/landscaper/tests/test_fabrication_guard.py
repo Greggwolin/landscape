@@ -9,7 +9,10 @@ calibration (does the model recover by calling the tool when blocked) is a
 separate, model-in-the-loop step.
 """
 
-from apps.landscaper.ai_handler import reply_states_unsourced_financials as guard
+from apps.landscaper.ai_handler import (
+    _fabrication_guard_trace,
+    reply_states_unsourced_financials as guard,
+)
 
 
 # ── MUST BLOCK: financial figures stated with no financial tool this turn ────
@@ -214,3 +217,32 @@ def test_provenance_back_compat_no_outputs_keeps_exemption():
     # site passes them in strict mode).
     content = "For the 46 units of 1BR: $15,300 per unit, total $703,800."
     assert guard(content, [{'tool': 'get_value_add_assumptions'}]) is False
+
+
+def test_guard_trace_reports_unsourced_figures_with_bounded_context():
+    content = (
+        "The development budget is $40,244,250 across 43 lots, which works out "
+        "to about $935,913 per lot."
+    )
+    outputs = [
+        {'tool': 'get_budget_items', 'success': True, 'result': {'total_budget': 40244250}},
+        {'tool': 'get_parcels', 'success': True, 'result': {'parcel_count': 43}},
+    ]
+
+    trace = _fabrication_guard_trace(
+        content,
+        [{'tool': 'get_budget_items'}, {'tool': 'get_parcels'}],
+        tool_outputs=outputs,
+    )
+
+    assert trace['tools'] == ['get_budget_items', 'get_parcels']
+    assert trace['traced_count'] == 1
+    assert trace['sourced_number_count'] == 2
+    assert len(trace['unsourced_figures']) == 1
+    unsourced = trace['unsourced_figures'][0]
+    assert unsourced['magnitude'] == 935913.0
+    assert unsourced['is_pct'] is False
+    assert unsourced['token'] == '$935,913'
+    assert unsourced['source'] == 'reply'
+    assert '$935,913 per lot' in unsourced['context']
+    assert len(unsourced['context']) < 100
