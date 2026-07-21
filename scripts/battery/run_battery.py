@@ -227,13 +227,10 @@ class ApiClient:
         try:
             with request.urlopen(req, timeout=self.timeout) as response:
                 raw = response.read().decode("utf-8", errors="replace")
-                return response.status, json.loads(raw), raw
+                return response.status, parse_response_body(raw), raw
         except error.HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
-            try:
-                parsed = json.loads(raw)
-            except json.JSONDecodeError:
-                parsed = {"success": False, "error": raw}
+            parsed = parse_response_body(raw)
             return exc.code, parsed, raw
 
     def post(self, endpoint: str, payload: dict[str, Any], *, auth: bool = True) -> dict[str, Any]:
@@ -259,6 +256,50 @@ class ApiClient:
     def archive_thread(self, thread_id: str) -> tuple[int, dict[str, Any]]:
         status, data, _raw = self.request_json("DELETE", f"/api/landscaper/threads/{thread_id}/")
         return status, data
+
+
+def parse_response_body(raw: str) -> dict[str, Any]:
+    body = raw.strip()
+    if not body:
+        return {"success": False, "error": "Empty response body"}
+
+    # Stage-1 event streaming is NDJSON with a final payload envelope.
+    final_payload: dict[str, Any] | None = None
+    saw_event = False
+    for line in body.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and "e" in event:
+            saw_event = True
+            if event.get("e") == "final" and isinstance(event.get("payload"), dict):
+                final_payload = event["payload"]
+    if final_payload is not None:
+        return final_payload
+    if saw_event:
+        return {"success": False, "error": "Streaming response ended without final payload"}
+
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        # Legacy heartbeat mode should be whitespace + JSON. If an edge or proxy
+        # prefixes text before the JSON object, recover from the first object.
+        first_object = body.find("{")
+        if first_object >= 0:
+            try:
+                parsed = json.loads(body[first_object:])
+            except json.JSONDecodeError:
+                parsed = None
+        else:
+            parsed = None
+        if parsed is None:
+            preview = body[:500]
+            return {"success": False, "error": "Non-JSON response body", "raw_preview": preview}
+    return parsed if isinstance(parsed, dict) else {"success": False, "response": parsed}
 
 
 def thread_id_from(data: dict[str, Any]) -> str | None:
