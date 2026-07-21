@@ -104,6 +104,7 @@ backend/media/
 backend/*_extraction.json
 backend/*_reconciliation_report.md
 backend/*_rent_roll_extracted.json
+scripts/battery/results/
 
 # Python cache and bytecode
 __pycache__/
