@@ -4679,13 +4679,13 @@ def get_landscaper_response(
                 loop_broke_early = True
                 break
 
-            # Extract tool calls and text from response
+            # Extract tool calls from response. Text that appears in the same
+            # assistant turn as tool_use is pre-tool narration; do not splice it
+            # into the final answer because it creates unstable first lines.
             tool_use_blocks = []
             for block in response.content:
                 if block.type == "tool_use":
                     tool_use_blocks.append(block)
-                elif hasattr(block, 'text'):
-                    final_content += block.text
 
             logger.info(f"[Tool Loop] Iteration {tool_iteration}: {len(tool_use_blocks)} tool(s), {elapsed:.1f}s elapsed")
 
