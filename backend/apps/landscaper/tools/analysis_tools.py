@@ -142,12 +142,16 @@ def handle_get_deal_summary(
     try:
         with connection.cursor() as cur:
             # ── Project basics ──
+            # NOTE (RF106): hold_period_years does NOT live on tbl_project — the
+            # prior SELECT referenced it here and raised ProgrammingError, which
+            # left get_deal_summary fully broken (success:False) before this fix.
+            # It is sourced separately from tbl_property_acquisition below.
             cur.execute("""
                 SELECT project_name, project_type, description,
                        street_address, city, state, county, zip_code,
                        acquisition_price, asking_price,
                        total_units, gross_sf, acres_gross, year_built,
-                       hold_period_years, discount_rate_pct,
+                       discount_rate_pct,
                        analysis_type
                 FROM landscape.tbl_project
                 WHERE project_id = %s
@@ -158,6 +162,17 @@ def handle_get_deal_summary(
 
             proj_cols = [c[0] for c in cur.description]
             proj = dict(zip(proj_cols, proj_row))
+
+            # Hold period lives on tbl_property_acquisition (not tbl_project).
+            cur.execute("""
+                SELECT hold_period_years
+                FROM landscape.tbl_property_acquisition
+                WHERE project_id = %s
+                ORDER BY hold_period_years DESC NULLS LAST
+                LIMIT 1
+            """, [project_id])
+            hp_row = cur.fetchone()
+            proj['hold_period_years'] = hp_row[0] if hp_row else None
 
             # ── Debt summary ──
             cur.execute("""
@@ -195,6 +210,95 @@ def handle_get_deal_summary(
             """, [project_id])
             doc_count = cur.fetchone()[0]
 
+            # ── Development budget total (RF106) ──
+            # Aggregate over core_fin_fact_budget — the same source and filter
+            # get_budget_items uses for its `total_amount` (no scenario/committed
+            # filter), so this snapshot figure ties out to the detailed budget tool
+            # to the cent (proj 9 → $40,244,250 across 30 line items). This is a
+            # summary field, NOT a line-item dump — call get_budget_items for detail.
+            cur.execute("""
+                SELECT COUNT(*), COALESCE(SUM(amount), 0)
+                FROM landscape.core_fin_fact_budget
+                WHERE project_id = %s
+            """, [project_id])
+            budget_row = cur.fetchone()
+            budget_line_count = budget_row[0] or 0
+            budget_total = _safe_float(budget_row[1])
+
+            # ── Absorption summary (RF106) ──
+            # Sourced from tbl_absorption_schedule (this project's own schedule —
+            # NOT get_absorption_benchmarks, which is industry benchmark data). The
+            # table carries scenario discriminators, so pick ONE canonical scenario
+            # deterministically (prefer a "base"-named scenario, else the one with
+            # the most units) and aggregate it — never SUM across scenarios, which
+            # would double-count. `scenario_count` is surfaced so the model knows
+            # alternatives exist.
+            cur.execute("""
+                SELECT COUNT(DISTINCT COALESCE(scenario_name, 'Base Case'))
+                FROM landscape.tbl_absorption_schedule
+                WHERE project_id = %s
+            """, [project_id])
+            absorption_scenario_count = cur.fetchone()[0] or 0
+
+            cur.execute("""
+                SELECT
+                    COALESCE(scenario_name, 'Base Case')        AS scenario_name,
+                    COUNT(*)                                     AS revenue_streams,
+                    SUM(total_units)                             AS total_units,
+                    SUM(units_per_period)                        AS units_per_period,
+                    MIN(start_period)                            AS start_period,
+                    MAX(start_period + periods_to_complete)      AS end_period,
+                    SUM(total_units * base_price_per_unit)       AS est_gross_sales
+                FROM landscape.tbl_absorption_schedule
+                WHERE project_id = %s
+                GROUP BY COALESCE(scenario_name, 'Base Case')
+                ORDER BY
+                    (CASE WHEN COALESCE(scenario_name, 'Base Case') ILIKE '%%base%%'
+                          THEN 0 ELSE 1 END),
+                    SUM(total_units) DESC NULLS LAST
+                LIMIT 1
+            """, [project_id])
+            abs_row = cur.fetchone()
+            if abs_row:
+                abs_cols = [c[0] for c in cur.description]
+                absorption = dict(zip(abs_cols, abs_row))
+            else:
+                absorption = None
+
+        # ── Headline returns (RF106) ──
+        # Reuse the working canonical cash-flow engine (LandDevCashFlowService for
+        # LAND, IncomePropertyCashFlowService otherwise) — the same service
+        # calculate_cash_flow already uses. include_financing=False yields the
+        # UNLEVERED, project-level return, which is labeled explicitly to avoid the
+        # C5 levered-vs-unlevered ambiguity (the waterfall's levered equity IRR is a
+        # different figure and is NOT what this surfaces). NOTE: the ORM path
+        # (CalculationService.calculate_project_metrics) is currently broken by a
+        # pre-existing BudgetItem.category column-mapping bug — flagged separately —
+        # which is another reason this reuses the raw-SQL cash-flow service. Wrapped
+        # so a returns failure degrades gracefully and never breaks the snapshot.
+        returns = None
+        if budget_total:  # no budget → no meaningful pro-forma to run
+            try:
+                ptype = (proj.get('project_type') or '').upper()
+                if ptype == 'LAND':
+                    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+                    cf = LandDevCashFlowService(project_id).calculate(include_financing=False)
+                else:
+                    from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+                    cf = IncomePropertyCashFlowService(project_id).calculate(include_financing=False)
+                cf_summary = (cf or {}).get('summary', {}) or {}
+                returns = {
+                    'unlevered_project_irr': _safe_float(cf_summary.get('irr')),
+                    'equity_multiple': _safe_float(cf_summary.get('equityMultiple')),
+                    'npv': _safe_float(cf_summary.get('npv')),
+                    'basis': 'unlevered (project-level, before financing)',
+                    'engine': 'LandDevCashFlowService' if ptype == 'LAND'
+                              else 'IncomePropertyCashFlowService',
+                }
+            except Exception as _ret_err:
+                logger.warning(f"get_deal_summary returns calc failed p{project_id}: {_ret_err}")
+                returns = None
+
         # Assemble response
         result = {
             'success': True,
@@ -230,10 +334,34 @@ def handle_get_deal_summary(
                 'ltv': _safe_float(l['loan_to_value_pct']),
             } for l in loans] if loans else [],
             'valuation': valuation,
+            # ── RF106: budget / absorption / returns — closes the "briefing"
+            # coverage gap so a compound budget+absorption+returns ask is sourced
+            # from a single get_deal_summary call instead of the model narrating
+            # figures the fabrication guard (correctly) rejects. All additive. ──
+            'budget': {
+                'total_budget': budget_total,
+                'line_item_count': budget_line_count,
+                'source': 'core_fin_fact_budget (aggregate; call get_budget_items for line detail)',
+            } if budget_total else None,
+            'absorption': ({
+                'scenario_name': absorption.get('scenario_name'),
+                'scenario_count': absorption_scenario_count,
+                'revenue_streams': absorption.get('revenue_streams'),
+                'total_units': absorption.get('total_units'),
+                'units_per_period': _safe_float(absorption.get('units_per_period')),
+                'start_period': absorption.get('start_period'),
+                'end_period': absorption.get('end_period'),
+                'est_gross_sales': _safe_float(absorption.get('est_gross_sales')),
+                'source': 'tbl_absorption_schedule (this project\'s schedule, not benchmarks)',
+            } if absorption else None),
+            'returns': returns,
             'data_summary': {
                 'documents': doc_count,
                 'has_debt': len(loans) > 0,
                 'has_valuation': valuation is not None,
+                'has_budget': bool(budget_total),
+                'has_absorption': absorption is not None,
+                'has_returns': returns is not None and returns.get('unlevered_project_irr') is not None,
             },
         }
         return result

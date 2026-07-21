@@ -5026,7 +5026,7 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "get_deal_summary",
-        "description": "Comprehensive project snapshot in one call: property basics, financials, debt, valuation, data summary. Replaces 6-8 sequential reads.",
+        "description": "Comprehensive project snapshot in one call: property basics, financials, debt, valuation, development budget total, absorption summary, headline returns (unlevered project-level IRR / equity multiple / NPV, basis-labeled), and data summary. Replaces 6-8 sequential reads. Use this for any 'give me a briefing / catch me up / where do we stand' ask covering budget, absorption, and/or returns together — every figure it returns is tool-sourced. The returns block is the UNLEVERED project-level basis (before financing); the levered/equity waterfall IRR is a different figure. For budget line-item detail call get_budget_items; the budget here is the aggregate total only.",
         "input_schema": {
             "type": "object",
             "properties": {},
