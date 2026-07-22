@@ -20,16 +20,20 @@ def _assumptions():
         ],
         "parcel_sales": [
             {
+                "assumption_id": 101,
                 "parcel_id": 10,
                 "sale_period": 12,
+                "custom_sale_date": "2027-01-01",
                 "gross_revenue": 200.0,
                 "net_revenue": 180.0,
                 "commissions": 10.0,
                 "transaction_costs": 10.0,
             },
             {
+                "assumption_id": 102,
                 "parcel_id": 11,
                 "sale_period": 24,
+                "custom_sale_date": "2028-01-01",
                 "gross_revenue": 200.0,
                 "net_revenue": 180.0,
                 "commissions": 10.0,
@@ -89,5 +93,31 @@ def test_absorption_override_delays_sales_and_lowers_npv():
 
     assert applied is True
     assert assumptions["land_model"]["parcel_sales"][1]["sale_period"] > 24
+    assert computed["npv"] < baseline["npv"]
+    assert computed["total_profit"] == pytest.approx(baseline["total_profit"])
+
+
+def test_sale_date_override_delays_matching_sale_and_lowers_npv():
+    engine = WhatIfEngine(1)
+    assumptions = _assumptions()
+    baseline = engine._compute_land_model_metrics(assumptions["land_model"])
+
+    applied = engine._apply_land_model_override(
+        assumptions,
+        Override(
+            field="sale_date",
+            table="tbl_parcel_sale_assumptions",
+            record_id="101",
+            override_value="2028-01-01",
+            unit="date",
+            label="Delay first parcel sale 12 months",
+        ),
+    )
+    computed = engine._compute_land_model_metrics(assumptions["land_model"])
+
+    assert applied is True
+    assert assumptions["land_model"]["parcel_sales"][0]["sale_period"] == 24
+    assert assumptions["land_model"]["parcel_sales"][1]["sale_period"] == 24
+    assert assumptions["_scenario_adjustments"][0]["delay_months"] == 12
     assert computed["npv"] < baseline["npv"]
     assert computed["total_profit"] == pytest.approx(baseline["total_profit"])
