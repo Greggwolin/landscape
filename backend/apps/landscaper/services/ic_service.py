@@ -207,8 +207,10 @@ def generate_sensitivity_grid(
             # Compute metrics
             results = engine.compute_shadow_metrics(shadow)
 
-            # Extract target metrics from results
-            metrics = results.get('metrics', {})
+            # Extract target metrics from results. WhatIfEngine returns
+            # computed metrics under "computed"; older code looked for
+            # "metrics" and silently produced empty sensitivity rows.
+            metrics = results.get('computed') or results.get('metrics', {})
             delta = results.get('delta', {})
 
             row = {

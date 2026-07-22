@@ -16,6 +16,8 @@ data-loading logic, patches overrides, and calls the same underlying math.
 import copy
 import json
 import logging
+import math
+from datetime import date
 from dataclasses import dataclass, field, asdict
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -354,23 +356,9 @@ class WhatIfEngine:
         result = {}
 
         with connection.cursor() as cursor:
-            # 1. Project config
-            cursor.execute("""
-                SELECT analysis_start_date, total_project_months,
-                       total_acres, total_lots
-                FROM landscape.tbl_project
-                WHERE project_id = %s
-            """, [self.project_id])
-            row = cursor.fetchone()
-            if row:
-                result['tbl_project'] = {
-                    'analysis_start_date': str(row[0]) if row[0] else None,
-                    'total_project_months': int(row[1]) if row[1] else None,
-                    'total_acres': float(row[2]) if row[2] else None,
-                    'total_lots': int(row[3]) if row[3] else None,
-                }
-
-            # 2. DCF / growth assumptions
+            # 1. DCF / growth assumptions. The DCF hold period is the
+            # canonical planning horizon; tbl_project has no
+            # total_project_months column in the live schema.
             cursor.execute("""
                 SELECT hold_period_years, discount_rate, selling_costs_pct,
                        price_growth_set_id, cost_inflation_set_id
@@ -380,8 +368,9 @@ class WhatIfEngine:
             """, [self.project_id])
             row = cursor.fetchone()
             if row:
+                hold_period_years = int(row[0]) if row[0] else None
                 result['tbl_dcf_analysis'] = {
-                    'hold_period_years': int(row[0]) if row[0] else None,
+                    'hold_period_years': hold_period_years,
                     'discount_rate': float(row[1]) if row[1] else 0.10,
                     'selling_costs_pct': float(row[2]) if row[2] else 0.0,
                     'price_growth_set_id': row[3],
@@ -407,6 +396,7 @@ class WhatIfEngine:
                     else:
                         result['tbl_dcf_analysis'][rate_key] = 0.0
             else:
+                hold_period_years = None
                 result['tbl_dcf_analysis'] = {
                     'hold_period_years': None,
                     'discount_rate': 0.10,
@@ -415,15 +405,38 @@ class WhatIfEngine:
                     'cost_inflation_rate': 0.0,
                 }
 
+            # 2. Project config
+            cursor.execute("""
+                SELECT analysis_start_date, analysis_end_date,
+                       acres_gross, total_units, target_units
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [self.project_id])
+            row = cursor.fetchone()
+            if row:
+                total_project_months = self._derive_total_project_months(
+                    hold_period_years=hold_period_years,
+                    analysis_start_date=row[0],
+                    analysis_end_date=row[1],
+                )
+                result['tbl_project'] = {
+                    'analysis_start_date': str(row[0]) if row[0] else None,
+                    'analysis_end_date': str(row[1]) if row[1] else None,
+                    'total_project_months': total_project_months,
+                    'total_acres': float(row[2]) if row[2] else None,
+                    'total_lots': int(row[3] or row[4] or 0) or None,
+                }
+
             # 3. Budget totals by category type
             cursor.execute("""
                 SELECT
-                    c.category_type,
-                    SUM(b.total_amount) as total
+                    COALESCE(NULLIF(b.activity, ''), c.category_name, 'Uncategorized') AS category_type,
+                    SUM(b.amount) as total
                 FROM landscape.core_fin_fact_budget b
-                JOIN landscape.core_unit_cost_category c ON c.category_id = b.category_id
+                LEFT JOIN landscape.core_unit_cost_category c ON c.category_id = b.category_id
                 WHERE b.project_id = %s
-                GROUP BY c.category_type
+                  AND b.amount IS NOT NULL
+                GROUP BY COALESCE(NULLIF(b.activity, ''), c.category_name, 'Uncategorized')
             """, [self.project_id])
             budget_by_type = {}
             for row in cursor.fetchall():
@@ -431,33 +444,123 @@ class WhatIfEngine:
             result['budget_summary'] = budget_by_type
             result['total_costs'] = sum(budget_by_type.values())
 
+            cursor.execute("""
+                SELECT
+                    b.fact_id,
+                    COALESCE(NULLIF(b.activity, ''), c.category_name, 'Uncategorized') AS category,
+                    b.amount,
+                    b.start_period,
+                    b.periods_to_complete,
+                    b.end_period,
+                    b.escalation_rate
+                FROM landscape.core_fin_fact_budget b
+                LEFT JOIN landscape.core_unit_cost_category c ON c.category_id = b.category_id
+                WHERE b.project_id = %s
+                  AND b.amount IS NOT NULL
+                  AND b.amount <> 0
+                ORDER BY b.start_period NULLS LAST, b.fact_id
+            """, [self.project_id])
+            cost_columns = [col[0] for col in cursor.description]
+            cost_schedule = [
+                {key: self._json_safe(value) for key, value in dict(zip(cost_columns, row)).items()}
+                for row in cursor.fetchall()
+            ]
+
             # 4. Revenue summary (aggregated parcel sales)
             cursor.execute("""
                 SELECT
                     COUNT(*) as parcel_count,
-                    SUM(s.sale_price) as total_gross_revenue,
-                    AVG(s.commission_pct) as avg_commission_pct,
-                    AVG(s.transaction_cost_pct) as avg_transaction_cost_pct
+                    SUM(COALESCE(s.gross_sale_proceeds, s.gross_parcel_price, 0)) as total_gross_revenue,
+                    SUM(COALESCE(s.net_sale_proceeds, s.gross_sale_proceeds, s.gross_parcel_price, 0)) as total_net_revenue,
+                    SUM(COALESCE(s.commission_amount, 0)) as total_commissions,
+                    SUM(
+                        COALESCE(s.legal_amount, 0) +
+                        COALESCE(s.closing_cost_amount, 0) +
+                        COALESCE(s.title_insurance_amount, 0)
+                    ) as total_transaction_costs
                 FROM landscape.tbl_parcel p
-                LEFT JOIN landscape.tbl_parcel_sale_assumption s ON s.parcel_id = p.parcel_id
+                LEFT JOIN landscape.tbl_parcel_sale_assumptions s ON s.parcel_id = p.parcel_id
                 WHERE p.project_id = %s
             """, [self.project_id])
             row = cursor.fetchone()
             if row:
+                total_gross = float(row[1]) if row[1] else 0.0
+                total_net = float(row[2]) if row[2] else 0.0
+                total_commissions = float(row[3]) if row[3] else 0.0
+                total_transaction_costs = float(row[4]) if row[4] else 0.0
                 result['revenue_summary'] = {
                     'parcel_count': int(row[0]) if row[0] else 0,
-                    'total_gross_revenue': float(row[1]) if row[1] else 0.0,
-                    'avg_commission_pct': float(row[2]) if row[2] else 0.0,
-                    'avg_transaction_cost_pct': float(row[3]) if row[3] else 0.0,
+                    'total_gross_revenue': total_gross,
+                    'total_net_revenue': total_net,
+                    'avg_commission_pct': total_commissions / total_gross if total_gross else 0.0,
+                    'avg_transaction_cost_pct': total_transaction_costs / total_gross if total_gross else 0.0,
                 }
             else:
                 result['revenue_summary'] = {
                     'parcel_count': 0,
                     'total_gross_revenue': 0.0,
+                    'total_net_revenue': 0.0,
                     'avg_commission_pct': 0.0,
                     'avg_transaction_cost_pct': 0.0,
                 }
 
+            cursor.execute("""
+                SELECT
+                    p.parcel_id,
+                    p.parcel_code,
+                    p.phase_id,
+                    p.sale_period,
+                    p.units_total,
+                    p.acres_gross,
+                    COALESCE(s.gross_sale_proceeds, s.gross_parcel_price, 0) AS gross_revenue,
+                    COALESCE(s.net_sale_proceeds, s.gross_sale_proceeds, s.gross_parcel_price, 0) AS net_revenue,
+                    COALESCE(s.commission_amount, 0) AS commissions,
+                    COALESCE(s.legal_amount, 0) +
+                        COALESCE(s.closing_cost_amount, 0) +
+                        COALESCE(s.title_insurance_amount, 0) AS transaction_costs,
+                    COALESCE(s.improvement_offset_total, 0) AS subdivision_costs
+                FROM landscape.tbl_parcel p
+                LEFT JOIN landscape.tbl_parcel_sale_assumptions s ON s.parcel_id = p.parcel_id
+                WHERE p.project_id = %s
+                  AND p.sale_period IS NOT NULL
+                  AND COALESCE(s.net_sale_proceeds, s.gross_sale_proceeds, s.gross_parcel_price, 0) <> 0
+                ORDER BY p.sale_period, p.parcel_id
+            """, [self.project_id])
+            sale_columns = [col[0] for col in cursor.description]
+            parcel_sales = [
+                {key: self._json_safe(value) for key, value in dict(zip(sale_columns, row)).items()}
+                for row in cursor.fetchall()
+            ]
+
+            cursor.execute("""
+                SELECT units_per_period, total_units, start_period, periods_to_complete
+                FROM landscape.tbl_absorption_schedule
+                WHERE project_id = %s
+                ORDER BY
+                    CASE WHEN LOWER(COALESCE(scenario_name, '')) = 'base case' THEN 0 ELSE 1 END,
+                    absorption_id
+                LIMIT 1
+            """, [self.project_id])
+            row = cursor.fetchone()
+            absorption_summary = {
+                'units_per_period': float(row[0]) if row and row[0] is not None else None,
+                'total_units': float(row[1]) if row and row[1] is not None else None,
+                'start_period': int(row[2]) if row and row[2] is not None else None,
+                'periods_to_complete': int(row[3]) if row and row[3] is not None else None,
+            }
+
+        land_model = {
+            'discount_rate': result.get('tbl_dcf_analysis', {}).get('discount_rate', 0.10),
+            'hold_period_years': result.get('tbl_dcf_analysis', {}).get('hold_period_years'),
+            'total_project_months': result.get('tbl_project', {}).get('total_project_months'),
+            'cost_schedule': cost_schedule,
+            'parcel_sales': parcel_sales,
+            'absorption_summary': absorption_summary,
+        }
+        land_model['total_project_months'] = land_model['total_project_months'] or self._derive_horizon_from_model(land_model)
+        result['tbl_project']['total_project_months'] = land_model['total_project_months']
+        result['land_model'] = land_model
+        result['_baseline_land_model'] = copy.deepcopy(land_model)
         return result
 
     def _load_income_property_assumptions(self) -> Dict[str, Any]:
@@ -507,6 +610,364 @@ class WhatIfEngine:
             result['total_opex'] = float(row[0]) if row and row[0] else 0.0
 
         return result
+
+    @staticmethod
+    def _derive_total_project_months(
+        hold_period_years: Optional[int],
+        analysis_start_date: Any = None,
+        analysis_end_date: Any = None,
+    ) -> Optional[int]:
+        """Derive the project horizon from real fields in priority order."""
+        if hold_period_years:
+            try:
+                months = int(hold_period_years) * 12
+                if months > 0:
+                    return months
+            except (TypeError, ValueError):
+                pass
+
+        start = WhatIfEngine._coerce_date(analysis_start_date)
+        end = WhatIfEngine._coerce_date(analysis_end_date)
+        if start and end and end >= start:
+            return max((end.year - start.year) * 12 + (end.month - start.month) + 1, 1)
+        return None
+
+    @staticmethod
+    def _coerce_date(value: Any) -> Optional[date]:
+        if value is None:
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value.split("T")[0])
+            except ValueError:
+                return None
+        return None
+
+    @classmethod
+    def _derive_horizon_from_model(cls, model: Dict[str, Any]) -> int:
+        max_period = 1
+        for item in model.get('cost_schedule', []):
+            start = int(item.get('start_period') or 1)
+            duration = int(item.get('periods_to_complete') or 1)
+            explicit_end = item.get('end_period')
+            end = int(explicit_end) if explicit_end else start + duration - 1
+            max_period = max(max_period, end)
+        for sale in model.get('parcel_sales', []):
+            max_period = max(max_period, int(sale.get('sale_period') or 1))
+        absorption = model.get('absorption_summary', {})
+        if absorption.get('start_period') and absorption.get('periods_to_complete'):
+            max_period = max(
+                max_period,
+                int(absorption['start_period']) + int(absorption['periods_to_complete']) - 1,
+            )
+        return max_period
+
+    @staticmethod
+    def _json_safe(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, date):
+            return value.isoformat()
+        return value
+
+    @staticmethod
+    def _pct_or_ratio_factor(value: Any, unit: str = "") -> Optional[float]:
+        try:
+            raw = float(value)
+        except (TypeError, ValueError):
+            return None
+
+        unit = (unit or "").lower()
+        if unit == 'pct':
+            factor = 1 + (raw / 100.0 if abs(raw) > 1 else raw)
+        elif unit == 'ratio':
+            factor = raw
+        elif -100 < raw < 100 and raw != 0:
+            # Scenario prompts often pass -10 for "10% below plan".
+            factor = 1 + raw / 100.0 if raw < 0 else raw
+        else:
+            factor = raw
+        return factor if factor > 0 else None
+
+    @staticmethod
+    def _append_adjustment(assumptions: Dict[str, Any], adjustment: Dict[str, Any]) -> None:
+        assumptions.setdefault('_scenario_adjustments', []).append(adjustment)
+
+    def _refresh_land_revenue_summary(self, assumptions: Dict[str, Any]) -> None:
+        sales = assumptions.get('land_model', {}).get('parcel_sales', [])
+        gross = sum(float(s.get('gross_revenue') or 0) for s in sales)
+        net = sum(float(s.get('net_revenue') or 0) for s in sales)
+        commissions = sum(float(s.get('commissions') or 0) for s in sales)
+        transaction_costs = sum(float(s.get('transaction_costs') or 0) for s in sales)
+        assumptions['revenue_summary'] = {
+            **assumptions.get('revenue_summary', {}),
+            'total_gross_revenue': gross,
+            'total_net_revenue': net,
+            'avg_commission_pct': commissions / gross if gross else 0.0,
+            'avg_transaction_cost_pct': transaction_costs / gross if gross else 0.0,
+        }
+
+    def _apply_land_model_override(
+        self,
+        assumptions: Dict[str, Any],
+        override: Override,
+    ) -> bool:
+        model = assumptions.get('land_model')
+        if not isinstance(model, dict):
+            return False
+
+        field = (override.field or '').lower()
+        table = (override.table or '').lower()
+        label = (override.label or '').lower()
+        unit = override.unit or ''
+
+        if field in ('units_per_period', 'absorption_rate', 'absorption_velocity'):
+            try:
+                new_rate = float(override.override_value)
+            except (TypeError, ValueError):
+                return False
+            if new_rate <= 0:
+                return False
+
+            absorption = model.setdefault('absorption_summary', {})
+            old_rate = absorption.get('units_per_period') or override.original_value
+            try:
+                old_rate = float(old_rate)
+            except (TypeError, ValueError):
+                old_rate = None
+            if not old_rate or old_rate <= 0:
+                return False
+
+            start_period = absorption.get('start_period') or self._first_sale_period(model)
+            stretch = old_rate / new_rate
+            for sale in model.get('parcel_sales', []):
+                sale_period = int(sale.get('sale_period') or start_period or 1)
+                if start_period and sale_period >= start_period:
+                    sale['sale_period'] = max(
+                        int(start_period),
+                        int(round(int(start_period) + (sale_period - int(start_period)) * stretch)),
+                    )
+            absorption['units_per_period'] = new_rate
+            if absorption.get('total_units'):
+                absorption['periods_to_complete'] = int(math.ceil(float(absorption['total_units']) / new_rate))
+            model['total_project_months'] = max(
+                int(model.get('total_project_months') or 1),
+                self._derive_horizon_from_model(model),
+            )
+            self._append_adjustment(assumptions, {
+                'type': 'absorption_velocity',
+                'field': override.field,
+                'from': old_rate,
+                'to': new_rate,
+                'timing_stretch': stretch,
+            })
+            return True
+
+        price_like = (
+            table in ('tbl_parcel_sale_assumptions', 'land_use_pricing', 'market_assumptions')
+            or any(token in field for token in ('price', 'revenue', 'proceeds'))
+            or 'price' in label
+        )
+        if price_like:
+            factor = self._pct_or_ratio_factor(override.override_value, unit)
+            if factor is None:
+                return False
+            record_id = str(override.record_id) if override.record_id else None
+            for sale in model.get('parcel_sales', []):
+                if record_id and str(sale.get('parcel_id')) != record_id:
+                    continue
+                for key in ('gross_revenue', 'net_revenue', 'commissions', 'transaction_costs'):
+                    sale[key] = float(sale.get(key) or 0) * factor
+            self._refresh_land_revenue_summary(assumptions)
+            self._append_adjustment(assumptions, {
+                'type': 'sale_price',
+                'field': override.field,
+                'factor': factor,
+                'record_id': record_id,
+            })
+            return True
+
+        cost_like = any(token in field for token in ('cost', 'budget', 'amount')) or 'cost' in label
+        if cost_like:
+            factor = self._pct_or_ratio_factor(override.override_value, unit)
+            if factor is None:
+                return False
+            for item in model.get('cost_schedule', []):
+                item['amount'] = float(item.get('amount') or 0) * factor
+            assumptions['total_costs'] = sum(float(i.get('amount') or 0) for i in model.get('cost_schedule', []))
+            self._append_adjustment(assumptions, {
+                'type': 'cost',
+                'field': override.field,
+                'factor': factor,
+            })
+            return True
+
+        delay_like = (
+            'delay' in field
+            or 'sale_period' in field
+            or any(token in label for token in ('walk', 'sit', 'delay', 'takedown'))
+        )
+        if delay_like:
+            try:
+                delay = int(round(float(override.override_value)))
+            except (TypeError, ValueError):
+                return False
+            if unit == 'years':
+                delay *= 12
+            if delay <= 0:
+                return False
+            first_period = self._first_sale_period(model)
+            shifted = False
+            for sale in model.get('parcel_sales', []):
+                if int(sale.get('sale_period') or 0) == first_period:
+                    sale['sale_period'] = first_period + delay
+                    shifted = True
+            if shifted:
+                model['total_project_months'] = max(
+                    int(model.get('total_project_months') or 1),
+                    self._derive_horizon_from_model(model),
+                )
+                self._append_adjustment(assumptions, {
+                    'type': 'sale_delay',
+                    'field': override.field,
+                    'delay_months': delay,
+                })
+            return shifted
+
+        return False
+
+    @staticmethod
+    def _first_sale_period(model: Dict[str, Any]) -> Optional[int]:
+        periods = [
+            int(s.get('sale_period'))
+            for s in model.get('parcel_sales', [])
+            if s.get('sale_period') is not None
+        ]
+        return min(periods) if periods else None
+
+    def _compute_land_model_metrics(self, model: Dict[str, Any]) -> Dict[str, Any]:
+        import numpy_financial as npf
+
+        period_count = max(
+            int(model.get('total_project_months') or 1),
+            self._derive_horizon_from_model(model),
+        )
+        cash_flows = [0.0] * period_count
+
+        total_costs = 0.0
+        for item in model.get('cost_schedule', []):
+            amount = float(item.get('amount') or 0)
+            total_costs += amount
+            start = max(int(item.get('start_period') or 1), 1)
+            duration = max(int(item.get('periods_to_complete') or 1), 1)
+            end = min(start + duration - 1, period_count)
+            active_periods = max(end - start + 1, 1)
+            monthly_amount = amount / active_periods
+            for period in range(start, end + 1):
+                cash_flows[period - 1] -= monthly_amount
+
+        total_net_revenue = 0.0
+        total_gross_revenue = 0.0
+        for sale in model.get('parcel_sales', []):
+            period = int(sale.get('sale_period') or period_count)
+            if period < 1:
+                period = 1
+            if period > period_count:
+                cash_flows.extend([0.0] * (period - period_count))
+                period_count = period
+            net = float(sale.get('net_revenue') or 0)
+            gross = float(sale.get('gross_revenue') or 0)
+            total_net_revenue += net
+            total_gross_revenue += gross
+            cash_flows[period - 1] += net
+
+        annual_cash_flows = [
+            sum(cash_flows[i:i + 12])
+            for i in range(0, len(cash_flows), 12)
+        ]
+        irr = None
+        if len(annual_cash_flows) >= 2:
+            try:
+                irr_result = npf.irr(annual_cash_flows)
+                if not np.isnan(irr_result):
+                    irr = float(irr_result)
+            except Exception:
+                pass
+
+        discount_rate = float(model.get('discount_rate') or 0.10)
+        npv = None
+        if discount_rate > 0:
+            try:
+                monthly_rate = (1 + discount_rate) ** (1 / 12) - 1
+                npv_result = npf.npv(monthly_rate, cash_flows)
+                if not np.isnan(npv_result):
+                    npv = float(npv_result)
+            except Exception:
+                pass
+
+        total_cash_in = sum(cf for cf in cash_flows if cf > 0)
+        total_cash_out = abs(sum(cf for cf in cash_flows if cf < 0))
+        total_profit = total_net_revenue - total_costs
+        cumulative = []
+        running = 0.0
+        peak_equity = 0.0
+        for cf in cash_flows:
+            running += cf
+            cumulative.append(running)
+            peak_equity = min(peak_equity, running)
+
+        return {
+            'irr': irr,
+            'npv': npv,
+            'equity_multiple': total_cash_in / total_cash_out if total_cash_out else None,
+            'total_profit': total_profit,
+            'gross_margin': total_profit / total_net_revenue if total_net_revenue else None,
+            'total_costs': total_costs,
+            'total_net_revenue': total_net_revenue,
+            'total_gross_revenue': total_gross_revenue,
+            'peak_equity': abs(peak_equity),
+            'discount_rate': discount_rate,
+            'total_project_months': len(cash_flows),
+        }
+
+    @staticmethod
+    def _calibrate_land_shadow_metrics(
+        service_base: Dict[str, Any],
+        shadow_base: Dict[str, Any],
+        shadow_computed: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        calibrated = {}
+        for key, computed_value in shadow_computed.items():
+            base_value = shadow_base.get(key)
+            service_value = service_base.get(key)
+            if isinstance(computed_value, (int, float)) and isinstance(base_value, (int, float)):
+                if key in ('equity_multiple', 'gross_margin') and isinstance(service_value, (int, float)) and base_value:
+                    calibrated[key] = service_value * (computed_value / base_value)
+                elif isinstance(service_value, (int, float)):
+                    delta = computed_value - base_value
+                    calibrated[key] = service_value + delta
+                else:
+                    calibrated[key] = computed_value
+            else:
+                calibrated[key] = computed_value
+
+        if calibrated.get('total_net_revenue'):
+            calibrated['gross_margin'] = (
+                calibrated.get('total_profit', 0) / calibrated['total_net_revenue']
+            )
+        service_irr = service_base.get('irr')
+        service_npv = service_base.get('npv')
+        calibrated_npv = calibrated.get('npv')
+        if (
+            isinstance(service_irr, (int, float))
+            and isinstance(service_npv, (int, float))
+            and isinstance(calibrated_npv, (int, float))
+            and service_npv
+        ):
+            calibrated['irr'] = service_irr * (calibrated_npv / service_npv)
+        return calibrated
 
     # ------------------------------------------------------------------
     # Internal: Patching + Computation
@@ -561,14 +1022,22 @@ class WhatIfEngine:
             'income_growth_rate': ('income_assumptions', 'income_growth_rate'),
             'expense_growth_rate': ('income_assumptions', 'expense_growth_rate'),
             'management_fee_pct': ('income_assumptions', 'management_fee_pct'),
+            'units_per_period': ('land_model', 'units_per_period'),
+            'periods_to_complete': ('land_model', 'periods_to_complete'),
         }
 
         if field in FIELD_ROUTING:
             target_table, target_field = FIELD_ROUTING[field]
+            if target_table == 'land_model':
+                if self._apply_land_model_override(assumptions, override):
+                    return
             if target_table in assumptions:
                 if isinstance(assumptions[target_table], dict):
                     assumptions[target_table][target_field] = value
                     return
+
+        if self._apply_land_model_override(assumptions, override):
+            return
 
         # Route 4: Top-level numeric fields
         assumptions[field] = value
@@ -606,33 +1075,48 @@ class WhatIfEngine:
         then extracts summary metrics.
         """
         try:
-            # Delegate to the existing service — it reads from DB
-            # but we'll use its output for baseline, and for shadow
-            # we compute deltas based on assumption ratios.
             from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
             service = LandDevCashFlowService(self.project_id)
             result = service.calculate(include_financing=False)
             summary = result.get('summary', {})
-
-            # Extract key metrics
-            dcf = assumptions.get('tbl_dcf_analysis', {})
-            revenue = assumptions.get('revenue_summary', {})
-            total_costs = assumptions.get('total_costs', 0)
-            total_revenue = revenue.get('total_gross_revenue', 0)
-            commission_pct = revenue.get('avg_commission_pct', 0)
-            net_revenue = total_revenue * (1 - commission_pct) if total_revenue else 0
-
-            return {
+            service_metrics = {
                 'irr': summary.get('irr'),
                 'npv': summary.get('npv'),
                 'equity_multiple': summary.get('equityMultiple'),
                 'total_profit': summary.get('grossProfit'),
                 'gross_margin': summary.get('grossMargin'),
-                'total_costs': summary.get('totalCosts', total_costs),
-                'total_net_revenue': summary.get('totalNetRevenue', net_revenue),
+                'total_costs': summary.get('totalCosts', assumptions.get('total_costs', 0)),
+                'total_net_revenue': summary.get(
+                    'totalNetRevenue',
+                    assumptions.get('revenue_summary', {}).get('total_net_revenue', 0),
+                ),
                 'peak_equity': summary.get('peakEquity'),
-                'discount_rate': dcf.get('discount_rate', 0.10),
+                'discount_rate': assumptions.get('tbl_dcf_analysis', {}).get('discount_rate', 0.10),
             }
+
+            adjustments = assumptions.get('_scenario_adjustments') or []
+            if not adjustments:
+                return {
+                    **service_metrics,
+                    'scenario_adjustments': [],
+                    'source': 'LandDevCashFlowService base case',
+                }
+
+            baseline_model = assumptions.get('_baseline_land_model')
+            current_model = assumptions.get('land_model')
+            if not baseline_model or not current_model:
+                return self._compute_land_dev_metrics_simplified(assumptions)
+
+            baseline_shadow = self._compute_land_model_metrics(baseline_model)
+            computed_shadow = self._compute_land_model_metrics(current_model)
+            calibrated = self._calibrate_land_shadow_metrics(
+                service_metrics,
+                baseline_shadow,
+                computed_shadow,
+            )
+            calibrated['scenario_adjustments'] = adjustments
+            calibrated['source'] = 'LandDevCashFlowService base case + patched shadow schedule'
+            return calibrated
         except Exception as e:
             logger.error(f"Land dev calc error: {e}", exc_info=True)
             return self._compute_land_dev_metrics_simplified(assumptions)
