@@ -794,7 +794,7 @@ class WhatIfEngine:
             or 'price' in label
         )
         if price_like:
-            factor = self._pct_or_ratio_factor(override.override_value, unit)
+            factor = self._price_factor_from_override(model, override)
             if factor is None:
                 return False
             record_id = str(override.record_id) if override.record_id else None
@@ -890,6 +890,10 @@ class WhatIfEngine:
         if len(label_dates) >= 2:
             return self._month_diff(label_dates[0], label_dates[-1])
 
+        label_delay = self._months_from_label(override.label)
+        if label_delay:
+            return label_delay
+
         if target:
             record_id = str(override.record_id) if override.record_id else None
             for sale in model.get('parcel_sales', []):
@@ -906,6 +910,53 @@ class WhatIfEngine:
                     break
         return None
 
+    def _price_factor_from_override(self, model: Dict[str, Any], override: Override) -> Optional[float]:
+        unit = (override.unit or '').lower()
+        field = (override.field or '').lower()
+
+        if unit == 'currency':
+            label_factor = self._pct_factor_from_label(override.label)
+            if label_factor is not None:
+                return label_factor
+
+            target_amount = self._float_or_none(override.override_value)
+            if target_amount and any(token in field for token in ('revenue', 'proceeds')):
+                current_total = sum(
+                    float(s.get('gross_revenue') or 0)
+                    for s in model.get('parcel_sales', [])
+                )
+                if current_total > 0:
+                    return target_amount / current_total
+
+            return None
+
+        return self._pct_or_ratio_factor(override.override_value, unit)
+
+    @staticmethod
+    def _float_or_none(value: Any) -> Optional[float]:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _pct_factor_from_label(label: str) -> Optional[float]:
+        match = re.search(
+            r'(\d+(?:\.\d+)?)\s*%\s*(below|lower|reduction|less|under|down)',
+            label or '',
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return 1 - float(match.group(1)) / 100.0
+        match = re.search(
+            r'(\d+(?:\.\d+)?)\s*%\s*(above|higher|increase|more|up)',
+            label or '',
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return 1 + float(match.group(1)) / 100.0
+        return None
+
     @staticmethod
     def _dates_from_label(label: str) -> List[date]:
         dates: List[date] = []
@@ -916,6 +967,17 @@ class WhatIfEngine:
             except ValueError:
                 continue
         return dates
+
+    @staticmethod
+    def _months_from_label(label: str) -> Optional[int]:
+        match = re.search(r'\b(\d+(?:\.\d+)?)\s*(months?|mos?|yrs?|years?)\b', label or '', flags=re.IGNORECASE)
+        if not match:
+            return None
+        value = float(match.group(1))
+        unit = match.group(2).lower()
+        if unit.startswith('y') or unit.startswith('yr'):
+            value *= 12
+        return int(round(value))
 
     @staticmethod
     def _month_diff(start: date, end: date) -> int:
