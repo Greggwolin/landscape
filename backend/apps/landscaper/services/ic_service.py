@@ -139,6 +139,20 @@ def respond_to_challenge(
 # SENSITIVITY GRID
 # =============================================================================
 
+def normalize_sensitivity_steps(base_value: float, steps: List[float]) -> List[Dict[str, float]]:
+    numeric_steps = [float(step) for step in steps]
+    use_percent_offsets = any(step <= 0 for step in numeric_steps)
+    normalized = []
+    for raw_step in numeric_steps:
+        if use_percent_offsets:
+            step_pct = raw_step / 100.0 if abs(raw_step) > 1 else raw_step
+            test_value = round(base_value * (1 + step_pct), 4)
+        else:
+            test_value = round(raw_step, 4)
+            step_pct = (test_value / base_value) - 1 if base_value else 0
+        normalized.append({'step_pct': step_pct, 'test_value': test_value})
+    return normalized
+
 def generate_sensitivity_grid(
     project_id: int,
     assumption_key: str,
@@ -188,8 +202,9 @@ def generate_sensitivity_grid(
         engine = WhatIfEngine(project_id)
         grid_rows = []
 
-        for step_pct in steps:
-            test_value = round(base_value * (1 + step_pct), 4)
+        for normalized_step in normalize_sensitivity_steps(base_value, steps):
+            step_pct = normalized_step['step_pct']
+            test_value = normalized_step['test_value']
 
             # Create a fresh shadow for each step (no compounding)
             shadow = engine.create_shadow(f"sensitivity_{assumption_key}")
@@ -241,8 +256,9 @@ def generate_sensitivity_grid(
         logger.warning(f"[IC] WhatIfEngine not available for sensitivity: {e}")
         # Fallback: return a grid with estimated linear interpolation
         grid_rows = []
-        for step_pct in steps:
-            test_value = round(base_value * (1 + step_pct), 4)
+        for normalized_step in normalize_sensitivity_steps(base_value, steps):
+            step_pct = normalized_step['step_pct']
+            test_value = normalized_step['test_value']
             grid_rows.append({
                 'step_pct': step_pct,
                 'test_value': test_value,
