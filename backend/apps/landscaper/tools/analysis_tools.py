@@ -669,7 +669,31 @@ def handle_calculate_project_metrics(
             project_type = (row[0] or '').upper()
             discount_rate = float(row[1]) if row[1] else 0.10
 
-        # Use the CalculationService which already knows how to aggregate
+        if project_type == 'LAND':
+            from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+            cf = LandDevCashFlowService(project_id).calculate(include_financing=False)
+            summary = (cf or {}).get('summary', {}) or {}
+            return {
+                'success': True,
+                'project_id': project_id,
+                'project_type': project_type,
+                'metrics': {
+                    'irr': _safe_float(summary.get('irr')),
+                    'npv': _safe_float(summary.get('npv')),
+                    'equity_multiple': _safe_float(summary.get('equityMultiple')),
+                    'total_costs': _safe_float(summary.get('totalCosts')),
+                    'total_revenue': _safe_float(
+                        summary.get('totalRevenue') or summary.get('totalNetRevenue')
+                    ),
+                    'discount_rate': discount_rate,
+                    'basis': 'unlevered (project-level, before financing)',
+                    'engine': 'LandDevCashFlowService',
+                },
+                'status': 'complete',
+            }
+
+        # Use the CalculationService for non-land projects.
         result = CalculationService.calculate_project_metrics(project_id)
 
         # Enhance with DSCR if we have loan data

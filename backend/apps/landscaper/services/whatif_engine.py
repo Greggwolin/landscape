@@ -17,6 +17,7 @@ import copy
 import json
 import logging
 import math
+import re
 from datetime import date
 from dataclasses import dataclass, field, asdict
 from decimal import Decimal
@@ -506,10 +507,12 @@ class WhatIfEngine:
 
             cursor.execute("""
                 SELECT
+                    s.assumption_id,
                     p.parcel_id,
                     p.parcel_code,
                     p.phase_id,
                     p.sale_period,
+                    p.custom_sale_date,
                     p.units_total,
                     p.acres_gross,
                     COALESCE(s.gross_sale_proceeds, s.gross_parcel_price, 0) AS gross_revenue,
@@ -552,6 +555,7 @@ class WhatIfEngine:
         land_model = {
             'discount_rate': result.get('tbl_dcf_analysis', {}).get('discount_rate', 0.10),
             'hold_period_years': result.get('tbl_dcf_analysis', {}).get('hold_period_years'),
+            'analysis_start_date': result.get('tbl_project', {}).get('analysis_start_date'),
             'total_project_months': result.get('tbl_project', {}).get('total_project_months'),
             'cost_schedule': cost_schedule,
             'parcel_sales': parcel_sales,
@@ -765,6 +769,25 @@ class WhatIfEngine:
             })
             return True
 
+        date_like = (
+            field in ('sale_date', 'closing_date', 'custom_sale_date')
+            or unit.lower() == 'date'
+            or self._coerce_date(override.override_value) is not None
+        )
+        if date_like:
+            delay = self._sale_delay_months(model, override)
+            if delay is None or delay <= 0:
+                return False
+            shifted = self._shift_land_sales(model, override.record_id, delay)
+            if shifted:
+                self._append_adjustment(assumptions, {
+                    'type': 'sale_delay',
+                    'field': override.field,
+                    'delay_months': delay,
+                    'record_id': str(override.record_id) if override.record_id else None,
+                })
+            return shifted
+
         price_like = (
             table in ('tbl_parcel_sale_assumptions', 'land_use_pricing', 'market_assumptions')
             or any(token in field for token in ('price', 'revenue', 'proceeds'))
@@ -776,7 +799,7 @@ class WhatIfEngine:
                 return False
             record_id = str(override.record_id) if override.record_id else None
             for sale in model.get('parcel_sales', []):
-                if record_id and str(sale.get('parcel_id')) != record_id:
+                if record_id and not self._sale_matches_record(sale, record_id):
                     continue
                 for key in ('gross_revenue', 'net_revenue', 'commissions', 'transaction_costs'):
                     sale[key] = float(sale.get(key) or 0) * factor
@@ -818,17 +841,8 @@ class WhatIfEngine:
                 delay *= 12
             if delay <= 0:
                 return False
-            first_period = self._first_sale_period(model)
-            shifted = False
-            for sale in model.get('parcel_sales', []):
-                if int(sale.get('sale_period') or 0) == first_period:
-                    sale['sale_period'] = first_period + delay
-                    shifted = True
+            shifted = self._shift_land_sales(model, override.record_id, delay)
             if shifted:
-                model['total_project_months'] = max(
-                    int(model.get('total_project_months') or 1),
-                    self._derive_horizon_from_model(model),
-                )
                 self._append_adjustment(assumptions, {
                     'type': 'sale_delay',
                     'field': override.field,
@@ -837,6 +851,81 @@ class WhatIfEngine:
             return shifted
 
         return False
+
+    def _shift_land_sales(
+        self,
+        model: Dict[str, Any],
+        record_id: Optional[str],
+        delay_months: int,
+    ) -> bool:
+        record = str(record_id) if record_id else None
+        first_period = self._first_sale_period(model)
+        shifted = False
+        for sale in model.get('parcel_sales', []):
+            if record:
+                if not self._sale_matches_record(sale, record):
+                    continue
+            elif int(sale.get('sale_period') or 0) != first_period:
+                continue
+            sale['sale_period'] = int(sale.get('sale_period') or first_period or 1) + delay_months
+            shifted = True
+        if shifted:
+            model['total_project_months'] = max(
+                int(model.get('total_project_months') or 1),
+                self._derive_horizon_from_model(model),
+            )
+        return shifted
+
+    @staticmethod
+    def _sale_matches_record(sale: Dict[str, Any], record_id: str) -> bool:
+        return any(
+            str(sale.get(key)) == record_id
+            for key in ('assumption_id', 'parcel_id')
+            if sale.get(key) is not None
+        )
+
+    def _sale_delay_months(self, model: Dict[str, Any], override: Override) -> Optional[int]:
+        target = self._coerce_date(override.override_value)
+        label_dates = self._dates_from_label(override.label)
+        if len(label_dates) >= 2:
+            return self._month_diff(label_dates[0], label_dates[-1])
+
+        if target:
+            record_id = str(override.record_id) if override.record_id else None
+            for sale in model.get('parcel_sales', []):
+                if record_id and not self._sale_matches_record(sale, record_id):
+                    continue
+                current = self._coerce_date(sale.get('custom_sale_date'))
+                if current:
+                    return self._month_diff(current, target)
+                current_period = int(sale.get('sale_period') or 0)
+                target_period = self._period_for_date(model, target)
+                if current_period and target_period:
+                    return target_period - current_period
+                if record_id:
+                    break
+        return None
+
+    @staticmethod
+    def _dates_from_label(label: str) -> List[date]:
+        dates: List[date] = []
+        for match in re.findall(r'\b(20\d{2})-(\d{1,2})(?:-(\d{1,2}))?\b', label or ''):
+            year, month, day = match
+            try:
+                dates.append(date(int(year), int(month), int(day or 1)))
+            except ValueError:
+                continue
+        return dates
+
+    @staticmethod
+    def _month_diff(start: date, end: date) -> int:
+        return (end.year - start.year) * 12 + (end.month - start.month)
+
+    def _period_for_date(self, model: Dict[str, Any], value: date) -> Optional[int]:
+        start = self._coerce_date(model.get('analysis_start_date'))
+        if not start:
+            return None
+        return self._month_diff(start, value) + 1
 
     @staticmethod
     def _first_sale_period(model: Dict[str, Any]) -> Optional[int]:
