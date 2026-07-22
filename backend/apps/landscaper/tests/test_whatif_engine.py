@@ -118,6 +118,50 @@ def test_absorption_override_delays_sales_and_lowers_npv():
     assert computed["total_profit"] == pytest.approx(baseline["total_profit"])
 
 
+def test_absorption_velocity_percent_alias_updates_rate_and_lowers_npv():
+    engine = WhatIfEngine(1)
+    assumptions = _assumptions()
+    baseline = engine._compute_land_model_metrics(assumptions["land_model"])
+
+    applied = engine._apply_land_model_override(
+        assumptions,
+        Override(
+            field="absorption_velocity",
+            table="",
+            override_value=-33,
+            unit="pct",
+            label="Slow absorption by 33% across all phases",
+        ),
+    )
+    computed = engine._compute_land_model_metrics(assumptions["land_model"])
+
+    assert applied is True
+    assert assumptions["land_model"]["absorption_summary"]["units_per_period"] == pytest.approx(5.36)
+    assert computed["npv"] < baseline["npv"]
+
+
+def test_absorption_velocity_ratio_alias_updates_rate_and_lowers_npv():
+    engine = WhatIfEngine(1)
+    assumptions = _assumptions()
+    baseline = engine._compute_land_model_metrics(assumptions["land_model"])
+
+    applied = engine._apply_land_model_override(
+        assumptions,
+        Override(
+            field="absorption_velocity_factor",
+            table="",
+            override_value=0.67,
+            unit="ratio",
+            label="Absorption slowed by one-third (velocity reduced to 67%)",
+        ),
+    )
+    computed = engine._compute_land_model_metrics(assumptions["land_model"])
+
+    assert applied is True
+    assert assumptions["land_model"]["absorption_summary"]["units_per_period"] == pytest.approx(5.36)
+    assert computed["npv"] < baseline["npv"]
+
+
 def test_sale_date_override_can_parse_delay_from_months_label():
     engine = WhatIfEngine(1)
     assumptions = _assumptions()

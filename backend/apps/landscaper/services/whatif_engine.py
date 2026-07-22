@@ -727,14 +727,12 @@ class WhatIfEngine:
         label = (override.label or '').lower()
         unit = override.unit or ''
 
-        if field in ('units_per_period', 'absorption_rate', 'absorption_velocity'):
-            try:
-                new_rate = float(override.override_value)
-            except (TypeError, ValueError):
-                return False
-            if new_rate <= 0:
-                return False
-
+        absorption_velocity_like = (
+            field in ('units_per_period', 'absorption_rate', 'absorption_velocity')
+            or 'absorption_velocity' in field
+            or 'absorption_rate' in field
+        )
+        if absorption_velocity_like:
             absorption = model.setdefault('absorption_summary', {})
             old_rate = absorption.get('units_per_period') or override.original_value
             try:
@@ -742,6 +740,22 @@ class WhatIfEngine:
             except (TypeError, ValueError):
                 old_rate = None
             if not old_rate or old_rate <= 0:
+                return False
+
+            try:
+                raw_rate = float(override.override_value)
+            except (TypeError, ValueError):
+                return False
+
+            if field == 'units_per_period':
+                new_rate = raw_rate
+            else:
+                factor = self._pct_or_ratio_factor(raw_rate, unit)
+                if factor is None:
+                    return False
+                new_rate = old_rate * factor
+
+            if new_rate <= 0:
                 return False
 
             start_period = absorption.get('start_period') or self._first_sale_period(model)
