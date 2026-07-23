@@ -101,6 +101,48 @@ def test_currency_price_override_uses_percent_label_not_raw_dollar_multiplier():
     assert assumptions["_scenario_adjustments"][0]["factor"] == pytest.approx(0.9)
 
 
+def test_currency_cost_override_uses_percent_label_not_raw_dollar_multiplier():
+    engine = WhatIfEngine(1)
+    assumptions = _assumptions()
+
+    applied = engine._apply_land_model_override(
+        assumptions,
+        Override(
+            field="total_budget",
+            table="",
+            override_value=115.0,
+            unit="currency",
+            label="Development costs +15%",
+        ),
+    )
+
+    assert applied is True
+    assert assumptions["land_model"]["cost_schedule"][0]["amount"] == pytest.approx(115.0)
+    assert assumptions["total_costs"] == pytest.approx(115.0)
+    assert assumptions["_scenario_adjustments"][0]["factor"] == pytest.approx(1.15)
+
+
+def test_absolute_cost_override_uses_target_over_current_total():
+    engine = WhatIfEngine(1)
+    assumptions = _assumptions()
+
+    applied = engine._apply_land_model_override(
+        assumptions,
+        Override(
+            field="total_budget",
+            table="",
+            override_value=130.0,
+            unit="currency",
+            label="Development budget target",
+        ),
+    )
+
+    assert applied is True
+    assert assumptions["land_model"]["cost_schedule"][0]["amount"] == pytest.approx(130.0)
+    assert assumptions["total_costs"] == pytest.approx(130.0)
+    assert assumptions["_scenario_adjustments"][0]["factor"] == pytest.approx(1.3)
+
+
 def test_absorption_override_delays_sales_and_lowers_npv():
     engine = WhatIfEngine(1)
     assumptions = _assumptions()

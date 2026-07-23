@@ -828,7 +828,7 @@ class WhatIfEngine:
 
         cost_like = any(token in field for token in ('cost', 'budget', 'amount')) or 'cost' in label
         if cost_like:
-            factor = self._pct_or_ratio_factor(override.override_value, unit)
+            factor = self._cost_factor_from_override(model, override)
             if factor is None:
                 return False
             for item in model.get('cost_schedule', []):
@@ -946,6 +946,24 @@ class WhatIfEngine:
 
         return self._pct_or_ratio_factor(override.override_value, unit)
 
+    def _cost_factor_from_override(self, model: Dict[str, Any], override: Override) -> Optional[float]:
+        label_factor = self._pct_factor_from_label(override.label)
+        if label_factor is not None:
+            return label_factor
+
+        unit = (override.unit or '').lower()
+        if unit == 'currency':
+            target_amount = self._float_or_none(override.override_value)
+            current_total = sum(
+                float(item.get('amount') or 0)
+                for item in model.get('cost_schedule', [])
+            )
+            if target_amount and current_total > 0:
+                return target_amount / current_total
+            return None
+
+        return self._pct_or_ratio_factor(override.override_value, unit)
+
     @staticmethod
     def _float_or_none(value: Any) -> Optional[float]:
         try:
@@ -955,6 +973,10 @@ class WhatIfEngine:
 
     @staticmethod
     def _pct_factor_from_label(label: str) -> Optional[float]:
+        match = re.search(r'([+-])\s*(\d+(?:\.\d+)?)\s*%', label or '')
+        if match:
+            value = float(match.group(2)) / 100.0
+            return 1 + value if match.group(1) == '+' else 1 - value
         match = re.search(
             r'(\d+(?:\.\d+)?)\s*%\s*(below|lower|reduction|less|under|down)',
             label or '',
@@ -963,12 +985,26 @@ class WhatIfEngine:
         if match:
             return 1 - float(match.group(1)) / 100.0
         match = re.search(
-            r'(\d+(?:\.\d+)?)\s*%\s*(above|higher|increase|more|up)',
+            r'(\d+(?:\.\d+)?)\s*%\s*(above|higher|increase|more|up|over)',
             label or '',
             flags=re.IGNORECASE,
         )
         if match:
             return 1 + float(match.group(1)) / 100.0
+        match = re.search(
+            r'(increase|more|up|over|above|higher)\s*(?:by\s*)?(\d+(?:\.\d+)?)\s*%',
+            label or '',
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return 1 + float(match.group(2)) / 100.0
+        match = re.search(
+            r'(decrease|reduction|reduce|less|under|below|lower|down)\s*(?:by\s*)?(\d+(?:\.\d+)?)\s*%',
+            label or '',
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return 1 - float(match.group(2)) / 100.0
         return None
 
     @staticmethod
