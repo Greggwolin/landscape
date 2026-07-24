@@ -1811,6 +1811,28 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_rent_roll_schedule",
+        "description": (
+            "Render the rent roll as a DETERMINISTIC artifact (a KPI header — unit "
+            "count, occupancy, in-place rent, market rent, loss-to-lease — plus the "
+            "unit-level rent-roll grid) in the right panel. Multifamily. Call it "
+            "whenever the user wants to SEE the rent roll: 'show me the rent roll', "
+            "'the unit mix', 'the rent roll grid', 'in-place vs market rents', 'open "
+            "the rent roll'. The artifact is built server-side and returned "
+            "already-created — do NOT call create_artifact and do NOT compose the "
+            "table yourself; just announce it in one sentence using its unit_count "
+            "and occupancy fields. Columns disclose by data granularity (a market-"
+            "rent, loss-to-lease, subsidy, delinquency, or renovation column appears "
+            "only when that data exists). For the P&L / NOI use get_operating_"
+            "statement; this tool is the unit-level rent roll. A generic ask with no "
+            "rent-roll noun may route to navigate_to_screen instead."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_budget_item",
         "description": "Create or update a budget line item.",
         "input_schema": {

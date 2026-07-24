@@ -1678,7 +1678,12 @@ factual question:
      'the promote', 'LP and GP returns' — call get_capitalization_schedule: it builds the capitalization
      artifact (KPI header + capital-stack grid + waterfall-tier grid) server-side and returns it ALREADY
      created. When it returns artifact_created:true you MUST NOT call create_artifact and MUST NOT compose
-     the tables yourself — reply with one short sentence using its lp_irr and tier_count fields. Only state percentage shares when the budget tool returned that exact
+     the tables yourself — reply with one short sentence using its lp_irr and tier_count fields. To SHOW or
+     OPEN the RENT ROLL (multifamily) — 'show me the rent roll', 'the unit mix', 'in-place vs market rents',
+     'open the rent roll' — call get_rent_roll_schedule: it builds the rent-roll artifact (KPI header +
+     unit-level grid) server-side and returns it ALREADY created. When it returns artifact_created:true you
+     MUST NOT call create_artifact and MUST NOT compose the table yourself — reply with one short sentence
+     using its unit_count and occupancy fields. For the P&L/NOI use get_operating_statement instead. Only state percentage shares when the budget tool returned that exact
      percentage field; do not compute or round your own budget percentages. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.
@@ -3759,7 +3764,7 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
 _NUMBERS_PRODUCING_PREFIXES = (
     'get_budget', 'calculate_', 'compute_', 'run_draft_calculations',
     'get_deal_summary', 'get_operating_statement', 'get_cashflow_results',
-    'get_cashflow_schedule', 'get_capitalization_schedule',
+    'get_cashflow_schedule', 'get_capitalization_schedule', 'get_rent_roll_schedule',
     'get_valuation_reconciliation', 'get_value_add_assumptions',
     'get_project_assumptions_detail', 'render_report_as_artifact',
     'generate_report_preview', 'export_report', 'get_sales_comp', 'get_rental_comp',

@@ -9172,6 +9172,117 @@ def handle_get_capitalization_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_rent_roll_schedule')
+def handle_get_rent_roll_schedule(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render the rent roll as a DETERMINISTIC artifact (KPI header — units,
+    occupancy, in-place rent, market rent, loss-to-lease — plus the unit-level
+    rent-roll grid) in the right panel. Server-side render — the model must NOT
+    compose the table. Mirrors get_operating_statement / get_cashflow_schedule.
+
+    Multifamily: reads tbl_multifamily_unit. Disclosure is by data granularity —
+    a Market Rent / Loss-to-Lease / Subsidy / Delinquency / Renovation column
+    appears only when that data is present. A project with no units returns a
+    clean 'no rent roll' result — no error, no empty artifact."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT unit_id, unit_number, building_name, unit_type, square_feet,
+                       market_rent, current_rent, occupancy_status, lease_end_date,
+                       past_due_amount, is_section8, renovation_status
+                FROM landscape.tbl_multifamily_unit
+                WHERE project_id = %s
+                ORDER BY building_name, unit_number
+            """, [project_id])
+            columns = [col[0] for col in cursor.description]
+            unit_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            cursor.execute(
+                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                [project_id],
+            )
+            pn = cursor.fetchone()
+            project_name = pn[0] if pn else None
+
+        # No units → clean, no artifact, no error.
+        if not unit_rows:
+            return {
+                'success': True, 'artifact_created': False,
+                'unit_count': 0,
+                'message': 'No rent roll exists for this project yet.',
+            }
+
+        for r in unit_rows:
+            for k in ('square_feet', 'market_rent', 'current_rent', 'past_due_amount'):
+                if r.get(k) is not None:
+                    r[k] = float(r[k])
+
+        unit_count = len(unit_rows)
+        occupied_count = sum(
+            1 for r in unit_rows if (r.get('occupancy_status') or '').strip().lower() == 'occupied'
+        )
+        total_in_place = sum((r.get('current_rent') or 0) for r in unit_rows)
+        any_market = any(r.get('market_rent') is not None for r in unit_rows)
+        total_market = sum((r.get('market_rent') or 0) for r in unit_rows) if any_market else None
+        total_ltl = (
+            sum((r.get('market_rent') - r.get('current_rent'))
+                for r in unit_rows
+                if r.get('market_rent') is not None and r.get('current_rent') is not None)
+            if any_market else None
+        )
+
+        occ_pct = f'{occupied_count / unit_count * 100:.1f}%' if unit_count else '—'
+
+        from .tools.rent_roll_artifact_builder import create_rent_roll_artifact
+        artifact_envelope = create_rent_roll_artifact(
+            project_id=int(project_id),
+            project_name=project_name,
+            unit_rows=unit_rows,
+            unit_count=unit_count,
+            occupied_count=occupied_count,
+            total_in_place=float(total_in_place),
+            total_market=float(total_market) if total_market is not None else None,
+            total_loss_to_lease=float(total_ltl) if total_ltl is not None else None,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        if artifact_envelope and artifact_envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': artifact_envelope,
+                'unit_count': unit_count,
+                'occupancy': occ_pct,
+                'total_in_place_rent': round(float(total_in_place)),
+                'instruction': (
+                    'The rent-roll artifact has ALREADY been created and is open in '
+                    'the right panel. Do NOT call create_artifact. Reply with one '
+                    'short sentence stating unit_count and occupancy from these '
+                    'fields — do NOT restate the table.'
+                ),
+            }
+
+        # Artifact build failed → degrade to raw headline so the model can fall back.
+        return {
+            'success': True,
+            'artifact_created': False,
+            'unit_count': unit_count,
+            'occupancy': occ_pct,
+            'total_in_place_rent': round(float(total_in_place)),
+        }
+
+    except Exception as e:
+        logger.error(f"Error building rent roll schedule artifact: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('update_budget_item', is_mutation=True)
 def handle_update_budget_item(
     tool_input: Dict[str, Any],

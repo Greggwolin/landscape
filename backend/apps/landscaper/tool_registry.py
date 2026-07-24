@@ -202,6 +202,9 @@ MF_ONLY_TOOLS = [
     # Units & rent roll
     "get_unit_types", "update_unit_types",
     "get_units", "update_units", "delete_units",
+    # Rent roll schedule artifact (deterministic server-rendered; disclosure by
+    # data granularity). RR1 — LSCMD-RR-RENTROLL-0724.
+    "get_rent_roll_schedule",
     "get_leases", "update_leases",
     "get_unit_turns", "create_unit_turn",
     # Rental comps
