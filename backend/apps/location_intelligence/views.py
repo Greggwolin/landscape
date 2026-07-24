@@ -1149,6 +1149,20 @@ def map_feature_detail(request, feature_id):
             update_fields.append("style = %s")
             params.append(json.dumps(data['style']) if data['style'] else None)
 
+        # Geometry (vertex reshape / boundary move). Absent from the PATCH body =>
+        # left untouched (partial update, never a wipe). Mirror the create path's
+        # validation + SRID handling exactly (ST_GeomFromGeoJSON => SRID 4326, the
+        # column's declared SRID) so the two write paths can't diverge.
+        if 'geometry' in data:
+            geometry = data['geometry']
+            if not isinstance(geometry, dict):
+                return Response(
+                    {"error": "geometry must be a GeoJSON geometry object"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            update_fields.append("geometry = ST_GeomFromGeoJSON(%s)")
+            params.append(json.dumps(geometry))
+
         if not update_fields:
             return Response(
                 {"error": "No fields to update"},
