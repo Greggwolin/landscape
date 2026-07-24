@@ -1787,6 +1787,30 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_capitalization_schedule",
+        "description": (
+            "Render the capitalization schedule — the capital stack plus the equity "
+            "distribution waterfall — as a DETERMINISTIC artifact (a KPI header — LP "
+            "IRR, LP equity multiple, GP promote, project IRR, total equity — plus "
+            "the capital-stack grid and the waterfall-tier grid) in the right panel. "
+            "Works for land and income deals with an equity structure. Call it "
+            "whenever the user wants to SEE the waterfall or the capital stack: 'show "
+            "me the waterfall', 'the equity waterfall', 'the capital stack', 'the "
+            "promote', 'LP and GP returns', 'the distribution waterfall', 'open "
+            "capitalization'. The artifact is built server-side and returned "
+            "already-created — do NOT call create_artifact and do NOT compose the "
+            "tables yourself; just announce it in one sentence using its lp_irr and "
+            "tier_count fields. This schedule carries the pref, hurdles, splits, and "
+            "promote — never a discount rate (that is the Cash Flow schedule). A "
+            "generic ask with no capitalization noun may route to navigate_to_screen "
+            "instead."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_budget_item",
         "description": "Create or update a budget line item.",
         "input_schema": {

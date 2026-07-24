@@ -9073,6 +9073,105 @@ def handle_get_cashflow_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_capitalization_schedule')
+def handle_get_capitalization_schedule(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render the capitalization schedule (capital stack + distribution waterfall)
+    as a DETERMINISTIC artifact (KPI header — LP/GP IRR, LP multiple, GP promote,
+    project IRR, total equity — plus an editable capital-stack grid and the
+    waterfall-tier grid) in the right panel. Server-side render — the model must
+    NOT compose the tables. Mirrors get_cashflow_schedule / get_sales_schedule /
+    get_budget_schedule / get_operating_statement.
+
+    Consumes the canonical waterfall engine
+    (CalculationService.calculate_project_waterfall) — never recomputes the math,
+    so the distributions can't drift from the returns. Carries the pref, hurdles,
+    splits, and promote — NEVER a discount rate (that lives on Cash Flow). A
+    project with no waterfall tiers configured returns a clean 'no schedule'
+    result — no error, no empty artifact."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        from apps.calculations.services import CalculationService
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                [project_id],
+            )
+            prow = cursor.fetchone()
+        project_name = prow[0] if prow else None
+
+        result = CalculationService.calculate_project_waterfall(project_id)
+
+        # No tiers / no cash flows / engine unavailable → clean, no artifact.
+        if not result or 'error' in result:
+            return {
+                'success': True, 'artifact_created': False,
+                'tier_count': 0,
+                'message': result.get('error') if isinstance(result, dict) and result.get('error')
+                else 'No capitalization / waterfall is configured for this project yet.',
+            }
+
+        lp_summary = result.get('lp_summary') or {}
+        gp_summary = result.get('gp_summary') or {}
+        project_summary = result.get('project_summary') or {}
+        tier_config = result.get('tier_config') or []
+
+        if not tier_config:
+            return {
+                'success': True, 'artifact_created': False,
+                'tier_count': 0,
+                'message': 'No waterfall tiers are configured for this project yet.',
+            }
+
+        from .tools.capitalization_artifact_builder import create_capitalization_artifact
+        artifact_envelope = create_capitalization_artifact(
+            project_id=int(project_id),
+            project_name=project_name,
+            lp_summary=lp_summary,
+            gp_summary=gp_summary,
+            project_summary=project_summary,
+            tier_config=tier_config,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        lp_irr = lp_summary.get('irr')
+        if artifact_envelope and artifact_envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': artifact_envelope,
+                'lp_irr': lp_irr,
+                'tier_count': len(tier_config),
+                'total_equity': round(float(project_summary['total_equity']))
+                if project_summary.get('total_equity') is not None else None,
+                'instruction': (
+                    'The capitalization artifact has ALREADY been created and is '
+                    'open in the right panel. Do NOT call create_artifact. Reply '
+                    'with one short sentence stating lp_irr and tier_count from '
+                    'these fields — do NOT restate the tables.'
+                ),
+            }
+
+        # Artifact build failed → degrade to raw headline so the model can fall back.
+        return {
+            'success': True,
+            'artifact_created': False,
+            'lp_irr': lp_irr,
+            'tier_count': len(tier_config),
+        }
+
+    except Exception as e:
+        logger.error(f"Error building capitalization schedule artifact: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('update_budget_item', is_mutation=True)
 def handle_update_budget_item(
     tool_input: Dict[str, Any],
