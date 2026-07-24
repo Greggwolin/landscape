@@ -1724,6 +1724,25 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_budget_schedule",
+        "description": (
+            "Render the development budget as a DETERMINISTIC artifact (a KPI "
+            "header — total budget, line-item count, category count, cost per lot "
+            "— plus the full line-item table) in the right panel. Call this "
+            "whenever the user wants to SEE the budget: 'show me the budget', "
+            "'show me the line-item budget', 'the development budget', 'open the "
+            "budget', 'budget detail'. The artifact is built server-side and "
+            "returned already-created — do NOT call create_artifact and do NOT "
+            "compose the table yourself; just announce it in one sentence. Use "
+            "get_budget_rollup for a text category summary, get_budget_items for "
+            "raw rows."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_budget_item",
         "description": "Create or update a budget line item.",
         "input_schema": {

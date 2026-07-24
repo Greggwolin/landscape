@@ -1655,7 +1655,13 @@ factual question:
      never from memory. Use get_budget_rollup for budget breakdowns, cost by category,
      biggest budget categories, high-level "biggest line items" budget summaries, and
      cost buckets. Use get_budget_items only for raw individual/vendor/row-level budget
-     line items. Only state percentage shares when the budget tool returned that exact
+     line items. To SHOW or OPEN the budget as an artifact — 'show me the budget',
+     'show me the line-item budget', 'open the budget', 'budget detail' — call
+     get_budget_schedule: it builds the budget artifact (KPI header + line-item table)
+     server-side and returns it ALREADY created. When it returns artifact_created:true
+     you MUST NOT call create_artifact and MUST NOT compose or restate the budget table
+     yourself — reply with one short sentence using its total_budget and line_item_count
+     fields. Only state percentage shares when the budget tool returned that exact
      percentage field; do not compute or round your own budget percentages. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.
