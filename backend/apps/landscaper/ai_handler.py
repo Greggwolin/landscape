@@ -1661,7 +1661,13 @@ factual question:
      server-side and returns it ALREADY created. When it returns artifact_created:true
      you MUST NOT call create_artifact and MUST NOT compose or restate the budget table
      yourself — reply with one short sentence using its total_budget and line_item_count
-     fields. Only state percentage shares when the budget tool returned that exact
+     fields. Likewise, to SHOW or OPEN the parcel SALES schedule (land dev) — 'show me
+     the sales schedule', 'the parcel sale schedule', 'the pricing', 'the rate card' —
+     call get_sales_schedule: it builds the sales artifact (KPI header + pricing rate-card
+     + parcel sale schedule) server-side and returns it ALREADY created. When it returns
+     artifact_created:true you MUST NOT call create_artifact and MUST NOT compose the
+     tables yourself — reply with one short sentence using its total_gross_proceeds and
+     parcel_count fields. Call it "sales schedule" — never "absorption" or "takedown". Only state percentage shares when the budget tool returned that exact
      percentage field; do not compute or round your own budget percentages. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.

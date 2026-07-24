@@ -1743,6 +1743,28 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_sales_schedule",
+        "description": (
+            "Render the parcel-sales schedule as a DETERMINISTIC artifact (a KPI "
+            "header — total gross proceeds, total net proceeds, sale-date span, "
+            "parcel count, product count — plus the pricing rate-card grid and the "
+            "per-parcel sale-schedule grid) in the right panel. This is a LAND "
+            "development tool (parcel sales). Call it whenever the user wants to "
+            "SEE the sales schedule: 'show me the sales schedule', 'the parcel sale "
+            "schedule', 'the pricing', 'the rate card', 'open the sales schedule'. "
+            "The artifact is built server-side and returned already-created — do "
+            "NOT call create_artifact and do NOT compose the tables yourself; just "
+            "announce it in one sentence. This is the sales schedule, NOT "
+            "absorption (homebuyer velocity) and NOT takedown — do not use those "
+            "words. A generic 'sales' ask with no schedule/pricing noun may route "
+            "to navigate_to_screen instead."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_budget_item",
         "description": "Create or update a budget line item.",
         "input_schema": {
