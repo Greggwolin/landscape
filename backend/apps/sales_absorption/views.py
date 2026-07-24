@@ -1326,6 +1326,12 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                 'improvement_offset_total': float(improvement_offset_total),
                 'gross_sale_proceeds': float(gross_sale_proceeds),
                 'commission_amount': float(commission_amount),
+                # Itemized transaction-cost components — persist alongside the lump so
+                # component-reading consumers (cash-flow breakdown, what-if) don't show
+                # cost-of-sale as $0 (SS3/SS4 gap fix, LSCMD-SS-COSTOFSALE-REPOP-0724).
+                'legal_amount': float(legal_amount),
+                'closing_cost_amount': float(closing_amount),
+                'title_insurance_amount': float(title_amount),
                 'net_sale_proceeds': float(net_sale_proceeds),
                 'total_transaction_costs': float(total_transaction_costs)
             }
@@ -1338,6 +1344,9 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                 'improvement_offset_total': result.get('improvement_offset_total', 0),
                 'gross_sale_proceeds': result.get('gross_sale_proceeds', 0),
                 'commission_amount': result.get('commission_amount', 0),
+                'legal_amount': result.get('legal_amount', 0),
+                'closing_cost_amount': result.get('closing_cost_amount', 0),
+                'title_insurance_amount': result.get('title_insurance_amount', 0),
                 'net_sale_proceeds': result.get('net_sale_proceeds', 0),
                 'total_transaction_costs': result.get('total_transaction_costs', 0),
                 'sale_date': sale_date,
@@ -1360,6 +1369,9 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                     improvement_offsets = [u['improvement_offset_total'] for u in updates_to_save]
                     gross_sale_proceeds_list = [u['gross_sale_proceeds'] for u in updates_to_save]
                     commission_amounts = [u['commission_amount'] for u in updates_to_save]
+                    legal_amounts = [u['legal_amount'] for u in updates_to_save]
+                    closing_cost_amounts = [u['closing_cost_amount'] for u in updates_to_save]
+                    title_insurance_amounts = [u['title_insurance_amount'] for u in updates_to_save]
                     net_proceeds = [u['net_sale_proceeds'] for u in updates_to_save]
                     transaction_costs = [u['total_transaction_costs'] for u in updates_to_save]
                     sale_dates = [u['sale_date'] for u in updates_to_save]
@@ -1367,7 +1379,8 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                     cursor.execute("""
                         INSERT INTO landscape.tbl_parcel_sale_assumptions
                             (parcel_id, inflated_price_per_unit, gross_parcel_price, improvement_offset_total,
-                             gross_sale_proceeds, commission_amount, net_sale_proceeds, total_transaction_costs,
+                             gross_sale_proceeds, commission_amount, legal_amount, closing_cost_amount,
+                             title_insurance_amount, net_sale_proceeds, total_transaction_costs,
                              sale_date, created_at, updated_at)
                         SELECT
                             parcel_id,
@@ -1376,6 +1389,9 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                             improvement_offset_total,
                             gross_sale_proceeds,
                             commission_amount,
+                            legal_amount,
+                            closing_cost_amount,
+                            title_insurance_amount,
                             net_sale_proceeds,
                             total_transaction_costs,
                             sale_date,
@@ -1390,9 +1406,13 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                             %s::numeric[],
                             %s::numeric[],
                             %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
+                            %s::numeric[],
                             %s::date[]
                         ) AS t(parcel_id, inflated_price_per_unit, gross_parcel_price, improvement_offset_total,
-                               gross_sale_proceeds, commission_amount, net_sale_proceeds, total_transaction_costs, sale_date)
+                               gross_sale_proceeds, commission_amount, legal_amount, closing_cost_amount,
+                               title_insurance_amount, net_sale_proceeds, total_transaction_costs, sale_date)
                         ON CONFLICT (parcel_id)
                         DO UPDATE SET
                             inflated_price_per_unit = EXCLUDED.inflated_price_per_unit,
@@ -1400,12 +1420,16 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
                             improvement_offset_total = EXCLUDED.improvement_offset_total,
                             gross_sale_proceeds = EXCLUDED.gross_sale_proceeds,
                             commission_amount = EXCLUDED.commission_amount,
+                            legal_amount = EXCLUDED.legal_amount,
+                            closing_cost_amount = EXCLUDED.closing_cost_amount,
+                            title_insurance_amount = EXCLUDED.title_insurance_amount,
                             net_sale_proceeds = EXCLUDED.net_sale_proceeds,
                             total_transaction_costs = EXCLUDED.total_transaction_costs,
                             sale_date = EXCLUDED.sale_date,
                             updated_at = NOW()
                     """, (parcel_ids, inflated_prices, gross_prices, improvement_offsets, gross_sale_proceeds_list,
-                          commission_amounts, net_proceeds, transaction_costs, sale_dates))
+                          commission_amounts, legal_amounts, closing_cost_amounts, title_insurance_amounts,
+                          net_proceeds, transaction_costs, sale_dates))
 
         # Log query statistics
         total_time = time.time() - start_time
