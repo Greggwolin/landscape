@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.7.1
-**Last Updated:** July 19, 2026
-**Supersedes:** v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.7.2
+**Last Updated:** July 24, 2026
+**Supersedes:** v4.7.1 (July 19, 2026), v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -980,6 +980,8 @@ This section establishes the manual two-way handoff between the Claude.ai chat p
 ---
 
 ## CHANGELOG
+
+**v4.7.2 (2026-07-24)** — One location fact updated, no behavior change. Source: chat FC (folder consolidation session). §23.1 (Sync Bridge location) updated twice in place: (1) the OneDrive parent folder moved from `2Pursuit/3LandscapeApp` to `1Active/_Landscape`, (2) the Cowork workspace child folder was renamed from `Landscape app` to `_cowork` the same day, with session-log files relocated into a new `_cowork/session-logs/` subfolder. No section content changed beyond the path/name in §23.1 — no new rules, no rule changes. **Per §0.4: paste this file into the project instructions field ONCE.**
 
 **v4.7.1 (2026-07-19)** — One add. §4.7 extended with (1) a completion-header requirement — CC's final response starts with the prompt name/title ("Done — <prompt name> — merged and verified") so finished sessions match to chats at a glance across parallel terminals — and (2) front-loaded chat markers in prompt titles so the terminal tab's auto-summarized title keeps the marker. Source: chat DR. Also mirrored app-wide (all repos) via the global user-level instruction file for the coding assistant. **Per §0.4: paste this file into the project instructions field ONCE.**
 
