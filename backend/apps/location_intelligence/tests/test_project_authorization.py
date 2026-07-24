@@ -10,6 +10,7 @@ resolves the owning project from the row first; those tests build the raw-SQL
 Session: KP-GISAUTH-0629
 """
 
+import json
 import uuid
 
 from django.contrib.auth import get_user_model
@@ -227,3 +228,107 @@ class MapFeatureDetailOwnerAccessTests(_ProjectAuthFixture):
         self.client.force_authenticate(self.staff)
         resp = self.client.get(f"/api/v1/map/features/{self.owner_feature_id}/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+
+class MapFeatureDetailGeometryPatchTests(_ProjectAuthFixture):
+    """Reshape persistence (LSCMD-SS-BOUNDARY-SAVE-FIX-0724).
+
+    A PATCH carrying a new geometry must actually persist it (the bug: the
+    update path dropped geometry and returned 200). A PATCH that omits geometry
+    must leave the existing geometry untouched. Exercises the real
+    ST_GeomFromGeoJSON write path, so it needs PostGIS.
+    """
+
+    _POLY_A = '{"type":"Polygon","coordinates":[[[0,0],[0,1],[1,1],[1,0],[0,0]]]}'
+    _POLY_B = '{"type":"Polygon","coordinates":[[[5,5],[5,6],[6,6],[6,5],[5,5]]]}'
+
+    def setUp(self):
+        if not _postgis_available():
+            self.skipTest("PostGIS not available in the test database")
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS location_intelligence")
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS location_intelligence.project_map_features (
+                    id           UUID PRIMARY KEY,
+                    project_id   INTEGER NOT NULL,
+                    feature_type TEXT,
+                    category     TEXT,
+                    geometry     geometry(GEOMETRY, 4326),
+                    label        TEXT,
+                    notes        TEXT,
+                    style        JSONB,
+                    linked_table TEXT,
+                    linked_id    TEXT,
+                    area_sqft    DOUBLE PRECISION,
+                    area_acres   DOUBLE PRECISION,
+                    perimeter_ft DOUBLE PRECISION,
+                    length_ft    DOUBLE PRECISION,
+                    created_by   INTEGER,
+                    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+        self.feature_id = uuid.uuid4()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO location_intelligence.project_map_features
+                    (id, project_id, feature_type, category, geometry, label, created_by)
+                VALUES (%s, %s, 'polygon', 'boundary', ST_GeomFromGeoJSON(%s), 'b', %s)
+                """,
+                [str(self.feature_id), self.owner_project.project_id,
+                 self._POLY_A, self.owner.id],
+            )
+
+    def _stored_geometry(self):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT ST_AsGeoJSON(geometry) "
+                "FROM location_intelligence.project_map_features WHERE id = %s",
+                [str(self.feature_id)],
+            )
+            return cursor.fetchone()[0]
+
+    def test_patch_geometry_persists(self):
+        """The primary gate: an owner's geometry PATCH round-trips to the DB."""
+        self.client.force_authenticate(self.owner)
+        resp = self.client.patch(
+            f"/api/v1/map/features/{self.feature_id}/",
+            {"geometry": json.loads(self._POLY_B)},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # Response reflects the new geometry ...
+        self.assertEqual(resp.data["geometry"]["coordinates"],
+                         json.loads(self._POLY_B)["coordinates"])
+        # ... and it actually landed in the row (was: 200 but unchanged).
+        self.assertEqual(json.loads(self._stored_geometry())["coordinates"],
+                         json.loads(self._POLY_B)["coordinates"])
+
+    def test_patch_without_geometry_preserves_geometry(self):
+        """A metadata-only PATCH must not wipe or alter the existing geometry."""
+        self.client.force_authenticate(self.owner)
+        resp = self.client.patch(
+            f"/api/v1/map/features/{self.feature_id}/",
+            {"label": "renamed"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["label"], "renamed")
+        self.assertEqual(json.loads(self._stored_geometry())["coordinates"],
+                         json.loads(self._POLY_A)["coordinates"])
+
+    def test_patch_invalid_geometry_is_400(self):
+        """Non-object geometry is rejected, mirroring the create path."""
+        self.client.force_authenticate(self.owner)
+        resp = self.client.patch(
+            f"/api/v1/map/features/{self.feature_id}/",
+            {"geometry": "not-a-geojson-object"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        # Existing geometry untouched by the rejected request.
+        self.assertEqual(json.loads(self._stored_geometry())["coordinates"],
+                         json.loads(self._POLY_A)["coordinates"])
