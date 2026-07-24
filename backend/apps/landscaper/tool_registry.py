@@ -185,6 +185,9 @@ LAND_ONLY_TOOLS = [
     # Cash flow / discounted-sellout schedule artifact (LAND + income property;
     # deterministic server-rendered). CF1 — LSCMD-CF-CASHFLOWSCHED-0724.
     "get_cashflow_schedule",
+    # Capitalization (capital stack + distribution waterfall) artifact (LAND +
+    # income; deterministic server-rendered). CAP1 — LSCMD-CAP-CAPSCHED-0724.
+    "get_capitalization_schedule",
     # Land planning
     "configure_project_hierarchy", "create_land_dev_containers",
     "update_lot_mix", "update_land_use_budget",
@@ -229,6 +232,7 @@ INCOME_PROPERTY_TOOLS = [
     "get_budget_rollup",
     "get_budget_schedule",
     "get_cashflow_schedule",
+    "get_capitalization_schedule",
     # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
     # had executors but were ungated; income-property scoped, not land dev).
     "get_expense_comparables", "update_expense_comparable", "delete_expense_comparable",
