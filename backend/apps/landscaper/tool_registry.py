@@ -182,6 +182,9 @@ LAND_ONLY_TOOLS = [
     # Sales schedule artifact (parcel sales — LAND only; MF/office use opex, not
     # parcel sale assumptions). Deterministic server-rendered artifact.
     "get_sales_schedule",
+    # Cash flow / discounted-sellout schedule artifact (LAND + income property;
+    # deterministic server-rendered). CF1 — LSCMD-CF-CASHFLOWSCHED-0724.
+    "get_cashflow_schedule",
     # Land planning
     "configure_project_hierarchy", "create_land_dev_containers",
     "update_lot_mix", "update_land_use_budget",
@@ -225,6 +228,7 @@ INCOME_PROPERTY_TOOLS = [
     "check_income_analysis_availability",
     "get_budget_rollup",
     "get_budget_schedule",
+    "get_cashflow_schedule",
     # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
     # had executors but were ungated; income-property scoped, not land dev).
     "get_expense_comparables", "update_expense_comparable", "delete_expense_comparable",
