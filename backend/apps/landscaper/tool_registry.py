@@ -178,7 +178,7 @@ LAND_ONLY_TOOLS = [
     # category siblings above).
     "delete_budget_category",
     "get_category_lifecycle_stages", "update_category_lifecycle_stages",
-    "get_budget_items", "get_budget_rollup", "update_budget_item", "delete_budget_item",
+    "get_budget_items", "get_budget_rollup", "get_budget_schedule", "update_budget_item", "delete_budget_item",
     # Land planning
     "configure_project_hierarchy", "create_land_dev_containers",
     "update_lot_mix", "update_land_use_budget",
@@ -221,6 +221,7 @@ INCOME_PROPERTY_TOOLS = [
     "analyze_loss_to_lease", "calculate_year1_buyer_noi",
     "check_income_analysis_availability",
     "get_budget_rollup",
+    "get_budget_schedule",
     # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
     # had executors but were ungated; income-property scoped, not land dev).
     "get_expense_comparables", "update_expense_comparable", "delete_expense_comparable",

@@ -8702,6 +8702,114 @@ def handle_get_budget_rollup(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_budget_schedule')
+def handle_get_budget_schedule(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render the development budget as a DETERMINISTIC artifact (KPI header +
+    line-item table) in the right panel. Server-side render — the model must NOT
+    compose the table. Mirrors get_operating_statement; fixes the inconsistent
+    LLM-composed budget artifact (bogus 'Cost Per Lot', hollow card)."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT f.fact_id, f.category_id, c.category_name,
+                       f.uom_code, f.qty, f.rate, f.amount,
+                       f.start_date, f.end_date, f.notes,
+                       f.start_period, f.periods_to_complete, f.end_period
+                FROM landscape.core_fin_fact_budget f
+                LEFT JOIN landscape.core_unit_cost_category c
+                    ON f.category_id = c.category_id
+                WHERE f.project_id = %s
+                ORDER BY c.account_level, c.sort_order, f.fact_id
+            """, [project_id])
+            columns = [col[0] for col in cursor.description]
+            records = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            # Cost-per-lot denominator = SUM(parcel units_total) = the LOT count,
+            # NOT a parcel row count (rpt_15 divided by COUNT(parcel)=43; wrong).
+            cursor.execute("""
+                SELECT COALESCE(SUM(units_total), 0)
+                FROM landscape.tbl_parcel WHERE project_id = %s
+            """, [project_id])
+            lot_row = cursor.fetchone()
+            lot_count = int(lot_row[0]) if lot_row and lot_row[0] else None
+
+            cursor.execute(
+                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                [project_id],
+            )
+            pn = cursor.fetchone()
+            project_name = pn[0] if pn else None
+
+        for r in records:
+            for k in ('qty', 'rate', 'amount'):
+                if r.get(k) is not None:
+                    r[k] = float(r[k])
+
+        total_budget = sum((r.get('amount') or 0) for r in records)
+        category_count = len({
+            r.get('category_id') for r in records if r.get('category_id') is not None
+        })
+        cost_per_lot = round(total_budget / lot_count) if lot_count else None
+
+        if not records:
+            return {
+                'success': True, 'artifact_created': False,
+                'total_budget': 0, 'line_item_count': 0,
+                'message': 'No budget line items exist for this project yet.',
+            }
+
+        from .tools.budget_artifact_builder import create_budget_artifact
+        envelope = create_budget_artifact(
+            project_id=int(project_id),
+            project_name=project_name,
+            records=records,
+            total_budget=float(total_budget),
+            category_count=category_count,
+            lot_count=lot_count,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        if envelope and envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': envelope,
+                'total_budget': round(total_budget),
+                'line_item_count': len(records),
+                'category_count': category_count,
+                'cost_per_lot': cost_per_lot,
+                'instruction': (
+                    'The development-budget artifact has ALREADY been created and '
+                    'is open in the right panel. Do NOT call create_artifact. Reply '
+                    'with one short sentence stating total_budget and line_item_count '
+                    'from these fields — do NOT restate the table.'
+                ),
+            }
+
+        # Artifact build failed → degrade to raw data so the model can fall back.
+        return {
+            'success': True,
+            'artifact_created': False,
+            'total_budget': round(total_budget),
+            'line_item_count': len(records),
+            'category_count': category_count,
+            'cost_per_lot': cost_per_lot,
+            'records': records,
+        }
+
+    except Exception as e:
+        logger.error(f"Error building budget schedule artifact: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('update_budget_item', is_mutation=True)
 def handle_update_budget_item(
     tool_input: Dict[str, Any],
