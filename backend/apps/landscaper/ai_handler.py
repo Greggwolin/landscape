@@ -1667,7 +1667,13 @@ factual question:
      + parcel sale schedule) server-side and returns it ALREADY created. When it returns
      artifact_created:true you MUST NOT call create_artifact and MUST NOT compose the
      tables yourself — reply with one short sentence using its total_gross_proceeds and
-     parcel_count fields. Call it "sales schedule" — never "absorption" or "takedown". Only state percentage shares when the budget tool returned that exact
+     parcel_count fields. Call it "sales schedule" — never "absorption" or "takedown". To SHOW or
+     OPEN the CASH FLOW / discounted-sellout schedule (land OR income) — 'show me the cash flow',
+     'the discounted sellout', 'returns over time', 'NPV and IRR', 'open the cash flow' — call
+     get_cashflow_schedule: it builds the cash-flow artifact (KPI header + editable assumptions strip
+     + read-only period grid) server-side and returns it ALREADY created. When it returns
+     artifact_created:true you MUST NOT call create_artifact and MUST NOT compose the tables yourself —
+     reply with one short sentence using its npv and period_count fields. Only state percentage shares when the budget tool returned that exact
      percentage field; do not compute or round your own budget percentages. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.
@@ -3748,6 +3754,7 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
 _NUMBERS_PRODUCING_PREFIXES = (
     'get_budget', 'calculate_', 'compute_', 'run_draft_calculations',
     'get_deal_summary', 'get_operating_statement', 'get_cashflow_results',
+    'get_cashflow_schedule',
     'get_valuation_reconciliation', 'get_value_add_assumptions',
     'get_project_assumptions_detail', 'render_report_as_artifact',
     'generate_report_preview', 'export_report', 'get_sales_comp', 'get_rental_comp',

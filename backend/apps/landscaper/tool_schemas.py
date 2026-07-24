@@ -1765,6 +1765,28 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_cashflow_schedule",
+        "description": (
+            "Render the cash flow / discounted-sellout schedule as a DETERMINISTIC "
+            "artifact (a KPI header — NPV, IRR, equity multiple, peak capital — plus "
+            "an editable assumptions strip and the read-only period grid) in the "
+            "right panel. Works for BOTH land development (discounted sellout) and "
+            "income property (DCF). Call it whenever the user wants to SEE the cash "
+            "flow or returns over time: 'show me the cash flow', 'the discounted "
+            "sellout', 'the cash flow schedule', 'returns over time', 'NPV and IRR', "
+            "'open the cash flow'. The artifact is built server-side and returned "
+            "already-created — do NOT call create_artifact and do NOT compose the "
+            "tables yourself; just announce it in one sentence using its npv and "
+            "period_count fields. Use get_cashflow_results for a text/values read; "
+            "this tool is for SHOWING the schedule. A generic ask with no cash-flow "
+            "noun may route to navigate_to_screen instead."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_budget_item",
         "description": "Create or update a budget line item.",
         "input_schema": {

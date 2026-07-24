@@ -8970,6 +8970,109 @@ def handle_get_sales_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_cashflow_schedule')
+def handle_get_cashflow_schedule(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render the cash flow / discounted-sellout schedule as a DETERMINISTIC
+    artifact (KPI header — NPV, IRR, equity multiple, peak capital — plus an
+    EDITABLE assumptions strip and the read-only period grid) in the right panel.
+    Server-side render — the model must NOT compose the tables. Mirrors
+    get_budget_schedule / get_sales_schedule / get_operating_statement.
+
+    Works for BOTH land (discounted sellout) and income property (DCF). Consumes
+    the canonical cash-flow engine (apps.financial.services.cashflow_routing)
+    reduced to leveraged cash flow — it never recomputes the math, so the schedule
+    can't drift from the returns path. A project with no cash-flow schedule returns
+    a clean 'no schedule' result — no error, no empty artifact."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        from apps.financial.services.cashflow_routing import leveraged_cashflow_summary
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT project_name, UPPER(COALESCE(project_type_code, '')) "
+                "FROM landscape.tbl_project WHERE project_id = %s",
+                [project_id],
+            )
+            prow = cursor.fetchone()
+        project_name = prow[0] if prow else None
+        project_type_code = (prow[1] if prow else '') or ''
+
+        # include_financing=False → operating schedule (matches get_cashflow_results).
+        envelope = _fetch_cashflow_schedule(project_id)
+        summary_reduced = leveraged_cashflow_summary(envelope)
+        rows = summary_reduced.get('rows') or []
+
+        # No dated cash flow (e.g. an un-modeled project) → clean, no artifact.
+        if not rows:
+            return {
+                'success': True, 'artifact_created': False,
+                'period_count': 0,
+                'message': 'No cash flow schedule exists for this project yet.',
+            }
+
+        assumptions = _build_cashflow_assumptions(project_id)
+        engine_summary = envelope.get('summary') or {}
+        results = {k: engine_summary[k] for k in CASHFLOW_RESULT_KEYS if k in engine_summary}
+
+        is_income = project_type_code in INCOME_PROPERTY_TYPE_CODES
+        net_revenue_label = 'Net Operating Income' if is_income else 'Net Revenue'
+
+        from .tools.cashflow_artifact_builder import create_cashflow_artifact
+        artifact_envelope = create_cashflow_artifact(
+            project_id=int(project_id),
+            project_name=project_name,
+            rows=rows,
+            assumptions=assumptions,
+            results=results,
+            net_revenue_label=net_revenue_label,
+            period_type=summary_reduced.get('periodType') or 'month',
+            total_periods=summary_reduced.get('totalPeriods') or len(rows),
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        npv = results.get('npv')
+        irr = results.get('irr')
+        total_net = round(float(summary_reduced.get('totalNet') or 0))
+
+        if artifact_envelope and artifact_envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': artifact_envelope,
+                'npv': round(float(npv)) if npv is not None else None,
+                'irr': irr,
+                'period_count': len(rows),
+                'total_net_cash_flow': total_net,
+                'instruction': (
+                    'The cash-flow schedule artifact has ALREADY been created and '
+                    'is open in the right panel. Do NOT call create_artifact. Reply '
+                    'with one short sentence stating npv and period_count from these '
+                    'fields — do NOT restate the tables.'
+                ),
+            }
+
+        # Artifact build failed → degrade to raw headline so the model can fall back.
+        return {
+            'success': True,
+            'artifact_created': False,
+            'npv': round(float(npv)) if npv is not None else None,
+            'irr': irr,
+            'period_count': len(rows),
+            'total_net_cash_flow': total_net,
+        }
+
+    except Exception as e:
+        logger.error(f"Error building cash flow schedule artifact: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('update_budget_item', is_mutation=True)
 def handle_update_budget_item(
     tool_input: Dict[str, Any],
