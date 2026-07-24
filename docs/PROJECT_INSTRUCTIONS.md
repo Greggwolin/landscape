@@ -956,7 +956,7 @@ This section establishes the manual two-way handoff between the Claude.ai chat p
 
 **Not to be confused with §0.4.** The *instructions field* is a single shared object across Cowork and Claude.ai (one paste updates both). *Memory* is not shared, which is why this bridge exists. Instructions: shared. Memory: relayed.
 
-**23.1 Location.** Both files live in: `OneDrive-CrescentBayHoldings / 2Pursuit / 3LandscapeApp / Landscape app`. The chat project reaches this folder read-only through the Microsoft 365 connector, by search (filename / content / folder), not by fixed path. File names must therefore stay distinctive and stable so search resolves them reliably.
+**23.1 Location.** Both files live in: `OneDrive-CrescentBayHoldings / 1Active / _Landscape / _cowork` (moved from `2Pursuit / 3LandscapeApp / Landscape app` on 2026-07-24, folder renamed `Landscape app` → `_cowork` same day). The chat project reaches this folder read-only through the Microsoft 365 connector, by search (filename / content / folder), not by fixed path. File names must therefore stay distinctive and stable so search resolves them reliably.
 
 **23.2 Inbound — chat project reads at session start [CLAUDE.AI].**
 

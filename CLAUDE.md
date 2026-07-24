@@ -431,7 +431,7 @@ Commit messages matching the regex `(?i)\b(?:fixes|closes|resolves)\s+FB-(\d+)\b
 |----------|-------|
 | Generator | `scripts/brief/generate_daily_brief.py` |
 | Schedule | Nightly 23:30 local via launchd (`~/Library/LaunchAgents/com.landscape.daily-brief.plist`) |
-| Output | `~/.../OneDrive/.../Landscape app/daily-brief/YYYY-MM-DD-brief.html` + `current.html` |
+| Output | `~/.../OneDrive/.../1Active/_Landscape/_cowork/daily-brief/YYYY-MM-DD-brief.html` + `current.html` |
 | Sections (in order) | Summary · Work In Progress · Today's Sessions (rolling 3-day) · Open Feedback · Resolved Recently · Parallel Sessions · Uncommitted · System Status |
 
 ### Live refresh tasks (LSCMD-FBLOG-0505-kp Phases 2 + 4)
@@ -464,7 +464,7 @@ Brief renders `page_context` values via `PAGE_TAG_MAP` in the generator. Strip t
 
 ### Spec
 
-Full design lives in `Landscape app/LANDSCAPE_DAILY_BRIEF_SPEC.md` (OneDrive workspace folder). Plain-English version: `Landscape app/LANDSCAPE_DAILY_BRIEF_OVERVIEW.html`.
+Full design lives in `_cowork/_specs/LANDSCAPE_DAILY_BRIEF_SPEC.md` (OneDrive workspace folder, renamed from `Landscape app` on 2026-07-24). Plain-English version: `_cowork/_specs/LANDSCAPE_DAILY_BRIEF_OVERVIEW.html`.
 
 ---
 

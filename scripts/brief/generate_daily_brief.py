@@ -42,7 +42,7 @@ import psycopg2.extras
 REPO_URL_PREFIX = "https://github.com/Greggwolin/landscape/commit/"
 ONEDRIVE_BRIEF_DIR = (
     "/Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/"
-    "2Pursuit/3LandscapeApp/Landscape app/daily-brief"
+    "1Active/_Landscape/_cowork/daily-brief"
 )
 HEALTH_STALE_THRESHOLD_HOURS = 24
 RECENTLY_CLOSED_DAYS = 7
