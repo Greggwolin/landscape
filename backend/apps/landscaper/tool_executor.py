@@ -8810,6 +8810,166 @@ def handle_get_budget_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_sales_schedule')
+def handle_get_sales_schedule(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render the parcel-sales schedule as a DETERMINISTIC artifact (KPI header +
+    pricing rate-card grid + parcel sale-schedule grid) in the right panel.
+    Server-side render — the model must NOT compose the tables. Mirrors
+    get_budget_schedule / get_operating_statement.
+
+    Land-only: a project with no dated parcel sale assumptions (e.g. an MF deal)
+    returns a clean "no sales schedule" result — no error, no empty artifact.
+
+    Gross/net are the STORED gross_sale_proceeds / net_sale_proceeds columns —
+    the same source the returns/absorption tool reports as its headline (see
+    analysis_tools._landdev_parcel_takedown_absorption_summary), so the schedule
+    can never drift from the returns. Net is calculated
+    (gross − commission − cost of sale); deductions trace to the Benchmarks
+    library."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        with connection.cursor() as cursor:
+            # Per-parcel sale schedule. Deductions: commission = commission_amount;
+            # cost of sale = the remaining transaction costs (legal + closing +
+            # title). Net is the stored net_sale_proceeds and equals
+            # gross_sale_proceeds − total_transaction_costs by construction.
+            cursor.execute("""
+                SELECT
+                    p.parcel_id,
+                    p.parcel_code,
+                    p.product_code,
+                    COALESCE(a.area_alias, NULLIF('Area ' || a.area_no, 'Area ')) AS area,
+                    ph.phase_name AS phase,
+                    psa.sale_date,
+                    psa.gross_sale_proceeds,
+                    psa.commission_amount,
+                    (COALESCE(psa.total_transaction_costs, 0)
+                        - COALESCE(psa.commission_amount, 0)) AS cost_of_sale,
+                    psa.net_sale_proceeds
+                FROM landscape.tbl_parcel p
+                JOIN landscape.tbl_parcel_sale_assumptions psa
+                    ON psa.parcel_id = p.parcel_id
+                LEFT JOIN landscape.tbl_area a ON p.area_id = a.area_id
+                LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+                WHERE p.project_id = %s
+                  AND psa.sale_date IS NOT NULL
+                ORDER BY psa.sale_date, p.parcel_code
+            """, [project_id])
+            columns = [col[0] for col in cursor.description]
+            parcel_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            # Pricing rate-card (the basis). Its own table — one row per product.
+            cursor.execute("""
+                SELECT
+                    lu_type_code,
+                    product_code,
+                    price_per_unit,
+                    unit_of_measure,
+                    growth_rate,
+                    growth_rate_set_id,
+                    benchmark_id
+                FROM landscape.land_use_pricing
+                WHERE project_id = %s
+                ORDER BY lu_type_code, product_code
+            """, [project_id])
+            pcols = [col[0] for col in cursor.description]
+            pricing_rows = [dict(zip(pcols, row)) for row in cursor.fetchall()]
+
+            cursor.execute(
+                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                [project_id],
+            )
+            pn = cursor.fetchone()
+            project_name = pn[0] if pn else None
+
+        # Land-only guard: no dated parcel sales → clean, no artifact, no error.
+        if not parcel_rows:
+            return {
+                'success': True, 'artifact_created': False,
+                'total_gross_proceeds': 0, 'parcel_count': 0,
+                'message': 'No parcel sales schedule exists for this project.',
+            }
+
+        for r in parcel_rows:
+            for k in ('gross_sale_proceeds', 'commission_amount',
+                      'cost_of_sale', 'net_sale_proceeds'):
+                if r.get(k) is not None:
+                    r[k] = float(r[k])
+
+        total_gross = sum((r.get('gross_sale_proceeds') or 0) for r in parcel_rows)
+        total_net = sum((r.get('net_sale_proceeds') or 0) for r in parcel_rows)
+        parcel_count = len(parcel_rows)
+        product_count = len({
+            r.get('product_code') for r in parcel_rows if r.get('product_code')
+        })
+
+        # Sale-date span label ("2028–2034", or a single year).
+        years = sorted({
+            sd.year for r in parcel_rows
+            if (sd := r.get('sale_date')) is not None and hasattr(sd, 'year')
+        })
+        if years and years[0] != years[-1]:
+            span_label = f'{years[0]}–{years[-1]}'
+        elif years:
+            span_label = str(years[0])
+        else:
+            span_label = '—'
+
+        from .tools.sales_artifact_builder import create_sales_artifact
+        envelope = create_sales_artifact(
+            project_id=int(project_id),
+            project_name=project_name,
+            parcel_rows=parcel_rows,
+            pricing_rows=pricing_rows,
+            total_gross=float(total_gross),
+            total_net=float(total_net),
+            parcel_count=parcel_count,
+            product_count=product_count,
+            span_label=span_label,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        if envelope and envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': envelope,
+                'total_gross_proceeds': round(total_gross),
+                'total_net_proceeds': round(total_net),
+                'parcel_count': parcel_count,
+                'product_count': product_count,
+                'sale_date_span': span_label,
+                'instruction': (
+                    'The sales-schedule artifact has ALREADY been created and is '
+                    'open in the right panel. Do NOT call create_artifact. Reply '
+                    'with one short sentence stating total_gross_proceeds and '
+                    'parcel_count from these fields — do NOT restate the tables.'
+                ),
+            }
+
+        # Artifact build failed → degrade to raw totals so the model can fall back.
+        return {
+            'success': True,
+            'artifact_created': False,
+            'total_gross_proceeds': round(total_gross),
+            'total_net_proceeds': round(total_net),
+            'parcel_count': parcel_count,
+            'product_count': product_count,
+            'sale_date_span': span_label,
+        }
+
+    except Exception as e:
+        logger.error(f"Error building sales schedule artifact: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('update_budget_item', is_mutation=True)
 def handle_update_budget_item(
     tool_input: Dict[str, Any],

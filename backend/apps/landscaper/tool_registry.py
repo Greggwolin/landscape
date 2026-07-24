@@ -179,6 +179,9 @@ LAND_ONLY_TOOLS = [
     "delete_budget_category",
     "get_category_lifecycle_stages", "update_category_lifecycle_stages",
     "get_budget_items", "get_budget_rollup", "get_budget_schedule", "update_budget_item", "delete_budget_item",
+    # Sales schedule artifact (parcel sales — LAND only; MF/office use opex, not
+    # parcel sale assumptions). Deterministic server-rendered artifact.
+    "get_sales_schedule",
     # Land planning
     "configure_project_hierarchy", "create_land_dev_containers",
     "update_lot_mix", "update_land_use_budget",
