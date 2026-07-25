@@ -1374,6 +1374,62 @@ class ConfirmMutationView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class ClarificationApplyView(APIView):
+    """Apply a batch of clarification-artifact answers into live project data.
+
+    Phase 3a (LSCMD-CLARIFY-ARTIFACT-0724-BA5-PHASE3). The stepped answers are
+    the user's confirm, so this commits each writable step through its target
+    tool's own writer in commit mode (see clarification_apply_service).
+
+    POST /api/landscaper/clarification/apply/
+    Body: {"artifact_id": int, "answers": [{"step_id": str, "value": any}, ...]}
+    Response: {"success": true, "applied": [...],
+               "preliminary": {"label": str, "value": number|null},
+               "impact_line": str}
+    """
+
+    def post(self, request):
+        try:
+            from .services.clarification_apply_service import (
+                apply_clarification,
+                ClarificationApplyError,
+            )
+
+            data = request.data or {}
+            artifact_id = data.get('artifact_id')
+            answers = data.get('answers') or []
+            if artifact_id is None:
+                return Response(
+                    {'success': False, 'error': 'artifact_id is required'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not isinstance(answers, list):
+                return Response(
+                    {'success': False, 'error': 'answers must be a list'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user_id = None
+            if hasattr(request, 'user') and request.user.is_authenticated:
+                user_id = request.user.id
+
+            try:
+                result = apply_clarification(int(artifact_id), answers, user_id=user_id)
+            except ClarificationApplyError as exc:
+                return Response(
+                    {'success': False, 'error': str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            return Response({'success': True, **result}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class RejectMutationView(APIView):
     """
     Reject a pending mutation.

@@ -5680,9 +5680,14 @@ LANDSCAPER_TOOLS = [
                             "target": {
                                 "type": "object",
                                 "description": (
-                                    "Where the answer writes on apply (Phase 3). Either "
-                                    "{tool, field, params?} for a downstream update tool, or "
-                                    "{modal, context?} to open an existing designed form."
+                                    "Where the answer writes on apply. For a downstream update "
+                                    "tool make it PARAMS-COMPLETE: {tool, value_key, params, field?} "
+                                    "where params is the full tool_input MINUS the answer and "
+                                    "value_key is the tool_input key the answer fills in "
+                                    "(e.g. {tool:'update_cashflow_assumption', value_key:'new_value', "
+                                    "params:{field:'discount_rate', confirm:true, reason:'...'}}). "
+                                    "A tool target without value_key is not writable (surfaced as "
+                                    "skipped). Or {modal, context?} to open an existing designed form."
                                 ),
                             },
                             "help": {
