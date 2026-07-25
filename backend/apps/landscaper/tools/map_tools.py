@@ -473,3 +473,127 @@ def _geocode_city_state(location_str: Optional[str]) -> Optional[List[float]]:
         logger.warning(f"Nominatim geocode failed for '{location_str}': {e}")
 
     return None
+
+
+# ===========================================================================
+# control_map_overlay — chat door for the site-plan drape workflow (SS16).
+#
+# Thin bridge tool: it maps a chat instruction to a command the FRONT-END drains
+# on the map page, where the shipped SS14 drape handlers (fit-to-target, warp mode,
+# scale, rotate, opacity, lock, save) do the actual work — the same handlers a
+# mouse user drives. The tool renders nothing and writes nothing itself; the only
+# DB write is the overlay Save on the client, which goes through the overlay
+# endpoints' ownership guard (user_can_access_project). Emitted through the proven
+# extract_plan_image bridge (latch -> navigate -> CustomEvent, drained on MapTab).
+# ===========================================================================
+
+_OVERLAY_ACTIONS = {
+    "drape", "fit", "set_opacity", "scale", "rotate",
+    "set_warp_mode", "nudge", "lock", "unlock", "save",
+}
+_OVERLAY_TARGETS = {"selected_parcels", "drawn_polygon", "auto"}
+_NUDGE_DIRECTIONS = {"north", "south", "east", "west", "up", "down", "left", "right"}
+
+
+def _normalize_opacity(value):
+    """Accept 0-1 or a 0-100 percent; clamp to [0,1]. None -> None."""
+    if value is None:
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if v > 1:  # user said "60%" -> 0.6
+        v = v / 100.0
+    return max(0.0, min(1.0, v))
+
+
+@register_tool('control_map_overlay')
+def control_map_overlay(tool_input: Dict[str, Any] = None, project_id: int = None, **kwargs):
+    """Drive the site-plan drape workflow by chat via the front-end command bridge.
+
+    Returns a bridge command ({action, target, params}); MapTab drains it and calls
+    the shipped drape handlers. Does not render or write — persistence is the client's
+    Save action through the ownership-guarded overlay endpoints.
+    """
+    tool_input = tool_input or {}
+    action = str(tool_input.get('action') or '').strip().lower()
+    if action not in _OVERLAY_ACTIONS:
+        return {
+            "success": False,
+            "error": f"Unknown action '{action}'. One of: {sorted(_OVERLAY_ACTIONS)}",
+        }
+    if not project_id:
+        return {
+            "success": False,
+            "error": "control_map_overlay needs a project — open a project first.",
+        }
+
+    target = str(tool_input.get('target') or 'auto').strip().lower()
+    if target not in _OVERLAY_TARGETS:
+        target = 'auto'
+
+    params: Dict[str, Any] = {}
+
+    if action == 'drape':
+        source_uri = tool_input.get('source_uri')
+        if not source_uri:
+            return {
+                "success": False,
+                "error": "drape needs a source_uri. Extract the plan first with "
+                         "extract_plan_image, then drape/fit the extracted image.",
+                "relay_hint": "Ask the user which plan/exhibit to drape, or run "
+                              "extract_plan_image first to place it.",
+            }
+        params.update({
+            "source_uri": source_uri,
+            "source_doc_id": tool_input.get('source_doc_id'),
+            "source_page": tool_input.get('source_page'),
+            # Default: fit to the resolved target right after placing.
+            "fit": bool(tool_input.get('fit', True)),
+        })
+    elif action == 'set_opacity':
+        op = _normalize_opacity(tool_input.get('opacity'))
+        if op is None:
+            return {"success": False, "error": "set_opacity needs an opacity (0-1 or a percent)."}
+        params["opacity"] = op
+    elif action == 'scale':
+        # Absolute factor (1.0 = 100%) OR a relative multiplier ("scale up" -> 1.25).
+        params["scale"] = tool_input.get('scale')
+        params["scale_delta"] = tool_input.get('scale_delta')
+        if params["scale"] is None and params["scale_delta"] is None:
+            return {"success": False, "error": "scale needs `scale` (absolute) or `scale_delta` (relative)."}
+    elif action == 'rotate':
+        params["rotation_deg"] = tool_input.get('rotation_deg')
+        params["rotation_delta"] = tool_input.get('rotation_delta')
+        if params["rotation_deg"] is None and params["rotation_delta"] is None:
+            return {"success": False, "error": "rotate needs `rotation_deg` (absolute) or `rotation_delta` (relative)."}
+    elif action == 'set_warp_mode':
+        wm = str(tool_input.get('warp_mode') or '').strip().lower()
+        if wm not in {"quad", "tps"}:
+            return {"success": False, "error": "warp_mode must be 'quad' (4-corner) or 'tps' (warp)."}
+        params["warp_mode"] = wm
+    elif action == 'nudge':
+        direction = str(tool_input.get('direction') or '').strip().lower()
+        if direction not in _NUDGE_DIRECTIONS:
+            return {"success": False, "error": "nudge needs a direction (north/south/east/west)."}
+        params["direction"] = direction
+        params["amount"] = tool_input.get('amount')  # optional fraction of extent; client defaults
+    elif action == 'lock':
+        params["locked"] = True
+    elif action == 'unlock':
+        params["locked"] = False
+    # 'fit' and 'save' carry no extra params.
+
+    return {
+        "success": True,
+        "action": "control_map_overlay",
+        "overlay_command": {"action": action, "target": target, "params": params},
+        # The FE navigates here so MapTab mounts + drains (no-op if already on the map).
+        "navigate_to": f"/w/projects/{project_id}/map",
+        "relay_hint": (
+            "The map will carry out the drape command. If no overlay is active yet "
+            "(for non-drape actions) or no target geometry exists, the map falls back "
+            "and says so — relay that to the user rather than claiming success."
+        ),
+    }

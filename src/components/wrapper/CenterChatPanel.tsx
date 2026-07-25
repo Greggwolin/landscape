@@ -12,6 +12,7 @@ import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { emitLandscapeCommand } from '@/lib/landscape-command-bus';
 import { setPendingPlanExtract, type PlanOverlayPayload } from '@/lib/gis/planExtractBridge';
+import { setPendingDrapeCommand, type DrapeCommand } from '@/lib/gis/drapeCommandBridge';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
@@ -248,6 +249,23 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay', { detail: overlay }));
+        }
+      }
+      // Drape control (SS16) — control_map_overlay drives the site-plan drape handlers.
+      // Same seam as extract_plan_image: latch the command, navigate the /w/ panel to
+      // the map so MapTab mounts, and fire the live CustomEvent for the already-mounted
+      // case. MapTab drains the latch on mount and runs the shipped drape handlers.
+      if (toolName === 'control_map_overlay' && result.action === 'control_map_overlay' && result.overlay_command) {
+        const cmd = result.overlay_command as DrapeCommand;
+        setPendingDrapeCommand(cmd);
+        if (projectId) {
+          const target = typeof result.navigate_to === 'string'
+            ? result.navigate_to
+            : `/w/projects/${projectId}/map`;
+          emitLandscapeCommand('navigate', { target_url: target, context: { tool: toolName } });
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('landscaper:control_map_overlay', { detail: cmd }));
         }
       }
     },
