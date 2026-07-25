@@ -86,6 +86,7 @@ UNIVERSAL_TOOLS = [
     "log_alpha_feedback",
     # UI navigation
     "open_input_modal",
+    "open_clarification",
     "navigate_to_project",
     "navigate_to_dashboard",
     "navigate_to_screen",
@@ -287,6 +288,7 @@ UNASSIGNED_SAFE_TOOLS = [
     "classify_waterfall", "run_sources_uses", "compute_trust_score",
     # UI affordance
     "open_input_modal",
+    "open_clarification",
     # Navigation tools — route the user to a different surface. Universal
     # (works pre- and post-project). LF-USERDASH-0514 Phase 3.
     "navigate_to_project", "navigate_to_dashboard",
