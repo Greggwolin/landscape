@@ -67,6 +67,7 @@ import { useSitePlanOverlay } from './overlay/useSitePlanOverlay';
 import { SitePlanOverlayControls } from './overlay/SitePlanOverlayControls';
 import { useSitePlanOverlays, type OverlayControlPoint } from './hooks/useSitePlanOverlays';
 import { addImageOverlay, fitCornersToGeometry, type OverlayHandle } from '@/lib/gis/imageOverlay';
+import { addTpsOverlayFromControlPoints, shouldRenderTps, type TpsOverlayHandle } from '@/lib/gis/tpsOverlay';
 import PlanExtractCanvas, { type ExtractedRegion } from './extract/PlanExtractCanvas';
 import { georeference, snapToVertex, recommendTpsWarp, type ControlPoint } from '@/lib/gis/controlPoints';
 import { takePendingPlanExtract } from '@/lib/gis/planExtractBridge';
@@ -2962,7 +2963,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   }, [savedOverlays]);
 
   // Read-only drapes for every saved overlay NOT currently being edited.
-  const savedDrapeHandlesRef = useRef<Map<number, OverlayHandle>>(new Map());
+  // Handles are kind-tagged: 'quad' = 4-corner image source (unchanged), 'tps' =
+  // pre-warped canvas source at parity with the edit path (SS15). Both expose
+  // layerId/setOpacity/remove, so the lift + teardown effects treat them uniformly.
+  type SavedDrapeEntry =
+    | { kind: 'quad'; handle: OverlayHandle }
+    | { kind: 'tps'; handle: TpsOverlayHandle };
+  const savedDrapeHandlesRef = useRef<Map<number, SavedDrapeEntry>>(new Map());
   useEffect(() => {
     const m = mapCanvasRef.current?.getMap();
     if (!m || !mapIsLoaded) return;
@@ -2974,14 +2981,38 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       if (hiddenOverlayIds.has(ov.overlay_id)) continue; // hidden via legend toggle (A)
       if (unavailableOverlayIds.has(ov.overlay_id)) continue; // image 404 → legend shows re-drape (C)
       wanted.add(ov.overlay_id);
+
+      const wantKind: 'quad' | 'tps' = shouldRenderTps(ov) ? 'tps' : 'quad';
       const existing = handles.get(ov.overlay_id);
-      if (existing) {
-        existing.setCorners(ov.corners);
-        existing.setOpacity(ov.opacity);
+      // Mode flipped since last render (only possible via edit+save) → rebuild.
+      if (existing && existing.kind !== wantKind) {
+        existing.handle.remove();
+        handles.delete(ov.overlay_id);
+      }
+
+      const current = handles.get(ov.overlay_id);
+      if (current) {
+        current.handle.setOpacity(ov.opacity);
+        // A passive TPS drape's warp is fixed from the saved control points, so only
+        // the quad path re-pins corners here.
+        if (current.kind === 'quad') current.handle.setCorners(ov.corners);
+      } else if (wantKind === 'tps') {
+        handles.set(ov.overlay_id, {
+          kind: 'tps',
+          handle: addTpsOverlayFromControlPoints(m, {
+            id: `saved-${ov.overlay_id}`,
+            // Same-origin proxy so MapLibre + the canvas warp can read the pixels
+            // (R2's public bucket isn't CORS-enabled). Legacy URLs pass through.
+            imageUrl: toRenderableOverlayUrl(ov.source_uri),
+            controlPoints: (ov.control_points ?? []) as unknown as ControlPoint[],
+            opacity: ov.opacity,
+            // No beforeId: a SAVED drape sits on TOP of the stack (see quad note below).
+          }),
+        });
       } else {
-        handles.set(
-          ov.overlay_id,
-          addImageOverlay(m, {
+        handles.set(ov.overlay_id, {
+          kind: 'quad',
+          handle: addImageOverlay(m, {
             id: `saved-${ov.overlay_id}`,
             // R2 source_uris aren't CORS-enabled for MapLibre's image-source fetch;
             // route them through the same-origin proxy. Legacy/UploadThing URLs pass through.
@@ -2991,14 +3022,14 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             // No beforeId: a SAVED drape sits on TOP of the stack (parcels,
             // basemap) so it reads as the finished site plan. During editing the
             // active overlay still drops beneath the parcel layer for alignment.
-          })
-        );
+          }),
+        });
       }
     }
 
-    for (const [id, handle] of handles) {
+    for (const [id, entry] of handles) {
       if (!wanted.has(id)) {
-        handle.remove();
+        entry.handle.remove();
         handles.delete(id);
       }
     }
@@ -3008,7 +3039,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   useEffect(() => {
     const handles = savedDrapeHandlesRef.current;
     return () => {
-      handles.forEach((handle) => handle.remove());
+      handles.forEach((entry) => entry.handle.remove());
       handles.clear();
     };
   }, []);
@@ -3031,9 +3062,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     // (queryRenderedFeatures ignores occlusion), so shapes stay selectable and
     // editable even where the drape covers them.
     const lift = () => {
-      savedDrapeHandlesRef.current.forEach((handle) => {
+      savedDrapeHandlesRef.current.forEach((entry) => {
         try {
-          if (m.getLayer(handle.layerId)) m.moveLayer(handle.layerId);
+          if (m.getLayer(entry.handle.layerId)) m.moveLayer(entry.handle.layerId);
         } catch { /* ignore */ }
       });
     };
