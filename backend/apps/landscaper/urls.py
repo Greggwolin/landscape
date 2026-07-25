@@ -12,6 +12,8 @@ from .views import (
     ConfirmMutationView,
     RejectMutationView,
     ConfirmBatchView,
+    # Clarification-artifact apply (Phase 3a)
+    ClarificationApplyView,
     # Thread-based chat views
     ChatThreadViewSet,
     ThreadMessageViewSet,
@@ -194,6 +196,13 @@ urlpatterns = [
         'landscaper/mutations/batch/<uuid:batch_id>/confirm/',
         ConfirmBatchView.as_view(),
         name='confirm-batch'
+    ),
+
+    # Apply a batch of clarification-artifact answers (Phase 3a)
+    path(
+        'landscaper/clarification/apply/',
+        ClarificationApplyView.as_view(),
+        name='clarification-apply'
     ),
 
     # ========================================================================

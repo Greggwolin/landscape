@@ -71,10 +71,17 @@ class ClarificationValidationError(ValueError):
 
 
 def _normalize_target(target: Any, path: str) -> Optional[Dict[str, Any]]:
-    """Validate the optional write-back target. Either ``{tool, field, params?}``
-    (a downstream update tool) or ``{modal, context?}`` (open an existing designed
-    form via the modal registry). Shape is checked; existence of the tool/modal is
-    the Phase-3 write-path's concern."""
+    """Validate the optional write-back target. Either
+    ``{tool, field?, value_key?, params?}`` (a downstream update tool) or
+    ``{modal, context?}`` (open an existing designed form via the modal registry).
+    Shape is checked; existence of the tool/modal is the Phase-3 write-path's
+    concern.
+
+    ``value_key`` + ``params`` make a tool target "params-complete" for the Phase-3
+    apply path: ``params`` is the full tool_input MINUS the answer, and the apply
+    service places the user's answer at ``value_key`` before dispatching the tool
+    in commit mode. A tool target without ``value_key`` is not directly writable
+    (the apply path surfaces it as skipped) — ``field`` alone is descriptive."""
     if target is None:
         return None
     if not isinstance(target, dict):
@@ -87,6 +94,10 @@ def _normalize_target(target: Any, path: str) -> Optional[Dict[str, Any]]:
             if not isinstance(target['field'], str) or not target['field']:
                 raise ClarificationValidationError(f'{path}.target.field must be a non-empty string')
             out['field'] = target['field']
+        if 'value_key' in target:
+            if not isinstance(target['value_key'], str) or not target['value_key']:
+                raise ClarificationValidationError(f'{path}.target.value_key must be a non-empty string')
+            out['value_key'] = target['value_key']
         if isinstance(target.get('params'), dict):
             out['params'] = target['params']
         return out
