@@ -1,7 +1,7 @@
 """
 Compressed Landscaper tool schemas.
 
-Tool count: 244
+Tool count: 245
 Estimated tokens: ~18,500
 """
 
@@ -5607,6 +5607,107 @@ LANDSCAPER_TOOLS = [
                 },
             },
             "required": ["master_lease_id"],
+        },
+    },
+    {
+        "name": "open_clarification",
+        "description": (
+            "Open a CLARIFICATION artifact — a stepped, one-question-at-a-time interview in "
+            "the right panel — when you need SEVERAL inputs (>= 3) before you can run an "
+            "analysis. Each step carries a typed input (number, percent, choice, same_as) with "
+            "a PRE-FILLED editable default the user accepts or overrides; defaults start tagged "
+            "'assumed'. YOU author the steps — questions are not fabricated figures, so authoring "
+            "them is correct. The artifact is built server-side and returned already-created — do "
+            "NOT call create_artifact, do NOT list the questions in chat, and do NOT restate any "
+            "figure; reply with EXACTLY ONE line pointing to the panel. "
+            "STRICT TRIGGER: use ONLY when >= 3 distinct inputs are genuinely required before "
+            "proceeding. A SINGLE missing input stays an inline chat question — do NOT open the "
+            "artifact for one question. Ask only questions that MOVE THE NUMBER; everything else "
+            "runs on a stated default. Ask five, not fifteen. Works pre- and post-project."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "steps": {
+                    "type": "array",
+                    "description": (
+                        "The ordered questions, one rendered at a time. Only the unknowns that "
+                        "swing the result — a good clarification asks ~5, not 15."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "Stable step id, e.g. 'front_footage'. Auto-assigned if omitted.",
+                            },
+                            "question": {
+                                "type": "string",
+                                "description": "The question shown to the user.",
+                            },
+                            "input_type": {
+                                "type": "string",
+                                "enum": ["number", "percent", "choice", "same_as", "toggle", "date", "text"],
+                                "description": "Widget type. Slice 1 renders number/percent/choice/same_as.",
+                            },
+                            "default": {
+                                "description": (
+                                    "Pre-filled editable default. REQUIRED and non-null — nothing is "
+                                    "asked cold. For choice/same_as/toggle it MUST equal one option value."
+                                ),
+                            },
+                            "unit": {
+                                "type": "string",
+                                "description": "Optional unit label, e.g. 'FF', '$', '%'.",
+                            },
+                            "options": {
+                                "type": "array",
+                                "description": "Required for choice/same_as/toggle. Each {value, label}.",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "value": {"description": "The option's stored value."},
+                                        "label": {"type": "string", "description": "The option's display label."},
+                                    },
+                                    "required": ["value", "label"],
+                                },
+                            },
+                            "evidence": {
+                                "type": "string",
+                                "enum": ["assumed", "entered", "benchmark"],
+                                "description": "Defaults to 'assumed' (amber) — a pre-fill the user hasn't touched.",
+                            },
+                            "target": {
+                                "type": "object",
+                                "description": (
+                                    "Where the answer writes on apply (Phase 3). Either "
+                                    "{tool, field, params?} for a downstream update tool, or "
+                                    "{modal, context?} to open an existing designed form."
+                                ),
+                            },
+                            "help": {
+                                "type": "string",
+                                "description": "Optional helper text for the step.",
+                            },
+                        },
+                        "required": ["question", "input_type", "default"],
+                    },
+                },
+                "preliminary": {
+                    "type": "object",
+                    "description": (
+                        "Optional live preliminary result strip shown at the top (grey/'calculated'). "
+                        "Only pass a value that traces to a numbers-producing tool's output THIS turn — "
+                        "never invent it. Omit if nothing can be computed yet."
+                    ),
+                    "properties": {
+                        "label": {"type": "string", "description": "e.g. 'Preliminary residual land value'."},
+                        "value": {"description": "The computed figure (string or number), or omit for '—'."},
+                    },
+                    "required": ["label"],
+                },
+            },
+            "required": ["steps"],
         },
     },
 ]

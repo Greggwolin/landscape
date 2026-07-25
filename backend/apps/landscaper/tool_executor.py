@@ -9073,6 +9073,101 @@ def handle_get_cashflow_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('open_clarification')
+def handle_open_clarification(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Open a CLARIFICATION artifact — a stepped, one-question-at-a-time interview
+    in the right panel — when Landscaper needs SEVERAL inputs (>= 3) before it can
+    run an analysis. The MODEL authors the steps (authoring a question is not
+    fabricating a figure); this handler renders them deterministically via
+    clarification_artifact_builder and returns the artifact already-created. The
+    model must reply with EXACTLY ONE line pointing to the panel — never list the
+    questions in chat.
+
+    Universal + unassigned-safe: project_id may be None (pre-project interview).
+    A malformed step contract returns a recoverable error with guidance so the
+    model can re-author the steps rather than the turn dying.
+    """
+    steps = tool_input.get('steps')
+    if not isinstance(steps, list) or not steps:
+        return {
+            'success': False, 'artifact_created': False,
+            'error': 'open_clarification requires a non-empty "steps" array.',
+            'guidance': (
+                'Author 3-5 stepped questions, each with a question, an input_type '
+                '(number/percent/choice/same_as), and a pre-filled non-null default.'
+            ),
+        }
+    preliminary = tool_input.get('preliminary')
+
+    # Neutral title carries the project name when we have one; pre-project threads
+    # render without it. Lookup mirrors handle_get_cashflow_schedule.
+    project_name = None
+    if project_id:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                    [project_id],
+                )
+                prow = cursor.fetchone()
+            project_name = prow[0] if prow else None
+        except Exception:  # noqa: BLE001 — name is cosmetic; never block the artifact
+            project_name = None
+
+    from .tools.clarification_artifact_builder import (
+        create_clarification_artifact,
+        ClarificationValidationError,
+    )
+
+    try:
+        artifact_envelope = create_clarification_artifact(
+            steps=steps,
+            preliminary=preliminary,
+            project_id=int(project_id) if project_id else None,
+            project_name=project_name,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+    except ClarificationValidationError as exc:
+        return {
+            'success': False, 'artifact_created': False,
+            'error': f'clarification step contract invalid: {exc}',
+            'guidance': (
+                'Fix the flagged step and retry. Each step needs a question, an '
+                'input_type, and a non-null default; choice/same_as steps need '
+                'options and a default that equals one option value.'
+            ),
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Error building clarification artifact: {e}")
+        return {'success': False, 'artifact_created': False, 'error': str(e)}
+
+    if artifact_envelope and artifact_envelope.get('success') is not False:
+        return {
+            'success': True,
+            'artifact_created': True,
+            'artifact': artifact_envelope,
+            'step_count': len(steps),
+            'instruction': (
+                'The clarification artifact has ALREADY been created and is open in '
+                'the right panel. Do NOT call create_artifact. Reply with EXACTLY ONE '
+                'short line pointing the user to the panel (e.g. "A few things to '
+                'confirm before I run this — in the panel →"). Do NOT list the '
+                'questions in chat and do NOT restate any figure.'
+            ),
+        }
+
+    return {
+        'success': False,
+        'artifact_created': False,
+        'error': (artifact_envelope or {}).get('error', 'clarification artifact creation failed'),
+    }
+
+
 @register_tool('get_capitalization_schedule')
 def handle_get_capitalization_schedule(
     tool_input: Dict[str, Any],
