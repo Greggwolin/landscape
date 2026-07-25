@@ -66,6 +66,10 @@ export interface SitePlanOverlayRecord {
   source_page?: number | null;
   source_crop_bbox?: OverlayCropBbox | null;
   control_points?: OverlayControlPoint[] | null;
+  // Drape transform extras (SS14). Legacy rows default to quad / 1.0 / false.
+  warp_mode?: 'quad' | 'tps';
+  scale?: number;
+  locked?: boolean;
 }
 
 export interface SitePlanOverlayInput {
@@ -80,6 +84,11 @@ export interface SitePlanOverlayInput {
   source_page?: number | null;
   source_crop_bbox?: OverlayCropBbox | null;
   control_points?: OverlayControlPoint[] | null;
+  // Drape transform extras (SS14). Omitted → server keeps the stored value (PATCH)
+  // or applies the column default (create).
+  warp_mode?: 'quad' | 'tps';
+  scale?: number;
+  locked?: boolean;
 }
 
 export function useSitePlanOverlays(projectId: number | undefined) {

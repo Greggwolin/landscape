@@ -37,7 +37,8 @@ _MAX_OVERLAY_BYTES = 24 * 1024 * 1024  # 24 MB — comfortably above a draped pl
 _SELECT_COLS = (
     "overlay_id, project_id, title, source_uri, corners, "
     "opacity, rotation_deg, created_at, updated_at, "
-    "source_doc_id, source_page, source_crop_bbox, control_points"
+    "source_doc_id, source_page, source_crop_bbox, control_points, "
+    "warp_mode, scale, locked"
 )
 
 
@@ -74,6 +75,11 @@ def _row_to_overlay(row):
         "source_crop_bbox": crop_bbox,
         # Control-point georeferencing inputs (D16). NULL for manual 4-corner drapes.
         "control_points": control_points,
+        # Drape transform extras (SS14). Defaulted at the column level, so legacy
+        # rows read back as an unlocked, unscaled 4-corner ('quad') drape.
+        "warp_mode": row[13],
+        "scale": float(row[14]) if row[14] is not None else None,
+        "locked": row[15],
     }
 
 
@@ -130,8 +136,10 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
             cursor.execute(
                 "INSERT INTO landscape.tbl_project_overlay "
                 "(project_id, title, source_uri, corners, opacity, rotation_deg, "
-                "source_doc_id, source_page, source_crop_bbox, control_points) "
-                "VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb, %s::jsonb) "
+                "source_doc_id, source_page, source_crop_bbox, control_points, "
+                "warp_mode, scale, locked) "
+                "VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s::jsonb, %s::jsonb, "
+                "%s, %s, %s) "
                 f"RETURNING {_SELECT_COLS}",
                 [
                     int(project_pk),
@@ -146,6 +154,9 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
                     if data.get("source_crop_bbox") is not None else None,
                     json.dumps(data["control_points"])
                     if data.get("control_points") is not None else None,
+                    data.get("warp_mode", "quad"),
+                    data.get("scale", 1.0),
+                    data.get("locked", False),
                 ],
             )
             row = cursor.fetchone()
@@ -177,7 +188,8 @@ class ProjectOverlayViewSet(viewsets.ViewSet):
         set_clauses = []
         params = []
         for column in ("title", "source_uri", "opacity", "rotation_deg",
-                       "source_doc_id", "source_page"):
+                       "source_doc_id", "source_page",
+                       "warp_mode", "scale", "locked"):
             if column in data:
                 set_clauses.append(f"{column} = %s")
                 params.append(data[column])

@@ -1,13 +1,18 @@
 'use client';
 
 /**
- * SitePlanOverlayControls — opacity, rotation, snap indicator, and save for the
- * site-plan image drape (first slice). Presentational; state lives in
- * useSitePlanOverlay. Uses CoreUI / wrapper CSS tokens — no hardcoded palette
- * except the green snap indicator, which mirrors the handle snap color.
+ * SitePlanOverlayControls — opacity, rotation, scale, lock, warp-mode, snap indicator,
+ * and save for the site-plan image drape. Presentational; state lives in
+ * useSitePlanOverlay. Uses CoreUI / wrapper CSS tokens — no hardcoded palette except
+ * the green snap indicator, which mirrors the handle snap color.
+ *
+ * SS14: scale slider, lock toggle, and Quad/Warp (TPS) mode switch are additive; the
+ * opacity/rotation/name/save controls are unchanged.
  */
 
 import React from 'react';
+
+export type OverlayWarpMode = 'quad' | 'tps';
 
 export interface SitePlanOverlayControlsProps {
   /** Editable overlay name (set during creation; pre-filled when editing). */
@@ -23,6 +28,15 @@ export interface SitePlanOverlayControlsProps {
   onRotationChange: (deg: number) => void;
   onSave: () => void;
   onCancel: () => void;
+  // SS14 — additive. Rendered only when the handlers are supplied.
+  scale?: number;
+  onScaleChange?: (factor: number) => void;
+  locked?: boolean;
+  onLockToggle?: (locked: boolean) => void;
+  warpMode?: OverlayWarpMode;
+  onWarpModeChange?: (mode: OverlayWarpMode) => void;
+  /** TPS warp needs ≥3 control points; the toggle is disabled until then. */
+  tpsAvailable?: boolean;
 }
 
 const labelStyle: React.CSSProperties = {
@@ -46,7 +60,22 @@ export function SitePlanOverlayControls({
   onRotationChange,
   onSave,
   onCancel,
+  scale,
+  onScaleChange,
+  locked = false,
+  onLockToggle,
+  warpMode = 'quad',
+  onWarpModeChange,
+  tpsAvailable = false,
 }: SitePlanOverlayControlsProps) {
+  const showScale = typeof scale === 'number' && !!onScaleChange;
+  const showLock = !!onLockToggle;
+  const showWarp = !!onWarpModeChange;
+  const isTps = warpMode === 'tps';
+  // In TPS mode the warp is driven by control points, so the quad transforms
+  // (rotation/scale) don't apply; lock also freezes them.
+  const transformsDisabled = locked || isTps;
+
   return (
     <div
       style={{
@@ -99,6 +128,35 @@ export function SitePlanOverlayControls({
         />
       </div>
 
+      {/* Warp mode (SS14) */}
+      {showWarp && (
+        <div>
+          <div style={labelStyle}>
+            <span>Warp mode</span>
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              className={`btn ${!isTps ? 'btn-primary' : 'btn-ghost-secondary'}`}
+              onClick={() => onWarpModeChange?.('quad')}
+              style={{ flex: 1, fontSize: '11.5px', padding: '4px 6px' }}
+            >
+              4-corner
+            </button>
+            <button
+              type="button"
+              className={`btn ${isTps ? 'btn-primary' : 'btn-ghost-secondary'}`}
+              onClick={() => tpsAvailable && onWarpModeChange?.('tps')}
+              disabled={!tpsAvailable}
+              title={tpsAvailable ? 'Rubber-sheet warp from control points' : 'Place at least 3 control points to enable warp'}
+              style={{ flex: 1, fontSize: '11.5px', padding: '4px 6px', opacity: tpsAvailable ? 1 : 0.5 }}
+            >
+              Warp (TPS)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Opacity */}
       <div>
         <div style={labelStyle}>
@@ -127,9 +185,43 @@ export function SitePlanOverlayControls({
           max={180}
           value={rotationDeg}
           onChange={(e) => onRotationChange(Number(e.target.value))}
-          style={{ width: '100%' }}
+          disabled={transformsDisabled}
+          style={{ width: '100%', opacity: transformsDisabled ? 0.5 : 1 }}
         />
       </div>
+
+      {/* Scale (SS14) */}
+      {showScale && (
+        <div>
+          <div style={labelStyle}>
+            <span>Scale</span>
+            <span>{Math.round((scale as number) * 100)}%</span>
+          </div>
+          <input
+            type="range"
+            min={25}
+            max={400}
+            step={5}
+            value={Math.round((scale as number) * 100)}
+            onChange={(e) => onScaleChange?.(Number(e.target.value) / 100)}
+            disabled={transformsDisabled}
+            style={{ width: '100%', opacity: transformsDisabled ? 0.5 : 1 }}
+          />
+        </div>
+      )}
+
+      {/* Lock (SS14) */}
+      {showLock && (
+        <button
+          type="button"
+          className={`btn ${locked ? 'btn-warning' : 'btn-ghost-secondary'}`}
+          onClick={() => onLockToggle?.(!locked)}
+          style={{ fontSize: '11.5px', padding: '4px 8px', alignSelf: 'flex-start' }}
+          title={locked ? 'Unlock the overlay transform' : 'Lock so the overlay can’t be nudged'}
+        >
+          {locked ? '🔒 Locked' : '🔓 Lock transform'}
+        </button>
+      )}
 
       {saveError && (
         <div style={{ fontSize: '11px', color: 'var(--cui-danger, #ef4444)' }}>{saveError}</div>
