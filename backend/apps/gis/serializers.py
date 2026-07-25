@@ -45,6 +45,13 @@ class ProjectOverlaySerializer(serializers.Serializer):
     # drapes carry none, so this stays OUT of the required set.
     control_points = serializers.JSONField(required=False, allow_null=True)
 
+    # Drape transform extras (SS14). All optional — omitting them on PATCH leaves
+    # the stored value untouched (partial update), and legacy rows default to a
+    # quad/unscaled/unlocked drape.
+    warp_mode = serializers.ChoiceField(choices=["quad", "tps"], required=False)
+    scale = serializers.FloatField(required=False, min_value=0.01, max_value=100.0)
+    locked = serializers.BooleanField(required=False)
+
     def validate_corners(self, value):
         if not isinstance(value, list) or len(value) != 4:
             raise serializers.ValidationError(

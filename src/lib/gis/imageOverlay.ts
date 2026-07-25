@@ -88,6 +88,60 @@ export function rotateCorners(c: Corners, deg: number): Corners {
   }) as Corners;
 }
 
+/**
+ * Scale four corners about their centroid by a uniform `factor` (1 = unchanged).
+ * Latitude is scaled by cos(lat) so the scaling stays square on a Web-Mercator map,
+ * mirroring rotateCorners. Used by the discrete overlay scale control (SS14).
+ */
+export function scaleCorners(c: Corners, factor: number): Corners {
+  const f = factor > 0 ? factor : 1e-6;
+  const [cLng, cLat] = cornersCenter(c);
+  const latScale = Math.cos((cLat * Math.PI) / 180) || 1e-6;
+  return c.map(([lng, lat]) => {
+    const dx = (lng - cLng) * latScale;
+    const dy = lat - cLat;
+    return [cLng + (dx * f) / latScale, cLat + dy * f] as [number, number];
+  }) as Corners;
+}
+
+/**
+ * Fit a four-corner drape quad to the axis-aligned extent (bbox) of a GeoJSON
+ * Polygon/MultiPolygon — the "snap the image to that drawn polygon" affordance (SS14).
+ * The parcel-boundary drape already derives corners from parcel geometry; this is the
+ * same idea generalised to any drawn polygon. Returns corners in TL, TR, BR, BL order.
+ * Returns null if the geometry has no usable coordinates.
+ */
+export function fitCornersToGeometry(
+  geom: { type?: string; coordinates?: unknown } | null | undefined
+): Corners | null {
+  if (!geom || !geom.coordinates) return null;
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  const visit = (node: unknown): void => {
+    if (!Array.isArray(node)) return;
+    if (typeof node[0] === 'number' && typeof node[1] === 'number') {
+      const lng = node[0] as number;
+      const lat = node[1] as number;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      return;
+    }
+    for (const child of node) visit(child);
+  };
+  visit(geom.coordinates);
+  if (!Number.isFinite(minLng) || !Number.isFinite(minLat) ||
+      minLng === maxLng || minLat === maxLat) {
+    return null;
+  }
+  return [
+    [minLng, maxLat], // TL
+    [maxLng, maxLat], // TR
+    [maxLng, minLat], // BR
+    [minLng, minLat], // BL
+  ];
+}
+
 const isStyleReady = (map: MlMap): boolean => {
   try {
     return Boolean(map.isStyleLoaded());

@@ -66,7 +66,7 @@ import { uploadOverlayImageDurable, toRenderableOverlayUrl } from '@/lib/gis/ove
 import { useSitePlanOverlay } from './overlay/useSitePlanOverlay';
 import { SitePlanOverlayControls } from './overlay/SitePlanOverlayControls';
 import { useSitePlanOverlays, type OverlayControlPoint } from './hooks/useSitePlanOverlays';
-import { addImageOverlay, type OverlayHandle } from '@/lib/gis/imageOverlay';
+import { addImageOverlay, fitCornersToGeometry, type OverlayHandle } from '@/lib/gis/imageOverlay';
 import PlanExtractCanvas, { type ExtractedRegion } from './extract/PlanExtractCanvas';
 import { georeference, snapToVertex, recommendTpsWarp, type ControlPoint } from '@/lib/gis/controlPoints';
 import { takePendingPlanExtract } from '@/lib/gis/planExtractBridge';
@@ -2342,7 +2342,15 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     });
   }, []);
   const [overlayInitial, setOverlayInitial] = useState<
-    { corners?: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number; rotationDeg?: number } | undefined
+    {
+      corners?: [[number, number], [number, number], [number, number], [number, number]];
+      opacity?: number;
+      rotationDeg?: number;
+      // SS14 — restored on edit so a saved TPS/scaled/locked drape reloads as saved.
+      scale?: number;
+      locked?: boolean;
+      warpMode?: 'quad' | 'tps';
+    } | undefined
   >(undefined);
   const [overlaySaving, setOverlaySaving] = useState(false);
   const [overlaySaveError, setOverlaySaveError] = useState<string | null>(null);
@@ -2352,10 +2360,32 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // Reuse whatever vector parcel FeatureCollection is already loaded as snap
   // targets: taxParcels (county vector, incl. Maricopa for Peoria Meadows),
   // then LA county parcels, then plan parcels. Null → free drag, no snapping.
-  const overlayParcels = useMemo(
-    () => taxParcels ?? parcelCollection ?? planParcels ?? null,
-    [taxParcels, parcelCollection, planParcels]
-  );
+  // Drawn polygons (user features) are valid drape + snap targets too (SS14): a drape no
+  // longer needs a county parcel underneath. Merge them with whatever vector parcel set
+  // is loaded so handle-snap and control points work over a hand-drawn boundary as well.
+  const drawnPolygonsFC = useMemo<FeatureCollection | null>(() => {
+    const feats = mapFeatures
+      .filter((f) => f.geometry &&
+        (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'))
+      .map((f) => ({ type: 'Feature' as const, geometry: f.geometry as Geometry, properties: {} }));
+    return feats.length ? { type: 'FeatureCollection', features: feats } : null;
+  }, [mapFeatures]);
+
+  const overlayParcels = useMemo<FeatureCollection | null>(() => {
+    const base = taxParcels ?? parcelCollection ?? planParcels ?? null;
+    if (base && drawnPolygonsFC) {
+      return { type: 'FeatureCollection', features: [...base.features, ...drawnPolygonsFC.features] };
+    }
+    return base ?? drawnPolygonsFC;
+  }, [taxParcels, parcelCollection, planParcels, drawnPolygonsFC]);
+
+  // The polygon a "Fit to drawn area" action snaps the drape to — the most recently
+  // drawn polygon (mapFeatures is newest-first from the API order) (SS14).
+  const drapeTargetPolygon = useMemo<Geometry | null>(() => {
+    const f = mapFeatures.find((x) => x.geometry &&
+      (x.geometry.type === 'Polygon' || x.geometry.type === 'MultiPolygon'));
+    return (f?.geometry as Geometry) ?? null;
+  }, [mapFeatures]);
 
   // Drape sits beneath the lowest existing parcel layer so outlines stay on top.
   const overlayBeneathLayerId = useMemo(() => {
@@ -2383,6 +2413,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     parcels: overlayParcels,
     beneathLayerId: overlayBeneathLayerId,
     initial: overlayInitial,
+    // SS14 — the TPS warp mode solves from these control points + the extracted-image
+    // pixel dims. Ignored in the default quad mode.
+    controlPoints,
+    imgDims: cpImgDims,
   });
 
   const {
@@ -2606,6 +2640,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       const clicked: [number, number] = [e.lngLat.lng, e.lngLat.lat];
       const layerIds = [
         'tax-parcels-fill', 'la-parcels-all-fill', 'plan-parcels-fill',
+        'user-features-fill', // SS14: snap control points to drawn-polygon vertices too
         MARICOPA_PARCEL_OUTLINE_LAYER_ID,
       ].filter((id) => map.getLayer(id));
       let vertices: Array<[number, number]> = [];
@@ -2657,6 +2692,12 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           corners: state.corners,
           opacity: state.opacity,
           rotation_deg: state.rotationDeg,
+          // SS14 — persist the transform extras on the same row.
+          warp_mode: state.warpMode,
+          scale: state.scale,
+          locked: state.locked,
+          // Keep control points fresh so a saved TPS drape reloads warped.
+          ...(controlPoints.length ? { control_points: controlPoints } : {}),
         });
         showToast('Overlay updated');
       } else {
@@ -2666,6 +2707,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           corners: state.corners,
           opacity: state.opacity,
           rotation_deg: state.rotationDeg,
+          // SS14 — transform extras.
+          warp_mode: state.warpMode,
+          scale: state.scale,
+          locked: state.locked,
           // Provenance only present for extracted plans; spread-empty otherwise
           // so manual overlays POST exactly as before.
           ...(overlayProvenance ?? {}),
@@ -2699,7 +2744,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   }, [resetExtractState]);
 
   const handleEditOverlay = useCallback(
-    (overlay: { overlay_id: number; title?: string | null; source_uri: string; corners: [[number, number], [number, number], [number, number], [number, number]]; opacity: number; rotation_deg: number }) => {
+    (overlay: {
+      overlay_id: number; title?: string | null; source_uri: string;
+      corners: [[number, number], [number, number], [number, number], [number, number]];
+      opacity: number; rotation_deg: number;
+      scale?: number; locked?: boolean; warp_mode?: 'quad' | 'tps';
+      control_points?: OverlayControlPoint[] | null;
+    }) => {
       setOverlaySaveError(null);
       setEditingOverlayId(overlay.overlay_id);
       setOverlayTitle(overlay.title?.trim() || 'Overlay');
@@ -2707,7 +2758,21 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         corners: overlay.corners,
         opacity: overlay.opacity,
         rotationDeg: overlay.rotation_deg,
+        // SS14 — restore the saved transform extras.
+        scale: overlay.scale ?? 1,
+        locked: overlay.locked ?? false,
+        warpMode: overlay.warp_mode ?? 'quad',
       });
+      // Restore control points so a saved TPS drape reloads warped. Re-showing the
+      // extracted image (source_uri IS the extracted crop) lets the placement be
+      // re-edited AND gives the TPS solver its pixel dims via the <img> onLoad below.
+      const cps = overlay.control_points ?? [];
+      setControlPoints(cps);
+      setGeorefInfo(null);
+      if (overlay.warp_mode === 'tps' && cps.length >= 3) {
+        setCpImageSrc(toRenderableOverlayUrl(overlay.source_uri));
+        setCpImgDims(null); // filled from the image's natural size on load
+      }
       setOverlayImageUrl(overlay.source_uri);
     },
     []
@@ -3306,7 +3371,31 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             onRotationChange={overlayEditor.setRotation}
             onSave={handleOverlaySave}
             onCancel={handleOverlayCancel}
+            scale={overlayEditor.scale}
+            onScaleChange={overlayEditor.setScale}
+            locked={overlayEditor.locked}
+            onLockToggle={overlayEditor.setLocked}
+            warpMode={overlayEditor.warpMode}
+            onWarpModeChange={overlayEditor.setWarpMode}
+            tpsAvailable={controlPoints.length >= 3 && !!cpImgDims}
           />
+        )}
+
+        {/* Fit the drape to a hand-drawn polygon's extent (SS14). */}
+        {overlayImageUrl && drapeTargetPolygon && !overlayEditor.locked && overlayEditor.warpMode === 'quad' && (
+          <button
+            type="button"
+            className="btn btn-ghost-secondary"
+            style={{ margin: '0 12px', fontSize: '11.5px', padding: '4px 8px', alignSelf: 'flex-start' }}
+            onClick={() => {
+              const corners = fitCornersToGeometry(drapeTargetPolygon);
+              if (corners) overlayEditor.setCorners(corners);
+              else showToast('That drawn shape has no usable extent to fit to');
+            }}
+            title="Snap the drape corners to the most recently drawn polygon"
+          >
+            Fit to drawn area
+          </button>
         )}
 
         {/* ─── Control-point georeferencing (D16) ─── */}
@@ -3333,6 +3422,16 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                   src={cpImageSrc}
                   alt="Extracted plan"
                   onClick={handleCpImageClick}
+                  onLoad={(e) => {
+                    // On a reopened saved overlay we have no crop bbox — take the pixel
+                    // dims from the image itself so the TPS solver has its extent (SS14).
+                    if (!cpImgDims) {
+                      const im = e.currentTarget;
+                      if (im.naturalWidth && im.naturalHeight) {
+                        setCpImgDims({ w: im.naturalWidth, h: im.naturalHeight });
+                      }
+                    }
+                  }}
                   style={{
                     width: '100%', cursor: 'crosshair', borderRadius: 4,
                     border: '1px solid var(--cui-border-color)',
@@ -3346,7 +3445,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             </div>
             {georefInfo?.recommendTps && (
               <div style={{ fontSize: 11, color: 'var(--cui-warning)', marginTop: 4 }}>
-                A warp (TPS) would fit tighter — later slice.
+                A warp (TPS) would fit tighter — switch to Warp mode above.
               </div>
             )}
             {controlPoints.length > 0 && (

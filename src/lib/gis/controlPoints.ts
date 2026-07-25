@@ -246,8 +246,134 @@ export function snapToVertex(
 /**
  * Whether a thin-plate-spline warp would meaningfully help: many control points AND a
  * projective fit that still leaves notable residual (the plan is non-planar / hand-drawn).
- * Used to nudge the UI toward the (later) TPS slice rather than implying 4-corner is exact.
+ * Used to nudge the UI toward the TPS warp mode rather than implying 4-corner is exact.
  */
 export function recommendTpsWarp(result: GeorefResult, pointCount: number): boolean {
   return pointCount >= 5 && result.rmsMeters > 3;
+}
+
+// ===========================================================================
+// Thin-plate-spline (true rubber-sheet) warp — SS14 (LSCMD-SS-DRAPE-POLYGON-TPS)
+//
+// The 4-corner fits above (similarity/affine/projective) reposition exactly four
+// corners; MapLibre's `image` source can render that. A genuine rubber-sheet warp
+// bends the *interior* of the bitmap so every control point lands on its map target,
+// which the image source cannot express — the caller renders the warp onto a canvas
+// (see lib/gis/tpsOverlay.ts) using the `warp` function returned here.
+//
+// TPS interpolates each output coordinate independently as
+//     f(x,y) = a0 + a1·x + a2·y + Σ w_i·U(‖(x,y) − p_i‖)
+// with U(r) = r²·ln(r²) (r>0, U(0)=0), solved so f reproduces the control values
+// exactly (λ = 0) subject to the affine side-constraints Σw_i = Σw_i·x_i = Σw_i·y_i = 0.
+// Fit is done in the same local equirectangular metre frame as georeference(), then
+// converted back to lng/lat, so longitude compression by cos(lat) doesn't skew it.
+// ===========================================================================
+
+/** A solved TPS warp: image pixel (x,y) → geographic [lng,lat]. */
+export interface TpsWarp {
+  /** Map an image pixel to a geographic coordinate. */
+  at(x: number, y: number): GeoPoint;
+}
+
+export interface TpsResult {
+  warp: TpsWarp;
+  /** Four image-corner geo coords (TL,TR,BR,BL) — a bounding quad for fallback/preview. */
+  corners: Corners;
+  /** RMS residual at the control points, in metres (≈0 for an exact interpolation). */
+  rmsMeters: number;
+  kind: 'tps';
+}
+
+const U = (r2: number): number => (r2 <= 0 ? 0 : r2 * Math.log(r2));
+
+/**
+ * Solve one TPS component: image points → scalar target values. Returns an evaluator
+ * f(x,y). `null` if the (n+3) system is degenerate (e.g. all points coincident).
+ */
+function solveTpsComponent(
+  pts: ImgPoint[],
+  values: number[]
+): ((x: number, y: number) => number) | null {
+  const n = pts.length;
+  const dim = n + 3;
+  const A: number[][] = Array.from({ length: dim }, () => new Array(dim).fill(0));
+  const b: number[] = new Array(dim).fill(0);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const dx = pts[i].x - pts[j].x;
+      const dy = pts[i].y - pts[j].y;
+      A[i][j] = U(dx * dx + dy * dy);
+    }
+    // P block (affine terms) — right columns and bottom rows.
+    A[i][n] = 1; A[i][n + 1] = pts[i].x; A[i][n + 2] = pts[i].y;
+    A[n][i] = 1; A[n + 1][i] = pts[i].x; A[n + 2][i] = pts[i].y;
+    b[i] = values[i];
+  }
+
+  const sol = solve(A, b);
+  if (!sol) return null;
+  const w = sol.slice(0, n);
+  const a0 = sol[n], a1 = sol[n + 1], a2 = sol[n + 2];
+
+  return (x: number, y: number) => {
+    let acc = a0 + a1 * x + a2 * y;
+    for (let i = 0; i < n; i++) {
+      const dx = x - pts[i].x;
+      const dy = y - pts[i].y;
+      acc += w[i] * U(dx * dx + dy * dy);
+    }
+    return acc;
+  };
+}
+
+/**
+ * Solve a thin-plate-spline warp from ≥3 control points. The warp reproduces every
+ * control point exactly (rubber-sheet). Callers keep the 4-corner {@link georeference}
+ * as the default and only switch to TPS on request.
+ *
+ * @throws if fewer than 3 control points or the system is degenerate.
+ */
+export function solveTps(
+  imgWidth: number,
+  imgHeight: number,
+  points: ControlPoint[]
+): TpsResult {
+  if (points.length < 3) {
+    throw new Error('Thin-plate-spline warp needs at least 3 control points.');
+  }
+  const lng0 = points.reduce((a, p) => a + p.map[0], 0) / points.length;
+  const lat0 = points.reduce((a, p) => a + p.map[1], 0) / points.length;
+  const frame = makeFrame(lng0, lat0);
+
+  const src = points.map((p) => p.img);
+  const dstM = points.map((p) => toMeters(frame, p.map));
+  const fx = solveTpsComponent(src, dstM.map((d) => d[0]));
+  const fy = solveTpsComponent(src, dstM.map((d) => d[1]));
+  if (!fx || !fy) {
+    throw new Error('Control points are degenerate — spread them out.');
+  }
+
+  const warp: TpsWarp = {
+    at: (x, y) => toGeo(frame, [fx(x, y), fy(x, y)]),
+  };
+
+  // RMS residual at the control points (exact TPS ⇒ ~0, guards a bad solve).
+  let s = 0;
+  for (let i = 0; i < src.length; i++) {
+    const mx = fx(src[i].x, src[i].y);
+    const my = fy(src[i].x, src[i].y);
+    s += (mx - dstM[i][0]) ** 2 + (my - dstM[i][1]) ** 2;
+  }
+  const rmsMeters = Math.sqrt(s / src.length);
+
+  const cornerPx: ImgPoint[] = [
+    { x: 0, y: 0 },
+    { x: imgWidth, y: 0 },
+    { x: imgWidth, y: imgHeight },
+    { x: 0, y: imgHeight },
+  ];
+  const corners = cornerPx.map((c) => warp.at(c.x, c.y)) as Corners;
+
+  return { warp, corners, rmsMeters, kind: 'tps' };
 }

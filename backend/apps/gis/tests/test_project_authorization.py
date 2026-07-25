@@ -190,7 +190,10 @@ class OverlayAuthorizationTests(_ProjectAuthFixture):
                     source_doc_id    BIGINT,
                     source_page      INTEGER,
                     source_crop_bbox JSONB,
-                    control_points   JSONB
+                    control_points   JSONB,
+                    warp_mode        TEXT NOT NULL DEFAULT 'quad',
+                    scale            NUMERIC(8, 4) NOT NULL DEFAULT 1.0,
+                    locked           BOOLEAN NOT NULL DEFAULT false
                 )
                 """
             )
