@@ -17,6 +17,7 @@ import {
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
+import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -394,6 +395,21 @@ export function ArtifactWorkspacePanel({
           </div>
         ) : !active ? (
           <div style={emptyStateStyle}>Artifact not found.</div>
+        ) : active.tool_name === 'open_clarification' &&
+          active.params_json &&
+          (active.params_json as { clarification_config?: unknown }).clarification_config ? (
+          // Clarification / interview artifact (LSCMD-CLARIFY-ARTIFACT-0724-BA5,
+          // Phase 2). Stepped one-question-at-a-time renderer. The generic
+          // ArtifactRenderer only knows section/table/key_value_grid/text, so the
+          // rich stepped payload (typed inputs, defaults, evidence tags) rides in
+          // params_json.clarification_config — same carve-out shape as the brief.
+          <ClarificationArtifact
+            config={
+              (active.params_json as { clarification_config: ClarificationArtifactConfig })
+                .clarification_config
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
         ) : active.tool_name === 'generate_location_brief' &&
           active.params_json &&
           (active.params_json as { location_brief_config?: unknown }).location_brief_config ? (
