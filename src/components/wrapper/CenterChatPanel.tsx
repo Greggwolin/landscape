@@ -203,6 +203,22 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         );
         if (!artifactsOpen) toggleArtifacts();
       }
+      // Clarification / interview artifact (LSCMD-CLARIFY-ARTIFACT-0724-BA5,
+      // Phase 2) → auto-open in the workspace panel. open_clarification returns
+      // the persisted artifact NESTED under result.artifact (the create_artifact_record
+      // envelope — same shape the server-rendered schedule tools use), so the generic
+      // show_artifact branch below (top-level result.artifact_id) never fires for it.
+      // Promote the nested id to activeArtifactId so ArtifactWorkspacePanel's
+      // open_clarification carve-out renders the stepped view immediately — the
+      // one-line chat reply ("… in the panel →") must land on a visible artifact.
+      if (toolName === 'open_clarification' && result.artifact_created && result.artifact) {
+        const env = result.artifact as { artifact_id?: unknown };
+        if (typeof env.artifact_id === 'number') {
+          setActiveArtifactId(env.artifact_id);
+          qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
+          if (!artifactsOpen) toggleArtifacts();
+        }
+      }
       // Generative artifact (Finding #4 Phase 3) — create_artifact /
       // update_artifact tools both return action='show_artifact' with an
       // artifact_id. Set as active and auto-open the panel; the panel's

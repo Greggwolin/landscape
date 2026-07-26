@@ -20,7 +20,7 @@
  */
 
 import type { Map as MlMap } from 'maplibre-gl';
-import type { TpsWarp } from './controlPoints';
+import { solveTps, type TpsWarp, type ControlPoint } from './controlPoints';
 import type { Corners } from './imageOverlay';
 
 export interface TpsOverlayHandle {
@@ -271,4 +271,88 @@ export function addTpsOverlay(map: MlMap, opts: AddTpsOverlayOpts): TpsOverlayHa
       removeExisting();
     },
   };
+}
+
+interface AddTpsFromControlPointsOpts {
+  id: string;
+  imageUrl: string;
+  /** Saved control points (image px ↔ map lng/lat) — solved into the warp on load. */
+  controlPoints: ControlPoint[];
+  opacity?: number;
+  beforeId?: string;
+  grid?: number;
+  maxCanvasPx?: number;
+}
+
+/**
+ * Mount a TPS-warped drape when only the saved control points are known and the image's
+ * pixel dimensions are NOT (the read-only / passive render path — SS15). The overlay row
+ * stores control_points but no image dims, so we probe the image, take its natural size
+ * as the control-point pixel space (source_uri IS the extracted crop, same space the
+ * points were placed in), solve the warp with the shipped solveTps(), and delegate to the
+ * unchanged addTpsOverlay() with the same `id`. Returns a handle immediately; the delegate
+ * mounts once the (browser-cached) image loads. If the points are too few/degenerate, no
+ * warp is mounted (the caller keeps whatever it had).
+ */
+export function addTpsOverlayFromControlPoints(
+  map: MlMap,
+  opts: AddTpsFromControlPointsOpts
+): TpsOverlayHandle {
+  const { id, imageUrl, controlPoints, beforeId, grid, maxCanvasPx } = opts;
+  let delegate: TpsOverlayHandle | null = null;
+  let removed = false;
+  let pendingOpacity = opts.opacity ?? 0.7;
+
+  const probe = new Image();
+  probe.crossOrigin = 'anonymous';
+  probe.onload = () => {
+    if (removed) return;
+    const w = probe.naturalWidth;
+    const h = probe.naturalHeight;
+    if (!w || !h) return;
+    try {
+      const { warp } = solveTps(w, h, controlPoints);
+      delegate = addTpsOverlay(map, {
+        id, imageUrl, warp, imgWidth: w, imgHeight: h,
+        opacity: pendingOpacity, beforeId, grid, maxCanvasPx,
+      });
+    } catch {
+      // Too few / degenerate points — leave nothing mounted (parity with edit-path fallback).
+    }
+  };
+  probe.src = imageUrl;
+
+  return {
+    // Same ids addTpsOverlay will create, so layer-lifting works even before the delegate mounts.
+    sourceId: `siteplan-tps-${id}`,
+    layerId: `siteplan-tps-layer-${id}`,
+    setOpacity(value: number) {
+      pendingOpacity = Math.max(0, Math.min(1, value));
+      delegate?.setOpacity(pendingOpacity);
+    },
+    setWarp() {
+      // Passive re-render: the warp is fixed from the saved control points.
+    },
+    getCorners() {
+      return delegate?.getCorners() ?? ([[0, 0], [0, 0], [0, 0], [0, 0]] as Corners);
+    },
+    remove() {
+      removed = true;
+      probe.onload = null;
+      delegate?.remove();
+    },
+  };
+}
+
+/**
+ * Whether a saved overlay should render as a TPS warp rather than a 4-corner quad:
+ * its warp_mode is 'tps' AND it carries at least the 3 control points TPS needs.
+ * Shared by the read-only render (SS15) so the branch is one testable predicate.
+ */
+export function shouldRenderTps(
+  overlay: { warp_mode?: string | null; control_points?: unknown[] | null }
+): boolean {
+  return overlay.warp_mode === 'tps'
+    && Array.isArray(overlay.control_points)
+    && overlay.control_points.length >= 3;
 }
