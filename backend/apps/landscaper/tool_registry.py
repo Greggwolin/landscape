@@ -105,6 +105,9 @@ UNIVERSAL_TOOLS = [
     "compute_trust_score",
     # Map artifacts
     "generate_map_artifact",
+    # Site-plan drape control by chat (SS16) — drives the shipped drape handlers
+    # (fit/opacity/scale/rotate/warp-mode/lock/save) via the front-end command bridge.
+    "control_map_overlay",
     # Plan image extraction (renders a plan/plat page -> transparent PNG for the overlay flow)
     "extract_plan_image",
     # Location Brief artifact (universal, works pre-project)
@@ -595,6 +598,8 @@ PAGE_TOOLS = {
         "update_site_attribute",
         # Map artifact generation
         "generate_map_artifact",
+        # Site-plan drape control by chat (SS16)
+        "control_map_overlay",
     ],
 
     "reports": [

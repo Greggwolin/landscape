@@ -71,6 +71,12 @@ import { addTpsOverlayFromControlPoints, shouldRenderTps, type TpsOverlayHandle 
 import PlanExtractCanvas, { type ExtractedRegion } from './extract/PlanExtractCanvas';
 import { georeference, snapToVertex, recommendTpsWarp, type ControlPoint } from '@/lib/gis/controlPoints';
 import { takePendingPlanExtract } from '@/lib/gis/planExtractBridge';
+import {
+  takePendingDrapeCommand,
+  resolveDrapeTargetGeometry,
+  nudgeCorners,
+  type DrapeCommand,
+} from '@/lib/gis/drapeCommandBridge';
 import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
@@ -2961,6 +2967,120 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       return changed ? next : prev;
     });
   }, [savedOverlays]);
+
+  // ─── Landscaper drape control (SS16) ───────────────────────────────────
+  // Drive the SAME drape handlers a mouse user does, from a chat command drained via
+  // the bridge (drapeCommandBridge). Runs on the map page; the target resolves from
+  // live map state (selected parcels → drawn polygon → free-drape fallback).
+  const pendingFitRef = useRef<
+    [[number, number], [number, number], [number, number], [number, number]] | null
+  >(null);
+
+  const resolveDrapeGeom = useCallback(
+    (target: DrapeCommand['target']) =>
+      resolveDrapeTargetGeometry(target, {
+        selectedParcelGeoms: selectedParcelList.map(
+          (f) => f?.geometry as { coordinates?: unknown } | undefined
+        ),
+        drawnPolygon: drapeTargetPolygon as { coordinates?: unknown } | null,
+      }),
+    [selectedParcelList, drapeTargetPolygon]
+  );
+
+  const handleDrapeCommand = useCallback(
+    (cmd: DrapeCommand) => {
+      const action = cmd.action;
+      const target = cmd.target ?? 'auto';
+      const params = cmd.params ?? {};
+      switch (action) {
+        case 'drape': {
+          if (!params.source_uri) {
+            showToast('No image to drape — extract a plan first, then drape it.');
+            return;
+          }
+          const geom = params.fit !== false ? resolveDrapeGeom(target) : null;
+          const corners = geom ? fitCornersToGeometry(geom) : null;
+          // Apply the fit once the editor has (re)built for the new image.
+          pendingFitRef.current = corners;
+          applyExtractedPlanOverlay({
+            source_uri: params.source_uri,
+            source_doc_id: params.source_doc_id ?? null,
+            source_page: params.source_page ?? null,
+          });
+          if (params.fit !== false && !corners) {
+            showToast('Draping — no parcels selected or polygon drawn to fit to; drag the corners to place it.');
+          }
+          break;
+        }
+        case 'fit': {
+          if (!overlayImageUrl) { showToast('No overlay to fit — drape a plan first.'); return; }
+          const geom = resolveDrapeGeom(target);
+          const corners = geom ? fitCornersToGeometry(geom) : null;
+          if (corners) overlayEditor.setCorners(corners);
+          else showToast('Nothing to fit to — select parcels or draw a polygon first.');
+          break;
+        }
+        case 'set_opacity':
+          if (typeof params.opacity === 'number') overlayEditor.setOpacity(params.opacity);
+          break;
+        case 'scale':
+          if (typeof params.scale === 'number') overlayEditor.setScale(params.scale);
+          else if (typeof params.scale_delta === 'number') overlayEditor.setScale(overlayEditor.scale * params.scale_delta);
+          break;
+        case 'rotate':
+          if (typeof params.rotation_deg === 'number') overlayEditor.setRotation(params.rotation_deg);
+          else if (typeof params.rotation_delta === 'number') overlayEditor.setRotation(overlayEditor.rotationDeg + params.rotation_delta);
+          break;
+        case 'set_warp_mode':
+          if (params.warp_mode === 'tps' && (controlPoints.length < 3 || !cpImgDims)) {
+            showToast('Place at least 3 control points before switching to warp (TPS).');
+            return;
+          }
+          if (params.warp_mode) overlayEditor.setWarpMode(params.warp_mode);
+          break;
+        case 'nudge': {
+          if (!overlayImageUrl) { showToast('No overlay to nudge — drape a plan first.'); return; }
+          const cur = overlayEditor.getState().corners;
+          overlayEditor.setCorners(
+            nudgeCorners(cur, params.direction ?? 'east', typeof params.amount === 'number' ? params.amount : 0.1)
+          );
+          break;
+        }
+        case 'lock': overlayEditor.setLocked(true); break;
+        case 'unlock': overlayEditor.setLocked(false); break;
+        case 'save':
+          if (overlayImageUrl) handleOverlaySave();
+          else showToast('Nothing to save — drape a plan first.');
+          break;
+        default:
+          break;
+      }
+    },
+    [resolveDrapeGeom, overlayImageUrl, overlayEditor, applyExtractedPlanOverlay, handleOverlaySave, controlPoints, cpImgDims, showToast]
+  );
+
+  // Apply a pending fit once the editor is ready after a chat-driven drape.
+  useEffect(() => {
+    if (overlayEditor.ready && pendingFitRef.current) {
+      overlayEditor.setCorners(pendingFitRef.current);
+      pendingFitRef.current = null;
+    }
+  }, [overlayEditor.ready, overlayImageUrl, overlayEditor]);
+
+  // Drain the drape command (bridge): the live CustomEvent for the already-mounted
+  // case, plus the latch for the navigate-then-mount case. Mirrors the plan-extract
+  // drain — no duplicated map logic, reuses the shipped handlers.
+  useEffect(() => {
+    const onCmd = (e: Event) => {
+      const detail = (e as CustomEvent).detail as DrapeCommand | undefined;
+      takePendingDrapeCommand();
+      if (detail) handleDrapeCommand(detail);
+    };
+    window.addEventListener('landscaper:control_map_overlay', onCmd);
+    const pending = takePendingDrapeCommand();
+    if (pending) handleDrapeCommand(pending);
+    return () => window.removeEventListener('landscaper:control_map_overlay', onCmd);
+  }, [handleDrapeCommand]);
 
   // Read-only drapes for every saved overlay NOT currently being edited.
   // Handles are kind-tagged: 'quad' = 4-corner image source (unchanged), 'tps' =

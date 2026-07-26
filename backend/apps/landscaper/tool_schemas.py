@@ -4994,6 +4994,58 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "control_map_overlay",
+        "description": (
+            "Drive the site-plan drape (image overlay) workflow by chat, on the project map page. "
+            "This carries out the SAME actions a mouse user performs in the overlay editor: place an "
+            "extracted plan image, fit it to a target, change opacity, scale, rotate, switch warp mode "
+            "(4-corner vs TPS rubber-sheet warp), nudge/position, lock/unlock, and save. The map runs "
+            "the command; if there is no active overlay or no target geometry, it falls back (e.g. to a "
+            "free drape) and reports back — relay that, don't claim success. "
+            "TARGET: 'selected_parcels' (parcels the user has selected on the map), 'drawn_polygon' (a "
+            "polygon the user drew — a drape target need NOT be a county parcel), or 'auto' (selected "
+            "parcels if any, else a drawn polygon). "
+            "SOURCE for action='drape': pass source_uri of an already-extracted plan image. To place a "
+            "document/exhibit that hasn't been extracted yet, call extract_plan_image FIRST (it renders "
+            "the page and loads it into the editor), then use this tool to fit/warp/save. "
+            "Examples: 'drape this exhibit over the selected parcels and fit it' -> action='drape' "
+            "(source_uri) target='selected_parcels' fit=true; 'switch to warp / tighten the fit' -> "
+            "action='set_warp_mode' warp_mode='tps'; 'drop opacity to 60%' -> action='set_opacity' "
+            "opacity=0.6; 'scale it up' -> action='scale' scale_delta=1.25; 'nudge it east' -> "
+            "action='nudge' direction='east'; 'lock it' -> action='lock'; 'save the overlay' -> "
+            "action='save'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["drape", "fit", "set_opacity", "scale", "rotate",
+                             "set_warp_mode", "nudge", "lock", "unlock", "save"],
+                    "description": "Which drape action to perform.",
+                },
+                "target": {
+                    "type": "string",
+                    "enum": ["selected_parcels", "drawn_polygon", "auto"],
+                    "description": "What drape/fit targets. Resolved on the client from live map state. Default 'auto'.",
+                },
+                "source_uri": {"type": "string", "description": "action='drape': URL of an already-extracted plan image to place."},
+                "source_doc_id": {"type": "integer", "description": "Optional provenance: the source document id."},
+                "source_page": {"type": "integer", "description": "Optional provenance: the source page number."},
+                "fit": {"type": "boolean", "description": "action='drape': fit to the target right after placing. Default true."},
+                "opacity": {"type": "number", "description": "action='set_opacity': 0-1 (a percent like 60 is accepted and normalized)."},
+                "scale": {"type": "number", "description": "action='scale': absolute factor (1.0 = 100%)."},
+                "scale_delta": {"type": "number", "description": "action='scale': relative multiplier (e.g. 1.25 = scale up 25%)."},
+                "rotation_deg": {"type": "number", "description": "action='rotate': absolute degrees (-180..180)."},
+                "rotation_delta": {"type": "number", "description": "action='rotate': relative degrees to add."},
+                "warp_mode": {"type": "string", "enum": ["quad", "tps"], "description": "action='set_warp_mode': 'quad' = 4-corner (default), 'tps' = rubber-sheet warp (needs >=3 control points)."},
+                "direction": {"type": "string", "enum": ["north", "south", "east", "west", "up", "down", "left", "right"], "description": "action='nudge': which way to move the overlay."},
+                "amount": {"type": "number", "description": "action='nudge': optional step as a fraction of the overlay extent (client default otherwise)."},
+            },
+            "required": ["action"],
+        },
+    },
+    {
         "name": "extract_plan_image",
         "description": "Render a page (or a cropped region of a page) from an uploaded plan / plat / site-plan PDF into a transparent-background PNG, then hand it to the site-plan overlay (drape) flow so the user can place it on the map. STRICT TRIGGER: Fire ONLY when the user EXPLICITLY asks to extract / pull out / clip / crop / grab the site plan (or plat / exhibit) as an image for the map. DO NOT fire on general document questions, on 'open/show me the plan' (that is a document view, not an extraction), or as supplementary work tacked onto another tool's call. TWO-STEP, NEVER SILENT: first call with doc_id ALONE to render a preview + a proposed crop for the user to confirm; only after the user confirms a page and crop_bbox do you call again with both to produce the final cropped image. This tool never places the overlay itself — the user positions and saves it in the existing overlay editor. If you downloaded a plat during research, still surface the preview for confirmation; never auto-place.",
         "input_schema": {
