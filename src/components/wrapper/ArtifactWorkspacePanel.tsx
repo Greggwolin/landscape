@@ -408,6 +408,7 @@ export function ArtifactWorkspacePanel({
               (active.params_json as { clarification_config: ClarificationArtifactConfig })
                 .clarification_config
             }
+            artifactId={active.artifact_id}
             onClose={() => setActiveArtifactId(null)}
           />
         ) : active.tool_name === 'generate_location_brief' &&
