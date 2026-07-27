@@ -4999,9 +4999,14 @@ LANDSCAPER_TOOLS = [
             "Drive the site-plan drape (image overlay) workflow by chat, on the project map page. "
             "This carries out the SAME actions a mouse user performs in the overlay editor: place an "
             "extracted plan image, fit it to a target, change opacity, scale, rotate, switch warp mode "
-            "(4-corner vs TPS rubber-sheet warp), nudge/position, lock/unlock, and save. The map runs "
-            "the command; if there is no active overlay or no target geometry, it falls back (e.g. to a "
-            "free drape) and reports back — relay that, don't claim success. "
+            "(4-corner vs TPS rubber-sheet warp), nudge/position, lock/unlock, and save. "
+            "The tool returns a `message` and an `applied` flag — ALWAYS relay `message` to the user, "
+            "and NEVER state a change was made when `applied` is false. Opacity, scale, rotate, warp-mode "
+            "and lock/unlock are applied AND SAVED immediately to the chosen saved overlay (applied=true) "
+            "and take effect even when the user is not on the map page. Drape (place image), fit, nudge and "
+            "save are interactive: they OPEN the map for the user to position and Save (applied=false) — say "
+            "the map was opened, not that it's done. If the project has more than one saved overlay the tool "
+            "asks which one; relay that question and pass the chosen `overlay_id` on the next call. "
             "TARGET: 'selected_parcels' (parcels the user has selected on the map), 'drawn_polygon' (a "
             "polygon the user drew — a drape target need NOT be a county parcel), or 'auto' (selected "
             "parcels if any, else a drawn polygon). "
@@ -5041,6 +5046,7 @@ LANDSCAPER_TOOLS = [
                 "warp_mode": {"type": "string", "enum": ["quad", "tps"], "description": "action='set_warp_mode': 'quad' = 4-corner (default), 'tps' = rubber-sheet warp (needs >=3 control points)."},
                 "direction": {"type": "string", "enum": ["north", "south", "east", "west", "up", "down", "left", "right"], "description": "action='nudge': which way to move the overlay."},
                 "amount": {"type": "number", "description": "action='nudge': optional step as a fraction of the overlay extent (client default otherwise)."},
+                "overlay_id": {"type": "integer", "description": "Which saved overlay to adjust (persist actions). Omit when there's only one overlay; pass it after the tool asks 'which one?' on a multi-overlay project."},
             },
             "required": ["action"],
         },
