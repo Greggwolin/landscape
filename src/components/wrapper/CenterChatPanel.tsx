@@ -267,14 +267,18 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay', { detail: overlay }));
         }
       }
-      // Drape control (SS16) — control_map_overlay drives the site-plan drape handlers.
-      // Same seam as extract_plan_image: latch the command, navigate the /w/ panel to
-      // the map so MapTab mounts, and fire the live CustomEvent for the already-mounted
-      // case. MapTab drains the latch on mount and runs the shipped drape handlers.
+      // Drape control (SS16 / SS18) — control_map_overlay. Persist actions
+      // (opacity/scale/rotate/warp/lock) are already applied + saved server-side
+      // (result.applied === true); we only fire the live-refresh event so an
+      // on-map user sees it immediately, WITHOUT yanking an off-map user to the map.
+      // Geometric actions (result.action_required === 'map_placement') need the
+      // interactive editor, so we navigate the /w/ panel to the map (MapTab mounts +
+      // drains the latch) and fire the live CustomEvent for the already-mounted case.
       if (toolName === 'control_map_overlay' && result.action === 'control_map_overlay' && result.overlay_command) {
         const cmd = result.overlay_command as DrapeCommand;
         setPendingDrapeCommand(cmd);
-        if (projectId) {
+        const needsMap = result.action_required === 'map_placement';
+        if (projectId && needsMap) {
           const target = typeof result.navigate_to === 'string'
             ? result.navigate_to
             : `/w/projects/${projectId}/map`;

@@ -2992,6 +2992,21 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       const action = cmd.action;
       const target = cmd.target ?? 'auto';
       const params = cmd.params ?? {};
+
+      // SS18: persist actions (opacity/scale/rotate/warp-mode/lock/unlock) are already
+      // applied + saved to tbl_project_overlay SERVER-SIDE by control_map_overlay. The
+      // client just live-refreshes the saved overlays so the read-only render reflects
+      // the new value immediately. (Previously these drove the idle EDIT editor and did
+      // nothing to the saved overlay — the false-success bug.)
+      if (
+        action === 'set_opacity' || action === 'scale' || action === 'rotate' ||
+        action === 'set_warp_mode' || action === 'lock' || action === 'unlock'
+      ) {
+        fetchOverlays();
+        return;
+      }
+
+      // Geometric actions — interactive editor flow (unchanged from SS16).
       switch (action) {
         case 'drape': {
           if (!params.source_uri) {
@@ -3020,24 +3035,6 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           else showToast('Nothing to fit to — select parcels or draw a polygon first.');
           break;
         }
-        case 'set_opacity':
-          if (typeof params.opacity === 'number') overlayEditor.setOpacity(params.opacity);
-          break;
-        case 'scale':
-          if (typeof params.scale === 'number') overlayEditor.setScale(params.scale);
-          else if (typeof params.scale_delta === 'number') overlayEditor.setScale(overlayEditor.scale * params.scale_delta);
-          break;
-        case 'rotate':
-          if (typeof params.rotation_deg === 'number') overlayEditor.setRotation(params.rotation_deg);
-          else if (typeof params.rotation_delta === 'number') overlayEditor.setRotation(overlayEditor.rotationDeg + params.rotation_delta);
-          break;
-        case 'set_warp_mode':
-          if (params.warp_mode === 'tps' && (controlPoints.length < 3 || !cpImgDims)) {
-            showToast('Place at least 3 control points before switching to warp (TPS).');
-            return;
-          }
-          if (params.warp_mode) overlayEditor.setWarpMode(params.warp_mode);
-          break;
         case 'nudge': {
           if (!overlayImageUrl) { showToast('No overlay to nudge — drape a plan first.'); return; }
           const cur = overlayEditor.getState().corners;
@@ -3046,8 +3043,6 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           );
           break;
         }
-        case 'lock': overlayEditor.setLocked(true); break;
-        case 'unlock': overlayEditor.setLocked(false); break;
         case 'save':
           if (overlayImageUrl) handleOverlaySave();
           else showToast('Nothing to save — drape a plan first.');
@@ -3056,7 +3051,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           break;
       }
     },
-    [resolveDrapeGeom, overlayImageUrl, overlayEditor, applyExtractedPlanOverlay, handleOverlaySave, controlPoints, cpImgDims, showToast]
+    [fetchOverlays, resolveDrapeGeom, overlayImageUrl, overlayEditor, applyExtractedPlanOverlay, handleOverlaySave, showToast]
   );
 
   // Apply a pending fit once the editor is ready after a chat-driven drape.

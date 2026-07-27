@@ -858,6 +858,13 @@ export function useLandscaperThreads({
               setMessages((prev) => prev.filter((m) => String(m.messageId).startsWith('temp-')));
               // Don't await loadThreads here — it's non-blocking sidebar refresh
               loadThreads();
+              // SS18 UX-B: refresh the /w/ sidebar list immediately on create. The
+              // sidebar listens for this event (w/layout.tsx); relying on a downstream
+              // thread-count delta to fire it was race-prone, so a new chat could be
+              // missing from history until a hard refresh. Dispatch directly here.
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('landscaper:threads-changed'));
+              }
             } else {
               removeTempMessage();
               setError(data.error || 'Failed to start new thread');
@@ -901,6 +908,11 @@ export function useLandscaperThreads({
               // Preserve the optimistic echo; clear anything else.
               setMessages((prev) => prev.filter((m) => String(m.messageId).startsWith('temp-')));
               loadThreads();
+              // SS18 UX-B: refresh the /w/ sidebar list immediately on create (see the
+              // unassigned branch above for the rationale — the count-delta trigger raced).
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('landscaper:threads-changed'));
+              }
             } else {
               removeTempMessage();
               setError(data.error || 'Failed to start new thread');
