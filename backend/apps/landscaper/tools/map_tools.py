@@ -476,21 +476,29 @@ def _geocode_city_state(location_str: Optional[str]) -> Optional[List[float]]:
 
 
 # ===========================================================================
-# control_map_overlay — chat door for the site-plan drape workflow (SS16).
+# control_map_overlay — chat door for the site-plan drape workflow (SS16 / SS18).
 #
-# Thin bridge tool: it maps a chat instruction to a command the FRONT-END drains
-# on the map page, where the shipped SS14 drape handlers (fit-to-target, warp mode,
-# scale, rotate, opacity, lock, save) do the actual work — the same handlers a
-# mouse user drives. The tool renders nothing and writes nothing itself; the only
-# DB write is the overlay Save on the client, which goes through the overlay
-# endpoints' ownership guard (user_can_access_project). Emitted through the proven
-# extract_plan_image bridge (latch -> navigate -> CustomEvent, drained on MapTab).
+# Two classes of action:
+#   * PERSIST actions (set_opacity / scale / rotate / set_warp_mode / lock / unlock)
+#     target a SAVED overlay and are applied + persisted SERVER-SIDE here, straight
+#     to landscape.tbl_project_overlay, behind an ownership check. They return
+#     applied=True with the real new value, so "Done" is truthful, the change
+#     survives reload, and it works even when the user is NOT on the map page. The
+#     front-end, if the map is open, live-refreshes so the change shows immediately.
+#   * GEOMETRIC actions (drape / fit / nudge / save) need the interactive editor, so
+#     they return applied=False plus a bridge command the FE drains on the map page
+#     (latch -> navigate -> CustomEvent). Their message says the map was OPENED for
+#     placement — never a fabricated "Done".
+#
+# SS18 (LSCMD-SS-DRAPECHAT-FIX): fixes the silent false-success where set_opacity
+# drove the idle EDIT editor (no visible change, no persistence) yet the model still
+# reported success. The model must relay the tool's `message` and must NOT claim the
+# change is done/saved when applied is False.
 # ===========================================================================
 
-_OVERLAY_ACTIONS = {
-    "drape", "fit", "set_opacity", "scale", "rotate",
-    "set_warp_mode", "nudge", "lock", "unlock", "save",
-}
+_PERSIST_ACTIONS = {"set_opacity", "scale", "rotate", "set_warp_mode", "lock", "unlock"}
+_GEOMETRIC_ACTIONS = {"drape", "fit", "nudge", "save"}
+_OVERLAY_ACTIONS = _PERSIST_ACTIONS | _GEOMETRIC_ACTIONS
 _OVERLAY_TARGETS = {"selected_parcels", "drawn_polygon", "auto"}
 _NUDGE_DIRECTIONS = {"north", "south", "east", "west", "up", "down", "left", "right"}
 
@@ -508,92 +516,248 @@ def _normalize_opacity(value):
     return max(0.0, min(1.0, v))
 
 
-@register_tool('control_map_overlay')
-def control_map_overlay(tool_input: Dict[str, Any] = None, project_id: int = None, **kwargs):
-    """Drive the site-plan drape workflow by chat via the front-end command bridge.
+def _user_can_write_project(user_id, project_id) -> bool:
+    """Owner-or-staff check, mirroring apps.projects.permissions.user_can_access_project
+    (which needs a request). A chat overlay write must clear the same bar the overlay
+    PATCH endpoint enforces."""
+    if not user_id:
+        return False
+    try:
+        from django.contrib.auth import get_user_model
+        u = get_user_model().objects.filter(id=user_id).first()
+        if u is None:
+            return False
+        if getattr(u, "is_staff", False) or getattr(u, "is_superuser", False):
+            return True
+        from apps.projects.models import Project
+        return Project.objects.filter(project_id=project_id, created_by_id=user_id).exists()
+    except Exception:  # pragma: no cover - defensive; deny on any lookup error
+        logger.exception("control_map_overlay ownership check failed")
+        return False
 
-    Returns a bridge command ({action, target, params}); MapTab drains it and calls
-    the shipped drape handlers. Does not render or write — persistence is the client's
-    Save action through the ownership-guarded overlay endpoints.
-    """
-    tool_input = tool_input or {}
-    action = str(tool_input.get('action') or '').strip().lower()
-    if action not in _OVERLAY_ACTIONS:
-        return {
-            "success": False,
-            "error": f"Unknown action '{action}'. One of: {sorted(_OVERLAY_ACTIONS)}",
-        }
-    if not project_id:
-        return {
-            "success": False,
-            "error": "control_map_overlay needs a project — open a project first.",
-        }
 
+def _fetch_project_overlays(project_id):
+    """Saved overlays for a project, newest first:
+    (overlay_id, title, opacity, rotation_deg, scale, warp_mode, locked, control_point_count)."""
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT overlay_id, title, opacity, rotation_deg, scale, warp_mode, locked, "
+            "CASE WHEN jsonb_typeof(control_points) = 'array' "
+            "     THEN jsonb_array_length(control_points) ELSE 0 END "
+            "FROM landscape.tbl_project_overlay "
+            "WHERE project_id = %s "
+            "ORDER BY updated_at DESC NULLS LAST, overlay_id DESC",
+            [project_id],
+        )
+        return cur.fetchall()
+
+
+def _geometric_overlay_command(action, tool_input, project_id):
+    """Build the honest bridge response for actions that require the interactive map
+    editor. Always applied=False — the reply must say the map was OPENED, not done."""
     target = str(tool_input.get('target') or 'auto').strip().lower()
     if target not in _OVERLAY_TARGETS:
         target = 'auto'
-
     params: Dict[str, Any] = {}
 
     if action == 'drape':
         source_uri = tool_input.get('source_uri')
         if not source_uri:
             return {
-                "success": False,
-                "error": "drape needs a source_uri. Extract the plan first with "
-                         "extract_plan_image, then drape/fit the extracted image.",
-                "relay_hint": "Ask the user which plan/exhibit to drape, or run "
-                              "extract_plan_image first to place it.",
+                "success": False, "applied": False, "error": "drape_needs_source",
+                "message": "To drape an image I first need an extracted plan. Run "
+                           "extract_plan_image (it renders the page and loads it into the "
+                           "editor), then I can place and fit it.",
+                "relay_hint": "Tell the user to extract the plan first; do not claim anything was draped.",
             }
         params.update({
             "source_uri": source_uri,
             "source_doc_id": tool_input.get('source_doc_id'),
             "source_page": tool_input.get('source_page'),
-            # Default: fit to the resolved target right after placing.
             "fit": bool(tool_input.get('fit', True)),
         })
-    elif action == 'set_opacity':
-        op = _normalize_opacity(tool_input.get('opacity'))
-        if op is None:
-            return {"success": False, "error": "set_opacity needs an opacity (0-1 or a percent)."}
-        params["opacity"] = op
-    elif action == 'scale':
-        # Absolute factor (1.0 = 100%) OR a relative multiplier ("scale up" -> 1.25).
-        params["scale"] = tool_input.get('scale')
-        params["scale_delta"] = tool_input.get('scale_delta')
-        if params["scale"] is None and params["scale_delta"] is None:
-            return {"success": False, "error": "scale needs `scale` (absolute) or `scale_delta` (relative)."}
-    elif action == 'rotate':
-        params["rotation_deg"] = tool_input.get('rotation_deg')
-        params["rotation_delta"] = tool_input.get('rotation_delta')
-        if params["rotation_deg"] is None and params["rotation_delta"] is None:
-            return {"success": False, "error": "rotate needs `rotation_deg` (absolute) or `rotation_delta` (relative)."}
-    elif action == 'set_warp_mode':
-        wm = str(tool_input.get('warp_mode') or '').strip().lower()
-        if wm not in {"quad", "tps"}:
-            return {"success": False, "error": "warp_mode must be 'quad' (4-corner) or 'tps' (warp)."}
-        params["warp_mode"] = wm
+        message = ("Opened the map to place the plan image — I'll fit it to the target; "
+                   "position it and Save it there.")
+    elif action == 'fit':
+        message = "Opened the map to fit the overlay to the target — review it and Save there."
     elif action == 'nudge':
         direction = str(tool_input.get('direction') or '').strip().lower()
         if direction not in _NUDGE_DIRECTIONS:
-            return {"success": False, "error": "nudge needs a direction (north/south/east/west)."}
-        params["direction"] = direction
-        params["amount"] = tool_input.get('amount')  # optional fraction of extent; client defaults
+            return {
+                "success": False, "applied": False, "error": "nudge_needs_direction",
+                "message": "Which way should I nudge it — north, south, east, or west?",
+            }
+        params.update({"direction": direction, "amount": tool_input.get('amount')})
+        message = f"Opened the map to nudge the overlay {direction} — review it and Save there."
+    else:  # 'save'
+        message = "Saving the overlay on the map."
+
+    return {
+        "success": True, "applied": False, "action": "control_map_overlay",
+        "action_required": "map_placement",
+        "overlay_command": {"action": action, "target": target, "params": params},
+        "navigate_to": f"/w/projects/{project_id}/map",
+        "message": message,
+        "relay_hint": ("applied is False — this happens interactively on the map. Relay "
+                       "`message` as-is; do NOT tell the user the change is already done or saved."),
+    }
+
+
+@register_tool('control_map_overlay', is_mutation=True)
+def control_map_overlay(tool_input: Dict[str, Any] = None, project_id: int = None, **kwargs):
+    """Adjust a saved site-plan overlay by chat.
+
+    PERSIST actions (opacity/scale/rotate/warp-mode/lock/unlock) are applied and saved
+    to tbl_project_overlay here (ownership-checked) and return applied=True with the real
+    new value. GEOMETRIC actions (drape/fit/nudge/save) return applied=False + a bridge
+    command the map drains. The caller must relay `message` and never claim success when
+    applied is False.
+    """
+    tool_input = tool_input or {}
+    user_id = kwargs.get('user_id')
+    action = str(tool_input.get('action') or '').strip().lower()
+    if action not in _OVERLAY_ACTIONS:
+        return {"success": False, "applied": False,
+                "error": f"Unknown action '{action}'. One of: {sorted(_OVERLAY_ACTIONS)}"}
+    if not project_id:
+        return {"success": False, "applied": False,
+                "message": "Open a project first — I can only adjust overlays on an open project.",
+                "error": "no_project"}
+
+    # Geometric actions run on the interactive map; hand off the bridge command.
+    if action in _GEOMETRIC_ACTIONS:
+        return _geometric_overlay_command(action, tool_input, project_id)
+
+    # ---- PERSIST actions: apply + save server-side, ownership-checked. ----
+    if not _user_can_write_project(user_id, project_id):
+        return {"success": False, "applied": False, "error": "forbidden",
+                "message": "I can't modify this project's overlays — it isn't one you own."}
+
+    overlays = _fetch_project_overlays(project_id)
+    if not overlays:
+        return {"success": False, "applied": False, "error": "no_saved_overlay",
+                "message": "There's no saved site-plan overlay to adjust yet. Drape one on "
+                           "the map first, then I can change its opacity, rotation, scale, "
+                           "warp mode, or lock it."}
+
+    # Resolve the target overlay: explicit id > single overlay > ask which.
+    wanted_id = tool_input.get('overlay_id')
+    target_row = None
+    if wanted_id is not None:
+        try:
+            wanted_id = int(wanted_id)
+        except (TypeError, ValueError):
+            wanted_id = None
+        target_row = next((r for r in overlays if r[0] == wanted_id), None)
+        if target_row is None:
+            return {"success": False, "applied": False, "error": "overlay_not_found",
+                    "message": f"I couldn't find overlay #{wanted_id} on this project."}
+    elif len(overlays) == 1:
+        target_row = overlays[0]
+    else:
+        listing = [{"overlay_id": r[0], "title": r[1] or f"Overlay {r[0]}"} for r in overlays]
+        names = ", ".join(f'"{o["title"]}" (#{o["overlay_id"]})' for o in listing)
+        return {"success": False, "applied": False, "needs_disambiguation": True,
+                "overlays": listing,
+                "message": f"This project has {len(overlays)} saved overlays: {names}. "
+                           "Which one should I adjust?"}
+
+    ov_id = target_row[0]
+    ov_title = target_row[1] or f"Overlay {ov_id}"
+    cur_rot, cur_scale, cp_count = target_row[3], target_row[4], target_row[7]
+
+    column = None
+    value = None
+    human = None
+
+    if action == 'set_opacity':
+        v = _normalize_opacity(tool_input.get('opacity'))
+        if v is None:
+            return {"success": False, "applied": False, "error": "bad_opacity",
+                    "message": "Tell me an opacity between 0 and 100%."}
+        column, value, human = "opacity", v, f"opacity to {round(v * 100)}%"
+    elif action == 'scale':
+        if tool_input.get('scale') is not None:
+            try:
+                v = float(tool_input['scale'])
+            except (TypeError, ValueError):
+                return {"success": False, "applied": False, "error": "bad_scale",
+                        "message": "Tell me a numeric scale factor (e.g. 1.5)."}
+        elif tool_input.get('scale_delta') is not None:
+            base = float(cur_scale) if cur_scale is not None else 1.0
+            try:
+                v = base * float(tool_input['scale_delta'])
+            except (TypeError, ValueError):
+                return {"success": False, "applied": False, "error": "bad_scale",
+                        "message": "Tell me how much to scale (e.g. 1.25 for +25%)."}
+        else:
+            return {"success": False, "applied": False, "error": "scale_needs_value",
+                    "message": "Tell me a scale factor (e.g. 1.25 to scale up 25%)."}
+        v = max(0.05, min(20.0, v))
+        column, value, human = "scale", v, f"scale to {round(v, 3)}x"
+    elif action == 'rotate':
+        if tool_input.get('rotation_deg') is not None:
+            try:
+                v = float(tool_input['rotation_deg'])
+            except (TypeError, ValueError):
+                return {"success": False, "applied": False, "error": "bad_rotation",
+                        "message": "Tell me an angle in degrees."}
+        elif tool_input.get('rotation_delta') is not None:
+            base = float(cur_rot) if cur_rot is not None else 0.0
+            try:
+                v = base + float(tool_input['rotation_delta'])
+            except (TypeError, ValueError):
+                return {"success": False, "applied": False, "error": "bad_rotation",
+                        "message": "Tell me how many degrees to rotate."}
+        else:
+            return {"success": False, "applied": False, "error": "rotate_needs_value",
+                    "message": "Tell me an angle in degrees (absolute or relative)."}
+        v = ((v + 180) % 360) - 180  # normalize to (-180, 180]
+        column, value, human = "rotation_deg", v, f"rotation to {round(v, 1)} degrees"
+    elif action == 'set_warp_mode':
+        wm = str(tool_input.get('warp_mode') or '').strip().lower()
+        if wm not in {"quad", "tps"}:
+            return {"success": False, "applied": False, "error": "bad_warp_mode",
+                    "message": "Warp mode is either 'quad' (4-corner) or 'tps' (rubber-sheet warp)."}
+        if wm == 'tps' and (cp_count or 0) < 3:
+            return {"success": False, "applied": False, "error": "tps_needs_control_points",
+                    "message": f'"{ov_title}" needs at least 3 control points before it can use '
+                               f'TPS warp (it has {cp_count or 0}). Add control points on the map first.'}
+        column, value = "warp_mode", wm
+        human = f"warp mode to {'TPS (warp)' if wm == 'tps' else '4-corner'}"
     elif action == 'lock':
-        params["locked"] = True
+        column, value, human = "locked", True, "locked"
     elif action == 'unlock':
-        params["locked"] = False
-    # 'fit' and 'save' carry no extra params.
+        column, value, human = "locked", False, "unlocked"
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f"UPDATE landscape.tbl_project_overlay SET {column} = %s, updated_at = NOW() "
+            "WHERE overlay_id = %s AND project_id = %s",
+            [value, ov_id, project_id],
+        )
+        applied = cur.rowcount > 0
+
+    if not applied:
+        return {"success": False, "applied": False, "error": "write_failed",
+                "message": f'I tried to update "{ov_title}" but the change did not take. Please try again.'}
+
+    if action in ('lock', 'unlock'):
+        message = f'{human.capitalize()} "{ov_title}".'
+    else:
+        message = f'Set "{ov_title}" {human}.'
 
     return {
         "success": True,
+        "applied": True,
         "action": "control_map_overlay",
-        "overlay_command": {"action": action, "target": target, "params": params},
-        # The FE navigates here so MapTab mounts + drains (no-op if already on the map).
-        "navigate_to": f"/w/projects/{project_id}/map",
-        "relay_hint": (
-            "The map will carry out the drape command. If no overlay is active yet "
-            "(for non-drape actions) or no target geometry exists, the map falls back "
-            "and says so — relay that to the user rather than claiming success."
-        ),
+        "overlay_id": ov_id,
+        "overlay_title": ov_title,
+        "changed": {column: value},
+        "message": message,
+        # Persisted already; the FE only needs to live-refresh saved overlays if the
+        # map is open. No forced navigation for a persist action.
+        "overlay_command": {"action": action, "overlay_id": ov_id, "persisted": True,
+                            "params": {column: value}},
+        "relay_hint": "Applied and saved to the overlay. Relay `message` as the confirmation.",
     }
