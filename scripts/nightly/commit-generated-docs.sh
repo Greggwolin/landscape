@@ -76,7 +76,11 @@ ALLOWLIST_GLOBS=(
 
 # ── Deny pattern: anything matching is code/source and must never be committed
 #    by this job. Belt-and-suspenders on top of the allowlist + scoped commit.
-DENY_REGEX='(^|/)(src|backend|services|scripts|migrations)/|\.(ts|tsx|js|jsx|mjs|cjs|py|sql|css|scss|sh)$'
+#    Sourced from the single source of truth shared with .husky/commit-msg so
+#    the two enforcement points can never drift (FB-304 recurrence hardening).
+# shellcheck source=scripts/nightly/fb304-deny-regex.sh
+. "$(dirname "$0")/fb304-deny-regex.sh"
+DENY_REGEX="$FB304_DENY_REGEX"
 
 # Expand allowlist globs into concrete candidate paths.
 candidates=()

@@ -1,0 +1,46 @@
+#!/usr/bin/env sh
+# FB-304 recurrence guard (session LSCMD-RN2-NIGHTLYSWEEP-0727).
+#
+# Rejects any commit whose message begins "docs: nightly health check" when its
+# staged paths include source/code. This is the caller-independent backstop:
+# scripts/nightly/commit-generated-docs.sh only protects the nightly job when it
+# is actually invoked, but on 2026-07-27 the nightly agent bypassed it by staging
+# the working tree manually and reusing that message string (commit 0e4eb03f).
+# A commit-msg hook fires for every path — script, manual, or daemon.
+#
+# commit-msg receives the message file as $1. We read the FIRST line so trailing
+# body text (file lists, footers) can never trigger a false positive.
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+first_line=$(head -n 1 "$msg_file")
+
+case "$first_line" in
+  "docs: nightly health check"*)
+    # Load the single source of truth for the deny pattern.
+    regex_file="scripts/nightly/fb304-deny-regex.sh"
+    if [ ! -f "$regex_file" ]; then
+      echo "FB-304 GUARD: cannot find $regex_file — refusing to validate blindly." >&2
+      exit 1
+    fi
+    # shellcheck source=scripts/nightly/fb304-deny-regex.sh
+    . "./$regex_file"
+
+    offending=$(git diff --cached --name-only | grep -E "$FB304_DENY_REGEX" || true)
+    if [ -n "$offending" ]; then
+      echo "" >&2
+      echo "FB-304 GUARD — COMMIT REJECTED." >&2
+      echo "  A commit labeled 'docs: nightly health check ...' must contain ONLY" >&2
+      echo "  generated docs. These staged source/code paths are not allowed here:" >&2
+      echo "$offending" | sed 's/^/    - /' >&2
+      echo "" >&2
+      echo "  This is the exact FB-304 hazard (in-flight code swept into a docs commit)." >&2
+      echo "  Fix: unstage the source files and commit them separately with an honest" >&2
+      echo "  message, or use scripts/nightly/commit-generated-docs.sh for the docs." >&2
+      echo "" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+exit 0
