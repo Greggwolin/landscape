@@ -336,3 +336,84 @@ export function useArtifactCommitFieldEdit() {
     },
   });
 }
+
+/* ─── CB8 — batch commit (stage several edits, land as one set) ───────────
+ * POSTs to `commit_field_edits`. All-or-report: each edit commits through
+ * its own writer, one failure does not roll back the others. The response
+ * carries a per-edit `results` list plus ONE `impact_line` for the batch.
+ * Duplicate targets in one batch are rejected up front (400 duplicate_target).
+ */
+
+export interface ArtifactBatchEdit {
+  /** Table cell path, e.g. ["blocks","1","rows","4","cells","rate"]. */
+  cell_path?: string[];
+  /** Or a kv_pair path. Exactly one of cell_path / pair_path per edit. */
+  pair_path?: string[];
+  new_value: string;
+}
+
+export interface ArtifactCommitFieldEditsInput {
+  edits: ArtifactBatchEdit[];
+  user_id?: string;
+}
+
+export interface ArtifactBatchEditResult {
+  index: number;
+  status: 'applied' | 'error';
+  cell_path?: string[] | null;
+  pair_path?: string[] | null;
+  target?: { table: string; row_id: number | string; column: string };
+  coerced_value?: unknown;
+  meta?: Record<string, unknown>;
+  error?: string;
+  detail?: string;
+  suggested_user_question?: string;
+}
+
+export interface ArtifactCommitFieldEditsResponse {
+  success: boolean;
+  action?: string;
+  artifact_id?: number;
+  new_state?: BlockDocument;
+  results?: ArtifactBatchEditResult[];
+  applied_count?: number;
+  error_count?: number;
+  impact_line?: string;
+  /** Batch-level rejection code (e.g. duplicate_target, edits_required). */
+  error?: string;
+  detail?: string;
+}
+
+export function useArtifactCommitFieldEdits() {
+  const qc = useQueryClient();
+  return useMutation<
+    ArtifactCommitFieldEditsResponse,
+    Error,
+    { artifactId: number; input: ArtifactCommitFieldEditsInput }
+  >({
+    mutationFn: async ({ artifactId, input }) => {
+      const res = await fetch(
+        `${DJANGO_API_URL}/api/artifacts/${artifactId}/commit_field_edits/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      );
+      const data = await res
+        .json()
+        .catch(() => ({} as ArtifactCommitFieldEditsResponse));
+      // Do NOT throw on non-2xx — the renderer wants the structured envelope
+      // (per-edit results, or a batch-level duplicate_target code) for inline UI.
+      return data;
+    },
+    onSuccess: (data, vars) => {
+      // Any applied edit means the artifact mutated — refresh caches.
+      if (data?.success && (data.applied_count ?? 0) > 0) {
+        qc.invalidateQueries({ queryKey: ['artifacts', 'detail', vars.artifactId] });
+        qc.invalidateQueries({ queryKey: ['artifacts', 'versions', vars.artifactId] });
+        qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
+      }
+    },
+  });
+}

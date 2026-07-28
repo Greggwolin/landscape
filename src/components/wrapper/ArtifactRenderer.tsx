@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useContext } from 'react';
 import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
 import type {
   ArtifactRendererProps,
@@ -31,8 +31,33 @@ import styles from './ArtifactRenderer.module.css';
  *
  * Spec: SPEC_FINDING4_GENERATIVE_ARTIFACTS.md §8
  */
+/* ─── Batch-edit staging (CB8) ───────────────────────────────────────────
+ * Table cell edits do NOT post immediately — they stage into this per-renderer
+ * context. A commit bar lands the whole set through one batch request. Kept as
+ * a context (not prop-drilled) so any EditableCell can stage without threading
+ * through BlockList → Block → Section → Table. kv-pair edits are unaffected —
+ * they still commit immediately via onCommitFieldEdit.
+ */
+interface StagedEdit {
+  path: string[];
+  value: string;
+  /** Inline reason when this cell's commit failed (kept staged + dirty). */
+  error?: string;
+}
+interface StagingContextValue {
+  /** Keyed by path.join('/'). */
+  staged: Record<string, StagedEdit>;
+  /** Stage (or unstage, if newValue equals committed) one cell. */
+  stageEdit: (path: string[], newValue: string, committed: string | number | null) => void;
+  /** True when at least one cell is staged (used to mark calculated cells stale). */
+  active: boolean;
+}
+const StagingContext = React.createContext<StagingContextValue | null>(null);
+const stagedKey = (path: string[]) => path.join('/');
+
 export function ArtifactRenderer(props: ArtifactRendererProps) {
   const {
+    artifactId,
     title,
     schema,
     sourcePointers = {},
@@ -44,12 +69,92 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     onClose,
     onUpdate,
     onCommitFieldEdit,
+    onCommitFieldEdits,
     onPin,
     onUnpin,
     onSaveAsNewVersion,
     onOpenModal,
     headerExtras,
   } = props;
+
+  // ── CB8 staging state ──────────────────────────────────────────────────
+  const [staged, setStaged] = useState<Record<string, StagedEdit>>({});
+  const [committing, setCommitting] = useState(false);
+
+  // Clear staging when switching to a different artifact.
+  useEffect(() => {
+    setStaged({});
+  }, [artifactId]);
+
+  const stageEdit = useCallback(
+    (path: string[], newValue: string, committed: string | number | null) => {
+      const key = stagedKey(path);
+      const committedStr = committed == null ? '' : String(committed);
+      setStaged((prev) => {
+        const next = { ...prev };
+        if (newValue === committedStr) {
+          // Reverted to the committed value — drop it from staging.
+          delete next[key];
+        } else {
+          next[key] = { path, value: newValue };
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const discardStaged = useCallback(() => setStaged({}), []);
+
+  const commitStaged = useCallback(async () => {
+    if (!onCommitFieldEdits) return;
+    const entries = Object.values(staged);
+    if (!entries.length) return;
+    setCommitting(true);
+    try {
+      const edits = entries.map((e) => ({ cell_path: e.path, new_value: e.value }));
+      const resp = await onCommitFieldEdits(edits);
+      if (!resp?.success) {
+        // Batch-level rejection (e.g. duplicate_target) — keep everything
+        // staged and annotate each cell with the reason.
+        const msg = resp?.detail || resp?.error || 'Commit failed.';
+        setStaged((prev) => {
+          const next: Record<string, StagedEdit> = {};
+          for (const [k, v] of Object.entries(prev)) next[k] = { ...v, error: msg };
+          return next;
+        });
+        return;
+      }
+      // Per-edit results: clear the ones that landed, keep the failed ones
+      // staged + dirty with their reason. Never silently drop a typed edit.
+      const results = resp.results || [];
+      setStaged((prev) => {
+        const next: Record<string, StagedEdit> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          const r = results.find(
+            (rr) => Array.isArray(rr.cell_path) && rr.cell_path.join('/') === k,
+          );
+          if (r && r.status === 'error') {
+            next[k] = {
+              ...v,
+              error: r.suggested_user_question || r.detail || r.error || 'Could not save.',
+            };
+          }
+          // applied (or unmatched) → cleared; the refetched artifact shows the
+          // canonical committed value.
+        }
+        return next;
+      });
+    } finally {
+      setCommitting(false);
+    }
+  }, [onCommitFieldEdits, staged]);
+
+  const stagedCount = Object.keys(staged).length;
+  const stagingValue = useMemo<StagingContextValue>(
+    () => ({ staged, stageEdit, active: stagedCount > 0 }),
+    [staged, stageEdit, stagedCount],
+  );
 
   // Track unknown block types so the header can flag schema warnings.
   // Computed synchronously via schema walk (not a ref populated during
@@ -97,6 +202,51 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
           </div>
         )}
 
+        {/* CB8 commit bar — appears once anything is staged. Commit lands the
+            whole set in one batch; Discard reverts to committed values. */}
+        {stagedCount > 0 && (
+          <div
+            role="region"
+            aria-label="Staged changes"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              margin: '0 0 8px',
+              padding: '6px 12px',
+              borderRadius: 4,
+              fontSize: 13,
+              color: 'var(--cui-body-color)',
+              background: 'var(--cui-tertiary-bg, rgba(120,120,120,0.12))',
+              border: '1px solid var(--cui-border-color)',
+            }}
+          >
+            <span style={{ fontWeight: 600 }}>
+              {stagedCount} change{stagedCount === 1 ? '' : 's'} staged
+            </span>
+            <span style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                className={styles.btn}
+                disabled={committing || !onCommitFieldEdits}
+                onClick={commitStaged}
+                style={{ fontWeight: 600 }}
+              >
+                {committing ? 'Committing…' : 'Commit'}
+              </button>
+              <button
+                type="button"
+                className={styles.btn}
+                disabled={committing}
+                onClick={discardStaged}
+              >
+                Discard
+              </button>
+            </span>
+          </div>
+        )}
+
         {newRowsAvailable && (
           <div className={styles.newRowsBanner}>
             <span>
@@ -117,15 +267,17 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
           </div>
         )}
 
-        <BlockListRenderer
-          blocks={schema.blocks}
-          sourcePointers={sourcePointers}
-          currentValues={currentValues}
-          removedRowPaths={removedRowPaths}
-          basePath={['blocks']}
-          onUpdate={onUpdate}
-          onCommitFieldEdit={onCommitFieldEdit}
-        />
+        <StagingContext.Provider value={stagingValue}>
+          <BlockListRenderer
+            blocks={schema.blocks}
+            sourcePointers={sourcePointers}
+            currentValues={currentValues}
+            removedRowPaths={removedRowPaths}
+            basePath={['blocks']}
+            onUpdate={onUpdate}
+            onCommitFieldEdit={onCommitFieldEdit}
+          />
+        </StagingContext.Provider>
       </div>
     </div>
   );
@@ -609,6 +761,8 @@ function TableBlockRenderer({
   onUpdate,
   onCommitFieldEdit,
 }: TableBlockRendererProps) {
+  // CB8 staging — table cells stage into this context instead of posting.
+  const staging = useContext(StagingContext);
   const hasAnySourceRefs = block.rows.some((r) => Boolean(r.source_ref || r.cell_source_refs));
 
   // When the table has section_divider rows, those rows act as inline
@@ -756,17 +910,32 @@ function TableBlockRenderer({
                     );
                   }
 
+                  // CB8: a cell with a source ref STAGES (batch) rather than
+                  // posting immediately. A calculated cell (numeric, no ref, in
+                  // a ref-carrying row) shows its last committed value, marked
+                  // stale when a sibling in the same row is staged — we never
+                  // recompute amount/totals in the browser.
+                  const rowPrefix = `${rowPath.join('/')}/cells/`;
+                  const rowStaged = Boolean(staging?.active)
+                    && Object.keys(staging?.staged ?? {}).some((k) => k.startsWith(rowPrefix));
+                  const isCalculated = rowHasCellRefs && !cellRef && !isLabelCol;
+                  const stale = isCalculated && rowStaged;
                   return (
                     <td
                       key={col.key}
                       className={`${alignClass(col.align)}`}
+                      style={stale ? { opacity: 0.45, fontStyle: 'italic' } : undefined}
+                      title={stale ? 'Recomputes on commit' : undefined}
                     >
                       <EditableCell
                         value={cellValue}
                         editable={cellEditable}
                         path={cellPath}
                         onUpdate={onUpdate}
-                        onCommitFieldEdit={cellRef ? onCommitFieldEdit : undefined}
+                        onCommitFieldEdit={
+                          cellRef && !staging ? onCommitFieldEdit : undefined
+                        }
+                        stageable={Boolean(cellRef) && Boolean(staging)}
                         formatNumeric={!isLabelCol}
                         format={col.format}
                       />
@@ -1072,6 +1241,9 @@ interface EditableCellProps {
   /** Write-back callback for cells carrying a source_ref (CB6). When present,
    *  commits post to commit_field_edit instead of emitting a snapshot patch. */
   onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
+  /** CB8: when true, this table cell STAGES into the batch (StagingContext)
+   *  instead of posting immediately. */
+  stageable?: boolean;
   /** When true, value is rendered via formatCellValue (accounting style). */
   formatNumeric?: boolean;
   /** Column-level format hint (currency, currency2, number, date) from
@@ -1101,7 +1273,7 @@ function _statusBadgeClass(value: unknown): string | null {
   return _STATUS_BADGE_CLASS[probe] ?? null;
 }
 
-function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, formatNumeric = true, format }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, format }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
   const [saving, setSaving] = useState(false);
@@ -1113,6 +1285,13 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, form
   // emitting a snapshot-only JSON Patch.
   const hasSourceRef = Boolean(onCommitFieldEdit);
 
+  // CB8 staging: a stageable cell edits into the batch (StagingContext), not
+  // the network. A staged cell shows its dirty (uncommitted) value until Commit.
+  const staging = useContext(StagingContext);
+  const stagingMode = Boolean(stageable) && Boolean(staging);
+  const stagedEntry = stagingMode ? staging!.staged[stagedKey(path)] : undefined;
+  const isStaged = Boolean(stagedEntry);
+
   // Status-pill carve-out: bypass numeric formatting and wrap the value
   // in a badge span. Status cells are never editable so we can short-
   // circuit before the editable branches below.
@@ -1123,38 +1302,57 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, form
     );
   }
 
-  // Display path: format via tabular standard for non-editing state.
-  const display = formatNumeric
+  // Display path: committed value formatted via the tabular standard. When a
+  // cell is staged, show its dirty typed value instead, marked visibly.
+  const committedDisplay = formatNumeric
     ? formatCellValue(value, format)
     : (value == null ? '—' : value);
+  const display = isStaged ? stagedEntry!.value : committedDisplay;
 
   if (!editable) {
-    return <>{display}</>;
+    return <>{committedDisplay}</>;
   }
 
   if (!editing) {
     return (
       <span
         className={styles.editableCell}
+        style={isStaged ? { color: 'var(--cui-primary)', fontWeight: 600 } : undefined}
         onDoubleClick={() => {
-          setDraft(value == null ? '' : String(value));
+          setDraft(isStaged ? stagedEntry!.value : (value == null ? '' : String(value)));
           setErrorMsg(null);
           setEditing(true);
         }}
-        title="Double-click to edit"
+        title={isStaged ? (stagedEntry!.error ?? 'Staged — Commit to save') : 'Double-click to edit'}
       >
         {display}
+        {isStaged && stagedEntry!.error && (
+          <span
+            role="alert"
+            style={{ display: 'block', fontSize: '11px', color: 'var(--cui-danger)', fontWeight: 400, lineHeight: 1.3 }}
+          >
+            {stagedEntry!.error}
+          </span>
+        )}
       </span>
     );
   }
 
   const commit = async () => {
     const currentDisplayed = value == null ? '' : String(value);
-    if (draft === currentDisplayed) {
+    if (draft === currentDisplayed && !stagingMode) {
       setEditing(false);
       return;
     }
     setErrorMsg(null);
+
+    // CB8 staging — stage locally (or un-stage if reverted to committed); no
+    // network until the batch Commit.
+    if (stagingMode) {
+      staging!.stageEdit(path, draft, value);
+      setEditing(false);
+      return;
+    }
 
     // Write-back path — post to commit_field_edit; keep the editor open on
     // failure so the user can correct without losing their input.

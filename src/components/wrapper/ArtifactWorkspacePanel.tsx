@@ -9,6 +9,7 @@ import {
   type ArtifactSummary,
   useArtifact,
   useArtifactCommitFieldEdit,
+  useArtifactCommitFieldEdits,
   useArtifactList,
   useArtifactPatch,
   useArtifactRestore,
@@ -172,6 +173,7 @@ export function ArtifactWorkspacePanel({
   const restoreMutation = useArtifactRestore();
   const updateStateMutation = useArtifactUpdateState();
   const commitFieldEditMutation = useArtifactCommitFieldEdit();
+  const commitFieldEditsMutation = useArtifactCommitFieldEdits();
 
   // Transient impact banner (CB6) — one-line engine delta after a cell commit
   // (e.g. "Cash-flow NPV +$12,400 → $3,420,000"). Auto-clears after a few
@@ -210,6 +212,23 @@ export function ArtifactWorkspacePanel({
       detail: result?.detail,
       suggested_user_question: result?.suggested_user_question,
     };
+  };
+
+  // CB8 — batch commit for staged table cell edits. Posts the whole set,
+  // sets the single impact-line banner, and returns the per-edit results so
+  // the renderer can clear the landed cells and keep the failed ones staged.
+  const runCommitFieldEdits = async (
+    artifactId: number,
+    edits: Array<{ cell_path?: string[]; pair_path?: string[]; new_value: string }>,
+  ) => {
+    const result = await commitFieldEditsMutation.mutateAsync({
+      artifactId,
+      input: { edits },
+    });
+    if (result?.success && result?.impact_line) {
+      setImpactBanner(result.impact_line);
+    }
+    return result;
   };
 
   // Row actions — rename and delete (soft-delete via is_archived).
@@ -633,6 +652,10 @@ export function ArtifactWorkspacePanel({
               // onSuccess invalidates the artifact detail cache so useArtifact
               // refetches. runCommitFieldEdit also captures the impact line.
               runCommitFieldEdit(active.artifact_id, pairPath, newValue)
+            }
+            onCommitFieldEdits={(edits) =>
+              // CB8 — batch commit for staged table cell edits.
+              runCommitFieldEdits(active.artifact_id, edits)
             }
             onPin={(label: string) => {
               patchMutation.mutate({

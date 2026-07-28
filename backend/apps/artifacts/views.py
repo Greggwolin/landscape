@@ -216,28 +216,11 @@ class ArtifactViewSet(viewsets.ViewSet):
             )
 
         body = request.data or {}
-        pair_path = body.get('pair_path')
-        cell_path = body.get('cell_path')
-        new_value = body.get('new_value')
-
-        # Exactly one of pair_path (kv_grid) / cell_path (table cell) must be
-        # given. cell_path is the editing-spine addition (CB6): it points at a
-        # table cell and resolves the source_ref from the ROW's
-        # `cell_source_refs[column]`, not from a kv_pair's `source_ref`.
-        pair_given = isinstance(pair_path, list) and pair_path
-        cell_given = isinstance(cell_path, list) and cell_path
-        if bool(pair_given) == bool(cell_given):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'path_required',
-                    'detail': (
-                        'exactly one of pair_path or cell_path '
-                        '(non-empty list) is required'
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        spec = {
+            'pair_path': body.get('pair_path'),
+            'cell_path': body.get('cell_path'),
+            'new_value': body.get('new_value'),
+        }
 
         try:
             artifact = Artifact.objects.get(pk=artifact_id)
@@ -247,125 +230,31 @@ class ArtifactViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        if cell_given:
-            source_ref, err = _resolve_cell_source_ref(
-                artifact.current_state_json, cell_path
-            )
-            if err is not None:
-                return Response(err, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            # Walk the schema to find the pair at pair_path. Path tokens are
-            # JSON Pointer-style (block index, "pairs", pair index).
-            pair = _resolve_pair(artifact.current_state_json, pair_path)
-            if pair is None:
-                return Response(
-                    {
-                        'success': False,
-                        'error': 'pair_not_found',
-                        'detail': (
-                            f"no key_value_grid pair at {pair_path!r} in artifact "
-                            f"{artifact_id}'s current_state_json"
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            source_ref = pair.get('source_ref') if isinstance(pair, dict) else None
-            if not isinstance(source_ref, dict):
-                return Response(
-                    {
-                        'success': False,
-                        'error': 'no_source_ref',
-                        'detail': (
-                            f"pair {pair.get('label')!r} has no source_ref — "
-                            'inline edit requires a source_ref pointing at '
-                            '(table, row_id, column).'
-                        ),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        table = source_ref.get('table')
-        row_id = source_ref.get('row_id')
-        column = source_ref.get('column')
-        if not (table and row_id is not None and column):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'incomplete_source_ref',
-                    'detail': (
-                        'source_ref must carry table, row_id, and column'
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         user_id = (
             getattr(request.user, 'id', None)
             or body.get('user_id')
             or None
         )
 
-        # Impact headline (CB6): capture the cash-flow NPV BEFORE the write so
-        # we can report the engine delta the edit caused. Scoped to budget
-        # writes (the only source that moves the cash flow in this slice) and
-        # best-effort — a failed read never blocks the write.
+        # Impact headline (CB6): read the cash-flow NPV BEFORE the write so we
+        # can report the engine delta. Scoped to budget writes (the only source
+        # that moves the cash flow) — resolve the target first (cheap in-memory
+        # walk) to learn the table. Best-effort; a failed read never blocks.
+        pre_ref, _pre_err = _resolve_edit_target(artifact.current_state_json, spec)
         npv_before = None
-        if table == 'core_fin_fact_budget' and artifact.project_id is not None:
+        if (_pre_err is None and pre_ref.get('table') == 'core_fin_fact_budget'
+                and artifact.project_id is not None):
             npv_before = _read_cashflow_npv(artifact.project_id)
 
-        # Dispatch on table. tbl_project → project-profile field writer.
-        # core_fin_fact_budget → the existing update_budget_item writer (no
-        # parallel writer). Other tables are not yet wired.
-        if table == 'tbl_project':
-            from .field_writers import write_project_field
-            try:
-                row_id_int = int(row_id)
-            except (TypeError, ValueError):
-                return Response(
-                    {
-                        'success': False,
-                        'error': 'invalid_row_id',
-                        'detail': f'row_id must be an integer; got {row_id!r}',
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            write_result = write_project_field(
-                project_id=row_id_int,
-                field=column,
-                raw_value=new_value,
-                user_id=user_id,
-            )
-        elif table == 'core_fin_fact_budget':
-            write_result = _write_budget_cell(
-                project_id=artifact.project_id,
-                fact_id=row_id,
-                column=column,
-                raw_value=new_value,
-                user_id=user_id,
-            )
-        else:
-            return Response(
-                {
-                    'success': False,
-                    'error': 'table_not_supported',
-                    'detail': (
-                        f"inline-edit write-back is not yet wired for {table!r}. "
-                        'Supported source tables: tbl_project, '
-                        'core_fin_fact_budget.'
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not write_result.get('success'):
-            # Surface the writer envelope as a 400 — includes
+        # Single write path — the SAME per-edit helper the batch endpoint uses.
+        result = _apply_one_edit(artifact, spec, user_id)
+        if not result.get('success'):
+            # Surface the writer/resolver envelope as a 400 — includes
             # suggested_user_question for FK-ambiguous and FK-unmatched cases.
-            return Response(write_result, status=status.HTTP_400_BAD_REQUEST)
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
 
         # Field write landed. Re-build the artifact via its tool's schema
-        # builder so the user sees the canonical, freshly-formatted value
-        # (currency / dates / MSA name) rather than their typed string.
+        # builder so the user sees the canonical, freshly-formatted value.
         refreshed = _refresh_artifact_after_write(
             artifact=artifact,
             user_id=user_id,
@@ -377,16 +266,166 @@ class ArtifactViewSet(viewsets.ViewSet):
         # empty string when nothing moved, never a fabricated figure.
         impact_line = ''
         if npv_before is not None:
-            npv_after = _read_cashflow_npv(artifact.project_id)
-            impact_line = _format_npv_impact(npv_before, npv_after)
+            impact_line = _format_npv_impact(
+                npv_before, _read_cashflow_npv(artifact.project_id)
+            )
 
         return Response({
             'success': True,
             'action': 'commit_field_edit',
             'artifact_id': artifact.artifact_id,
             'new_state': refreshed.get('new_state'),
-            'coerced_value': _jsonable(write_result.get('coerced_value')),
-            'meta': write_result.get('meta') or {},
+            'coerced_value': result.get('coerced_value'),
+            'meta': result.get('meta') or {},
+            'impact_line': impact_line,
+        })
+
+    @action(detail=True, methods=['post'], url_path='commit_field_edits')
+    def commit_field_edits(self, request, pk=None):
+        """CB8 — batch commit: stage several edits, land them together, ONE
+        impact line for the set.
+
+        Body: ``{edits: [{cell_path | pair_path, new_value}, ...], user_id?}``.
+
+        Semantics (all-or-report, matching the clarification apply endpoint):
+          - Each edit commits through its OWN writer (the same ``_apply_one_edit``
+            the single path uses). One failure does NOT roll back the others.
+          - Duplicate targets — two edits hitting the same
+            ``(table, row_id, column)`` — are rejected UP FRONT (400) rather than
+            racing writes against each other.
+          - The expensive work is done ONCE for the batch: one NPV-before read,
+            one artifact rebuild after all writes, one NPV-after read, one
+            ``impact_line``.
+          - Response carries a per-edit ``results`` list (``applied`` / ``error``
+            with the cell + reason) so the frontend can clear the landed cells
+            and keep the failed ones staged with their reason.
+        """
+        try:
+            artifact_id = int(pk)
+        except (TypeError, ValueError):
+            return Response(
+                {'success': False, 'error': 'invalid artifact id'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        body = request.data or {}
+        edits = body.get('edits')
+        if not isinstance(edits, list) or not edits:
+            return Response(
+                {'success': False, 'error': 'edits_required',
+                 'detail': 'edits (non-empty list) is required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            artifact = Artifact.objects.get(pk=artifact_id)
+        except Artifact.DoesNotExist:
+            return Response(
+                {'success': False, 'error': f'artifact {artifact_id} not found'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user_id = (
+            getattr(request.user, 'id', None)
+            or body.get('user_id')
+            or None
+        )
+        schema = artifact.current_state_json
+
+        # Pass 1 — resolve every edit's target (cheap in-memory walk). Used for
+        # duplicate detection and NPV scoping. Resolution errors are NOT fatal
+        # to the batch (all-or-report) — they become per-edit errors in pass 2.
+        resolved = [(spec, *_resolve_edit_target(schema, spec)) for spec in edits]
+
+        # Duplicate-target rejection — a client construction bug. Reject the
+        # WHOLE batch up front rather than letting two writes race the same row.
+        targets = [
+            (sr['table'], str(sr['row_id']), sr['column'])
+            for _spec, sr, err in resolved if sr is not None
+        ]
+        if len(targets) != len(set(targets)):
+            return Response(
+                {'success': False, 'error': 'duplicate_target',
+                 'detail': ('two or more edits target the same '
+                            '(table, row_id, column) in one batch')},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # NPV-before, once — only meaningful if a budget cell is in the set.
+        any_budget = any(
+            sr is not None and sr['table'] == 'core_fin_fact_budget'
+            for _spec, sr, _err in resolved
+        )
+        npv_before = (
+            _read_cashflow_npv(artifact.project_id)
+            if any_budget and artifact.project_id is not None else None
+        )
+
+        # Pass 2 — apply each edit through its own writer.
+        results = []
+        applied = 0
+        for idx, (spec, source_ref, resolve_err) in enumerate(resolved):
+            entry = {
+                'index': idx,
+                'cell_path': spec.get('cell_path') if isinstance(spec, dict) else None,
+                'pair_path': spec.get('pair_path') if isinstance(spec, dict) else None,
+            }
+            if resolve_err is not None:
+                results.append({
+                    **entry, 'status': 'error',
+                    'error': resolve_err.get('error'),
+                    'detail': resolve_err.get('detail'),
+                    'suggested_user_question': resolve_err.get('suggested_user_question'),
+                })
+                continue
+            target = {'table': source_ref['table'], 'row_id': source_ref['row_id'],
+                      'column': source_ref['column']}
+            write_result = _dispatch_edit_write(
+                artifact.project_id, source_ref, spec.get('new_value'), user_id
+            )
+            if write_result.get('success'):
+                applied += 1
+                results.append({
+                    **entry, 'status': 'applied', 'target': target,
+                    'coerced_value': _jsonable(write_result.get('coerced_value')),
+                    'meta': write_result.get('meta') or {},
+                })
+            else:
+                results.append({
+                    **entry, 'status': 'error', 'target': target,
+                    'error': write_result.get('error'),
+                    'detail': write_result.get('detail'),
+                    'suggested_user_question': write_result.get('suggested_user_question'),
+                })
+
+        # Rebuild the artifact ONCE if anything landed; otherwise leave it as-is.
+        new_state = schema
+        if applied:
+            refreshed = _refresh_artifact_after_write(
+                artifact=artifact, user_id=user_id
+            )
+            if not refreshed.get('success'):
+                return Response(
+                    refreshed, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            new_state = refreshed.get('new_state')
+
+        # ONE impact line for the whole set — engine delta, empty if nothing
+        # moved, never fabricated.
+        impact_line = ''
+        if npv_before is not None and applied:
+            impact_line = _format_npv_impact(
+                npv_before, _read_cashflow_npv(artifact.project_id)
+            )
+
+        return Response({
+            'success': True,
+            'action': 'commit_field_edits',
+            'artifact_id': artifact.artifact_id,
+            'new_state': new_state,
+            'results': results,
+            'applied_count': applied,
+            'error_count': len(results) - applied,
             'impact_line': impact_line,
         })
 
@@ -667,6 +706,112 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
         'coerced_value': coerced,
         'meta': {'amount': result.get('amount')},
     }
+
+
+# ─── Per-edit resolve + dispatch (shared by single + batch commit, CB8) ──────
+#
+# The editing spine has ONE write path. `commit_field_edit` (single) and
+# `commit_field_edits` (batch) both go through these helpers — no forked
+# resolve/dispatch logic. The batch endpoint does the expensive work
+# (NPV-before / artifact rebuild / NPV-after) ONCE for the whole set.
+
+
+def _resolve_edit_target(schema, spec):
+    """Resolve one edit spec to its source_ref. Returns ``(source_ref, error)``.
+
+    ``spec`` is ``{cell_path | pair_path, new_value}`` — exactly one path key.
+    On success the source_ref carries table / row_id / column. On any problem
+    returns ``(None, error_dict)`` with the same codes the CB6 single path used
+    (path_required / no_cell_source_ref / pair_not_found / no_source_ref /
+    incomplete_source_ref).
+    """
+    if not isinstance(spec, dict):
+        return None, {'success': False, 'error': 'invalid_edit',
+                      'detail': 'each edit must be an object'}
+    pair_path = spec.get('pair_path')
+    cell_path = spec.get('cell_path')
+    pair_given = isinstance(pair_path, list) and pair_path
+    cell_given = isinstance(cell_path, list) and cell_path
+    if bool(pair_given) == bool(cell_given):
+        return None, {'success': False, 'error': 'path_required',
+                      'detail': ('exactly one of pair_path or cell_path '
+                                 '(non-empty list) is required')}
+    if cell_given:
+        source_ref, err = _resolve_cell_source_ref(schema, cell_path)
+        if err is not None:
+            return None, err
+    else:
+        pair = _resolve_pair(schema, pair_path)
+        if pair is None:
+            return None, {'success': False, 'error': 'pair_not_found',
+                          'detail': f'no key_value_grid pair at {pair_path!r}'}
+        source_ref = pair.get('source_ref') if isinstance(pair, dict) else None
+        if not isinstance(source_ref, dict):
+            return None, {'success': False, 'error': 'no_source_ref',
+                          'detail': (f"pair {pair.get('label')!r} has no "
+                                     'source_ref — inline edit requires a '
+                                     'source_ref pointing at (table, row_id, '
+                                     'column).')}
+    table = source_ref.get('table')
+    row_id = source_ref.get('row_id')
+    column = source_ref.get('column')
+    if not (table and row_id is not None and column):
+        return None, {'success': False, 'error': 'incomplete_source_ref',
+                      'detail': 'source_ref must carry table, row_id, and column'}
+    return source_ref, None
+
+
+def _dispatch_edit_write(project_id, source_ref, new_value, user_id):
+    """Write one resolved edit through the table's writer (no parallel writer).
+
+    Returns the writer envelope: ``{success, coerced_value, meta}`` on success,
+    or ``{success: False, error, detail, ...}``. Dispatch matches CB6:
+    tbl_project → project-profile field writer; core_fin_fact_budget →
+    _write_budget_cell → update_budget_item.
+    """
+    table = source_ref['table']
+    row_id = source_ref['row_id']
+    column = source_ref['column']
+    if table == 'tbl_project':
+        from .field_writers import write_project_field
+        try:
+            row_id_int = int(row_id)
+        except (TypeError, ValueError):
+            return {'success': False, 'error': 'invalid_row_id',
+                    'detail': f'row_id must be an integer; got {row_id!r}'}
+        return write_project_field(project_id=row_id_int, field=column,
+                                   raw_value=new_value, user_id=user_id)
+    if table == 'core_fin_fact_budget':
+        return _write_budget_cell(project_id=project_id, fact_id=row_id,
+                                  column=column, raw_value=new_value,
+                                  user_id=user_id)
+    return {'success': False, 'error': 'table_not_supported',
+            'detail': (f"inline-edit write-back is not yet wired for {table!r}. "
+                       'Supported source tables: tbl_project, '
+                       'core_fin_fact_budget.')}
+
+
+def _apply_one_edit(artifact, spec, user_id):
+    """Resolve + write ONE edit. Returns a normalized per-edit result.
+
+    Does NOT rebuild the artifact or read NPV — those are batch-level concerns
+    the caller does once. On success carries the resolved ``target`` +
+    ``coerced_value`` + ``meta``; on failure carries the error envelope + (when
+    resolution succeeded) the ``target`` so the caller can report which cell.
+    """
+    source_ref, err = _resolve_edit_target(artifact.current_state_json, spec)
+    if err is not None:
+        return {**err, 'success': False}
+    write_result = _dispatch_edit_write(
+        artifact.project_id, source_ref, spec.get('new_value'), user_id
+    )
+    target = {'table': source_ref['table'], 'row_id': source_ref['row_id'],
+              'column': source_ref['column']}
+    if not write_result.get('success'):
+        return {**write_result, 'success': False, 'target': target}
+    return {'success': True, 'target': target,
+            'coerced_value': _jsonable(write_result.get('coerced_value')),
+            'meta': write_result.get('meta') or {}}
 
 
 def _read_cashflow_npv(project_id):

@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.7.4
-**Last Updated:** July 27, 2026
-**Supersedes:** v4.7.3 (July 27, 2026), v4.7.2 (July 24, 2026), v4.7.1 (July 19, 2026), v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.8.0
+**Last Updated:** July 28, 2026
+**Supersedes:** v4.7.4 (July 27, 2026), v4.7.3 (July 27, 2026), v4.7.2 (July 24, 2026), v4.7.1 (July 19, 2026), v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -273,6 +273,31 @@ The DOWNSTREAM IMPACT section (§17.4) and SUCCESS CRITERIA section continue to 
 
 **4.9.4 Failure mode this closes.** VA1 (2026-07-14) — a three-file, 35-call-site mechanical fix (adding an auth header to API clients), already type-checked clean by Cowork, was handed off with a ~200-line body: nine success criteria, redundant type/build/lint gates, curl proofs, and a full restatement of the diff. The work was four lines of plumbing; the handoff was sized for a schema migration. CC then spent most of its execution satisfying the checklist rather than shipping, and Gregg waited. The ceremony bought no safety that the change's own profile didn't already provide. Over-sizing a handoff is a defect the same way under-sizing one is — it just fails as latency instead of breakage.
 
+**4.10 Nothing merges to main until Gregg has seen it run — HARD RULE.** No CC handoff instructs, authorizes, or pre-approves a merge to `main`. The handoff ends at **pushed + PR open + CI green**, and then stops. The merge is a separate, later instruction that Gregg gives after he has run the change himself. Green CI is not a substitute and never was.
+
+**4.10.1 What green CI actually proves.** Lint, typecheck, `next build`, the theme-token jest suite, and the Django pytest suite. That is: *the code assembles and the back-end maths holds*. Nothing in CI opens a screen, renders an artifact, or touches a project with real rows in it — the ten Playwright specs in `tests/` are not wired into either workflow, and the Neon preview branch is created `--schema-only` (see `scripts/neon-branch-create.sh`), so the preview URL serves an empty database. **A green check mark carries no information about whether the feature works.** Treating it as an approval gate is the defect this rule closes.
+
+**4.10.2 Required handoff shape.** Every implementation/fix handoff ends with a section in this form:
+
+```markdown
+## STOP HERE — DO NOT MERGE
+Push the branch, open the PR, confirm CI is green, and report back with:
+- the branch name
+- how Gregg runs this locally (exact command + the URL/screen to open)
+- the 2–4 specific things he should look at to know it worked
+Then STOP. Gregg merges, or tells you to merge, only after he has run it.
+```
+
+The "2–4 specific things" line is not optional garnish — it is the acceptance test, written by the person who wrote the code, before the person who owns the decision spends any attention. A handoff that says "verify it works" instead of naming what to look at has not satisfied this rule.
+
+**4.10.3 Cowork's obligation before the handoff.** Cowork writes the code into the working tree and states, in plain English in chat, how Gregg runs it and what he should see. Gregg tests local-first (see the standing feedback entry) — that is the review environment until §4.10.5 lands.
+
+**4.10.4 Carve-out — documentation and generated artifacts only.** Nightly doc syncs, health-check notes, session logs, and instruction-file edits may merge without a look; they change no running behavior. Everything that changes what the app does — front-end, back-end, tools, schema, prompts, guards — is inside the rule. "It's only a one-line prompt tweak" is not a carve-out; the 22 July what-if chain was five such changes.
+
+**4.10.5 The tool half is separately tracked.** The preview URL will remain useless for review until a demo dataset loads into the schema-only preview branch. Until that exists, §4.10 is enforced by local testing alone. When it lands, §4.10 does not relax — the review moves from Gregg's machine to a link, and the merge still waits for him.
+
+**4.10.6 Failure mode this closes.** In the 30 days to 2026-07-28: 100 commits on `main`, 39 labelled `fix` against 22 labelled `feat` — roughly two corrections per new thing. Branch-commit-to-merge gaps ran 6–12 minutes, so no human saw any of it in between. Two representative chains: the land what-if engine took **five** merged changes on 22 July between 14:14 and 15:37 (plus a sixth on 23 July), and the budget rollup took **four** merged changes on 21 July inside 46 minutes. Every failed attempt is permanently on `main` and had to be corrected by another commit — which is the whole of the "work gets undone / same ground twice" complaint. This rule supersedes the prior standing instruction to bake the merge into push+PR handoffs and squash-merge on green; that instruction is withdrawn.
+
 ---
 
 ## 5.0 COMMUNICATION STYLE
@@ -400,6 +425,8 @@ This is a hard rule. Same severity tier as plain-English chat (§5.7) and brevit
 - Sizing a handoff body to the ceremony rather than to the risk (§4.9). A verified, low-risk, mechanical change does not need nine success criteria, redundant gates Cowork already ran, and a restatement of the diff — that spends Gregg's time to buy nothing. The inverse of §4.8: under-sizing fails as breakage, over-sizing fails as latency. Both are defects. Note the boundary — §4.9 never licenses dropping the §4.6/§4.7/§4.8 safety rails.
 - Answering a CC completion report with anything longer than two sentences (§5.12). Recapping what CC verified, restating its numbers, or re-explaining the fix spends Gregg's attention on a report he already read. When there's genuinely more — a decision he owns, or a picture two sentences would distort — it goes in an HTML artifact, and the chat line stays at two sentences.
 - Writing a date into a generated document without reading the current date from the system clock first (§10.7). Template dates, inferred dates, dates recalled from earlier in the conversation, and dates copied from a prior version are all defects — the 2026-07-27 audit found two memos that carried a template's `11/19/2024` for nine months. Verify, then stamp.
+- Instructing, authorizing, or pre-approving a merge to `main` inside a handoff (§4.10). Green CI proves the code assembles — it opens no screen and touches no real project data, because the Playwright specs are unwired and the preview branch is schema-only. Handoffs end at pushed + PR open + green, then STOP. The merge is Gregg's separate instruction, given after he has run it. "It's a one-line tweak" is not a carve-out — the 22 July what-if chain was five one-line tweaks, each merged unseen.
+- Reporting a feature as done on the strength of code existing, without confirming the place its data lives was ever created (§4.10.1, and the standing never-claim-live-without-executing entry). Three features are on record as finished with no storage behind them; a careful metrics fix in July was spent on a screen no user could reach. Code assembles identically whether or not the tables exist.
 
 ---
 
@@ -845,6 +872,8 @@ Sync triggers:
 - Handoff bodies are sized to the change's risk; the §4.6/§4.7/§4.8 safety rails are present in every handoff regardless (§4.9)
 - The two instruction copies (repo master + the shared project field) stay in sync via one paste; drift is flagged, never blind-merged (§0.4)
 - Every generated document's date stamp is read from the system clock at generation time; filename dates and body dates agree; template dates are never inherited into the body or the file properties (§10.7)
+- No handoff authorizes its own merge; every behavior-changing change is run by Gregg before it lands on `main`, and the handoff names the 2–4 things he should look at (§4.10)
+- The ratio of `fix` commits to `feat` commits on `main` trends down from the 39:22 baseline measured over the 30 days to 2026-07-28 (§4.10.6)
 
 ---
 
@@ -1014,6 +1043,10 @@ This section establishes the manual two-way handoff between the Claude.ai chat p
 ---
 
 ## CHANGELOG
+
+**v4.8.0 (2026-07-28)** — One add, and it **withdraws a standing instruction**, hence the minor bump rather than a patch. Source: chat DX (collision-diagnosis discovery session), answering "why does testing keep colliding when the isolation machinery is already in place?" Added **§4.10 (Nothing merges to main until Gregg has seen it run — HARD RULE)** with six sub-rules: what green CI actually proves and does not (§4.10.1 — lint/typecheck/build/token-jest/pytest; the ten Playwright specs are unwired in both workflows and `neon-branch-create.sh` creates the preview branch `--schema-only`, so the preview URL serves an empty database and the green check carries no information about whether the feature works); the required STOP-HERE handoff block, including the 2–4 named things to look at, written by the author of the code (§4.10.2); Cowork's obligation to state how to run it (§4.10.3); a carve-out for documentation and generated artifacts only, explicitly refusing a "small change" carve-out (§4.10.4); a note that the preview-data build does not relax the rule when it lands (§4.10.5); and the loss evidence (§4.10.6). **Withdrawn:** the prior standing instruction to bake the merge into push+PR handoffs and squash-merge on green CI. That instruction, combined with CI that only proves assembly, meant the first human look at any change happened after it was already permanent — so every miss had to be corrected by a second commit, and sometimes a fifth.
+
+Evidence recorded in §4.10.6: 100 commits on `main` in the 30 days to 2026-07-28, 39 `fix` against 22 `feat`; branch-commit-to-merge gaps of 6–12 minutes; the land what-if engine merged five times on 22 July between 14:14 and 15:37 plus a sixth on 23 July; the budget rollup merged four times on 21 July inside 46 minutes. Same session separately confirmed, and did **not** fix: the nightly Vercel check writes to `/Users/greggwolin/...` (wrong user; correct is `5150east`) at a folder path superseded by the 2026-07-24 move, untouched since 2026-03-22, and it is a silence-means-healthy check — so it has reported healthy by failing silently for four months. Also confirmed: the 15-minute auto-commit is **not** running (last fired 2025-09-19; guarded since FB-304), two stale stashes remain (2026-06-22 map WIP, 615 lines, explicitly labelled parallel-session; 2026-06-19, 5 lines, duplicate of shipped work), `chore/worktree-cleanup-0724` is one commit and unmerged, and 34 merged remote branches are undeleted. Two matching anti-pattern bullets added to §6 and two success metrics to §20. **Per §0.4: paste this file into the project instructions field ONCE.**
 
 **v4.7.4 (2026-07-27)** — One add. Source: chat CB (base-artifact build thread). Added **§5.12 (Replies to CC completion reports — TWO SENTENCES, HARD RULE)**: a CC completion report, merge confirmation, test result, or surfaced observation is answered in one or two short sentences — what is now true, and what happens next. No recap of what CC verified, no criteria-by-criteria restatement, no re-explanation of the fix, no praise, no lesson-learned reflection. Two escape hatches (§5.12.1), and both produce an **HTML artifact** while the chat line stays at two sentences: (1) a decision Gregg owns — scope, priority, business judgment, what to build next; (2) brevity would mislead — a "verified" that rests on data that isn't what it appears to be, a success hiding a structural gap, a fix that closes one path and not its siblings. The test for hatch 2 is not "is there more I could say" (there always is) but **"would Gregg act differently if he knew what I'm leaving out?"** Rationale (§5.12.2): these threads run long and CC's reports are already dense; the two-sentence reply keeps Gregg's attention on the decisions, the only part he can't delegate. Same severity tier as §5.7 / §5.11. Matching anti-pattern bullet added to §6. Worked example is Gregg's own wording from this session. **Per §0.4: paste this file into the project instructions field ONCE.**
 
