@@ -49,7 +49,8 @@ def batch_recalculate_assumptions(request: Request, project_id: int) -> Response
                     p.lot_width,
                     p.units_total,
                     p.acres_gross,
-                    psa.sale_date
+                    psa.sale_date,
+                    p.sale_period
                 FROM landscape.tbl_parcel p
                 INNER JOIN landscape.tbl_parcel_sale_assumptions psa
                     ON psa.parcel_id = p.parcel_id
@@ -73,6 +74,19 @@ def batch_recalculate_assumptions(request: Request, project_id: int) -> Response
             parcel_id = row[0]
 
             try:
+                # sale_period drives the improvement-offset cost-escalation
+                # inside calculate_sale_proceeds. Without it the calc silently
+                # applies the FLAT benchmark ($1,300/FF), understating the offset
+                # and overstating gross by ~6% (CB11/CB12). A dated sale row with
+                # no sale_period should not exist — a parcel with no sale timing
+                # is not being sold. Refuse loudly rather than write the flat
+                # basis; the loop records this as a per-parcel error and carries
+                # on with the rest.
+                if row[8] is None:
+                    raise ValueError(
+                        "parcel has no sale_period — refusing to recalculate "
+                        "(would produce the un-escalated flat $1,300/FF basis)"
+                    )
                 parcel_data = {
                     'parcel_id': row[0],
                     'project_id': row[1],
@@ -80,7 +94,10 @@ def batch_recalculate_assumptions(request: Request, project_id: int) -> Response
                     'product_code': row[3] or '',
                     'lot_width': float(row[4]) if row[4] else 0,
                     'units_total': int(row[5]) if row[5] else 0,
-                    'acres_gross': float(row[6]) if row[6] else 0
+                    'acres_gross': float(row[6]) if row[6] else 0,
+                    # Pass sale_period so calculate_sale_proceeds escalates the
+                    # improvement offset per period (matches recalculate_sfd_parcels).
+                    'sale_period': int(row[8]),
                 }
                 sale_date = row[7].isoformat() if hasattr(row[7], 'isoformat') else str(row[7])
 
