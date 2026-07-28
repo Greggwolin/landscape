@@ -9753,10 +9753,13 @@ def _log_planning_activity(project_id: int, table: str, action: str, count: int,
     """Log planning hierarchy activity."""
     try:
         with connection.cursor() as cursor:
+            # status must be one of the landscaper_activity_status_check values
+            # (complete / partial / blocked / pending). 'completed' silently
+            # violated the constraint and dropped every planning log (CB7 fix).
             cursor.execute("""
                 INSERT INTO landscape.landscaper_activity
                 (project_id, activity_type, title, summary, status, details, is_read, created_at, updated_at)
-                VALUES (%s, 'update', %s, %s, 'completed', %s::jsonb, false, NOW(), NOW())
+                VALUES (%s, 'update', %s, %s, 'complete', %s::jsonb, false, NOW(), NOW())
             """, [
                 project_id,
                 f"Planning {action}",
