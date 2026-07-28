@@ -1757,6 +1757,85 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             'thread': ChatThreadSerializer(instance).data,
         })
 
+    @action(detail=True, methods=['get', 'put'], url_path='destination')
+    def destination(self, request, pk=None):
+        """GET / PUT the thread's "where was I last productive" pointer.
+
+        Deliberately its own endpoint rather than a field on the thread PATCH.
+        This value MOVES THE USER'S SCREEN when the thread is reopened, so the
+        write path is kept narrow and explicitly named — a title rename must
+        never be able to relocate someone. (LSCMD-THREADDEST-0728-TA)
+
+        GET  -> {"success": true, "destination": {...} | null}
+        PUT  -> body is the destination object; returns the stored value.
+                PUT (not PATCH) because the semantics are last-wins replacement:
+                each productive turn overwrites the whole pointer. Sending
+                `null` or `{}` clears it.
+
+        Shape is defined and validated on the client in
+        `src/lib/landscaper/threadDestination.ts`. The server validates only
+        the envelope — enough to keep junk out of the column without pinning
+        the schema in two places and letting them drift.
+        """
+        thread = self.get_object()
+
+        if request.method == 'GET':
+            # page_context / project_id ride along so the client can apply its
+            # legacy fallback for threads that predate destination recording.
+            # The fallback rules live in TypeScript
+            # (`destinationFromPageContext`) rather than here, so the list of
+            # which contexts map to which routes exists once, next to the
+            # routes themselves. The server just supplies the raw inputs.
+            return Response({
+                'success': True,
+                'destination': thread.last_destination,
+                'pageContext': thread.page_context,
+                'projectId': thread.project_id,
+            })
+
+        payload = request.data
+
+        # Explicit clear.
+        if payload in (None, {}, ''):
+            thread.last_destination = None
+            thread.save(update_fields=['last_destination'])
+            return Response({'success': True, 'destination': None})
+
+        if not isinstance(payload, dict):
+            return Response(
+                {'success': False, 'error': 'destination must be an object or null'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        kind = payload.get('kind')
+        if kind not in ('artifact', 'screen'):
+            return Response(
+                {'success': False,
+                 'error': "destination.kind must be 'artifact' or 'screen'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Each kind must carry the one field that makes it restorable. A
+        # destination that cannot be acted on is worse than no destination —
+        # it would make reopen look broken rather than intentionally inert.
+        if kind == 'artifact' and not isinstance(payload.get('artifactId'), int):
+            return Response(
+                {'success': False,
+                 'error': "destination.kind='artifact' requires an integer artifactId"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if kind == 'screen' and not (payload.get('route') or payload.get('folder')):
+            return Response(
+                {'success': False,
+                 'error': "destination.kind='screen' requires a route or folder"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        thread.last_destination = payload
+        thread.save(update_fields=['last_destination'])
+
+        return Response({'success': True, 'destination': thread.last_destination})
+
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
         """POST close a thread and generate summary."""
