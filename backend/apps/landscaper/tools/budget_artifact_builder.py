@@ -176,6 +176,94 @@ def build_budget_artifact_schema(
     }
 
 
+def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
+    """Read the budget-schedule inputs for a project in ONE place.
+
+    Single source of truth for the schedule read path so the tool executor
+    (``get_budget_schedule``) and the after-write refresh
+    (``_refresh_artifact_after_write``) build byte-identical schemas — the
+    editing spine depends on the refreshed artifact matching what a fresh
+    render would produce. Returns the same fields the executor computes:
+    records (qty/rate/amount coerced to float), total_budget, category_count,
+    lot_count (SUM parcel units_total, the cost-per-lot denominator), and
+    project_name. ``records`` is empty when the project has no line items.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT f.fact_id, f.category_id, c.category_name,
+                   f.uom_code, f.qty, f.rate, f.amount,
+                   f.start_date, f.end_date, f.notes,
+                   f.start_period, f.periods_to_complete, f.end_period
+            FROM landscape.core_fin_fact_budget f
+            LEFT JOIN landscape.core_unit_cost_category c
+                ON f.category_id = c.category_id
+            WHERE f.project_id = %s
+            ORDER BY c.account_level, c.sort_order, f.fact_id
+            """,
+            [project_id],
+        )
+        columns = [col[0] for col in cursor.description]
+        records = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        # Cost-per-lot denominator = SUM(parcel units_total) = the LOT count,
+        # NOT a parcel row count.
+        cursor.execute(
+            """
+            SELECT COALESCE(SUM(units_total), 0)
+            FROM landscape.tbl_parcel WHERE project_id = %s
+            """,
+            [project_id],
+        )
+        lot_row = cursor.fetchone()
+        lot_count = int(lot_row[0]) if lot_row and lot_row[0] else None
+
+        cursor.execute(
+            "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+            [project_id],
+        )
+        pn = cursor.fetchone()
+        project_name = pn[0] if pn else None
+
+    for r in records:
+        for k in ('qty', 'rate', 'amount'):
+            if r.get(k) is not None:
+                r[k] = float(r[k])
+
+    total_budget = sum((r.get('amount') or 0) for r in records)
+    category_count = len({
+        r.get('category_id') for r in records if r.get('category_id') is not None
+    })
+
+    return {
+        'records': records,
+        'total_budget': float(total_budget),
+        'category_count': category_count,
+        'lot_count': lot_count,
+        'project_name': project_name,
+    }
+
+
+def build_budget_schema_for_project(project_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch + build the fixed budget-artifact schema for a project.
+
+    Returns ``None`` when the project has no budget line items (the caller
+    decides what to do with an empty schedule). Used by the after-write
+    refresh so the rebuilt artifact is identical to a fresh ``get_budget_schedule``
+    render — same rows, same editable cell refs, same KPI header."""
+    data = fetch_budget_schedule_data(project_id)
+    if not data['records']:
+        return None
+    return build_budget_artifact_schema(
+        data['records'],
+        total_budget=data['total_budget'],
+        category_count=data['category_count'],
+        lot_count=data['lot_count'],
+    )
+
+
 def create_budget_artifact(
     *,
     project_id: int,

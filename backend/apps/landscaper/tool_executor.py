@@ -8203,10 +8203,13 @@ def _log_budget_activity(project_id: int, table: str, action: str, count: int, r
     """Log budget-related activity."""
     try:
         with connection.cursor() as cursor:
+            # status must be one of the landscaper_activity_status_check values
+            # (complete / partial / blocked / pending). 'completed' silently
+            # violated the constraint and dropped every budget log (CB6 fix).
             cursor.execute("""
                 INSERT INTO landscape.landscaper_activity
                 (project_id, activity_type, title, summary, status, details, is_read, created_at, updated_at)
-                VALUES (%s, 'update', %s, %s, 'completed', %s::jsonb, false, NOW(), NOW())
+                VALUES (%s, 'update', %s, %s, 'complete', %s::jsonb, false, NOW(), NOW())
             """, [
                 project_id,
                 f"Budget {action}",
@@ -8751,46 +8754,16 @@ def handle_get_budget_schedule(
         return {'success': False, 'error': 'project_id is required'}
 
     try:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT f.fact_id, f.category_id, c.category_name,
-                       f.uom_code, f.qty, f.rate, f.amount,
-                       f.start_date, f.end_date, f.notes,
-                       f.start_period, f.periods_to_complete, f.end_period
-                FROM landscape.core_fin_fact_budget f
-                LEFT JOIN landscape.core_unit_cost_category c
-                    ON f.category_id = c.category_id
-                WHERE f.project_id = %s
-                ORDER BY c.account_level, c.sort_order, f.fact_id
-            """, [project_id])
-            columns = [col[0] for col in cursor.description]
-            records = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-            # Cost-per-lot denominator = SUM(parcel units_total) = the LOT count,
-            # NOT a parcel row count (rpt_15 divided by COUNT(parcel)=43; wrong).
-            cursor.execute("""
-                SELECT COALESCE(SUM(units_total), 0)
-                FROM landscape.tbl_parcel WHERE project_id = %s
-            """, [project_id])
-            lot_row = cursor.fetchone()
-            lot_count = int(lot_row[0]) if lot_row and lot_row[0] else None
-
-            cursor.execute(
-                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
-                [project_id],
-            )
-            pn = cursor.fetchone()
-            project_name = pn[0] if pn else None
-
-        for r in records:
-            for k in ('qty', 'rate', 'amount'):
-                if r.get(k) is not None:
-                    r[k] = float(r[k])
-
-        total_budget = sum((r.get('amount') or 0) for r in records)
-        category_count = len({
-            r.get('category_id') for r in records if r.get('category_id') is not None
-        })
+        # Read path lives in the builder module so the after-write refresh
+        # (commit_field_edit → _refresh_artifact_after_write) builds a schema
+        # identical to this fresh render. Editing spine (CB6) depends on that.
+        from .tools.budget_artifact_builder import fetch_budget_schedule_data
+        data = fetch_budget_schedule_data(int(project_id))
+        records = data['records']
+        lot_count = data['lot_count']
+        project_name = data['project_name']
+        total_budget = data['total_budget']
+        category_count = data['category_count']
         cost_per_lot = round(total_budget / lot_count) if lot_count else None
 
         if not records:
