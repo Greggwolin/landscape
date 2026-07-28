@@ -18,6 +18,8 @@ import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import { useChatAttachment } from '@/components/landscaper/useChatAttachment';
 import { ChatDragOverlay } from '@/components/landscaper/ChatDragOverlay';
+import { deriveDestination } from '@/lib/landscaper/threadDestination';
+import { recordDestination, useThreadRestore } from '@/hooks/useThreadDestination';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -130,6 +132,13 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   // a subscriber mounted inside the provider's tree handles it. See
   // /src/lib/landscape-command-bus.ts and
   // /src/components/wrapper/LandscapeCommandSubscriber.tsx.
+
+  // Mirror of the activeThreadId state declared further down, held in a ref so
+  // handleToolResult can record a destination against the live thread without
+  // taking activeThreadId as a dependency. handleToolResult is passed straight
+  // into LandscaperChatThreaded; churning its identity on every thread switch
+  // would remount chat internals. (LSCMD-THREADDEST-0728-TA)
+  const activeThreadIdRef = useRef<string | null>(initialThreadId ?? null);
 
   const handleToolResult = useCallback(
     (toolName: string, result: Record<string, unknown>) => {
@@ -287,6 +296,21 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('landscaper:control_map_overlay', { detail: cmd }));
         }
+      }
+
+      // Remember where this turn was productive, so reopening the thread later
+      // can put the user back here instead of on a blank stage. Runs LAST and
+      // deliberately mirrors the branches above rather than hooking into them —
+      // the live restoration is the contract, and this only records it.
+      //
+      // Most turns derive nothing (a plain answer has no destination) and that
+      // is the intended outcome, not a miss. Fire-and-forget: the user already
+      // has their result on screen and a failed write must never surface.
+      // (LSCMD-THREADDEST-0728-TA)
+      const threadId = activeThreadIdRef.current;
+      if (threadId) {
+        const destination = deriveDestination(toolName, result, projectId);
+        if (destination) void recordDestination(threadId, destination);
       }
     },
     [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc, projectId],
@@ -527,6 +551,58 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     if (initialThreadId) setActiveThreadId(initialThreadId);
     else if (homepageThreadId) setActiveThreadId(homepageThreadId);
   }, [initialThreadId, homepageThreadId]);
+
+  // Keep the ref handleToolResult reads in step with the state.
+  useEffect(() => {
+    activeThreadIdRef.current = activeThreadId;
+  }, [activeThreadId]);
+
+  // ---- Reopening a thread puts you back where it left off -------------------
+  // Decision 1a (2026-07-28): restore immediately, no "Resume" prompt, so the
+  // app behaves the same way whether a result arrives live or is reopened
+  // later. Fires at most once per thread per mount — see useThreadRestore.
+  const { pending: pendingRestore, clear: clearRestore } = useThreadRestore(activeThreadId);
+
+  useEffect(() => {
+    if (!pendingRestore) return;
+
+    if (pendingRestore.kind === 'artifact') {
+      // Decision 2a: the pointer already holds the NEWEST artifact of the
+      // thread (each productive turn overwrote it), and the panel lists the
+      // rest alongside — so opening the pointer alone satisfies "newest open,
+      // others one click away" with no extra query.
+      setActiveArtifactId(pendingRestore.artifactId);
+      if (!artifactsOpen) toggleArtifacts();
+    } else if (pendingRestore.folder) {
+      emitLandscapeCommand('navigate_screen', {
+        folder: pendingRestore.folder,
+        tab: pendingRestore.tab,
+      });
+    } else if (pendingRestore.route && pendingRestore.route !== pathname) {
+      // Guarded on pathname: reopening a map thread while already on the map
+      // must not re-push the route and remount the map underneath the user.
+      //
+      // Carry the thread on the URL. The /w/ shell derives the active thread
+      // from the URL (?thread= / /chat/[id]) for the chat panel that persists
+      // beside the page content; a bare route push would drop it and blank the
+      // chat while the map opened. Preserve the selection so the reopened chat
+      // and its screen come back together.
+      const sep = pendingRestore.route.includes('?') ? '&' : '?';
+      const target = activeThreadId
+        ? `${pendingRestore.route}${sep}thread=${activeThreadId}`
+        : pendingRestore.route;
+      emitLandscapeCommand('navigate', {
+        target_url: target,
+        context: { tool: pendingRestore.tool, reason: 'thread_restore' },
+      });
+    }
+
+    // NOTE — what this deliberately does NOT do: it never re-runs the tool and
+    // never re-applies the change. A chat that set an overlay to 30% opacity
+    // returns you to the map; the overlay is already at 30% because that was
+    // saved when it happened. Re-applying would be a bug, not a restoration.
+    clearRestore();
+  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore, activeThreadId]);
 
   // Bridge the existing handleActiveThreadChange so it ALSO updates our
   // local activeThreadId — the upload path needs it for unassigned uploads.

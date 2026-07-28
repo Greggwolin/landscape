@@ -63,6 +63,12 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     closedAt = serializers.DateTimeField(source='closed_at', read_only=True, allow_null=True)
     messageCount = serializers.SerializerMethodField()
     firstUserMessage = serializers.SerializerMethodField()
+    # Read-only here. Written only through the dedicated `destination` action on
+    # ChatThreadViewSet so the write path stays narrow and auditable — a thread
+    # PATCH must never be able to move the user's screen. (LSCMD-THREADDEST-0728-TA)
+    lastDestination = serializers.JSONField(
+        source='last_destination', read_only=True, allow_null=True,
+    )
 
     class Meta:
         model = ChatThread
@@ -73,6 +79,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'docId',
             'pageContext',
             'subtabContext',
+            'lastDestination',
             'title',
             'summary',
             'isActive',
@@ -89,7 +96,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'threadId', 'projectId', 'projectName', 'docId', 'isActive',
             'isArchived', 'archivedAt', 'archivedByUserId',
             'createdAt', 'updatedAt', 'closedAt', 'messageCount',
-            'firstUserMessage',
+            'firstUserMessage', 'lastDestination',
         ]
 
     def get_messageCount(self, obj):

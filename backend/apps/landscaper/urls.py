@@ -271,6 +271,18 @@ urlpatterns = [
         }),
         name='landscaper-thread-promote'
     ),
+    # TA1 — "reopening a chat returns you where it left off". Explicit route
+    # because ChatThreadViewSet is wired by hand here (no DRF router), so the
+    # @action decorator alone generates no URL. GET reads the pointer, PUT
+    # replaces it (last-productive-turn-wins). See destination() in views.py.
+    path(
+        'landscaper/threads/<uuid:pk>/destination/',
+        ChatThreadViewSet.as_view({
+            'get': 'destination',
+            'put': 'destination',
+        }),
+        name='landscaper-thread-destination'
+    ),
     # Doc-chat (chat qm — wrapper DMS "Chat with this document").
     path(
         'landscaper/threads/by-doc/<int:doc_id>/',

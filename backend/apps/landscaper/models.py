@@ -77,6 +77,27 @@ class ChatThread(models.Model):
         blank=True,
         help_text='Soft tag for UI awareness; not required for unassigned threads.'
     )
+    # Where this thread was last PRODUCTIVE — written on tool output, read once
+    # on reopen so the user lands back on the artifact or screen the
+    # conversation was working against. Last-wins: each productive turn
+    # overwrites it. NULL = the thread never produced anything restorable
+    # (the common case), and reopen must leave the user's screen alone.
+    #
+    # Deliberately NOT derived from page_context. page_context records where
+    # the user was standing when they started typing, not where the work
+    # landed — measured 2026-07-28, 504 of 565 threads carry 'home'/'general'/
+    # 'projects'/'dashboard', which name no screen. See the .up.sql header and
+    # `src/lib/landscaper/threadDestination.ts` for the payload shape.
+    # (LSCMD-THREADDEST-0728-TA)
+    last_destination = models.JSONField(
+        null=True,
+        blank=True,
+        db_column='last_destination',
+        help_text=(
+            'Where this thread was last productive: {kind, artifactId|route, '
+            'screen, tool, label, at}. NULL = nothing restorable.'
+        ),
+    )
     subtab_context = models.CharField(
         max_length=50,
         null=True,
