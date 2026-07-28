@@ -114,14 +114,20 @@ export function deriveDestination(
   const at = now();
 
   // ---- Artifact destinations ------------------------------------------------
-  // Ordered most-specific first. open_clarification nests its artifact inside
-  // an envelope, so the generic top-level check below never sees it — the same
-  // reason handleToolResult carries a dedicated branch for it.
-  if (toolName === 'open_clarification' && result.artifact_created && result.artifact) {
-    const nested = result.artifact as { artifact_id?: unknown };
+  // Ordered most-specific first. A whole class of tools — open_clarification
+  // AND the deterministic server-rendered schedule tools (get_budget_schedule,
+  // get_sales_schedule, get_cashflow_schedule, get_capitalization_schedule,
+  // get_rent_roll_schedule) — NEST the create_artifact_record envelope under
+  // result.artifact ({artifact_created:true, artifact:{action:'show_artifact',
+  // artifact_id}}) rather than spreading artifact_id at the top level. The
+  // generic top-level check below never sees them, so without this branch a
+  // budget/sales/cashflow chat records no destination and can never restore.
+  // Mirrors the nested branch in handleToolResult. (LSCMD-ARTIFACTHOST-0728-TA5)
+  if (result.artifact_created && result.artifact && typeof result.artifact === 'object') {
+    const nested = result.artifact as { artifact_id?: unknown; title?: unknown };
     const id = asArtifactId(nested.artifact_id);
     if (id) {
-      return { kind: 'artifact', artifactId: id, tool: toolName, at };
+      return { kind: 'artifact', artifactId: id, tool: toolName, label: asString(nested.title), at };
     }
   }
 

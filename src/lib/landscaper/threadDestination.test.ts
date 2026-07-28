@@ -52,6 +52,25 @@ describe('deriveDestination — things the chat MADE', () => {
     expect(d).toMatchObject({ kind: 'artifact', artifactId: 77 });
   });
 
+  it('a server-rendered schedule tool (nested envelope) is recorded', () => {
+    // Regression (LSCMD-ARTIFACTHOST-0728-TA5): get_budget_schedule and the
+    // other deterministic schedule tools return the create_artifact envelope
+    // nested under result.artifact — the SAME shape open_clarification uses.
+    // Before this, only open_clarification was recognized, so a budget/sales/
+    // cashflow chat recorded nothing and could never restore.
+    const d = deriveDestination(
+      'get_budget_schedule',
+      {
+        success: true,
+        artifact_created: true,
+        artifact: { success: true, action: 'show_artifact', artifact_id: 138, title: 'Development Budget' },
+      },
+      PROJECT,
+      NOW,
+    );
+    expect(d).toMatchObject({ kind: 'artifact', artifactId: 138, label: 'Development Budget' });
+  });
+
   it('a location brief restores through the ordinary artifact path', () => {
     const d = deriveDestination(
       'generate_location_brief',

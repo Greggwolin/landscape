@@ -220,7 +220,15 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       // Promote the nested id to activeArtifactId so ArtifactWorkspacePanel's
       // open_clarification carve-out renders the stepped view immediately — the
       // one-line chat reply ("… in the panel →") must land on a visible artifact.
-      if (toolName === 'open_clarification' && result.artifact_created && result.artifact) {
+      //
+      // Generalized beyond open_clarification (LSCMD-ARTIFACTHOST-0728-TA5):
+      // the deterministic schedule tools (get_budget_schedule, _sales_,
+      // _cashflow_, _capitalization_, _rent_roll_) return the SAME nested
+      // envelope. Without this, "show me the budget" rendered the artifact
+      // server-side but never surfaced it in the panel — action/artifact_id
+      // sit under result.artifact, so the top-level show_artifact branch below
+      // never fired. Any tool reporting the nested envelope opens here.
+      if (result.artifact_created && result.artifact) {
         const env = result.artifact as { artifact_id?: unknown };
         if (typeof env.artifact_id === 'number') {
           setActiveArtifactId(env.artifact_id);
