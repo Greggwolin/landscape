@@ -189,6 +189,32 @@ export interface ArtifactRendererProps {
     detail?: string;
     suggested_user_question?: string;
   }>;
+  /**
+   * CB8 — batch commit for staged table cell edits. The renderer stages
+   * table edits locally and calls this once on Commit with the whole set.
+   * Returns the batch envelope: a per-edit `results` list (applied / error)
+   * plus one `impact_line` for the set. The renderer clears the edits that
+   * landed and keeps the failed ones staged with their reason.
+   */
+  onCommitFieldEdits?: (
+    edits: Array<{ cell_path?: string[]; pair_path?: string[]; new_value: string }>,
+  ) => Promise<{
+    success: boolean;
+    results?: Array<{
+      index: number;
+      status: 'applied' | 'error';
+      cell_path?: string[] | null;
+      pair_path?: string[] | null;
+      error?: string;
+      detail?: string;
+      suggested_user_question?: string;
+    }>;
+    applied_count?: number;
+    error_count?: number;
+    impact_line?: string;
+    error?: string;
+    detail?: string;
+  }>;
   onPin: (label: string) => void;
   onUnpin: () => void;
   /** Optional label for the pinned new-version reference. */
