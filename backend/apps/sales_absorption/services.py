@@ -267,9 +267,17 @@ class SaleCalculationService:
             improvement_offset_source = 'manual_override' if 'improvement_offset_per_uom' in overrides else \
                 f"benchmark_{benchmarks.get('improvement_offset', {}).get('source', 'global')}"
 
-            legal_pct = Decimal(str(overrides.get('legal_pct',
-                benchmarks.get('legal', {}).get('rate', 0))))
-            legal_fixed = None
+            # CB13: a benchmark's fixed_amount SURVIVES an override of another
+            # cost — an override replaces only the cost it names. The prior code
+            # set legal/closing/title _fixed to None here, so any override (e.g.
+            # commission) silently dropped the fixed legal/closing/title
+            # benchmarks (~$50k/parcel).
+            if 'legal_pct' in overrides:
+                legal_fixed = None
+                legal_pct = Decimal(str(overrides['legal_pct']))
+            else:
+                legal_fixed = benchmarks.get('legal', {}).get('fixed_amount')
+                legal_pct = Decimal(str(benchmarks.get('legal', {}).get('rate', 0))) if not legal_fixed else Decimal('0')
             commission_pct = Decimal(str(overrides.get('commission_pct',
                 benchmarks.get('commission', {}).get('rate', 0))))
             # CB9: a user-typed commission dollar amount is a FIXED override —
@@ -280,12 +288,18 @@ class SaleCalculationService:
             _commission_amount_override = overrides.get('commission_amount')
             commission_fixed = (Decimal(str(_commission_amount_override))
                                 if _commission_amount_override is not None else None)
-            closing_pct = Decimal(str(overrides.get('closing_cost_pct',
-                benchmarks.get('closing', {}).get('rate', 0))))
-            closing_fixed = None
-            title_pct = Decimal(str(overrides.get('title_insurance_pct',
-                benchmarks.get('title_insurance', {}).get('rate', 0))))
-            title_fixed = None
+            if 'closing_cost_pct' in overrides:
+                closing_fixed = None
+                closing_pct = Decimal(str(overrides['closing_cost_pct']))
+            else:
+                closing_fixed = benchmarks.get('closing', {}).get('fixed_amount')
+                closing_pct = Decimal(str(benchmarks.get('closing', {}).get('rate', 0))) if not closing_fixed else Decimal('0')
+            if 'title_insurance_pct' in overrides:
+                title_fixed = None
+                title_pct = Decimal(str(overrides['title_insurance_pct']))
+            else:
+                title_fixed = benchmarks.get('title_insurance', {}).get('fixed_amount')
+                title_pct = Decimal(str(benchmarks.get('title_insurance', {}).get('rate', 0))) if not title_fixed else Decimal('0')
             custom_costs = overrides.get('custom_transaction_costs', [])
         else:
             improvement_offset_per_uom = Decimal(str(benchmarks.get('improvement_offset', {}).get('amount_per_uom', 0)))
