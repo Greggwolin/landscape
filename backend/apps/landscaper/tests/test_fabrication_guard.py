@@ -81,6 +81,66 @@ def test_passes_empty_content():
     assert guard(None, []) is False
 
 
+# ── CB5: income-property + land-sales vocabulary ─────────────────────────────
+#
+# The guard's no-tool branch always ran; its keyword list was land/returns-only,
+# so an invented rent roll or sales figure carried a dollar sign and a percentage
+# and still sailed through. Found by CC while verifying CB4. Each case below is a
+# fabrication shape that previously PASSED.
+
+def test_blocks_invented_rent_roll_no_tool():
+    content = "The rent roll shows 113 units averaging $1,988 a month, about 90% occupied."
+    assert guard(content, []) is True
+
+
+def test_blocks_invented_occupancy_and_in_place_rent():
+    assert guard("Occupancy is running 92% with in-place rents around $1,850.", []) is True
+
+
+def test_blocks_invented_lot_pricing():
+    assert guard("Finished lots are pricing around $250 per front foot.", []) is True
+
+
+def test_blocks_invented_net_proceeds_and_commission():
+    content = "Net proceeds come to $378.4M after commissions of 3%."
+    assert guard(content, []) is True
+
+
+def test_blocks_invented_per_unit_operating_expense():
+    assert guard("Operating expenses run about $6,200 per unit.", []) is True
+
+
+def test_blocks_invented_absorption_pricing():
+    assert guard("Sales absorption is 40 lots a quarter at $95,000 each.", []) is True
+
+
+def test_blocks_invented_loss_to_lease():
+    assert guard("Loss to lease is about 6% against market.", []) is True
+
+
+def test_blocks_invented_residual_land_value():
+    assert guard("The land residual works out to roughly $42M.", []) is True
+
+
+# The widening must not start blocking benign, non-financial replies.
+
+def test_passes_document_processing_percentage():
+    assert guard("I found 3 documents and 2 of them are 100% processed.", []) is False
+
+
+def test_passes_extraction_completeness_percentage():
+    assert guard("Extraction finished — 87% of fields were captured.", []) is False
+
+
+def test_passes_bare_unit_count():
+    assert guard("There are 113 units in the building.", []) is False
+
+
+def test_passes_rent_roll_figures_when_the_tool_ran():
+    content = "The rent roll shows 113 units, 90.3% occupied, $224,710 in place."
+    assert guard(content, [{'tool': 'get_rent_roll_schedule'}]) is False
+
+
 # ── JB50 slice 2: structure-only tightening ──────────────────────────────────
 
 def test_blocks_dollar_claim_when_only_a_structure_tool_ran():

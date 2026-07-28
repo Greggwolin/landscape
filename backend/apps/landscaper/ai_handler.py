@@ -3805,9 +3805,36 @@ _MONEY_OR_PCT_RE = re.compile(
     r'|\b\d+(?:\.\d+)?x\b',
     re.I,
 )
+# The vocabulary the guard recognizes as a financial claim. A figure only trips
+# the no-tool regime when it co-occurs with one of these — so anything absent
+# here is invisible to the guard no matter how fabricated it is.
+#
+# CB5 (2026-07-28) widened it. The original list was written for land deals and
+# investor returns (IRR / NPV / waterfall / budget), which left the entire
+# income-property and land-sales vocabulary unguarded: an invented "the rent roll
+# shows 113 units averaging $1,988, about 90% occupied" carried both a dollar
+# figure and a percentage and sailed through, because no word in it was on the
+# list. Found by CC while verifying CB4. The mechanism was never "the guard only
+# runs after a tool" — the no-tool branch has always run; it just couldn't read
+# what it was looking at.
 _FIN_CLAIM_KW = re.compile(
-    r'\b(IRR|NPV|equity multiple|promote|pref|hurdle|profit|invested|return|'
-    r'cash ?flow|budget|cap rate|NOI|valuation|waterfall|DSCR|equity)\b', re.I,
+    # returns / capital — the original vocabulary
+    r'\b(?:IRR|NPV|equity multiple|promote|pref|hurdle|profit|invested|return|'
+    r'cash ?flow|budget|cap rate|NOI|valuation|waterfall|DSCR|equity|'
+    # income property — rent roll + operating statement
+    r'rents?|rent ?roll|occupanc\w+|vacanc\w+|leases?|leased|tenants?|'
+    r'loss ?to ?lease|in.?place|asking|effective gross|EGI|GPR|'
+    r'expenses?|opex|reimbursements?|taxes|insurance|'
+    # land / sales
+    r'absorption|sell.?out|proceeds|commissions?|closing costs?|cost of sale|'
+    r'residual|land value|sale price|sales price|list price|lot price|'
+    # general money vocabulary
+    r'costs?|pricing|priced|price per|revenue|income)\b'
+    # unit-rate phrasings that carry a figure with none of the words above
+    r'|\bper\s(?:unit|lot|acre|door|key|square ?f\w+|sf|ff|front ?foot)\b'
+    r'|\$\s?/\s?(?:unit|lot|acre|sf|ff|door|key)\b'
+    r'|\bpsf\b|\d\s?/\s?(?:unit|lot|sf|ff)\b',
+    re.I,
 )
 
 
