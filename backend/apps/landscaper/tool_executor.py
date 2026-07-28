@@ -8782,6 +8782,7 @@ def handle_get_budget_schedule(
             total_budget=float(total_budget),
             category_count=category_count,
             lot_count=lot_count,
+            uom_options=data.get('uom_options'),
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
         )
