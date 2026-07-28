@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback, useContext } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
 import type {
   ArtifactRendererProps,
@@ -923,7 +923,14 @@ function TableBlockRenderer({
                   return (
                     <td
                       key={col.key}
-                      className={`${alignClass(col.align)}`}
+                      className={[
+                        alignClass(col.align),
+                        // CB10: a persistent tint marks a cell the user may
+                        // edit, so editable cells read as different from
+                        // calculated ones without hovering. Calculated cells
+                        // (numeric, no ref, in a ref-carrying row) stay inert.
+                        cellEditable ? styles.editableTd : '',
+                      ].filter(Boolean).join(' ')}
                       style={stale ? { opacity: 0.45, fontStyle: 'italic' } : undefined}
                       title={stale ? 'Recomputes on commit' : undefined}
                     >
@@ -938,6 +945,7 @@ function TableBlockRenderer({
                         stageable={Boolean(cellRef) && Boolean(staging)}
                         formatNumeric={!isLabelCol}
                         format={col.format}
+                        options={col.options}
                       />
                     </td>
                   );
@@ -1250,6 +1258,11 @@ interface EditableCellProps {
    *  the schema column metadata. Passed through to formatCellValue so
    *  currency cells include $ + correct decimal precision. */
   format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent';
+  /** CB10: picklist choices for an FK-constrained column (e.g. budget UOM).
+   *  When present on an editable cell, the editor is a dropdown of these
+   *  choices rather than a free-text input — the stored value is `value`
+   *  (the code), the dropdown shows `label`. */
+  options?: Array<{ value: string; label: string }>;
 }
 
 // Status-pill detection — when a cell's value matches one of these
@@ -1273,11 +1286,31 @@ function _statusBadgeClass(value: unknown): string | null {
   return _STATUS_BADGE_CLASS[probe] ?? null;
 }
 
-function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, format }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, format, options }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
+
+  // CB10: a column carrying `options` renders a dropdown, not a free-text
+  // editor — the choices are the only valid values (FK-constrained column),
+  // so typing is neither possible nor allowed.
+  const isPicklist = editable && Array.isArray(options) && options.length > 0;
+
+  // When a picklist opens, pop the native dropdown immediately so a single
+  // click reveals the choices — a dropdown that itself needs a second click
+  // would just move the discoverability problem, not solve it. showPicker is
+  // best-effort (Chrome 121+); if it is unavailable the select is still
+  // autofocused and opens on click/Enter.
+  useEffect(() => {
+    if (editing && isPicklist) {
+      // showPicker() is not in every TS lib.dom version for HTMLSelectElement;
+      // cast so the optional call typechecks and no-ops where unsupported.
+      const el = selectRef.current as (HTMLSelectElement & { showPicker?: () => void }) | null;
+      try { el?.showPicker?.(); } catch { /* focus fallback — select is autofocused */ }
+    }
+  }, [editing, isPicklist]);
 
   // Write-back path (CB6): when this cell carries a source_ref, the parent
   // passes onCommitFieldEdit. Commits then POST to commit_field_edit (which
@@ -1314,6 +1347,37 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
   }
 
   if (!editing) {
+    // CB10 picklist: the resting cell shows the stored code (compact); the
+    // full labels live in the dropdown. A SINGLE click opens it — a picklist
+    // hidden behind a double-click reintroduces the discoverability problem
+    // the affordance is meant to fix.
+    if (isPicklist) {
+      const pickDisplay = isStaged
+        ? stagedEntry!.value
+        : (value == null ? '—' : String(value));
+      return (
+        <span
+          className={styles.editablePicklistCell}
+          style={isStaged ? { color: 'var(--cui-primary)', fontWeight: 600 } : undefined}
+          onClick={() => {
+            setDraft(isStaged ? stagedEntry!.value : (value == null ? '' : String(value)));
+            setErrorMsg(null);
+            setEditing(true);
+          }}
+          title={isStaged ? (stagedEntry!.error ?? 'Staged — Commit to save') : 'Click to change'}
+        >
+          {pickDisplay}
+          {isStaged && stagedEntry!.error && (
+            <span
+              role="alert"
+              style={{ display: 'block', fontSize: '11px', color: 'var(--cui-danger)', fontWeight: 400, lineHeight: 1.3 }}
+            >
+              {stagedEntry!.error}
+            </span>
+          )}
+        </span>
+      );
+    }
     return (
       <span
         className={styles.editableCell}
@@ -1338,9 +1402,14 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
     );
   }
 
-  const commit = async () => {
+  // `override` lets the picklist commit the just-selected value directly —
+  // a <select>'s onChange fires before its state settles, so we pass the code
+  // explicitly rather than reading the async `draft`. Free-text cells call
+  // commit() with no argument and read `draft` as before.
+  const commit = async (override?: string) => {
+    const nextVal = override !== undefined ? override : draft;
     const currentDisplayed = value == null ? '' : String(value);
-    if (draft === currentDisplayed && !stagingMode) {
+    if (nextVal === currentDisplayed && !stagingMode) {
       setEditing(false);
       return;
     }
@@ -1349,7 +1418,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
     // CB8 staging — stage locally (or un-stage if reverted to committed); no
     // network until the batch Commit.
     if (stagingMode) {
-      staging!.stageEdit(path, draft, value);
+      staging!.stageEdit(path, nextVal, value);
       setEditing(false);
       return;
     }
@@ -1359,7 +1428,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
     if (hasSourceRef && onCommitFieldEdit) {
       setSaving(true);
       try {
-        const result = await onCommitFieldEdit(path, draft);
+        const result = await onCommitFieldEdit(path, nextVal);
         if (!result?.success) {
           setErrorMsg(
             result?.suggested_user_question
@@ -1384,7 +1453,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
     // Fallback: snapshot-only JSON Patch (no source_ref).
     setEditing(false);
     // Coerce numeric-looking input to number so the diff matches DB types.
-    const coerced = coerceCellValue(draft, value);
+    const coerced = coerceCellValue(nextVal, value);
     onUpdate([
       {
         op: 'replace',
@@ -1393,6 +1462,66 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
       },
     ]);
   };
+
+  // CB10 picklist editor: a native <select> of the allowed codes. Selecting a
+  // value commits it through the SAME path as a free-text edit (staging /
+  // write-back / snapshot) — no second write path. Because only valid codes
+  // are offered, an invalid UOM can't be entered through the UI; if one ever
+  // reaches commit, the FK rejection surfaces inline via the shared error span.
+  if (isPicklist) {
+    const currentInOptions = options!.some((o) => o.value === draft);
+    return (
+      <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <select
+          ref={selectRef}
+          className={styles.editSelect}
+          autoFocus
+          disabled={saving}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            void commit(e.target.value);
+          }}
+          onBlur={() => {
+            if (!saving) {
+              setEditing(false);
+              setErrorMsg(null);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setEditing(false);
+              setErrorMsg(null);
+            }
+          }}
+        >
+          {/* Keep the current value selectable even if it is no longer an
+              active code, so the select never silently misrepresents the row. */}
+          {!currentInOptions && draft !== '' && (
+            <option value={draft}>{draft}</option>
+          )}
+          {options!.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {errorMsg && (
+          <span
+            role="alert"
+            style={{
+              fontSize: '11px',
+              color: 'var(--cui-danger)',
+              maxWidth: '240px',
+              textAlign: 'right',
+              lineHeight: 1.3,
+            }}
+          >
+            {errorMsg}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
@@ -1403,7 +1532,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
         disabled={saving}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
+        onBlur={() => { void commit(); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();

@@ -476,6 +476,25 @@
   background: var(--cui-secondary-bg);
 }
 
+/* CB10 — picklist cell. Pointer cursor signals "clickable choice" rather than
+   "type here", and the hover feedback matches the free-text cell. */
+.editablePicklistCell {
+  cursor: pointer;
+}
+
+.editablePicklistCell:hover {
+  background: var(--cui-secondary-bg);
+}
+
+/* CB10 — persistent editable-cell affordance. A quiet, whole-cell tint marks
+   the cells a user may edit so they read as different from calculated cells
+   WITHOUT hovering. Kept faint (tertiary-bg) so a 30-row schedule doesn't
+   shout. Applied to the <td> so the whole cell reads as a field; calculated
+   cells carry no class and stay inert. */
+.editableTd {
+  background: var(--cui-tertiary-bg);
+}
+
 .editInput {
   width: 100%;
   padding: 2px 4px;
@@ -486,6 +505,20 @@
   color: var(--cui-body-color);
   font-variant-numeric: tabular-nums;
   box-sizing: border-box;
+}
+
+/* CB10 — picklist editor. Mirrors .editInput so an open dropdown reads as an
+   active field; native chrome supplies the disclosure arrow. */
+.editSelect {
+  width: 100%;
+  padding: 2px 4px;
+  font-size: 12px;
+  border: 1px solid var(--cui-primary);
+  border-radius: 3px;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  box-sizing: border-box;
+  cursor: pointer;
 }
 
 /* ─── Drift indicator dots ───────────────────────────────────────────── */
