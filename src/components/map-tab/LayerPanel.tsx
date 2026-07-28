@@ -217,11 +217,18 @@ export function LayerPanel({
               <div className="layer-group-items">
                 {dragEnabled && !isAnnotations ? (
                   <DndContext
+                    // Stable, per-group id so @dnd-kit's generated
+                    // `aria-describedby` (DndDescribedBy-N) is deterministic
+                    // across SSR + hydration. Without it @dnd-kit falls back to
+                    // a non-SSR-safe counter, causing a hydration mismatch on
+                    // the drag handles (server DndDescribedBy-1 vs client -2).
+                    id={`layer-dnd-${group.id}`}
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd(group)}
                   >
                     <SortableContext
+                      id={`layer-sort-${group.id}`}
                       items={group.layers.map((l) => l.id)}
                       strategy={verticalListSortingStrategy}
                     >
