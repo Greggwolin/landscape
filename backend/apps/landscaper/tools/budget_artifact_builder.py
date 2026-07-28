@@ -27,6 +27,7 @@ free — this module emits raw numbers, never formatted strings.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,41 @@ def _period_label(record: Dict[str, Any]) -> str:
     return str(s) if e == s else f'{s}-{e}'
 
 
+# Cells a user may edit directly on the budget schedule, mapped to the real
+# column they write. Editing-spine slice 1 (CB6).
+#
+# ONLY the two INPUTS are writable. `amount` is deliberately absent: a BEFORE
+# UPDATE trigger on core_fin_fact_budget (`trg_budget_calculate_amount`)
+# recomputes amount = qty x rate on every write, so amount is a CALCULATED cell.
+# Exposing it would let a user type a number the database immediately overwrites
+# — the worst kind of edit. This is the "editable vs calculated" rule from the
+# base-artifact contract, enforced in the payload rather than in the renderer.
+_EDITABLE_BUDGET_COLUMNS = ('qty', 'rate')
+
+
+def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any]:
+    """Per-cell pointers at the real source row, for the editable cells only.
+
+    A cell carries a ref ⇒ it is writable through the commit path. A cell without
+    one is read-only, whatever the row-level `editable` flag says — presence of
+    the ref is the contract, so a calculated cell can never become editable by
+    accident.
+    """
+    fact_id = record.get('fact_id')
+    if fact_id is None:
+        return {}
+    return {
+        column: {
+            'table': 'core_fin_fact_budget',
+            'row_id': fact_id,
+            'column': column,
+            'captured_at': captured_at,
+            'captured_value': _num(record.get(column)),
+        }
+        for column in _EDITABLE_BUDGET_COLUMNS
+    }
+
+
 def build_budget_artifact_schema(
     records: List[Dict[str, Any]],
     *,
@@ -95,10 +131,14 @@ def build_budget_artifact_schema(
     if cost_per_lot is not None:
         kpi_pairs.append({'label': 'Cost / Lot', 'value': round(cost_per_lot)})
 
+    captured_at = datetime.now(timezone.utc).isoformat()
+
     rows: List[Dict[str, Any]] = []
     for idx, r in enumerate(records, start=1):
+        refs = _cell_source_refs(r, captured_at)
         rows.append({
             'id': f"b{idx}",
+            **({'editable': True, 'cell_source_refs': refs} if refs else {}),
             'cells': {
                 'category': r.get('category_name') or '(uncategorized)',
                 'description': r.get('notes') or '(no description)',
