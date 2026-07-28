@@ -124,24 +124,29 @@ export function useThreadRestore(threadId: string | null | undefined): {
     if (!threadId) return;
     if (restoredRef.current.has(threadId)) return;
 
-    // Mark BEFORE the request resolves. Two renders can race here (the
-    // homepage sets the id, then the chat hook confirms it), and a double
-    // restore is visible to the user as a panel flicker.
-    restoredRef.current.add(threadId);
-
     const controller = new AbortController();
-    let cancelled = false;
+    let active = true;
 
     fetchDestination(threadId, controller.signal)
       .then((dest) => {
-        if (!cancelled && dest) setPending(dest);
+        // Drop the result of any superseded run. Under React StrictMode the
+        // effect fires setup → cleanup → setup on mount; the first run is
+        // aborted here (active=false) and only the surviving run delivers. If
+        // we instead marked the thread restored BEFORE the fetch resolved, the
+        // second setup would early-return and the aborted first fetch would be
+        // the only one — so the map (or artifact) never came back on reopen in
+        // dev. Mark restored on DELIVERY, not on dispatch, so exactly one run
+        // per (mount, thread) restores and a genuine remount can retry.
+        if (!active) return;
+        restoredRef.current.add(threadId);
+        if (dest) setPending(dest);
       })
       .catch(() => {
-        /* absent or unreachable destination → leave the screen alone */
+        /* aborted, absent, or unreachable → leave the screen alone */
       });
 
     return () => {
-      cancelled = true;
+      active = false;
       controller.abort();
     };
   }, [threadId]);
