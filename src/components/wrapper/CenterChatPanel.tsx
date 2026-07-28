@@ -18,7 +18,7 @@ import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import { useChatAttachment } from '@/components/landscaper/useChatAttachment';
 import { ChatDragOverlay } from '@/components/landscaper/ChatDragOverlay';
-import { deriveDestination } from '@/lib/landscaper/threadDestination';
+import { artifactHostRoute, deriveDestination } from '@/lib/landscaper/threadDestination';
 import { recordDestination, useThreadRestore } from '@/hooks/useThreadDestination';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -573,6 +573,21 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       // others one click away" with no extra query.
       setActiveArtifactId(pendingRestore.artifactId);
       if (!artifactsOpen) toggleArtifacts();
+
+      // ...and make sure there is somewhere for it to appear. Only the chat
+      // routes, the project ROOT and the dashboard mount an artifact surface;
+      // on the map / reports / documents pages the right-hand side is that
+      // page's own content and an artifact has no slot. activeArtifactId is
+      // global state, so setting it there succeeds and shows nothing —
+      // silently. Navigate to the project root, carrying the thread.
+      // (Reported 2026-07-28: reopening a budget-schedule chat from the map.)
+      const host = artifactHostRoute(pathname, projectId, activeThreadId);
+      if (host) {
+        emitLandscapeCommand('navigate', {
+          target_url: host,
+          context: { tool: pendingRestore.tool, reason: 'thread_restore_artifact' },
+        });
+      }
     } else if (pendingRestore.folder) {
       emitLandscapeCommand('navigate_screen', {
         folder: pendingRestore.folder,
@@ -602,7 +617,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     // returns you to the map; the overlay is already at 30% because that was
     // saved when it happened. Re-applying would be a bug, not a restoration.
     clearRestore();
-  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore, activeThreadId]);
+  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore, activeThreadId, projectId]);
 
   // Bridge the existing handleActiveThreadChange so it ALSO updates our
   // local activeThreadId — the upload path needs it for unassigned uploads.
@@ -881,6 +896,17 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             onOpenArtifact={(artifactId) => {
               setActiveArtifactId(artifactId);
               if (!artifactsOpen) toggleArtifacts();
+              // Same dead spot as thread restore, and it predates it: on the
+              // map / reports / documents pages there is no artifact surface,
+              // so this button set global state and appeared to do nothing.
+              // Send the user somewhere it can actually render.
+              const host = artifactHostRoute(pathname, projectId, activeThreadId);
+              if (host) {
+                emitLandscapeCommand('navigate', {
+                  target_url: host,
+                  context: { reason: 'open_artifact_card' },
+                });
+              }
             }}
             onThreadNotFound={() => {
               // URL-pinned thread is permanently gone (404). Recover to a fresh

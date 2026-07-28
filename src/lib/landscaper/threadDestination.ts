@@ -205,6 +205,56 @@ export function screenKeyFromRoute(route: string): string | undefined {
 }
 
 /**
+ * Does this route have anywhere to PUT an artifact?
+ *
+ * Only four of the wrapper's routes mount an artifact surface:
+ *   - /w/chat and /w/chat/[threadId]  → the takeover aside in the /w/ layout
+ *   - /w/projects/[projectId]          → ProjectArtifactsPanel (project ROOT only)
+ *   - /w/dashboard                     → ProjectArtifactsPanel
+ *
+ * Everywhere else the right-hand side is that page's own full-height content —
+ * the map, the reports body, the documents body — and there is no artifact slot
+ * beside it. `activeArtifactId` is global state in WrapperUIContext, so setting
+ * it on one of those routes succeeds silently and renders nothing at all.
+ *
+ * That silence is the whole bug this guards. Reported 2026-07-28: reopening a
+ * chat that had produced a budget schedule, from the map page, set the artifact
+ * and opened the panel — and nothing appeared, because on
+ * /w/projects/9/map the panel does not exist. The same dead spot swallows the
+ * "Open" button on an artifact chat card from any of those routes.
+ *
+ * (LSCMD-THREADDEST-0728-TA)
+ */
+export function routeShowsArtifacts(pathname: string): boolean {
+  if (/^\/w\/chat(\/|$)/.test(pathname)) return true;
+  if (pathname === '/w/dashboard') return true;
+  // Project ROOT only. `/w/projects` (the list) and `/w/projects/9/map`
+  // (a child page) both correctly fail this test.
+  if (/^\/w\/projects\/[^/]+\/?$/.test(pathname)) return true;
+  return false;
+}
+
+/**
+ * Where to go so an artifact has somewhere to render, or null if the current
+ * route is already fine.
+ *
+ * Returns the project root, carrying the thread on the query string so the
+ * chat comes with it rather than blanking — same reason the screen-restore
+ * path carries it. Returns null when there is no project to fall back to
+ * (an unassigned chat is already on /w/chat, which hosts artifacts).
+ */
+export function artifactHostRoute(
+  pathname: string,
+  projectId?: number | string | null,
+  threadId?: string | null,
+): string | null {
+  if (routeShowsArtifacts(pathname)) return null;
+  if (!projectId) return null;
+  const base = `/w/projects/${projectId}`;
+  return threadId ? `${base}?thread=${threadId}` : base;
+}
+
+/**
  * Last-resort fallback for threads that predate destination recording, or that
  * navigated somewhere without producing anything.
  *
