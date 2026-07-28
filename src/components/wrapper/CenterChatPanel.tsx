@@ -581,8 +581,18 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     } else if (pendingRestore.route && pendingRestore.route !== pathname) {
       // Guarded on pathname: reopening a map thread while already on the map
       // must not re-push the route and remount the map underneath the user.
+      //
+      // Carry the thread on the URL. The /w/ shell derives the active thread
+      // from the URL (?thread= / /chat/[id]) for the chat panel that persists
+      // beside the page content; a bare route push would drop it and blank the
+      // chat while the map opened. Preserve the selection so the reopened chat
+      // and its screen come back together.
+      const sep = pendingRestore.route.includes('?') ? '&' : '?';
+      const target = activeThreadId
+        ? `${pendingRestore.route}${sep}thread=${activeThreadId}`
+        : pendingRestore.route;
       emitLandscapeCommand('navigate', {
-        target_url: pendingRestore.route,
+        target_url: target,
         context: { tool: pendingRestore.tool, reason: 'thread_restore' },
       });
     }
@@ -592,7 +602,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     // returns you to the map; the overlay is already at 30% because that was
     // saved when it happened. Re-applying would be a bug, not a restoration.
     clearRestore();
-  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore]);
+  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore, activeThreadId]);
 
   // Bridge the existing handleActiveThreadChange so it ALSO updates our
   // local activeThreadId — the upload path needs it for unassigned uploads.
