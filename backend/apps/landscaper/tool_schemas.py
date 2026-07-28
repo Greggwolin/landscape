@@ -1724,6 +1724,44 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "review_budget_variance",
+        "description": (
+            "Check this project's budget rates against the firm's OTHER "
+            "comparable deals and open a variance-review artifact listing the "
+            "outliers. Call this when the user asks whether a number looks right, "
+            "wants a sanity check, or asks how this deal compares to their others: "
+            "'does this budget look right', 'check my costs', 'how does this "
+            "compare to my other deals', 'anything look off', 'sanity check the "
+            "budget', 'variance review'. Read-only — it reports divergence and "
+            "asks; it never changes anything. Comparison is against the median of "
+            "the user's own comparable deals at the tightest available geography "
+            "(county, else market, else state); lines without enough comparable "
+            "deals are NOT compared, and that silence must never be reported as "
+            "'looks fine'. The artifact is built server-side and returned "
+            "already-created — do NOT call create_artifact, do NOT compose the "
+            "table, and do NOT state any figure that is not in the tool result."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "review_pct": {
+                    "type": "number",
+                    "description": (
+                        "Optional. Flag a line diverging beyond this percentage "
+                        "from the peer median. Defaults to the firm setting (25)."
+                    ),
+                },
+                "blocker_pct": {
+                    "type": "number",
+                    "description": (
+                        "Optional. Beyond this percentage a line is marked 'needs "
+                        "a decision' rather than merely flagged. Defaults to 50."
+                    ),
+                },
+            },
+        },
+    },
+    {
         "name": "get_budget_schedule",
         "description": (
             "Render the development budget as a DETERMINISTIC artifact (a KPI "

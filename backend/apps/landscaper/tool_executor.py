@@ -8810,6 +8810,98 @@ def handle_get_budget_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('review_budget_variance')
+def handle_review_budget_variance(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Check this project's budget rates against the firm's other comparable
+    deals and render the outliers as a DETERMINISTIC artifact. READ-ONLY — it
+    reports divergence, it never writes and never blocks. Commit·Impact·Variance
+    reference §3. Server-side render; the model must NOT compose the table."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        from .services.variance_service import check_budget_variance, headline_finding
+
+        review_pct = tool_input.get('review_pct')
+        blocker_pct = tool_input.get('blocker_pct')
+        kw: Dict[str, Any] = {}
+        if review_pct is not None:
+            kw['review_pct'] = float(review_pct)
+        if blocker_pct is not None:
+            kw['blocker_pct'] = float(blocker_pct)
+
+        result = check_budget_variance(int(project_id), **kw)
+
+        if result.get('lines_checked', 0) == 0:
+            return {
+                'success': True, 'artifact_created': False,
+                'lines_checked': 0, 'finding_count': 0,
+                'message': (
+                    'No budget lines carry a unit rate on this project, so there '
+                    'is nothing to compare against your other deals.'
+                ),
+            }
+
+        if result.get('lines_compared', 0) == 0:
+            return {
+                'success': True, 'artifact_created': False,
+                'lines_checked': result.get('lines_checked'),
+                'lines_compared': 0, 'finding_count': 0,
+                'message': (
+                    'None of these budget lines has enough comparable deals to '
+                    'check against. Nothing was compared — that is not the same '
+                    'as nothing being wrong.'
+                ),
+            }
+
+        from .tools.variance_artifact_builder import create_variance_artifact
+        envelope = create_variance_artifact(
+            project_id=int(project_id),
+            project_name=result.get('project_name'),
+            result=result,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        payload = {
+            'success': True,
+            'lines_checked': result.get('lines_checked'),
+            'lines_compared': result.get('lines_compared'),
+            'finding_count': len(result.get('findings') or []),
+            'blocker_count': result.get('blocker_count'),
+            'review_count': result.get('review_count'),
+            'library_coverage': result.get('library_coverage'),
+            'headline': headline_finding(result),
+            'thresholds': result.get('thresholds'),
+        }
+
+        if envelope and envelope.get('success') is not False:
+            payload.update({
+                'artifact_created': True,
+                'artifact': envelope,
+                'instruction': (
+                    'The budget variance review has ALREADY been created and is '
+                    'open in the right panel. Do NOT call create_artifact and do '
+                    'NOT compose the table. Reply with ONE sentence: the '
+                    'finding_count and, if present, the headline field VERBATIM. '
+                    'Do not add figures of your own.'
+                ),
+            })
+            return payload
+
+        # Artifact build failed → degrade to the raw findings.
+        payload.update({'artifact_created': False, 'findings': result.get('findings')})
+        return payload
+
+    except Exception as e:
+        logger.error(f"Error building budget variance review: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('get_sales_schedule')
 def handle_get_sales_schedule(
     tool_input: Dict[str, Any],

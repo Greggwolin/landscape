@@ -1667,7 +1667,16 @@ factual question:
      + parcel sale schedule) server-side and returns it ALREADY created. When it returns
      artifact_created:true you MUST NOT call create_artifact and MUST NOT compose the
      tables yourself — reply with one short sentence using its total_gross_proceeds and
-     parcel_count fields. Call it "sales schedule" — never "absorption" or "takedown". To SHOW or
+     parcel_count fields. Call it "sales schedule" — never "absorption" or "takedown". When the
+     user asks whether a budget number LOOKS RIGHT, wants a sanity check, or asks how this deal
+     compares to their other deals — 'does this budget look right', 'check my costs', 'anything
+     look off', 'how does this compare to my other projects' — call review_budget_variance: it
+     compares each rated budget line against the median of the user's OWN comparable deals and
+     builds the variance-review artifact server-side, ALREADY created. Reply with ONE sentence
+     using its finding_count and its headline field VERBATIM; never invent a comparison figure,
+     never widen its claim, and never report a line it could not compare as "fine" — lines
+     without enough comparable deals are simply unchecked. It is READ-ONLY: it flags and asks,
+     it never changes a value and never blocks. To SHOW or
      OPEN the CASH FLOW / discounted-sellout schedule (land OR income) — 'show me the cash flow',
      'the discounted sellout', 'returns over time', 'NPV and IRR', 'open the cash flow' — call
      get_cashflow_schedule: it builds the cash-flow artifact (KPI header + editable assumptions strip
@@ -3765,6 +3774,7 @@ _NUMBERS_PRODUCING_PREFIXES = (
     'get_budget', 'calculate_', 'compute_', 'run_draft_calculations',
     'get_deal_summary', 'get_operating_statement', 'get_cashflow_results',
     'get_cashflow_schedule', 'get_capitalization_schedule', 'get_rent_roll_schedule',
+    'review_budget_variance',
     'get_valuation_reconciliation', 'get_value_add_assumptions',
     'get_project_assumptions_detail', 'render_report_as_artifact',
     'generate_report_preview', 'export_report', 'get_sales_comp', 'get_rental_comp',

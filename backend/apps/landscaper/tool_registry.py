@@ -183,6 +183,9 @@ LAND_ONLY_TOOLS = [
     "delete_budget_category",
     "get_category_lifecycle_stages", "update_category_lifecycle_stages",
     "get_budget_items", "get_budget_rollup", "get_budget_schedule", "update_budget_item", "delete_budget_item",
+    # Budget variance review against the firm's other comparable deals
+    # (Commit·Impact·Variance §3). Read-only. LAND + income property.
+    "review_budget_variance",
     # Sales schedule artifact (parcel sales — LAND only; MF/office use opex, not
     # parcel sale assumptions). Deterministic server-rendered artifact.
     "get_sales_schedule",
@@ -238,6 +241,7 @@ INCOME_PROPERTY_TOOLS = [
     "check_income_analysis_availability",
     "get_budget_rollup",
     "get_budget_schedule",
+    "review_budget_variance",
     "get_cashflow_schedule",
     "get_capitalization_schedule",
     # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
