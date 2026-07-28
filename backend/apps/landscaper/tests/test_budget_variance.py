@@ -236,3 +236,20 @@ def test_tool_is_gated_for_both_land_and_income_property():
 def test_executor_is_registered():
     from apps.landscaper.tool_executor import TOOL_REGISTRY
     assert 'review_budget_variance' in TOOL_REGISTRY
+
+
+def test_empty_paths_carry_a_verbatim_relay_instruction():
+    """The empty result must reach the user as itself, not as improvisation.
+
+    On the CB2 live run the model met the empty result and volunteered invented
+    per-lot industry costs; only the fabrication guard stopped it. Both empty
+    returns now carry the same relay instruction the artifact path carries.
+    """
+    import inspect
+    from apps.landscaper import tool_executor
+
+    src = inspect.getsource(tool_executor.handle_review_budget_variance)
+    assert src.count("'instruction': _RELAY") == 2
+    assert 'VERBATIM' in src
+    assert 'no industry ranges' in src
+    assert 'no per-lot benchmarks' in src

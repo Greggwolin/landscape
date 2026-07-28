@@ -8836,6 +8836,18 @@ def handle_review_budget_variance(
 
         result = check_budget_variance(int(project_id), **kw)
 
+        # Both empty paths carry the SAME relay instruction as the artifact path.
+        # Without it the model improvises around the empty result — the live run
+        # on project 9 (CB2) had it volunteering invented per-lot industry costs,
+        # caught only by the fabrication guard. An honest tool result must reach
+        # the user as itself, not as a guard's refusal.
+        _RELAY = (
+            'Relay the message field VERBATIM as your entire reply. Add NOTHING: '
+            'no cost figures, no industry ranges, no per-lot benchmarks, no '
+            'estimate of your own, and no reassurance that the budget looks fine. '
+            'Nothing was compared, which is NOT the same as nothing being wrong.'
+        )
+
         if result.get('lines_checked', 0) == 0:
             return {
                 'success': True, 'artifact_created': False,
@@ -8844,6 +8856,7 @@ def handle_review_budget_variance(
                     'No budget lines carry a unit rate on this project, so there '
                     'is nothing to compare against your other deals.'
                 ),
+                'instruction': _RELAY,
             }
 
         if result.get('lines_compared', 0) == 0:
@@ -8856,6 +8869,7 @@ def handle_review_budget_variance(
                     'check against. Nothing was compared — that is not the same '
                     'as nothing being wrong.'
                 ),
+                'instruction': _RELAY,
             }
 
         from .tools.variance_artifact_builder import create_variance_artifact
