@@ -3925,6 +3925,39 @@ def _build_operating_statement_source_pointers(
     return pointers
 
 
+# ─── Deterministic-artifact relay instructions (CB4) ──────────────────────
+#
+# Every deterministic-artifact tool has three exits: the artifact opened, the
+# data was empty, or the artifact build failed and we degraded to raw numbers.
+# The artifact exit has always carried an `instruction`; the other two did not,
+# so they were the only places left for the model to improvise — and it did.
+# Live proof (CB2, project 9): the variance tool returned an honest empty result
+# and the model answered with invented per-lot industry costs, caught only by
+# the fabrication guard. Fixed there in CB3; this sweep applies the same relay
+# to every remaining empty and degraded exit.
+#
+# Rule of thumb for any future tool: a return path without an `instruction` is
+# an invitation to improvise, and the empty/negative path is the one most likely
+# to lack one.
+
+_EMPTY_ARTIFACT_RELAY = (
+    'Relay the message field VERBATIM as your entire reply. Add NOTHING: no '
+    'figures, no estimates, no industry ranges or benchmarks, no typical values, '
+    'and no reassurance that the number looks fine or that nothing is wrong. An '
+    'empty result means this data has not been entered yet — it is NOT a finding '
+    'about the deal, and it is NOT permission to supply the missing numbers.'
+)
+
+_DEGRADED_ARTIFACT_RELAY = (
+    'The panel could NOT be opened. Reply with one short sentence that states '
+    'only the numeric fields present in this result and says the panel could not '
+    'open. Do NOT call create_artifact, do NOT compose or restate the table, do '
+    'NOT state any figure that is not a field of this result, and do NOT estimate '
+    'anything missing. A failed render is not a licence to hand-write the table — '
+    'that is the exact defect the server-rendered artifacts were built to end.'
+)
+
+
 @register_tool('get_operating_statement')
 def handle_get_operating_statement(
     tool_input: Dict[str, Any],
@@ -4167,6 +4200,7 @@ def handle_get_operating_statement(
 
     return {
         'success': True,
+        'artifact_created': False,
         'scenario_resolved': resolved_scenario,
         'scenario_resolution_source': resolution_source,
         'rendering_label': rendering_label,
@@ -4174,6 +4208,7 @@ def handle_get_operating_statement(
         'project_name': project_name,
         'data': payload,
         'source_pointers': source_pointers,
+        'instruction': _DEGRADED_ARTIFACT_RELAY,
     }
 
 
@@ -8763,6 +8798,7 @@ def handle_get_budget_schedule(
                 'success': True, 'artifact_created': False,
                 'total_budget': 0, 'line_item_count': 0,
                 'message': 'No budget line items exist for this project yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
         from .tools.budget_artifact_builder import create_budget_artifact
@@ -8803,6 +8839,7 @@ def handle_get_budget_schedule(
             'category_count': category_count,
             'cost_per_lot': cost_per_lot,
             'records': records,
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
         }
 
     except Exception as e:
@@ -8908,7 +8945,11 @@ def handle_review_budget_variance(
             return payload
 
         # Artifact build failed → degrade to the raw findings.
-        payload.update({'artifact_created': False, 'findings': result.get('findings')})
+        payload.update({
+            'artifact_created': False,
+            'findings': result.get('findings'),
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
+        })
         return payload
 
     except Exception as e:
@@ -9000,6 +9041,7 @@ def handle_get_sales_schedule(
                 'success': True, 'artifact_created': False,
                 'total_gross_proceeds': 0, 'parcel_count': 0,
                 'message': 'No parcel sales schedule exists for this project.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
         for r in parcel_rows:
@@ -9069,6 +9111,7 @@ def handle_get_sales_schedule(
             'parcel_count': parcel_count,
             'product_count': product_count,
             'sale_date_span': span_label,
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
         }
 
     except Exception as e:
@@ -9120,6 +9163,7 @@ def handle_get_cashflow_schedule(
                 'success': True, 'artifact_created': False,
                 'period_count': 0,
                 'message': 'No cash flow schedule exists for this project yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
         assumptions = _build_cashflow_assumptions(project_id)
@@ -9172,6 +9216,7 @@ def handle_get_cashflow_schedule(
             'irr': irr,
             'period_count': len(rows),
             'total_net_cash_flow': total_net,
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
         }
 
     except Exception as e:
@@ -9250,7 +9295,15 @@ def handle_open_clarification(
         }
     except Exception as e:  # noqa: BLE001
         logger.error(f"Error building clarification artifact: {e}")
-        return {'success': False, 'artifact_created': False, 'error': str(e)}
+        return {
+            'success': False, 'artifact_created': False, 'error': str(e),
+            'instruction': (
+                'The clarification panel could NOT be opened. Say so in one short '
+                'line and ask the user the SINGLE most decision-relevant question '
+                'inline. Do NOT dump the question list into chat, do NOT answer '
+                'any of them yourself, and do NOT proceed on assumed values.'
+            ),
+        }
 
     if artifact_envelope and artifact_envelope.get('success') is not False:
         return {
@@ -9271,6 +9324,12 @@ def handle_open_clarification(
         'success': False,
         'artifact_created': False,
         'error': (artifact_envelope or {}).get('error', 'clarification artifact creation failed'),
+        'instruction': (
+            'The clarification panel could NOT be opened. Say so in one short line '
+            'and ask the user the SINGLE most decision-relevant question inline. Do '
+            'NOT dump the whole question list into chat, do NOT answer any of them '
+            'yourself, and do NOT proceed on assumed values.'
+        ),
     }
 
 
@@ -9316,6 +9375,7 @@ def handle_get_capitalization_schedule(
                 'tier_count': 0,
                 'message': result.get('error') if isinstance(result, dict) and result.get('error')
                 else 'No capitalization / waterfall is configured for this project yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
         lp_summary = result.get('lp_summary') or {}
@@ -9328,6 +9388,7 @@ def handle_get_capitalization_schedule(
                 'success': True, 'artifact_created': False,
                 'tier_count': 0,
                 'message': 'No waterfall tiers are configured for this project yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
         from .tools.capitalization_artifact_builder import create_capitalization_artifact
@@ -9366,6 +9427,7 @@ def handle_get_capitalization_schedule(
             'artifact_created': False,
             'lp_irr': lp_irr,
             'tier_count': len(tier_config),
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
         }
 
     except Exception as e:
@@ -9417,6 +9479,7 @@ def handle_get_rent_roll_schedule(
                 'success': True, 'artifact_created': False,
                 'unit_count': 0,
                 'message': 'No rent roll exists for this project yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
         for r in unit_rows:
@@ -9477,6 +9540,7 @@ def handle_get_rent_roll_schedule(
             'unit_count': unit_count,
             'occupancy': occ_pct,
             'total_in_place_rent': round(float(total_in_place)),
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
         }
 
     except Exception as e:
