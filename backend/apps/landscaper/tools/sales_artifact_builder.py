@@ -42,9 +42,79 @@ free — this module emits raw numbers, never formatted strings.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# Editing spine slice 3 (CB9) — the parcel-schedule cells a user may edit, and
+# the real column each writes on ``tbl_parcel_sale_assumptions``.
+#
+# SCOPE DECISION (Gregg, 2026-07-28): the parcel schedule only. The rate card's
+# price stays READ-ONLY this slice. Editing a rate-card price fires
+# ``trg_recalc_on_pricing_change``, which does not recalculate — it DELETES the
+# parcel sale rows for that product ("the frontend must handle null values").
+# On project 9 that is up to 6 of 37 rows per price, taking any per-parcel
+# override with them. Making price editable is a separate slice that has to
+# rebuild what the delete removes.
+#
+# Everything derived stays out: gross, cost_of_sale and net are stored
+# calculated values. Unlike the budget table there is NO trigger recomputing
+# them, so the writer must recalculate the row (SaleCalculationService) after
+# any write — see the CB9 handoff.
+#
+# ``commission`` is an OVERRIDE cell: writing commission_amount without also
+# setting commission_override = true leaves the user's number to be silently
+# reverted by the next recalculation. The writer owns that companion flag.
+_EDITABLE_SALE_COLUMNS = {
+    'sale_date': 'sale_date',
+    'commission': 'commission_amount',
+}
+
+
+def _jsonable_capture(value: Any) -> Any:
+    """JSON-safe capture value for a source_ref.
+
+    The whole artifact schema (including these refs) is stored as JSON, so a raw
+    ``date`` in ``captured_value`` silently breaks artifact persistence — the
+    sale_date column is a DATE, so this is the load-bearing coercion. Dates →
+    ISO string; Decimals → float; everything else unchanged."""
+    if value is None:
+        return None
+    if hasattr(value, 'isoformat') and not isinstance(value, str):
+        try:
+            return value.isoformat()
+        except Exception:  # noqa: BLE001
+            return str(value)
+    from decimal import Decimal
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any]:
+    """Per-cell pointers at the real source row, for the editable cells only.
+
+    ``row_id`` is the PARCEL id, not ``assumption_id``: ``tbl_parcel_sale_
+    assumptions`` is UNIQUE on ``parcel_id`` and the existing writer
+    (``update_parcel_sale_assumptions``) keys on the parcel. Presence of a ref
+    is the write allowlist — a cell without one is read-only, whatever the
+    row-level ``editable`` flag says.
+    """
+    parcel_id = record.get('parcel_id')
+    if parcel_id is None:
+        return {}
+    return {
+        cell_key: {
+            'table': 'tbl_parcel_sale_assumptions',
+            'row_id': parcel_id,
+            'column': column,
+            'captured_at': captured_at,
+            'captured_value': _jsonable_capture(record.get(column)),
+        }
+        for cell_key, column in _EDITABLE_SALE_COLUMNS.items()
+    }
 
 
 def _num(value: Any) -> Optional[float]:
@@ -177,15 +247,21 @@ def build_sales_artifact_schema(
     schedule_columns.extend([
         {'key': 'sale_date', 'label': 'Sale Date', 'align': 'right', 'editable': True},
         {'key': 'gross', 'label': 'Gross', 'align': 'right', 'editable': False},
-        {'key': 'commission', 'label': 'Commission', 'align': 'right', 'editable': False},
+        # Commission is editable via its per-cell source_ref (CB9). The renderer
+        # gates on the ref, not this flag, but keep them aligned so the column
+        # def is honest about what a user can edit.
+        {'key': 'commission', 'label': 'Commission', 'align': 'right', 'editable': True},
         {'key': 'cost_of_sale', 'label': 'Cost of Sale', 'align': 'right', 'editable': False},
         # Net is CALCULATED (gross − commission − cost of sale); never editable.
         {'key': 'net', 'label': 'Net', 'align': 'right', 'editable': False},
         {'key': 'evidence', 'label': 'Evidence', 'align': 'left', 'editable': False},
     ])
 
+    captured_at = datetime.now(timezone.utc).isoformat()
+
     schedule_data: List[Dict[str, Any]] = []
     for idx, r in enumerate(parcel_rows, start=1):
+        refs = _cell_source_refs(r, captured_at)
         cells = {
             'parcel': r.get('parcel_code') or f"#{r.get('parcel_id')}",
             'sale_date': _date_label(r.get('sale_date')),
@@ -199,7 +275,11 @@ def build_sales_artifact_schema(
             cells['area'] = r.get('area') or ''
         if show_phase:
             cells['phase'] = r.get('phase') or ''
-        schedule_data.append({'id': f's{idx}', 'cells': cells})
+        schedule_data.append({
+            'id': f's{idx}',
+            **({'editable': True, 'cell_source_refs': refs} if refs else {}),
+            'cells': cells,
+        })
 
     return {
         'blocks': [
@@ -284,3 +364,135 @@ def create_sales_artifact(
     except Exception as exc:  # noqa: BLE001
         logger.exception('sales_artifact_builder: create_artifact_record failed')
         return {'success': False, 'error': f'artifact creation failed: {exc}'}
+
+
+# ─── Read path (CB9) ─────────────────────────────────────────────────────────
+#
+# The parcel-schedule + rate-card queries live here (not only in the
+# get_sales_schedule tool) so the after-write refresh
+# (commit_field_edit → _refresh_artifact_after_write) rebuilds a schema
+# IDENTICAL to the fresh render. The editing spine depends on that single source
+# of truth — the same reason the budget slice put its read path in
+# ``fetch_budget_schedule_data``.
+
+
+def fetch_sales_schedule_data(project_id: int) -> Dict[str, Any]:
+    """Read the parcel sale schedule + pricing rate-card for one project.
+
+    Returns everything ``build_sales_artifact_schema`` needs, already coerced:
+    ``parcel_rows`` (with ``parcel_id`` for the editable cell refs), ``pricing_rows``,
+    ``total_gross`` / ``total_net``, ``parcel_count`` / ``product_count``,
+    ``span_label`` and ``project_name``. ``parcel_rows`` is empty for a project
+    with no dated parcel sale assumptions (e.g. an MF deal)."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        # Per-parcel sale schedule. Deductions: commission = commission_amount;
+        # cost of sale = the remaining transaction costs (legal + closing +
+        # title). Net is the stored net_sale_proceeds and equals
+        # gross_sale_proceeds − total_transaction_costs by construction.
+        cursor.execute("""
+            SELECT
+                p.parcel_id,
+                p.parcel_code,
+                p.product_code,
+                COALESCE(a.area_alias, NULLIF('Area ' || a.area_no, 'Area ')) AS area,
+                ph.phase_name AS phase,
+                psa.sale_date,
+                psa.gross_sale_proceeds,
+                psa.commission_amount,
+                (COALESCE(psa.total_transaction_costs, 0)
+                    - COALESCE(psa.commission_amount, 0)) AS cost_of_sale,
+                psa.net_sale_proceeds
+            FROM landscape.tbl_parcel p
+            JOIN landscape.tbl_parcel_sale_assumptions psa
+                ON psa.parcel_id = p.parcel_id
+            LEFT JOIN landscape.tbl_area a ON p.area_id = a.area_id
+            LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+            WHERE p.project_id = %s
+              AND psa.sale_date IS NOT NULL
+            ORDER BY psa.sale_date, p.parcel_code
+        """, [project_id])
+        columns = [col[0] for col in cursor.description]
+        parcel_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        # Pricing rate-card (the basis). Its own table — one row per product.
+        cursor.execute("""
+            SELECT
+                lu_type_code,
+                product_code,
+                price_per_unit,
+                unit_of_measure,
+                growth_rate,
+                growth_rate_set_id,
+                benchmark_id
+            FROM landscape.land_use_pricing
+            WHERE project_id = %s
+            ORDER BY lu_type_code, product_code
+        """, [project_id])
+        pcols = [col[0] for col in cursor.description]
+        pricing_rows = [dict(zip(pcols, row)) for row in cursor.fetchall()]
+
+        cursor.execute(
+            "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+            [project_id],
+        )
+        pn = cursor.fetchone()
+        project_name = pn[0] if pn else None
+
+    # Coerce the money columns to float (the builder emits raw numbers).
+    for r in parcel_rows:
+        for k in ('gross_sale_proceeds', 'commission_amount',
+                  'cost_of_sale', 'net_sale_proceeds'):
+            if r.get(k) is not None:
+                r[k] = float(r[k])
+
+    total_gross = sum((r.get('gross_sale_proceeds') or 0) for r in parcel_rows)
+    total_net = sum((r.get('net_sale_proceeds') or 0) for r in parcel_rows)
+    parcel_count = len(parcel_rows)
+    product_count = len({
+        r.get('product_code') for r in parcel_rows if r.get('product_code')
+    })
+
+    # Sale-date span label ("2028–2034", or a single year).
+    years = sorted({
+        y for r in parcel_rows if (y := _year(r.get('sale_date'))) is not None
+    })
+    if years and years[0] != years[-1]:
+        span_label = f'{years[0]}–{years[-1]}'
+    elif years:
+        span_label = str(years[0])
+    else:
+        span_label = '—'
+
+    return {
+        'parcel_rows': parcel_rows,
+        'pricing_rows': pricing_rows,
+        'total_gross': float(total_gross),
+        'total_net': float(total_net),
+        'parcel_count': parcel_count,
+        'product_count': product_count,
+        'span_label': span_label,
+        'project_name': project_name,
+    }
+
+
+def build_sales_schema_for_project(project_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch + build the sales-schedule schema for a project.
+
+    Returns the schema dict, or ``None`` when the project has no dated parcel
+    sale assumptions (land-only guard — the caller renders "no schedule", not an
+    empty artifact). Used by the after-write refresh path so a freshly-committed
+    sale-cell edit re-renders exactly as a fresh ``get_sales_schedule`` would."""
+    data = fetch_sales_schedule_data(project_id)
+    if not data['parcel_rows']:
+        return None
+    return build_sales_artifact_schema(
+        data['parcel_rows'],
+        data['pricing_rows'],
+        total_gross=data['total_gross'],
+        total_net=data['total_net'],
+        parcel_count=data['parcel_count'],
+        product_count=data['product_count'],
+        span_label=data['span_label'],
+    )

@@ -272,7 +272,14 @@ class SaleCalculationService:
             legal_fixed = None
             commission_pct = Decimal(str(overrides.get('commission_pct',
                 benchmarks.get('commission', {}).get('rate', 0))))
-            commission_fixed = None
+            # CB9: a user-typed commission dollar amount is a FIXED override —
+            # honored to the cent, exactly like a benchmark fixed_amount. This is
+            # what lets an edited commission survive a recalc: commission_pct is
+            # numeric(5,4) in the DB, too coarse to round-trip the dollars, so
+            # the amount itself is the source of truth when overridden.
+            _commission_amount_override = overrides.get('commission_amount')
+            commission_fixed = (Decimal(str(_commission_amount_override))
+                                if _commission_amount_override is not None else None)
             closing_pct = Decimal(str(overrides.get('closing_cost_pct',
                 benchmarks.get('closing', {}).get('rate', 0))))
             closing_fixed = None
@@ -337,7 +344,15 @@ class SaleCalculationService:
 
         # Transaction costs - use fixed amounts if available, otherwise calculate as percentage
         legal_amount = Decimal(str(legal_fixed)) if legal_fixed else (gross_sale_proceeds * legal_pct)
-        commission_amount = Decimal(str(commission_fixed)) if commission_fixed else (gross_sale_proceeds * commission_pct)
+        # `is not None` (not truthiness) so an explicit $0 commission override is
+        # honored rather than silently reverting to the benchmark percentage.
+        commission_amount = Decimal(str(commission_fixed)) if commission_fixed is not None else (gross_sale_proceeds * commission_pct)
+        # When commission is a fixed dollar override, express the pct off the
+        # actual gross so the stored commission_pct stays consistent with the
+        # amount (the amount is the source of truth; pct is display / back-compat).
+        if commission_fixed is not None:
+            commission_pct = (commission_amount / gross_sale_proceeds
+                              if gross_sale_proceeds else Decimal('0'))
         closing_amount = Decimal(str(closing_fixed)) if closing_fixed else (gross_sale_proceeds * closing_pct)
         title_amount = Decimal(str(title_fixed)) if title_fixed else (gross_sale_proceeds * title_pct)
 
