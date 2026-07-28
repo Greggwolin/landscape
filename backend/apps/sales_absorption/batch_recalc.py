@@ -66,7 +66,7 @@ def recalculate_one_assumption(project_id: int, parcel_id, cost_inflation_rate=N
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT p.type_code, p.product_code, p.lot_width, p.units_total,
-                   p.acres_gross, psa.sale_date
+                   p.acres_gross, psa.sale_date, p.sale_period
             FROM landscape.tbl_parcel p
             JOIN landscape.tbl_parcel_sale_assumptions psa
                 ON psa.parcel_id = p.parcel_id
@@ -78,6 +78,16 @@ def recalculate_one_assumption(project_id: int, parcel_id, cost_inflation_rate=N
         raise ValueError(f"No sale assumption row for parcel {parcel_id}")
     if prow[5] is None:
         raise ValueError(f"Parcel {parcel_id} has no sale_date to recalculate against")
+    # sale_period drives the improvement-offset cost-escalation inside
+    # calculate_sale_proceeds. Without it the offset flattens to the benchmark
+    # ($1,300/FF), understating it and overstating gross ~6% (CB11/CB12). A dated
+    # sale row with no sale_period should not exist; refuse loudly rather than
+    # write the flat basis. _write_sale_cell surfaces this as a writer error.
+    if prow[6] is None:
+        raise ValueError(
+            f"Parcel {parcel_id} has no sale_period — refusing to recalculate "
+            "(would produce the un-escalated flat $1,300/FF basis)"
+        )
 
     parcel_data = {
         'parcel_id': parcel_id,
@@ -87,6 +97,9 @@ def recalculate_one_assumption(project_id: int, parcel_id, cost_inflation_rate=N
         'lot_width': float(prow[2]) if prow[2] else 0,
         'units_total': int(prow[3]) if prow[3] else 0,
         'acres_gross': float(prow[4]) if prow[4] else 0,
+        # Pass sale_period so the improvement offset escalates per period
+        # (matches recalculate_sfd_parcels — the path that produced the stored basis).
+        'sale_period': int(prow[6]),
     }
     sale_date = prow[5].isoformat() if hasattr(prow[5], 'isoformat') else str(prow[5])
 
