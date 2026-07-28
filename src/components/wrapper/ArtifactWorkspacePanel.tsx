@@ -173,6 +173,45 @@ export function ArtifactWorkspacePanel({
   const updateStateMutation = useArtifactUpdateState();
   const commitFieldEditMutation = useArtifactCommitFieldEdit();
 
+  // Transient impact banner (CB6) — one-line engine delta after a cell commit
+  // (e.g. "Cash-flow NPV +$12,400 → $3,420,000"). Auto-clears after a few
+  // seconds; the user can also dismiss it. Cleared when switching artifacts.
+  const [impactBanner, setImpactBanner] = useState<string | null>(null);
+  useEffect(() => {
+    if (!impactBanner) return;
+    const t = setTimeout(() => setImpactBanner(null), 7000);
+    return () => clearTimeout(t);
+  }, [impactBanner]);
+  useEffect(() => {
+    setImpactBanner(null);
+  }, [activeArtifactId]);
+
+  // Single commit path for inline edits. Table cells send `cell_path`
+  // (resolved from the row's cell_source_refs), kv pairs send `pair_path`.
+  // Captures the impact line into the transient banner on success.
+  const runCommitFieldEdit = async (
+    artifactId: number,
+    path: string[],
+    newValue: string,
+  ) => {
+    const isCell = path.includes('cells');
+    const result = await commitFieldEditMutation.mutateAsync({
+      artifactId,
+      input: isCell
+        ? { cell_path: path, new_value: newValue }
+        : { pair_path: path, new_value: newValue },
+    });
+    if (result?.success && result?.impact_line) {
+      setImpactBanner(result.impact_line);
+    }
+    return {
+      success: Boolean(result?.success),
+      error: result?.error,
+      detail: result?.detail,
+      suggested_user_question: result?.suggested_user_question,
+    };
+  };
+
   // Row actions — rename and delete (soft-delete via is_archived).
   const handleRenameArtifact = (artifact: ArtifactSummary) => {
     if (typeof window === 'undefined') return;
@@ -383,6 +422,33 @@ export function ArtifactWorkspacePanel({
           of takeover mode. The empty state keeps the dark surface so it
           blends with the surrounding rail chrome. */}
       <div className={`w-rail-card is-grow${activeArtifactId != null ? ' is-artifact-active' : ''}`}>
+        {impactBanner && (
+          // Transient impact banner (CB6) — the engine delta a cell edit
+          // caused. Auto-clears; click to dismiss now.
+          <div
+            role="status"
+            onClick={() => setImpactBanner(null)}
+            title="Dismiss"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              margin: '0 0 8px',
+              padding: '6px 12px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--cui-success, #2e7d32)',
+              background: 'var(--cui-success-bg-subtle, rgba(46,125,50,0.12))',
+              border: '1px solid var(--cui-success-border-subtle, rgba(46,125,50,0.35))',
+            }}
+          >
+            <span>{impactBanner}</span>
+            <span aria-hidden style={{ opacity: 0.6 }}>×</span>
+          </div>
+        )}
         {activeArtifactId == null ? (
           <EmptyActiveState
             hasArtifacts={pinnedArtifacts.length + recentArtifacts.length > 0}
@@ -464,18 +530,9 @@ export function ArtifactWorkspacePanel({
                 input: { schema_diff: patch, edit_source: 'user_edit' },
               });
             }}
-            onCommitFieldEdit={async (pairPath, newValue) => {
-              const result = await commitFieldEditMutation.mutateAsync({
-                artifactId: active.artifact_id,
-                input: { pair_path: pairPath, new_value: newValue },
-              });
-              return {
-                success: Boolean(result?.success),
-                error: result?.error,
-                detail: result?.detail,
-                suggested_user_question: result?.suggested_user_question,
-              };
-            }}
+            onCommitFieldEdit={(pairPath, newValue) =>
+              runCommitFieldEdit(active.artifact_id, pairPath, newValue)
+            }
             onPin={(label: string, modificationSpec?: unknown) => {
               // Report artifacts include the current toolbar draft spec
               // (visible columns, sort) so reopening restores the same
@@ -568,28 +625,15 @@ export function ArtifactWorkspacePanel({
                 },
               });
             }}
-            onCommitFieldEdit={async (pairPath, newValue) => {
-              // Phase 5 — write-back path. Used when the edited pair
-              // carries a `source_ref`. The backend writes the source
-              // row, re-builds the artifact via its tool's schema
-              // builder, and returns the refreshed snapshot. We don't
-              // need to do anything with new_state here because the
-              // mutation's onSuccess already invalidates the artifact
-              // detail cache, which causes useArtifact to refetch.
-              const result = await commitFieldEditMutation.mutateAsync({
-                artifactId: active.artifact_id,
-                input: {
-                  pair_path: pairPath,
-                  new_value: newValue,
-                },
-              });
-              return {
-                success: Boolean(result?.success),
-                error: result?.error,
-                detail: result?.detail,
-                suggested_user_question: result?.suggested_user_question,
-              };
-            }}
+            onCommitFieldEdit={(pairPath, newValue) =>
+              // Phase 5 / CB6 — write-back path. Used when the edited pair
+              // or table cell carries a source_ref. The backend writes the
+              // source row, re-builds the artifact via its tool's schema
+              // builder, and returns the refreshed snapshot; the mutation's
+              // onSuccess invalidates the artifact detail cache so useArtifact
+              // refetches. runCommitFieldEdit also captures the impact line.
+              runCommitFieldEdit(active.artifact_id, pairPath, newValue)
+            }
             onPin={(label: string) => {
               patchMutation.mutate({
                 artifactId: active.artifact_id,

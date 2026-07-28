@@ -268,8 +268,13 @@ export function useArtifactUpdateState() {
  */
 
 export interface ArtifactCommitFieldEditInput {
-  /** Path to the kv_pair, shaped like ["blocks", "0", "pairs", "12"]. */
-  pair_path: string[];
+  /** Path to the kv_pair, shaped like ["blocks", "0", "pairs", "12"].
+   *  Exactly one of pair_path / cell_path is sent. */
+  pair_path?: string[];
+  /** Path to a table cell, shaped like ["blocks","1","rows","4","cells","rate"].
+   *  Editing-spine (CB6) write path for table cells — the backend resolves the
+   *  source_ref from the row's cell_source_refs[column]. */
+  cell_path?: string[];
   /** Raw input string from the user. Backend coerces by column type. */
   new_value: string;
   user_id?: string;
@@ -283,8 +288,12 @@ export interface ArtifactCommitFieldEditResponse {
   new_state?: BlockDocument;
   /** Echoed back so the chat layer can log the change. */
   coerced_value?: unknown;
-  /** Per-field metadata (e.g. resolved msa_name on FK writes). */
+  /** Per-field metadata (e.g. resolved msa_name on FK writes; recomputed
+   *  amount on budget writes). */
   meta?: Record<string, unknown>;
+  /** One-line engine delta the edit caused (e.g. cash-flow NPV movement).
+   *  Empty string when nothing moved. Surfaced as a transient banner. (CB6) */
+  impact_line?: string;
   /** Error code on failure (field_not_writable, invalid_value, ambiguous, ...). */
   error?: string;
   detail?: string;

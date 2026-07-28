@@ -514,6 +514,7 @@ function BlockRenderer({ block, blockPath, sourcePointers, currentValues, remove
           currentValues={currentValues}
           removedRowPaths={removedRowPaths}
           onUpdate={onUpdate}
+          onCommitFieldEdit={onCommitFieldEdit}
         />
       );
     case 'key_value_grid':
@@ -596,6 +597,7 @@ interface TableBlockRendererProps {
   currentValues: CurrentValueMap;
   removedRowPaths?: Set<string>;
   onUpdate: (patch: JsonPatchOp[]) => void;
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
 }
 
 function TableBlockRenderer({
@@ -605,6 +607,7 @@ function TableBlockRenderer({
   currentValues,
   removedRowPaths,
   onUpdate,
+  onCommitFieldEdit,
 }: TableBlockRendererProps) {
   const hasAnySourceRefs = block.rows.some((r) => Boolean(r.source_ref || r.cell_source_refs));
 
@@ -707,7 +710,17 @@ function TableBlockRenderer({
                 )}
                 {block.columns.map((col, colIdx) => {
                   const cellValue = row.cells[col.key];
-                  const cellEditable = Boolean(row.editable);
+                  // Per-cell editability (CB6). When the row carries
+                  // cell_source_refs, ONLY cells with a ref are editable —
+                  // this keeps calculated cells (e.g. amount, recomputed by
+                  // the DB trigger) read-only even though the row is flagged
+                  // editable. Rows without cell_source_refs fall back to the
+                  // legacy row-level snapshot-edit behavior.
+                  const cellRef = row.cell_source_refs?.[col.key];
+                  const rowHasCellRefs = Boolean(row.cell_source_refs);
+                  const cellEditable = rowHasCellRefs
+                    ? Boolean(cellRef)
+                    : Boolean(row.editable);
                   const cellPath = [...rowPath, 'cells', col.key];
                   const isLabelCol = col.key === labelKey;
 
@@ -753,6 +766,7 @@ function TableBlockRenderer({
                         editable={cellEditable}
                         path={cellPath}
                         onUpdate={onUpdate}
+                        onCommitFieldEdit={cellRef ? onCommitFieldEdit : undefined}
                         formatNumeric={!isLabelCol}
                         format={col.format}
                       />
@@ -1055,6 +1069,9 @@ interface EditableCellProps {
   editable: boolean;
   path: string[];
   onUpdate: (patch: JsonPatchOp[]) => void;
+  /** Write-back callback for cells carrying a source_ref (CB6). When present,
+   *  commits post to commit_field_edit instead of emitting a snapshot patch. */
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
   /** When true, value is rendered via formatCellValue (accounting style). */
   formatNumeric?: boolean;
   /** Column-level format hint (currency, currency2, number, date) from
@@ -1084,9 +1101,17 @@ function _statusBadgeClass(value: unknown): string | null {
   return _STATUS_BADGE_CLASS[probe] ?? null;
 }
 
-function EditableCell({ value, editable, path, onUpdate, formatNumeric = true, format }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, formatNumeric = true, format }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Write-back path (CB6): when this cell carries a source_ref, the parent
+  // passes onCommitFieldEdit. Commits then POST to commit_field_edit (which
+  // writes the real DB row + returns the refreshed artifact) instead of
+  // emitting a snapshot-only JSON Patch.
+  const hasSourceRef = Boolean(onCommitFieldEdit);
 
   // Status-pill carve-out: bypass numeric formatting and wrap the value
   // in a badge span. Status cells are never editable so we can short-
@@ -1113,6 +1138,7 @@ function EditableCell({ value, editable, path, onUpdate, formatNumeric = true, f
         className={styles.editableCell}
         onDoubleClick={() => {
           setDraft(value == null ? '' : String(value));
+          setErrorMsg(null);
           setEditing(true);
         }}
         title="Double-click to edit"
@@ -1122,40 +1148,91 @@ function EditableCell({ value, editable, path, onUpdate, formatNumeric = true, f
     );
   }
 
-  const commit = () => {
-    setEditing(false);
-    if (draft !== (value == null ? '' : String(value))) {
-      // Coerce numeric-looking input to number so the diff matches DB types.
-      const coerced = coerceCellValue(draft, value);
-      onUpdate([
-        {
-          op: 'replace',
-          path: '/' + path.map(escapeJsonPointer).join('/'),
-          value: coerced,
-        },
-      ]);
+  const commit = async () => {
+    const currentDisplayed = value == null ? '' : String(value);
+    if (draft === currentDisplayed) {
+      setEditing(false);
+      return;
     }
+    setErrorMsg(null);
+
+    // Write-back path — post to commit_field_edit; keep the editor open on
+    // failure so the user can correct without losing their input.
+    if (hasSourceRef && onCommitFieldEdit) {
+      setSaving(true);
+      try {
+        const result = await onCommitFieldEdit(path, draft);
+        if (!result?.success) {
+          setErrorMsg(
+            result?.suggested_user_question
+              || result?.detail
+              || result?.error
+              || 'Could not save the change.',
+          );
+          return;
+        }
+        // Success — parent invalidates the artifact cache and re-renders
+        // with the canonical, trigger-recomputed values.
+        setEditing(false);
+      } catch (exc: unknown) {
+        const msg = exc instanceof Error ? exc.message : String(exc);
+        setErrorMsg(msg || 'Network error saving the change.');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Fallback: snapshot-only JSON Patch (no source_ref).
+    setEditing(false);
+    // Coerce numeric-looking input to number so the diff matches DB types.
+    const coerced = coerceCellValue(draft, value);
+    onUpdate([
+      {
+        op: 'replace',
+        path: '/' + path.map(escapeJsonPointer).join('/'),
+        value: coerced,
+      },
+    ]);
   };
 
   return (
-    <input
-      type="text"
-      className={styles.editInput}
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          (e.target as HTMLInputElement).blur();
-        }
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          setEditing(false);
-        }
-      }}
-    />
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+      <input
+        type="text"
+        className={styles.editInput}
+        autoFocus
+        disabled={saving}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+          }
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            setEditing(false);
+            setErrorMsg(null);
+          }
+        }}
+      />
+      {errorMsg && (
+        <span
+          role="alert"
+          style={{
+            fontSize: '11px',
+            color: 'var(--cui-danger)',
+            maxWidth: '240px',
+            textAlign: 'right',
+            lineHeight: 1.3,
+          }}
+        >
+          {errorMsg}
+        </span>
+      )}
+    </span>
   );
 }
 

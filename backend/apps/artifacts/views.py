@@ -217,11 +217,25 @@ class ArtifactViewSet(viewsets.ViewSet):
 
         body = request.data or {}
         pair_path = body.get('pair_path')
+        cell_path = body.get('cell_path')
         new_value = body.get('new_value')
 
-        if not isinstance(pair_path, list) or not pair_path:
+        # Exactly one of pair_path (kv_grid) / cell_path (table cell) must be
+        # given. cell_path is the editing-spine addition (CB6): it points at a
+        # table cell and resolves the source_ref from the ROW's
+        # `cell_source_refs[column]`, not from a kv_pair's `source_ref`.
+        pair_given = isinstance(pair_path, list) and pair_path
+        cell_given = isinstance(cell_path, list) and cell_path
+        if bool(pair_given) == bool(cell_given):
             return Response(
-                {'success': False, 'error': 'pair_path (non-empty list) is required'},
+                {
+                    'success': False,
+                    'error': 'path_required',
+                    'detail': (
+                        'exactly one of pair_path or cell_path '
+                        '(non-empty list) is required'
+                    ),
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -233,36 +247,43 @@ class ArtifactViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Walk the schema to find the pair at pair_path. Path tokens are
-        # JSON Pointer-style (block index, "pairs", pair index).
-        pair = _resolve_pair(artifact.current_state_json, pair_path)
-        if pair is None:
-            return Response(
-                {
-                    'success': False,
-                    'error': 'pair_not_found',
-                    'detail': (
-                        f"no key_value_grid pair at {pair_path!r} in artifact "
-                        f"{artifact_id}'s current_state_json"
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+        if cell_given:
+            source_ref, err = _resolve_cell_source_ref(
+                artifact.current_state_json, cell_path
             )
+            if err is not None:
+                return Response(err, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Walk the schema to find the pair at pair_path. Path tokens are
+            # JSON Pointer-style (block index, "pairs", pair index).
+            pair = _resolve_pair(artifact.current_state_json, pair_path)
+            if pair is None:
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'pair_not_found',
+                        'detail': (
+                            f"no key_value_grid pair at {pair_path!r} in artifact "
+                            f"{artifact_id}'s current_state_json"
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        source_ref = pair.get('source_ref') if isinstance(pair, dict) else None
-        if not isinstance(source_ref, dict):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'no_source_ref',
-                    'detail': (
-                        f"pair {pair.get('label')!r} has no source_ref — "
-                        'inline edit requires a source_ref pointing at '
-                        '(table, row_id, column).'
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            source_ref = pair.get('source_ref') if isinstance(pair, dict) else None
+            if not isinstance(source_ref, dict):
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'no_source_ref',
+                        'detail': (
+                            f"pair {pair.get('label')!r} has no source_ref — "
+                            'inline edit requires a source_ref pointing at '
+                            '(table, row_id, column).'
+                        ),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         table = source_ref.get('table')
         row_id = source_ref.get('row_id')
@@ -285,9 +306,17 @@ class ArtifactViewSet(viewsets.ViewSet):
             or None
         )
 
-        # Dispatch on table. v1 only supports tbl_project (the project
-        # profile artifact). Add other dispatchers here as more artifact
-        # types adopt inline edit.
+        # Impact headline (CB6): capture the cash-flow NPV BEFORE the write so
+        # we can report the engine delta the edit caused. Scoped to budget
+        # writes (the only source that moves the cash flow in this slice) and
+        # best-effort — a failed read never blocks the write.
+        npv_before = None
+        if table == 'core_fin_fact_budget' and artifact.project_id is not None:
+            npv_before = _read_cashflow_npv(artifact.project_id)
+
+        # Dispatch on table. tbl_project → project-profile field writer.
+        # core_fin_fact_budget → the existing update_budget_item writer (no
+        # parallel writer). Other tables are not yet wired.
         if table == 'tbl_project':
             from .field_writers import write_project_field
             try:
@@ -307,6 +336,14 @@ class ArtifactViewSet(viewsets.ViewSet):
                 raw_value=new_value,
                 user_id=user_id,
             )
+        elif table == 'core_fin_fact_budget':
+            write_result = _write_budget_cell(
+                project_id=artifact.project_id,
+                fact_id=row_id,
+                column=column,
+                raw_value=new_value,
+                user_id=user_id,
+            )
         else:
             return Response(
                 {
@@ -314,8 +351,8 @@ class ArtifactViewSet(viewsets.ViewSet):
                     'error': 'table_not_supported',
                     'detail': (
                         f"inline-edit write-back is not yet wired for {table!r}. "
-                        'Project profile (tbl_project) is the only supported '
-                        'source table in v1.'
+                        'Supported source tables: tbl_project, '
+                        'core_fin_fact_budget.'
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -336,6 +373,13 @@ class ArtifactViewSet(viewsets.ViewSet):
         if not refreshed.get('success'):
             return Response(refreshed, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        # Impact line: cash-flow NPV after vs before. Engine delta only —
+        # empty string when nothing moved, never a fabricated figure.
+        impact_line = ''
+        if npv_before is not None:
+            npv_after = _read_cashflow_npv(artifact.project_id)
+            impact_line = _format_npv_impact(npv_before, npv_after)
+
         return Response({
             'success': True,
             'action': 'commit_field_edit',
@@ -343,6 +387,7 @@ class ArtifactViewSet(viewsets.ViewSet):
             'new_state': refreshed.get('new_state'),
             'coerced_value': _jsonable(write_result.get('coerced_value')),
             'meta': write_result.get('meta') or {},
+            'impact_line': impact_line,
         })
 
     @action(detail=True, methods=['post'], url_path='update_state')
@@ -477,6 +522,188 @@ def _resolve_pair(schema, pair_path):
     return cursor
 
 
+def _walk_path(schema, path):
+    """Walk a block document by a list of JSON-Pointer-style tokens.
+
+    Returns the resolved node (any type) or ``None`` when a token doesn't
+    resolve. Unlike ``_resolve_pair`` it imposes no shape on the final node.
+    """
+    if not isinstance(schema, dict):
+        return None
+    cursor = schema
+    for token in path:
+        if isinstance(cursor, dict):
+            if token in cursor:
+                cursor = cursor[token]
+                continue
+            return None
+        if isinstance(cursor, list):
+            try:
+                idx = int(token)
+            except (TypeError, ValueError):
+                return None
+            if 0 <= idx < len(cursor):
+                cursor = cursor[idx]
+                continue
+            return None
+        return None
+    return cursor
+
+
+# Table cells a user may edit inline, mapped to their source columns. The
+# per-cell source_ref is the true allowlist (a cell with no ref can't resolve),
+# but this set fails closed a SECOND time so a stray ref on a calculated column
+# (e.g. amount, recomputed by trg_budget_calculate_amount) can never be written.
+_EDITABLE_BUDGET_CELL_COLUMNS = {'qty', 'rate'}
+
+
+def _resolve_cell_source_ref(schema, cell_path):
+    """Resolve a table cell's source_ref from ``cell_path`` (CB6).
+
+    ``cell_path`` is shaped ``[..., "rows", "<row_idx>", "cells", "<column>"]``.
+    We walk to the ROW dict (cell_path minus the trailing ``["cells", column]``),
+    read ``row["cell_source_refs"][column]``, and return ``(source_ref, None)``
+    on success or ``(None, error_dict)``.
+
+    Presence of the ref is the write allowlist: a cell whose column has no ref
+    (``amount`` / ``category`` / ``description`` on the budget schedule) fails
+    closed here, before any writer runs.
+    """
+    if not isinstance(cell_path, list) or len(cell_path) < 3 or cell_path[-2] != 'cells':
+        return None, {
+            'success': False,
+            'error': 'invalid_cell_path',
+            'detail': (
+                'cell_path must be shaped [..., "rows", <i>, "cells", <column>]; '
+                f'got {cell_path!r}'
+            ),
+        }
+    column = cell_path[-1]
+    row_path = cell_path[:-2]
+    row = _walk_path(schema, row_path)
+    if not isinstance(row, dict) or 'cells' not in row:
+        return None, {
+            'success': False,
+            'error': 'cell_not_found',
+            'detail': f'no table row at {row_path!r} in the artifact schema',
+        }
+    refs = row.get('cell_source_refs')
+    source_ref = refs.get(column) if isinstance(refs, dict) else None
+    if not isinstance(source_ref, dict):
+        return None, {
+            'success': False,
+            'error': 'no_cell_source_ref',
+            'detail': (
+                f'cell {column!r} has no source_ref — it is a read-only / '
+                'calculated cell and cannot be edited inline.'
+            ),
+        }
+    return source_ref, None
+
+
+def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
+    """Write one budget INPUT cell (qty/rate) via the existing writer (CB6).
+
+    Reuses ``handle_update_budget_item`` in commit mode — no parallel writer.
+    The DB trigger recomputes ``amount = qty × rate`` and the writer logs the
+    activity. Returns the standard field-writer envelope.
+    """
+    if column not in _EDITABLE_BUDGET_CELL_COLUMNS:
+        return {
+            'success': False,
+            'error': 'column_not_writable',
+            'detail': (
+                f'{column!r} is not an editable budget cell. Editable columns: '
+                f'{sorted(_EDITABLE_BUDGET_CELL_COLUMNS)}.'
+            ),
+        }
+    if project_id is None:
+        return {
+            'success': False,
+            'error': 'project_required',
+            'detail': 'budget schedule artifact missing project_id',
+        }
+    try:
+        fact_id_int = int(fact_id)
+    except (TypeError, ValueError):
+        return {
+            'success': False,
+            'error': 'invalid_row_id',
+            'detail': f'fact_id must be an integer; got {fact_id!r}',
+        }
+    # Coerce loose numeric input ("1,250" / "$500" / "300") to a Decimal.
+    from .field_writers import _coerce_decimal
+    try:
+        coerced = _coerce_decimal(raw_value)
+    except ValueError as exc:
+        return {'success': False, 'error': 'invalid_value', 'detail': str(exc)}
+    if coerced is None:
+        return {
+            'success': False,
+            'error': 'invalid_value',
+            'detail': f'{column} cannot be empty — enter a number.',
+        }
+
+    from apps.landscaper.tool_executor import handle_update_budget_item
+    result = handle_update_budget_item(
+        {
+            'fact_id': fact_id_int,
+            column: coerced,
+            'reason': f'Inline edit: {column}',
+        },
+        int(project_id),
+        propose_only=False,
+        user_id=user_id,
+    )
+    if not result.get('success'):
+        return {
+            'success': False,
+            'error': 'db_error',
+            'detail': result.get('error') or 'budget write failed',
+        }
+    # result['amount'] is the trigger-recomputed amount — surface it in meta.
+    return {
+        'success': True,
+        'coerced_value': coerced,
+        'meta': {'amount': result.get('amount')},
+    }
+
+
+def _read_cashflow_npv(project_id):
+    """Best-effort cash-flow NPV headline for the impact line (CB6).
+
+    Returns a float or ``None``; never raises. A missing / un-modeled schedule
+    simply yields no impact line rather than blocking the write.
+    """
+    try:
+        from apps.landscaper.tool_executor import _fetch_cashflow_schedule
+        envelope = _fetch_cashflow_schedule(int(project_id))
+        summary = (envelope or {}).get('summary') or {}
+        npv = summary.get('npv')
+        return float(npv) if npv is not None else None
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).debug(
+            'commit_field_edit: NPV read failed (non-blocking)', exc_info=True
+        )
+        return None
+
+
+def _format_npv_impact(before, after):
+    """One-line NPV delta for the impact banner.
+
+    Empty string when nothing moved (< $1) or either reading is unavailable.
+    Engine delta only — never a fabricated figure.
+    """
+    if before is None or after is None:
+        return ''
+    delta = after - before
+    if abs(delta) < 1:
+        return ''
+    sign = '+' if delta >= 0 else '−'  # minus sign
+    return f'Cash-flow NPV {sign}${abs(delta):,.0f} → ${after:,.0f}'
+
+
 def _refresh_artifact_after_write(*, artifact, user_id):
     """Re-build a freshly-written artifact from its source-of-truth read path.
 
@@ -517,6 +744,31 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                     },
                 ],
             }
+        elif artifact.tool_name == 'get_budget_schedule':
+            # Editing spine (CB6): rebuild the budget schedule from the same
+            # read path the tool uses, so the refreshed artifact shows the
+            # trigger-recomputed amount + refreshed KPI header and the version
+            # log records this as a user_edit.
+            from apps.landscaper.tools.budget_artifact_builder import (
+                build_budget_schema_for_project,
+            )
+            project_id = artifact.project_id
+            if project_id is None:
+                return {
+                    'success': False,
+                    'error': 'project_required',
+                    'detail': 'budget schedule artifact missing project_id',
+                }
+            new_schema = build_budget_schema_for_project(project_id)
+            if new_schema is None:
+                return {
+                    'success': False,
+                    'error': 'no_budget_rows',
+                    'detail': (
+                        f'project {project_id} has no budget line items to '
+                        're-render after the write'
+                    ),
+                }
         else:
             return {
                 'success': False,
