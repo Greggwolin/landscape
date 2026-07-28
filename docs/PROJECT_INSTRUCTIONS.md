@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.7.2
-**Last Updated:** July 24, 2026
-**Supersedes:** v4.7.1 (July 19, 2026), v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.7.4
+**Last Updated:** July 27, 2026
+**Supersedes:** v4.7.3 (July 27, 2026), v4.7.2 (July 24, 2026), v4.7.1 (July 19, 2026), v4.7.0 (July 14, 2026), v4.6.4 (July 14, 2026 — repo-only, superseded same day by this reconciliation), v4.6.3 (June 16, 2026), v4.6.2 (May 19, 2026), v4.6.1 (May 19, 2026), v4.6 (May 7, 2026), v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -344,6 +344,21 @@ A reply that survives a 50% cut without losing meaning was over-written. Treat t
 
 **Worked example.** A 320-word triage recommendation with five groups of items can be delivered in ~80 words: one line per group, action verb up front, no preamble, no recap, no closing offer. The user prefers the 80-word version.
 
+**5.12 Replies to CC completion reports — TWO SENTENCES, HARD RULE.** When CC reports back on a handoff (a completion report, a merge confirmation, a test result, an observation it surfaced), the chat reply is **one or two short sentences**: what is now true, and what happens next. Nothing else.
+
+The reply does NOT contain: a restatement of what CC verified, a criteria-by-criteria recap, a re-explanation of the fix, praise for the catch, a reflection on the lesson learned, or a summary of the numbers CC already reported. Gregg read CC's report. The reply exists to close the loop and point at the next action, not to mirror the report back at him.
+
+**Worked example.** A merge confirmation carrying nineteen test results, two DB-verified values, and a surfaced defect is answered in full by: *"CC's test revealed that Landscaper invented numbers where it shouldn't have. I fixed the bug — pass the prompt below for CC to retest, then merge."*
+
+**5.12.1 Two escape hatches — both produce an HTML artifact, not a longer chat reply.** The two-sentence rule holds unless one of these fires, and when one does, the *extra* content goes into an HTML artifact with the chat line still at two sentences pointing to it:
+
+1. **A decision Gregg owns.** The exchange raises a non-coding question only he can answer — scope, priority, business judgment, what to build next, whether a tradeoff is acceptable. Put the question and only the context needed to answer it in the artifact, options lettered per §5.6.
+2. **Brevity would mislead.** Two sentences would leave Gregg with a materially wrong picture — a "merged and verified" that rests on data that isn't what it appears to be, a success that hides a structural gap, a fix that closes one path and not its siblings, an assumption that will fail on the next case. State the correction in the artifact plainly.
+
+The test for hatch 2 is not "is there more I could say" — there always is. It is: **would Gregg act differently if he knew the thing I am leaving out?** If no, leave it out. If yes, it goes in the artifact.
+
+**5.12.2 Why.** These threads run long and the CC reports are already dense. A two-sentence reply keeps the thread scannable and keeps Gregg's attention on the decisions, which are the only part of the exchange he can't delegate. A violation is a defect, same tier as §5.7 and §5.11.
+
 ---
 
 ## 6.0 ANTI-PATTERNS
@@ -383,6 +398,8 @@ This is a hard rule. Same severity tier as plain-English chat (§5.7) and brevit
 - Sending Gregg a handoff link without a plain-English statement of which step Cowork did and which step the coding assistant needs to do next (§1.2.1). The boundary is restated every time, not assumed.
 - Drafting a CC prompt without explicit branch naming and a parallel-session collision check in Step 0 (§4.8). "Quick" tasks need the check; the day lost on Au7 was a "quick" task without it.
 - Sizing a handoff body to the ceremony rather than to the risk (§4.9). A verified, low-risk, mechanical change does not need nine success criteria, redundant gates Cowork already ran, and a restatement of the diff — that spends Gregg's time to buy nothing. The inverse of §4.8: under-sizing fails as breakage, over-sizing fails as latency. Both are defects. Note the boundary — §4.9 never licenses dropping the §4.6/§4.7/§4.8 safety rails.
+- Answering a CC completion report with anything longer than two sentences (§5.12). Recapping what CC verified, restating its numbers, or re-explaining the fix spends Gregg's attention on a report he already read. When there's genuinely more — a decision he owns, or a picture two sentences would distort — it goes in an HTML artifact, and the chat line stays at two sentences.
+- Writing a date into a generated document without reading the current date from the system clock first (§10.7). Template dates, inferred dates, dates recalled from earlier in the conversation, and dates copied from a prior version are all defects — the 2026-07-27 audit found two memos that carried a template's `11/19/2024` for nine months. Verify, then stamp.
 
 ---
 
@@ -561,6 +578,22 @@ Rendered as a styled HTML file using a clean neutral palette (or CoreUI tokens w
 **10.5.4 Scope triggers.** This rule fires any time the deliverable is called a spec, design doc, scoping doc, implementation plan, PRD, or architecture doc, OR will be used as input to a CC prompt. Short technical Q&A, bug-fix write-ups, conversational answers, and **instruction-file edits** do not trigger the dual-output requirement.
 
 **10.6 HTML-first for initial renderings.** First drafts of docs/specs/scripts go out as HTML artifacts for Gregg's review before being converted to docx or pdf. This applies to anything Gregg will need to mark up before it goes anywhere else.
+
+**10.7 Date stamps must be verified against the system clock — HARD RULE.** Every generated document that carries a date — memo header, cover page, version line, footer, "Last Updated," "As of," "Prepared," "Generated," "Effective," or any equivalent — stamps the **real current date, read from the system clock at generation time**. Never a date inferred from context, carried over from a template, copied from a prior version, or recalled from the conversation.
+
+**10.7.1 Verification is a positive act, not an assumption.** Before writing any date into a document, obtain the current date from the environment — `date` via bash, or the date supplied in the session environment block. Do not reason toward a date. Do not assume the date is unchanged since earlier in the session (sessions cross midnight; scheduled tasks run days after they were written). The check costs one command.
+
+**10.7.2 Applies to every generation path.** Word documents, PDFs, slide decks, HTML artifacts, markdown specs, CC handoff prompts, session logs, briefs, and any file written by a skill or scheduled task. Where a skill supplies a document template (`crescent-memo`, `crescent-docx`, and any successor), the template's date placeholder is filled from the verified system date at generation time — the template's own embedded date is never inherited into the body.
+
+**10.7.3 Filename dates and body dates must agree.** When a filename encodes a date (`FeatureMemo_2025-10-21.docx`, `Session_Log_2026-03-25.pdf`), the date printed inside the document matches it. A mismatch between filename and body is a defect on its face and does not require external evidence to establish.
+
+**10.7.4 Historical dates are content, not stamps.** A document may of course discuss past dates — a loss event, a lease commencement, a prior migration. Those are content. The rule governs the document's own stamp: the date asserting when *this document* was produced. Where both appear, the stamp is verified against the clock and the content date is left as written.
+
+**10.7.5 Document properties, not just the body.** Where the generation library permits, the document's own metadata (created / modified / author) is set from the verified system date. Machine-generated Word files otherwise inherit the blank template's creation date, which surfaces in file properties and in any downstream audit as a false authoring date.
+
+**10.7.6 Why this is hard-and-fast.** A wrong date on a memo, brief, or diligence document is not a cosmetic slip — it misdates the record. Documents circulate to third parties (ASU, investors, diligence counterparties) where an incorrect date is an accuracy failure attributable to Gregg, and it is invisible to him because he cannot audit generated output at scale.
+
+**Direct loss event 2026-07-27 (date-stamp audit)** — an audit of 1,392 Landscape documents found five documents carrying template-inherited or inferred dates: two feature memos stamped `11/19/2024` when the filename and authoring record both said October 2025 (a template date carried into the body, undetected for nine months), and three combined-documentation builds stamped "December 2024, Version 1.0" when the files were written September 2025. Every other date in the collection checked out, including weekday-to-calendar consistency across the whole set — the failures were confined to documents where a date was inherited rather than verified.
 
 ---
 
@@ -811,6 +844,7 @@ Sync triggers:
 - The chat project reads the coding side's status file at session start and produces an outbound file when work warrants it; staleness is flagged, not assumed (§23)
 - Handoff bodies are sized to the change's risk; the §4.6/§4.7/§4.8 safety rails are present in every handoff regardless (§4.9)
 - The two instruction copies (repo master + the shared project field) stay in sync via one paste; drift is flagged, never blind-merged (§0.4)
+- Every generated document's date stamp is read from the system clock at generation time; filename dates and body dates agree; template dates are never inherited into the body or the file properties (§10.7)
 
 ---
 
@@ -980,6 +1014,10 @@ This section establishes the manual two-way handoff between the Claude.ai chat p
 ---
 
 ## CHANGELOG
+
+**v4.7.4 (2026-07-27)** — One add. Source: chat CB (base-artifact build thread). Added **§5.12 (Replies to CC completion reports — TWO SENTENCES, HARD RULE)**: a CC completion report, merge confirmation, test result, or surfaced observation is answered in one or two short sentences — what is now true, and what happens next. No recap of what CC verified, no criteria-by-criteria restatement, no re-explanation of the fix, no praise, no lesson-learned reflection. Two escape hatches (§5.12.1), and both produce an **HTML artifact** while the chat line stays at two sentences: (1) a decision Gregg owns — scope, priority, business judgment, what to build next; (2) brevity would mislead — a "verified" that rests on data that isn't what it appears to be, a success hiding a structural gap, a fix that closes one path and not its siblings. The test for hatch 2 is not "is there more I could say" (there always is) but **"would Gregg act differently if he knew what I'm leaving out?"** Rationale (§5.12.2): these threads run long and CC's reports are already dense; the two-sentence reply keeps Gregg's attention on the decisions, the only part he can't delegate. Same severity tier as §5.7 / §5.11. Matching anti-pattern bullet added to §6. Worked example is Gregg's own wording from this session. **Per §0.4: paste this file into the project instructions field ONCE.**
+
+**v4.7.3 (2026-07-27)** — One add. Source: chat DS (document date-stamp audit). Added **§10.7 (Date stamps must be verified against the system clock — HARD RULE)** with six sub-rules: verification is a positive act performed at generation time, not an inference (§10.7.1); applies to every generation path including skill templates, whose embedded dates are never inherited into the body (§10.7.2); filename dates and body dates must agree, and a mismatch is a defect on its face (§10.7.3); historical dates discussed as content are distinguished from the document's own stamp (§10.7.4); document properties are stamped too, not just the body (§10.7.5); rationale — generated documents circulate to third parties and Gregg cannot audit them at scale (§10.7.6). Records the direct loss event: an audit of 1,392 Landscape documents found two feature memos carrying a template's `11/19/2024` for nine months against an October-2025 filename and authoring record, plus three combined-documentation builds stamped "December 2024" against a September-2025 file date. Matching anti-pattern bullet added to §6 and success metric added to §20. **Per §0.4: paste this file into the project instructions field ONCE.**
 
 **v4.7.2 (2026-07-24)** — One location fact updated, no behavior change. Source: chat FC (folder consolidation session). §23.1 (Sync Bridge location) updated twice in place: (1) the OneDrive parent folder moved from `2Pursuit/3LandscapeApp` to `1Active/_Landscape`, (2) the Cowork workspace child folder was renamed from `Landscape app` to `_cowork` the same day, with session-log files relocated into a new `_cowork/session-logs/` subfolder. No section content changed beyond the path/name in §23.1 — no new rules, no rule changes. **Per §0.4: paste this file into the project instructions field ONCE.**
 
