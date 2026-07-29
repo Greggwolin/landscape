@@ -160,6 +160,29 @@ def _escalation_label(record: Dict[str, Any]) -> str:
     return f'{rate * 100:.1f}%'
 
 
+# CB15 — human-readable offset-refusal notices for the schedule evidence cell.
+# Each reads as ABSENT (no offset configured), never "$0" or a bare em dash. The
+# two ways a per-FF offset can fail to apply — no benchmark for the parcel's unit
+# vs frontage not derivable — are kept distinct: they have different fixes.
+_OFFSET_NOTICE = {
+    'no_offset_benchmark_for_uom': 'No offset — no benchmark for this unit',
+    'no_offset_benchmark': 'No offset configured',
+    'frontage_unavailable': 'No offset — frontage unavailable',
+    'units_unavailable': 'No offset — unit count unavailable',
+    'area_unavailable': 'No offset — area unavailable',
+    'unsupported_uom': 'No offset — unsupported unit',
+}
+
+
+def _evidence_label(offset_status: Optional[str]) -> str:
+    """Evidence-cell text: the offset-refusal notice when the offset does not
+    resolve, else the default 'Benchmarks'. Front-foot (applied) parcels are
+    unchanged."""
+    if offset_status and offset_status != 'applied':
+        return _OFFSET_NOTICE.get(offset_status, 'No offset configured')
+    return 'Benchmarks'
+
+
 def build_sales_artifact_schema(
     parcel_rows: List[Dict[str, Any]],
     pricing_rows: List[Dict[str, Any]],
@@ -269,7 +292,7 @@ def build_sales_artifact_schema(
             'commission': _num(r.get('commission_amount')),
             'cost_of_sale': _num(r.get('cost_of_sale')),
             'net': _num(r.get('net_sale_proceeds')),
-            'evidence': 'Benchmarks',
+            'evidence': _evidence_label(r.get('offset_status')),
         }
         if show_area:
             cells['area'] = r.get('area') or ''
@@ -403,7 +426,11 @@ def fetch_sales_schedule_data(project_id: int) -> Dict[str, Any]:
                 psa.commission_amount,
                 (COALESCE(psa.total_transaction_costs, 0)
                     - COALESCE(psa.commission_amount, 0)) AS cost_of_sale,
-                psa.net_sale_proceeds
+                psa.net_sale_proceeds,
+                p.type_code,
+                p.lot_width,
+                p.units_total,
+                p.acres_gross
             FROM landscape.tbl_parcel p
             JOIN landscape.tbl_parcel_sale_assumptions psa
                 ON psa.parcel_id = p.parcel_id
@@ -446,6 +473,25 @@ def fetch_sales_schedule_data(project_id: int) -> Dict[str, Any]:
                   'cost_of_sale', 'net_sale_proceeds'):
             if r.get(k) is not None:
                 r[k] = float(r[k])
+
+    # Offset-resolution status per parcel (CB15) — so the schedule can say WHY a
+    # parcel has no improvement offset (unknown vs a real zero), using the same
+    # UOM resolution as the calculator. Deterministic, server-side; the pricing
+    # UOM is the rate card the parcel prices against. Live against the current
+    # benchmark config (adding/removing an offset benchmark changes it), not the
+    # stored offset value.
+    from apps.sales_absorption.services import SaleCalculationService
+    uom_by_key = {(pr.get('lu_type_code'), pr.get('product_code')): pr.get('unit_of_measure')
+                  for pr in pricing_rows}
+    for r in parcel_rows:
+        tc, pc = r.get('type_code'), r.get('product_code')
+        pricing_uom = uom_by_key.get((tc, pc)) or uom_by_key.get((tc, None))
+        try:
+            r['offset_status'] = SaleCalculationService.resolve_offset_status(
+                project_id, tc, pc, pricing_uom,
+                r.get('lot_width'), r.get('units_total'), r.get('acres_gross'))
+        except Exception:  # noqa: BLE001 — the notice is best-effort, never blocks the schedule
+            r['offset_status'] = None
 
     total_gross = sum((r.get('gross_sale_proceeds') or 0) for r in parcel_rows)
     total_net = sum((r.get('net_sale_proceeds') or 0) for r in parcel_rows)

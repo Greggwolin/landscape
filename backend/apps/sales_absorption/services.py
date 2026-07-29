@@ -204,6 +204,34 @@ class SaleCalculationService:
         return benchmarks
 
     @staticmethod
+    def resolve_offset_status(project_id, lu_type_code, product_code, pricing_uom,
+                              lot_width, units_total, acres_gross):
+        """Offset-resolution status for a parcel WITHOUT computing the amount (CB15).
+
+        Lets the sales schedule show WHY a parcel has no offset — unknown, not a
+        silent $0 — deterministically, using the same UOM-filtered lookup and
+        availability checks as calculate_sale_proceeds. Returns one of:
+        'applied' | 'no_offset_benchmark_for_uom' | 'no_offset_benchmark' |
+        'frontage_unavailable' | 'units_unavailable' | 'area_unavailable' |
+        'unsupported_uom'."""
+        uom = (pricing_uom or 'EA').replace('$/', '')
+        bm = SaleCalculationService.get_benchmarks_for_parcel(
+            project_id, lu_type_code, product_code or '', pricing_uom=uom)
+        offset = bm.get('improvement_offset')
+        if not offset or not offset.get('amount_per_uom'):
+            return ('no_offset_benchmark_for_uom'
+                    if bm.get('improvement_offset_absent') == 'wrong_uom'
+                    else 'no_offset_benchmark')
+        u = uom.upper()
+        if u == 'FF':
+            return 'applied' if (lot_width and units_total) else 'frontage_unavailable'
+        if u in ('EA', 'UN', 'UNIT'):
+            return 'applied' if units_total else 'units_unavailable'
+        if u in ('SF', 'AC'):
+            return 'applied' if acres_gross else 'area_unavailable'
+        return 'unsupported_uom'
+
+    @staticmethod
     def calculate_sale_proceeds(
         parcel_data: dict,
         pricing_data: dict,
