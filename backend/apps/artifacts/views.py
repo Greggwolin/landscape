@@ -593,7 +593,9 @@ def _walk_path(schema, path):
 # per-cell source_ref is the true allowlist (a cell with no ref can't resolve),
 # but this set fails closed a SECOND time so a stray ref on a calculated column
 # (e.g. amount, recomputed by trg_budget_calculate_amount) can never be written.
-_EDITABLE_BUDGET_CELL_COLUMNS = {'qty', 'rate'}
+# `uom_code` (CB10) is a picklist code, not a number — it is written as a
+# string, not decimal-coerced; see _write_budget_cell.
+_EDITABLE_BUDGET_CELL_COLUMNS = {'qty', 'rate', 'uom_code'}
 
 
 def _resolve_cell_source_ref(schema, cell_path):
@@ -641,11 +643,14 @@ def _resolve_cell_source_ref(schema, cell_path):
 
 
 def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
-    """Write one budget INPUT cell (qty/rate) via the existing writer (CB6).
+    """Write one budget INPUT cell (qty/rate/uom_code) via the existing writer.
 
     Reuses ``handle_update_budget_item`` in commit mode — no parallel writer.
-    The DB trigger recomputes ``amount = qty × rate`` and the writer logs the
-    activity. Returns the standard field-writer envelope.
+    ``qty``/``rate`` are decimal-coerced (the DB trigger recomputes
+    ``amount = qty × rate``); ``uom_code`` (CB10) is a picklist FK code, written
+    as a string. An invalid code is rejected by the ``core_fin_uom`` foreign key
+    and the rejection surfaces inline. Returns the standard field-writer
+    envelope.
     """
     if column not in _EDITABLE_BUDGET_CELL_COLUMNS:
         return {
@@ -670,24 +675,39 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
             'error': 'invalid_row_id',
             'detail': f'fact_id must be an integer; got {fact_id!r}',
         }
-    # Coerce loose numeric input ("1,250" / "$500" / "300") to a Decimal.
-    from .field_writers import _coerce_decimal
-    try:
-        coerced = _coerce_decimal(raw_value)
-    except ValueError as exc:
-        return {'success': False, 'error': 'invalid_value', 'detail': str(exc)}
-    if coerced is None:
-        return {
-            'success': False,
-            'error': 'invalid_value',
-            'detail': f'{column} cannot be empty — enter a number.',
-        }
+    # UOM (CB10) is a picklist FK code, not a number — write the string straight
+    # through. An empty selection is a client error; an invalid (non-existent)
+    # code is caught by the core_fin_uom foreign key inside the writer and comes
+    # back as a db_error envelope, surfaced inline rather than silently reverted.
+    if column == 'uom_code':
+        code = '' if raw_value is None else str(raw_value).strip()
+        if not code:
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': 'UOM cannot be empty — choose a unit of measure.',
+            }
+        value_to_write = code
+    else:
+        # Coerce loose numeric input ("1,250" / "$500" / "300") to a Decimal.
+        from .field_writers import _coerce_decimal
+        try:
+            coerced = _coerce_decimal(raw_value)
+        except ValueError as exc:
+            return {'success': False, 'error': 'invalid_value', 'detail': str(exc)}
+        if coerced is None:
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': f'{column} cannot be empty — enter a number.',
+            }
+        value_to_write = coerced
 
     from apps.landscaper.tool_executor import handle_update_budget_item
     result = handle_update_budget_item(
         {
             'fact_id': fact_id_int,
-            column: coerced,
+            column: value_to_write,
             'reason': f'Inline edit: {column}',
         },
         int(project_id),
@@ -703,7 +723,7 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
     # result['amount'] is the trigger-recomputed amount — surface it in meta.
     return {
         'success': True,
-        'coerced_value': coerced,
+        'coerced_value': value_to_write,
         'meta': {'amount': result.get('amount')},
     }
 
