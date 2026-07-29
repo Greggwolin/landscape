@@ -106,7 +106,8 @@ class SaleCalculationService:
     """Service for calculating net sale proceeds with benchmark hierarchy"""
 
     @staticmethod
-    def get_benchmarks_for_parcel(project_id: int, lu_type_code: str, product_code: str) -> Dict:
+    def get_benchmarks_for_parcel(project_id: int, lu_type_code: str, product_code: str,
+                                  pricing_uom: str = None) -> Dict:
         """
         Fetch benchmarks using hierarchy: product > project > global
 
@@ -116,6 +117,14 @@ class SaleCalculationService:
         - commission
         - closing
         - title_insurance
+
+        ``pricing_uom`` (CB14): when given, the improvement-offset benchmark is
+        resolved BY UNIT OF MEASURE — an offset applies only to parcels priced in
+        its unit (per FF to front-foot parcels, per unit to unit parcels, …). If
+        no offset benchmark matches the parcel's UOM, ``improvement_offset`` is
+        omitted and ``improvement_offset_absent`` records whether an offset
+        exists in a different unit (``'wrong_uom'``) or not at all (``'none'``),
+        so the caller can report an honest state instead of a silent $0.
         """
         from .models import SaleBenchmark
 
@@ -160,30 +169,22 @@ class SaleCalculationService:
                     'description': benchmark.description
                 }
 
-        # Improvement offset
-        imp_benchmark = SaleBenchmark.objects.filter(
-            scope_level='product',
-            project_id=project_id,
-            lu_type_code=lu_type_code,
-            product_code=product_code,
-            benchmark_type='improvement_offset',
-            is_active=True
-        ).first()
+        # Improvement offset — resolved BY UNIT OF MEASURE (CB14). An offset
+        # benchmark applies only to parcels priced in its unit, so each scope
+        # tier (product > project > global) is filtered to the parcel's UOM.
+        def _offset_qs(**scope):
+            qs = SaleBenchmark.objects.filter(
+                benchmark_type='improvement_offset', is_active=True, **scope)
+            if pricing_uom:
+                qs = qs.filter(uom_code=pricing_uom)
+            return qs
 
-        if not imp_benchmark:
-            imp_benchmark = SaleBenchmark.objects.filter(
-                scope_level='project',
-                project_id=project_id,
-                benchmark_type='improvement_offset',
-                is_active=True
-            ).first()
-
-        if not imp_benchmark:
-            imp_benchmark = SaleBenchmark.objects.filter(
-                scope_level='global',
-                benchmark_type='improvement_offset',
-                is_active=True
-            ).first()
+        imp_benchmark = (
+            _offset_qs(scope_level='product', project_id=project_id,
+                       lu_type_code=lu_type_code, product_code=product_code).first()
+            or _offset_qs(scope_level='project', project_id=project_id).first()
+            or _offset_qs(scope_level='global').first()
+        )
 
         if imp_benchmark:
             benchmarks['improvement_offset'] = {
@@ -192,6 +193,13 @@ class SaleCalculationService:
                 'source': imp_benchmark.scope_level,
                 'description': imp_benchmark.description
             }
+        elif pricing_uom:
+            # No offset matches this parcel's UOM. Distinguish "an offset exists
+            # but in a different unit" from "no offset configured at all" so the
+            # caller never conflates unknown with a deliberate zero.
+            any_offset = SaleBenchmark.objects.filter(
+                benchmark_type='improvement_offset', is_active=True).exists()
+            benchmarks['improvement_offset_absent'] = 'wrong_uom' if any_offset else 'none'
 
         return benchmarks
 
@@ -254,10 +262,15 @@ class SaleCalculationService:
         )
 
         # Get benchmarks
+        # Normalize the parcel's pricing UOM so the improvement offset resolves
+        # by unit of measure (CB14).
+        _raw_uom = pricing_data.get('unit_of_measure')
+        _pricing_uom = (_raw_uom.replace('$/', '') if _raw_uom else 'EA')
         benchmarks = SaleCalculationService.get_benchmarks_for_parcel(
             project_id=parcel_data['project_id'],
             lu_type_code=parcel_data['type_code'],
-            product_code=parcel_data.get('product_code', '')
+            product_code=parcel_data.get('product_code', ''),
+            pricing_uom=_pricing_uom,
         )
 
         # Apply overrides if provided
@@ -299,13 +312,29 @@ class SaleCalculationService:
 
             custom_costs = []
 
-        # Calculate improvement offset total
+        # Improvement offset — resolve by UNIT OF MEASURE (CB14).
+        #
+        # An offset denominated per FRONT FOOT applies ONLY to parcels priced in
+        # front feet; per UNIT only to parcels priced in units; per ACRE only to
+        # acres. The benchmark's uom_code and the parcel's pricing UOM must AGREE
+        # before any multiplication — a rate in feet must never be multiplied by
+        # a count of doors. Two facts the old code conflated with a silent $0:
+        #   * UNKNOWN — no offset benchmark matches this parcel's UOM (or the
+        #     benchmark can't declare its own unit, or a per-FF offset has no
+        #     derivable frontage). Refused, with an explicit status; NOT a zero
+        #     that reads as a deliberate assumption.
+        #   * ZERO — no offset is configured at all.
+        # The wrong-unit multiplication is made impossible here, at the point of
+        # multiplication, not merely discouraged.
         raw_uom = pricing_data['unit_of_measure']
-        # Normalize UOM: strip $/prefix if present (e.g., '$/FF' -> 'FF')
         uom = raw_uom.replace('$/', '') if raw_uom else 'EA'
-        benchmark_uom = benchmarks.get('improvement_offset', {}).get('uom', uom)
+        offset_bm = benchmarks.get('improvement_offset', {})
+        # No fallback to the parcel's UOM: a benchmark that cannot state its own
+        # unit cannot be safely applied. That fallback is exactly what let a
+        # $/FF rate be multiplied by a unit count.
+        benchmark_uom = offset_bm.get('uom')
 
-        # Apply cost inflation to improvement offset if rate is provided
+        # Escalate the per-uom rate to the sale period (unit-agnostic).
         sale_period = parcel_data.get('sale_period')
         if cost_inflation_rate and sale_period and improvement_offset_per_uom:
             inflated_offset_per_uom = calculate_inflated_price_from_periods(
@@ -316,21 +345,59 @@ class SaleCalculationService:
         else:
             inflated_offset_per_uom = improvement_offset_per_uom
 
-        # Only apply improvement offset if the benchmark UOM matches the pricing UOM (after normalization)
-        if inflated_offset_per_uom and benchmark_uom == uom:
-            if uom == 'FF':
-                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('lot_width', 0))) * Decimal(str(parcel_data.get('units_total', 0)))
-            elif uom in ['EA', 'UN']:
-                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('units_total', 0)))
-            elif uom == 'SF':
-                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('acres_gross', 0))) * Decimal('43560')
-            elif uom == 'AC':
-                improvement_offset_total = inflated_offset_per_uom * Decimal(str(parcel_data.get('acres_gross', 0)))
-            else:  # $$$
-                improvement_offset_total = Decimal('0')
+        _lot_w = Decimal(str(parcel_data.get('lot_width') or 0))
+        _units = Decimal(str(parcel_data.get('units_total') or 0))
+        _acres = Decimal(str(parcel_data.get('acres_gross') or 0))
+
+        improvement_offset_total = Decimal('0')
+        if not improvement_offset_per_uom:
+            # No offset applies to this parcel's UOM. Distinguish "an offset
+            # exists but in a different unit" (unknown for this UOM) from
+            # "none configured at all" — never conflate unknown with a zero.
+            improvement_offset_status = (
+                'no_offset_benchmark_for_uom'
+                if benchmarks.get('improvement_offset_absent') == 'wrong_uom'
+                else 'no_offset_benchmark'
+            )
+        elif not benchmark_uom:
+            improvement_offset_status = 'benchmark_missing_uom'
+        elif benchmark_uom != uom:
+            # Unit mismatch: refuse rather than multiply by the wrong denominator.
+            improvement_offset_status = 'no_offset_benchmark_for_uom'
+        elif uom.upper() == 'FF':
+            frontage = _lot_w * _units
+            if frontage <= 0:
+                improvement_offset_status = 'frontage_unavailable'
+            else:
+                improvement_offset_total = inflated_offset_per_uom * frontage
+                improvement_offset_status = 'applied'
+        elif uom.upper() in ('EA', 'UN', 'UNIT'):
+            if _units <= 0:
+                improvement_offset_status = 'units_unavailable'
+            else:
+                improvement_offset_total = inflated_offset_per_uom * _units
+                improvement_offset_status = 'applied'
+        elif uom.upper() == 'SF':
+            if _acres <= 0:
+                improvement_offset_status = 'area_unavailable'
+            else:
+                improvement_offset_total = inflated_offset_per_uom * _acres * Decimal('43560')
+                improvement_offset_status = 'applied'
+        elif uom.upper() == 'AC':
+            if _acres <= 0:
+                improvement_offset_status = 'area_unavailable'
+            else:
+                improvement_offset_total = inflated_offset_per_uom * _acres
+                improvement_offset_status = 'applied'
         else:
-            # UOM mismatch or no offset - don't apply improvement offset
+            improvement_offset_status = 'unsupported_uom'
+
+        if improvement_offset_status != 'applied':
+            # Surface WHY there is no offset (never a silent $0). The recalc
+            # response carries improvement_offset_status; the persisted
+            # improvement_offset_source records the reason for the schedule.
             improvement_offset_total = Decimal('0')
+            improvement_offset_source = improvement_offset_status
 
         # Gross sale proceeds (after improvement offset)
         gross_sale_proceeds = Decimal(str(gross_parcel_price)) - improvement_offset_total
@@ -372,6 +439,7 @@ class SaleCalculationService:
             'improvement_offset_per_uom': float(improvement_offset_per_uom),
             'improvement_offset_total': float(improvement_offset_total),
             'improvement_offset_source': improvement_offset_source,
+            'improvement_offset_status': improvement_offset_status,
 
             'gross_sale_proceeds': float(gross_sale_proceeds),
 
