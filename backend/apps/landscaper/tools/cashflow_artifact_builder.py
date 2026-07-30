@@ -95,8 +95,6 @@ _COMMON_SPEC: List[Dict[str, Any]] = [
      'column': 'discount_rate', 'writable': True},
     {'key': 'hold_period_years', 'label': 'Hold Period (yrs)', 'kind': 'int',
      'column': 'hold_period_years', 'writable': True},
-    {'key': 'exit_cap_rate', 'label': 'Exit Cap Rate', 'kind': 'pct',
-     'column': 'exit_cap_rate', 'writable': True},
     {'key': 'selling_costs_pct', 'label': 'Selling Costs', 'kind': 'pct',
      'column': 'selling_costs_pct', 'writable': True},
 ]
@@ -121,6 +119,12 @@ _LAND_SPEC: List[Dict[str, Any]] = [
 _INCOME_SPEC: List[Dict[str, Any]] = [
     {'key': 'going_in_cap_rate', 'label': 'Going-In Cap Rate', 'kind': 'pct',
      'column': 'going_in_cap_rate', 'writable': True},
+    # Terminal value is capped NOI — an income concept. A land deal exits through
+    # the parcel sell-out (or the bulk sale), so LandDevCashFlowService never reads
+    # exit_cap_rate. Showing it on a land deal offered an editable cell that wrote a
+    # value nothing consumed; it belongs here, not in _COMMON_SPEC.
+    {'key': 'exit_cap_rate', 'label': 'Exit Cap Rate', 'kind': 'pct',
+     'column': 'exit_cap_rate', 'writable': True},
     {'key': 'vacancy_rate', 'label': 'Vacancy', 'kind': 'pct',
      'column': 'vacancy_rate', 'writable': True},
     {'key': 'stabilized_vacancy', 'label': 'Stabilized Vacancy', 'kind': 'pct',

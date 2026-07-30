@@ -183,6 +183,21 @@ def test_net_revenue_label_switches_land_vs_income():
     assert any(c['label'] == 'Net Operating Income' for c in income)
 
 
+def test_exit_cap_rate_is_income_only():
+    """A land deal exits through the parcel sell-out, not a capped NOI.
+
+    ``LandDevCashFlowService`` never reads ``exit_cap_rate``, so offering the row
+    on a land artifact — editable, no less — was a cell whose write moved nothing.
+    """
+    def labels(schema):
+        return {r['cells']['assumption'] for r in schema['blocks'][1]['rows']}
+
+    assert 'Exit Cap Rate' not in labels(_land())
+    assert 'Exit Cap Rate' in labels(
+        _build(property_type='cre', dcf_row={**_DCF_LAND, 'property_type': 'cre',
+                                             'exit_cap_rate': 0.055}))
+
+
 def test_create_cashflow_artifact_rejects_empty_without_touching_db():
     result = create_cashflow_artifact(
         project_id=9, project_name='X', rows=[], assumptions={}, results={},
@@ -254,9 +269,10 @@ def test_benchmark_and_non_allowlisted_rows_carry_no_ref():
 
 def test_basis_distinguishes_entered_assumed_and_benchmark():
     rows = {r['cells']['assumption']: r['cells']['basis']
-            for r in _land(growth_set_names={45: 'Price Inflaton'})['blocks'][1]['rows']}
+            for r in _land(dcf_row={**_DCF_LAND, 'bulk_sale_discount_pct': None},
+                           growth_set_names={45: 'Price Inflaton'})['blocks'][1]['rows']}
     assert rows['Discount Rate'] == 'Entered'          # stored value
-    assert rows['Exit Cap Rate'] == 'Assumed'          # column is NULL → default
+    assert rows['Bulk Sale Discount'] == 'Assumed'     # column is NULL → default
     assert rows['Price Growth'] == 'Benchmark · Price Inflaton'
     # A benchmark row with no explicit set says so rather than implying a link.
     assert rows['Cost Inflation'] == 'Benchmark · project default'
