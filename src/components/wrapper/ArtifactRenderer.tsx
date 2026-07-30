@@ -944,7 +944,11 @@ function TableBlockRenderer({
                         }
                         stageable={Boolean(cellRef) && Boolean(staging)}
                         formatNumeric={!isLabelCol}
-                        format={col.format}
+                        // CC2: a per-cell format wins over the column's. One
+                        // column can then hold mixed units (the cash-flow
+                        // assumptions strip stacks rates, periods and dollars),
+                        // which a column-level hint cannot express.
+                        format={row.cell_formats?.[col.key] ?? col.format}
                         options={col.options}
                       />
                     </td>

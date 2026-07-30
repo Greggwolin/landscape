@@ -9051,22 +9051,16 @@ def handle_get_cashflow_schedule(
         return {'success': False, 'error': 'project_id is required'}
 
     try:
-        from apps.financial.services.cashflow_routing import leveraged_cashflow_summary
-
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT project_name, UPPER(COALESCE(project_type_code, '')) "
-                "FROM landscape.tbl_project WHERE project_id = %s",
-                [project_id],
-            )
-            prow = cursor.fetchone()
-        project_name = prow[0] if prow else None
-        project_type_code = (prow[1] if prow else '') or ''
-
-        # include_financing=False → operating schedule (matches get_cashflow_results).
-        envelope = _fetch_cashflow_schedule(project_id)
-        summary_reduced = leveraged_cashflow_summary(envelope)
-        rows = summary_reduced.get('rows') or []
+        # Read path lives in the builder module (fetch_cashflow_schedule_data) so
+        # the after-write refresh (commit_field_edit → _refresh_artifact_after_write)
+        # builds a schema identical to this fresh render. Editing spine (CC2)
+        # depends on that single source of truth.
+        from .tools.cashflow_artifact_builder import (
+            create_cashflow_artifact,
+            fetch_cashflow_schedule_data,
+        )
+        data = fetch_cashflow_schedule_data(int(project_id))
+        rows = data['rows']
 
         # No dated cash flow (e.g. an un-modeled project) → clean, no artifact.
         if not rows:
@@ -9077,30 +9071,27 @@ def handle_get_cashflow_schedule(
                 'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
-        assumptions = _build_cashflow_assumptions(project_id)
-        engine_summary = envelope.get('summary') or {}
-        results = {k: engine_summary[k] for k in CASHFLOW_RESULT_KEYS if k in engine_summary}
+        results = data['results']
 
-        is_income = project_type_code in INCOME_PROPERTY_TYPE_CODES
-        net_revenue_label = 'Net Operating Income' if is_income else 'Net Revenue'
-
-        from .tools.cashflow_artifact_builder import create_cashflow_artifact
         artifact_envelope = create_cashflow_artifact(
             project_id=int(project_id),
-            project_name=project_name,
+            project_name=data['project_name'],
             rows=rows,
-            assumptions=assumptions,
+            assumptions=data['assumptions'],
             results=results,
-            net_revenue_label=net_revenue_label,
-            period_type=summary_reduced.get('periodType') or 'month',
-            total_periods=summary_reduced.get('totalPeriods') or len(rows),
+            net_revenue_label=data['net_revenue_label'],
+            period_type=data['period_type'],
+            total_periods=data['total_periods'],
+            property_type=data['property_type'],
+            dcf_row=data['dcf_row'],
+            growth_set_names=data['growth_set_names'],
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
         )
 
         npv = results.get('npv')
         irr = results.get('irr')
-        total_net = round(float(summary_reduced.get('totalNet') or 0))
+        total_net = round(float(data['total_net'] or 0))
 
         if artifact_envelope and artifact_envelope.get('success') is not False:
             return {
