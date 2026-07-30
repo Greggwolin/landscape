@@ -12,9 +12,11 @@
  */
 
 import {
+  artifactHostRoute,
   deriveDestination,
   destinationFromPageContext,
   isThreadDestination,
+  routeShowsArtifacts,
   screenKeyFromRoute,
 } from './threadDestination';
 
@@ -48,6 +50,25 @@ describe('deriveDestination — things the chat MADE', () => {
       NOW,
     );
     expect(d).toMatchObject({ kind: 'artifact', artifactId: 77 });
+  });
+
+  it('a server-rendered schedule tool (nested envelope) is recorded', () => {
+    // Regression (LSCMD-ARTIFACTHOST-0728-TA5): get_budget_schedule and the
+    // other deterministic schedule tools return the create_artifact envelope
+    // nested under result.artifact — the SAME shape open_clarification uses.
+    // Before this, only open_clarification was recognized, so a budget/sales/
+    // cashflow chat recorded nothing and could never restore.
+    const d = deriveDestination(
+      'get_budget_schedule',
+      {
+        success: true,
+        artifact_created: true,
+        artifact: { success: true, action: 'show_artifact', artifact_id: 138, title: 'Development Budget' },
+      },
+      PROJECT,
+      NOW,
+    );
+    expect(d).toMatchObject({ kind: 'artifact', artifactId: 138, label: 'Development Budget' });
   });
 
   it('a location brief restores through the ordinary artifact path', () => {
@@ -212,6 +233,51 @@ describe('isThreadDestination', () => {
     for (const bad of [null, undefined, 'x', 42, {}, { kind: 'artifact' }, { kind: 'screen' }, { kind: 'other', route: '/w' }]) {
       expect(isThreadDestination(bad)).toBe(false);
     }
+  });
+});
+
+describe('routeShowsArtifacts — where an artifact can actually appear', () => {
+  it('the four routes that mount an artifact surface', () => {
+    expect(routeShowsArtifacts('/w/chat')).toBe(true);
+    expect(routeShowsArtifacts('/w/chat/88ffe3ee-eb14-4e9e-8b74-bd371fc42571')).toBe(true);
+    expect(routeShowsArtifacts('/w/dashboard')).toBe(true);
+    expect(routeShowsArtifacts('/w/projects/9')).toBe(true);
+    expect(routeShowsArtifacts('/w/projects/9/')).toBe(true);
+  });
+
+  it('the full-page routes that have no artifact slot', () => {
+    // The reported case is the first of these.
+    expect(routeShowsArtifacts('/w/projects/9/map')).toBe(false);
+    expect(routeShowsArtifacts('/w/projects/9/reports')).toBe(false);
+    expect(routeShowsArtifacts('/w/projects/9/documents')).toBe(false);
+    expect(routeShowsArtifacts('/w/tools')).toBe(false);
+    expect(routeShowsArtifacts('/w/admin')).toBe(false);
+  });
+
+  it('the project LIST is not the project root', () => {
+    // '/w/projects' renders its own RightContentPanel and must not be mistaken
+    // for '/w/projects/9'.
+    expect(routeShowsArtifacts('/w/projects')).toBe(false);
+  });
+});
+
+describe('artifactHostRoute', () => {
+  it('sends you to the project root, carrying the thread', () => {
+    expect(artifactHostRoute('/w/projects/9/map', 9, 'abc')).toBe('/w/projects/9?thread=abc');
+  });
+
+  it('omits the thread when there is none', () => {
+    expect(artifactHostRoute('/w/projects/9/reports', 9, null)).toBe('/w/projects/9');
+  });
+
+  it('stays put when the route can already show artifacts', () => {
+    expect(artifactHostRoute('/w/projects/9', 9, 'abc')).toBeNull();
+    expect(artifactHostRoute('/w/chat/abc', null, 'abc')).toBeNull();
+    expect(artifactHostRoute('/w/dashboard', 9, 'abc')).toBeNull();
+  });
+
+  it('stays put when there is no project to fall back to', () => {
+    expect(artifactHostRoute('/w/tools', null, 'abc')).toBeNull();
   });
 });
 

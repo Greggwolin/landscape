@@ -1,0 +1,77 @@
+{
+  "report": "Landscape Platform Health Check",
+  "timestamp": "2026-07-30T15:01:02Z",
+  "mode": "all",
+  "branch": "fix/artifact-panel-host-route",
+  "results": [
+    {
+  "agent": "coreui-compliance-auditor",
+  "timestamp": "2026-07-30T15:00:29Z",
+  "status": "FAIL",
+  "total_violations": 7218,
+  "breakdown": {
+    "mui_imports": 115,
+    "hardcoded_hex_css": 998,
+    "forbidden_tailwind": 815,
+    "dark_variants": 72,
+    "inline_styles": 5218
+  }
+}
+,
+    {
+  "agent": "django-api-route-enforcer",
+  "timestamp": "2026-07-30T15:00:33Z",
+  "status": "PASS",
+  "new_nextjs_violations": 0,
+  "violation_files": [],
+  "context": {
+    "total_nextjs_routes": 420,
+    "total_django_viewsets": 22
+  }
+}
+,
+    {
+  "agent": "claudemd-sync-checker",
+  "timestamp": "2026-07-30T15:00:33Z",
+  "status": "PASS",
+  "stale_file_count": 0,
+  "stale_files": []
+}
+,
+    {"agent":"extraction-queue-monitor","status":"SKIP","message":"Extraction table not found"}
+,
+    {
+  "agent": "dead-tool-detector",
+  "timestamp": "2026-07-30T15:01:02.316218+00:00",
+  "status": "FAIL",
+  "tools_scanned": 29,
+  "dead_table_refs": 3,
+  "dead_column_refs": 0,
+  "dead_tables": [
+    {
+      "file": "backend/apps/landscaper/tools/map_tools.py",
+      "table": "tbl_market_comparable"
+    },
+    {
+      "file": "backend/apps/landscaper/tools/appraisal_knowledge_tools.py",
+      "table": "tbl_knowledge_fact"
+    },
+    {
+      "file": "backend/apps/landscaper/tools/appraisal_knowledge_tools.py",
+      "table": "tbl_knowledge_entity"
+    }
+  ],
+  "dead_columns": []
+}
+,
+    {
+  "agent": "allowed-updates-auditor",
+  "timestamp": "2026-07-30T15:01:02.370304+00:00",
+  "status": "PASS",
+  "tools_checked": 0,
+  "critical_mismatches": 0,
+  "details": []
+}
+
+  ]
+}
