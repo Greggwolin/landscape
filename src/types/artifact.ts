@@ -46,6 +46,12 @@ export interface TableColumn {
    *    'date'      → Mmm-YY   (ISO-string detection happens in formatCellValue)
    */
   format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent';
+  /** Picklist options (CB10). When present on an editable column, the renderer
+   *  offers a dropdown of these choices instead of a free-text editor — used
+   *  for FK-constrained columns (e.g. budget UOM → core_fin_uom) where a typed
+   *  value would only earn a database rejection. `value` is the stored code;
+   *  `label` is the human-readable choice shown in the dropdown. */
+  options?: Array<{ value: string; label: string }>;
 }
 
 export interface TableRow {

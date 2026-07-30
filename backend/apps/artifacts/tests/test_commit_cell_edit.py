@@ -138,8 +138,16 @@ class WriteBudgetCellGuards(SimpleTestCase):
         self.assertFalse(res['success'])
         self.assertEqual(res['error'], 'column_not_writable')
 
-    def test_editable_columns_are_qty_and_rate(self):
-        self.assertEqual(_EDITABLE_BUDGET_CELL_COLUMNS, {'qty', 'rate'})
+    def test_editable_columns_are_qty_rate_and_uom(self):
+        # CB10 adds uom_code (a picklist FK code) to the inline-editable set.
+        self.assertEqual(_EDITABLE_BUDGET_CELL_COLUMNS, {'qty', 'rate', 'uom_code'})
+
+    def test_empty_uom_rejected(self):
+        # A blank UOM selection is a client error and never reaches the DB.
+        res = _write_budget_cell(
+            project_id=9, fact_id=257, column='uom_code', raw_value='   ')
+        self.assertFalse(res['success'])
+        self.assertEqual(res['error'], 'invalid_value')
 
     def test_missing_project_rejected(self):
         res = _write_budget_cell(

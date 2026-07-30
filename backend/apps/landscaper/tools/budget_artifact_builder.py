@@ -82,7 +82,15 @@ def _period_label(record: Dict[str, Any]) -> str:
 # Exposing it would let a user type a number the database immediately overwrites
 # — the worst kind of edit. This is the "editable vs calculated" rule from the
 # base-artifact contract, enforced in the payload rather than in the renderer.
-_EDITABLE_BUDGET_COLUMNS = ('qty', 'rate')
+# `uom` (CB10) is a PICKLIST cell, not free text: core_fin_fact_budget.uom_code
+# is FK-constrained to core_fin_uom, so a typed value that isn't a real code is
+# rejected by the database. The artifact carries the allowed codes on the column
+# so the renderer can offer a dropdown instead of letting the user type into a
+# foreign key.
+_EDITABLE_BUDGET_COLUMNS = ('qty', 'rate', 'uom')
+
+# Artifact cell key → the real column it writes, where they differ.
+_BUDGET_CELL_TO_COLUMN = {'uom': 'uom_code'}
 
 
 def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any]:
@@ -96,16 +104,19 @@ def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any
     fact_id = record.get('fact_id')
     if fact_id is None:
         return {}
-    return {
-        column: {
+    refs: Dict[str, Any] = {}
+    for cell_key in _EDITABLE_BUDGET_COLUMNS:
+        column = _BUDGET_CELL_TO_COLUMN.get(cell_key, cell_key)
+        raw = record.get(column)
+        refs[cell_key] = {
             'table': 'core_fin_fact_budget',
             'row_id': fact_id,
             'column': column,
             'captured_at': captured_at,
-            'captured_value': _num(record.get(column)),
+            # Numeric cells capture a number; the picklist captures its code.
+            'captured_value': raw if cell_key == 'uom' else _num(raw),
         }
-        for column in _EDITABLE_BUDGET_COLUMNS
-    }
+    return refs
 
 
 def build_budget_artifact_schema(
@@ -114,12 +125,19 @@ def build_budget_artifact_schema(
     total_budget: float,
     category_count: int,
     lot_count: Optional[int],
+    uom_options: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Build the fixed budget-artifact schema from real DB rows.
 
     Totals and the line count come from the rows themselves; cost-per-lot uses
     the supplied lot_count (SUM of parcel units_total) — never recomputed from a
-    parcel row count."""
+    parcel row count.
+
+    ``uom_options`` is the active ``core_fin_uom`` picklist as
+    ``[{'value': code, 'label': name}]``. When supplied it rides on the UOM
+    column so the renderer offers a dropdown; the column is FK-constrained, so
+    free text there would be rejected by the database. Omitted → the column
+    behaves as before."""
     line_item_count = len(records)
     cost_per_lot = (total_budget / lot_count) if lot_count else None
 
@@ -164,7 +182,12 @@ def build_budget_artifact_schema(
                 'columns': [
                     {'key': 'category', 'label': 'Category', 'align': 'left'},
                     {'key': 'description', 'label': 'Description', 'align': 'left'},
-                    {'key': 'uom', 'label': 'UOM', 'align': 'left'},
+                    {
+                        'key': 'uom', 'label': 'UOM', 'align': 'left',
+                        # Picklist — the renderer offers these as a dropdown
+                        # rather than a free-text editor (FK-constrained column).
+                        **({'options': uom_options} if uom_options else {}),
+                    },
                     {'key': 'qty', 'label': 'Qty', 'align': 'right'},
                     {'key': 'rate', 'label': 'Rate', 'align': 'right'},
                     {'key': 'amount', 'label': 'Amount', 'align': 'right'},
@@ -227,6 +250,22 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
         pn = cursor.fetchone()
         project_name = pn[0] if pn else None
 
+        # UOM picklist (CB10). `uom_code` is FK-constrained to core_fin_uom, so
+        # the artifact carries the allowed codes and the renderer offers a
+        # dropdown — typing into a foreign key only earns a database rejection.
+        # Read here (not in the tool) so the after-write refresh rebuilds the
+        # identical schema, options included.
+        cursor.execute(
+            """
+            SELECT uom_code, name FROM landscape.core_fin_uom
+            WHERE is_active ORDER BY uom_code
+            """
+        )
+        uom_options = [
+            {'value': row[0], 'label': f'{row[0]} — {row[1]}' if row[1] else row[0]}
+            for row in cursor.fetchall()
+        ]
+
     for r in records:
         for k in ('qty', 'rate', 'amount'):
             if r.get(k) is not None:
@@ -243,6 +282,7 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
         'category_count': category_count,
         'lot_count': lot_count,
         'project_name': project_name,
+        'uom_options': uom_options,
     }
 
 
@@ -261,6 +301,7 @@ def build_budget_schema_for_project(project_id: int) -> Optional[Dict[str, Any]]
         total_budget=data['total_budget'],
         category_count=data['category_count'],
         lot_count=data['lot_count'],
+        uom_options=data.get('uom_options'),
     )
 
 
@@ -272,6 +313,7 @@ def create_budget_artifact(
     total_budget: float,
     category_count: int,
     lot_count: Optional[int],
+    uom_options: Optional[List[Dict[str, Any]]] = None,
     user_id: Any = None,
     thread_id: Any = None,
 ) -> Dict[str, Any]:
@@ -296,6 +338,7 @@ def create_budget_artifact(
         total_budget=total_budget,
         category_count=category_count,
         lot_count=lot_count,
+        uom_options=uom_options,
     )
     title = f'{project_name} — Development Budget' if project_name \
         else 'Development Budget'
