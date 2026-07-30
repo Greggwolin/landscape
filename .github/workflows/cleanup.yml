@@ -10,9 +10,22 @@ name: Cleanup Preview
 on:
   pull_request:
     types: [closed]
-    branches:
-      - main
-      - work
+    # NO base-branch filter, deliberately — and it must MATCH preview.yml (CC15).
+    #
+    # This is the teardown half of the same bug. `branches:` filters on the PR's
+    # BASE, so a stacked pull request never reached this workflow either. While
+    # preview.yml shared the filter that was merely symmetric dead weight: no
+    # preview branch was created for a stacked PR, so none needed deleting.
+    #
+    # The moment preview.yml gates every PR, that stops being true — every
+    # stacked PR gets a Neon branch, and leaving this filter in place would mean
+    # none of them is ever deleted. The gating fix would itself have become a
+    # silent leak of database branches.
+    #
+    # Teardown keys on github.event.pull_request.number and has no base-branch
+    # dependency, so removing the filter changes nothing but reach. Keep these
+    # two triggers in step: whatever creates preview resources must be matched
+    # by whatever destroys them.
 
 # The default GITHUB_TOKEN is read-only, so the "Comment PR" step's
 # issues.createComment 403'd ("Resource not accessible by integration").
