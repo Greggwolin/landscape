@@ -8955,59 +8955,13 @@ def handle_get_sales_schedule(
         return {'success': False, 'error': 'project_id is required'}
 
     try:
-        with connection.cursor() as cursor:
-            # Per-parcel sale schedule. Deductions: commission = commission_amount;
-            # cost of sale = the remaining transaction costs (legal + closing +
-            # title). Net is the stored net_sale_proceeds and equals
-            # gross_sale_proceeds − total_transaction_costs by construction.
-            cursor.execute("""
-                SELECT
-                    p.parcel_id,
-                    p.parcel_code,
-                    p.product_code,
-                    COALESCE(a.area_alias, NULLIF('Area ' || a.area_no, 'Area ')) AS area,
-                    ph.phase_name AS phase,
-                    psa.sale_date,
-                    psa.gross_sale_proceeds,
-                    psa.commission_amount,
-                    (COALESCE(psa.total_transaction_costs, 0)
-                        - COALESCE(psa.commission_amount, 0)) AS cost_of_sale,
-                    psa.net_sale_proceeds
-                FROM landscape.tbl_parcel p
-                JOIN landscape.tbl_parcel_sale_assumptions psa
-                    ON psa.parcel_id = p.parcel_id
-                LEFT JOIN landscape.tbl_area a ON p.area_id = a.area_id
-                LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
-                WHERE p.project_id = %s
-                  AND psa.sale_date IS NOT NULL
-                ORDER BY psa.sale_date, p.parcel_code
-            """, [project_id])
-            columns = [col[0] for col in cursor.description]
-            parcel_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-            # Pricing rate-card (the basis). Its own table — one row per product.
-            cursor.execute("""
-                SELECT
-                    lu_type_code,
-                    product_code,
-                    price_per_unit,
-                    unit_of_measure,
-                    growth_rate,
-                    growth_rate_set_id,
-                    benchmark_id
-                FROM landscape.land_use_pricing
-                WHERE project_id = %s
-                ORDER BY lu_type_code, product_code
-            """, [project_id])
-            pcols = [col[0] for col in cursor.description]
-            pricing_rows = [dict(zip(pcols, row)) for row in cursor.fetchall()]
-
-            cursor.execute(
-                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
-                [project_id],
-            )
-            pn = cursor.fetchone()
-            project_name = pn[0] if pn else None
+        # Read path lives in the builder module (fetch_sales_schedule_data) so the
+        # after-write refresh (commit_field_edit → _refresh_artifact_after_write)
+        # builds a schema identical to this fresh render. Editing spine (CB9)
+        # depends on that single source of truth.
+        from .tools.sales_artifact_builder import fetch_sales_schedule_data
+        data = fetch_sales_schedule_data(int(project_id))
+        parcel_rows = data['parcel_rows']
 
         # Land-only guard: no dated parcel sales → clean, no artifact, no error.
         if not parcel_rows:
@@ -9018,30 +8972,13 @@ def handle_get_sales_schedule(
                 'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
-        for r in parcel_rows:
-            for k in ('gross_sale_proceeds', 'commission_amount',
-                      'cost_of_sale', 'net_sale_proceeds'):
-                if r.get(k) is not None:
-                    r[k] = float(r[k])
-
-        total_gross = sum((r.get('gross_sale_proceeds') or 0) for r in parcel_rows)
-        total_net = sum((r.get('net_sale_proceeds') or 0) for r in parcel_rows)
-        parcel_count = len(parcel_rows)
-        product_count = len({
-            r.get('product_code') for r in parcel_rows if r.get('product_code')
-        })
-
-        # Sale-date span label ("2028–2034", or a single year).
-        years = sorted({
-            sd.year for r in parcel_rows
-            if (sd := r.get('sale_date')) is not None and hasattr(sd, 'year')
-        })
-        if years and years[0] != years[-1]:
-            span_label = f'{years[0]}–{years[-1]}'
-        elif years:
-            span_label = str(years[0])
-        else:
-            span_label = '—'
+        pricing_rows = data['pricing_rows']
+        project_name = data['project_name']
+        total_gross = data['total_gross']
+        total_net = data['total_net']
+        parcel_count = data['parcel_count']
+        product_count = data['product_count']
+        span_label = data['span_label']
 
         from .tools.sales_artifact_builder import create_sales_artifact
         envelope = create_sales_artifact(

@@ -242,7 +242,7 @@ class ArtifactViewSet(viewsets.ViewSet):
         # walk) to learn the table. Best-effort; a failed read never blocks.
         pre_ref, _pre_err = _resolve_edit_target(artifact.current_state_json, spec)
         npv_before = None
-        if (_pre_err is None and pre_ref.get('table') == 'core_fin_fact_budget'
+        if (_pre_err is None and pre_ref.get('table') in _NPV_IMPACTING_TABLES
                 and artifact.project_id is not None):
             npv_before = _read_cashflow_npv(artifact.project_id)
 
@@ -351,14 +351,15 @@ class ArtifactViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # NPV-before, once — only meaningful if a budget cell is in the set.
-        any_budget = any(
-            sr is not None and sr['table'] == 'core_fin_fact_budget'
+        # NPV-before, once — only meaningful if an NPV-impacting cell (budget or
+        # parcel sale) is in the set.
+        any_npv_impacting = any(
+            sr is not None and sr['table'] in _NPV_IMPACTING_TABLES
             for _spec, sr, _err in resolved
         )
         npv_before = (
             _read_cashflow_npv(artifact.project_id)
-            if any_budget and artifact.project_id is not None else None
+            if any_npv_impacting and artifact.project_id is not None else None
         )
 
         # Pass 2 — apply each edit through its own writer.
@@ -728,6 +729,166 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
     }
 
 
+# ─── Sales schedule cell writer (CB9) ────────────────────────────────────────
+#
+# The parcel sale schedule exposes exactly two editable cells: sale_date and
+# commission_amount, both on tbl_parcel_sale_assumptions. Unlike the budget
+# table there is NO DB trigger recomputing the derived columns (gross / costs /
+# net) — so this writer OWNS the recalc: it writes the edited column via the
+# existing writer, then runs recalculate_one_assumption (the same maths the
+# batch recalculation endpoint uses) so the stored derived values stay
+# consistent with what was just typed. NOTHING derived is writable — the
+# per-cell source_ref allowlist stops at sale_date + commission_amount, and this
+# set fails closed a SECOND time.
+_EDITABLE_SALE_CELL_COLUMNS = {'sale_date', 'commission_amount'}
+
+
+def _coerce_sale_date(raw_value):
+    """Parse a user-entered sale date to an ISO ``YYYY-MM-DD`` string, or None.
+
+    Accepts a date/datetime, an ISO date/datetime string, or a few common human
+    formats. Returns None for empty / unparseable input — the caller rejects it
+    (the column is NOT NULL)."""
+    if raw_value is None:
+        return None
+    if hasattr(raw_value, 'isoformat') and not isinstance(raw_value, str):
+        try:
+            return raw_value.isoformat()[:10]
+        except Exception:
+            return None
+    s = str(raw_value).strip()
+    if not s:
+        return None
+    from datetime import datetime
+    try:
+        # ISO first — handles 'YYYY-MM-DD' and full ISO datetimes.
+        return datetime.fromisoformat(s[:19]).date().isoformat()
+    except ValueError:
+        pass
+    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y', '%B %d, %Y', '%b %d, %Y', '%Y/%m/%d'):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _write_sale_cell(*, project_id, parcel_id, column, raw_value, user_id=None):
+    """Write one editable parcel-sale cell (sale_date | commission_amount), then
+    recalc the row so gross / costs / net stay consistent (CB9).
+
+    Reuses ``handle_update_parcel_sale_assumptions`` in commit mode — no parallel
+    writer — then ``recalculate_one_assumption`` runs the SAME maths as the batch
+    recalc endpoint.
+
+    ``commission`` is an OVERRIDE cell. The user types a dollar amount; it is
+    stored on commission_amount with commission_override = true and treated as a
+    FIXED override — recalculate_one_assumption re-feeds it into
+    SaleCalculationService's fixed-commission path, which reproduces it to the
+    cent (commission_pct is numeric(5,4), too coarse to round-trip the dollars)."""
+    if column not in _EDITABLE_SALE_CELL_COLUMNS:
+        return {
+            'success': False,
+            'error': 'column_not_writable',
+            'detail': (
+                f'{column!r} is not an editable sale cell. Editable columns: '
+                f'{sorted(_EDITABLE_SALE_CELL_COLUMNS)}.'
+            ),
+        }
+    if project_id is None:
+        return {
+            'success': False,
+            'error': 'project_required',
+            'detail': 'sales schedule artifact missing project_id',
+        }
+    try:
+        parcel_id_int = int(parcel_id)
+    except (TypeError, ValueError):
+        return {
+            'success': False,
+            'error': 'invalid_row_id',
+            'detail': f'parcel_id must be an integer; got {parcel_id!r}',
+        }
+
+    from apps.landscaper.tool_executor import handle_update_parcel_sale_assumptions
+    from apps.sales_absorption.batch_recalc import recalculate_one_assumption
+
+    if column == 'sale_date':
+        iso = _coerce_sale_date(raw_value)
+        if iso is None:
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': (
+                    'sale_date must be a valid date (YYYY-MM-DD); '
+                    f'got {raw_value!r}. The column is NOT NULL.'
+                ),
+            }
+        writer_input = {
+            'parcel_id': parcel_id_int,
+            'sale_date': iso,
+            'reason': 'Inline edit: sale_date',
+        }
+        coerced_value = iso
+    else:  # commission_amount
+        from .field_writers import _coerce_decimal
+        try:
+            amount = _coerce_decimal(raw_value)
+        except ValueError as exc:
+            return {'success': False, 'error': 'invalid_value', 'detail': str(exc)}
+        if amount is None:
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': 'commission cannot be empty — enter a dollar amount.',
+            }
+        # Store the typed dollars + the override flag. commission_amount is a
+        # FIXED override: recalculate_one_assumption re-feeds it into
+        # SaleCalculationService, which honors it to the cent (the fixed-
+        # commission path) instead of rounding it through the numeric(5,4)
+        # commission_pct. The recalc also sets commission_pct = amount / gross
+        # for display consistency.
+        writer_input = {
+            'parcel_id': parcel_id_int,
+            'commission_amount': amount,
+            'commission_override': True,
+            'reason': 'Inline edit: commission',
+        }
+        coerced_value = amount
+
+    result = handle_update_parcel_sale_assumptions(
+        writer_input, int(project_id), propose_only=False, user_id=user_id,
+    )
+    if not result.get('success'):
+        return {
+            'success': False,
+            'error': 'db_error',
+            'detail': result.get('error') or 'sale assumption write failed',
+        }
+
+    # Recalc so the stored derived columns are consistent with the just-written
+    # value. The sales tables have NO trigger — the writer owns this.
+    try:
+        calc = recalculate_one_assumption(int(project_id), parcel_id_int)
+    except Exception as exc:
+        return {
+            'success': False,
+            'error': 'recalc_failed',
+            'detail': f'row written but recalculation failed: {exc}',
+        }
+
+    return {
+        'success': True,
+        'coerced_value': coerced_value,
+        'meta': {
+            'gross_sale_proceeds': calc.get('gross_sale_proceeds'),
+            'commission_amount': calc.get('commission_amount'),
+            'total_transaction_costs': calc.get('total_transaction_costs'),
+            'net_sale_proceeds': calc.get('net_sale_proceeds'),
+        },
+    }
+
+
 # ─── Per-edit resolve + dispatch (shared by single + batch commit, CB8) ──────
 #
 # The editing spine has ONE write path. `commit_field_edit` (single) and
@@ -805,10 +966,17 @@ def _dispatch_edit_write(project_id, source_ref, new_value, user_id):
         return _write_budget_cell(project_id=project_id, fact_id=row_id,
                                   column=column, raw_value=new_value,
                                   user_id=user_id)
+    if table == 'tbl_parcel_sale_assumptions':
+        # CB9: row_id is the PARCEL id (the table is UNIQUE on parcel_id and the
+        # existing writer keys on it). Editable columns: sale_date,
+        # commission_amount — the writer recalcs the row after writing.
+        return _write_sale_cell(project_id=project_id, parcel_id=row_id,
+                                column=column, raw_value=new_value,
+                                user_id=user_id)
     return {'success': False, 'error': 'table_not_supported',
             'detail': (f"inline-edit write-back is not yet wired for {table!r}. "
                        'Supported source tables: tbl_project, '
-                       'core_fin_fact_budget.')}
+                       'core_fin_fact_budget, tbl_parcel_sale_assumptions.')}
 
 
 def _apply_one_edit(artifact, spec, user_id):
@@ -832,6 +1000,13 @@ def _apply_one_edit(artifact, spec, user_id):
     return {'success': True, 'target': target,
             'coerced_value': _jsonable(write_result.get('coerced_value')),
             'meta': write_result.get('meta') or {}}
+
+
+# Source tables whose edits move the cash-flow NPV headline — the impact line
+# reads NPV before/after only for these. Budget cells (CB6) change cost timing;
+# parcel sale cells (CB9) change when/what proceeds land. Everything else
+# (project profile) leaves the cash flow untouched, so no read.
+_NPV_IMPACTING_TABLES = {'core_fin_fact_budget', 'tbl_parcel_sale_assumptions'}
 
 
 def _read_cashflow_npv(project_id):
@@ -932,6 +1107,31 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                     'detail': (
                         f'project {project_id} has no budget line items to '
                         're-render after the write'
+                    ),
+                }
+        elif artifact.tool_name == 'get_sales_schedule':
+            # Editing spine (CB9): rebuild the sales schedule from the same read
+            # path the tool uses so the refreshed artifact shows the recalculated
+            # gross / net + refreshed KPI header, and the version log records this
+            # as a user_edit.
+            from apps.landscaper.tools.sales_artifact_builder import (
+                build_sales_schema_for_project,
+            )
+            project_id = artifact.project_id
+            if project_id is None:
+                return {
+                    'success': False,
+                    'error': 'project_required',
+                    'detail': 'sales schedule artifact missing project_id',
+                }
+            new_schema = build_sales_schema_for_project(project_id)
+            if new_schema is None:
+                return {
+                    'success': False,
+                    'error': 'no_sales_rows',
+                    'detail': (
+                        f'project {project_id} has no dated parcel sale '
+                        'assumptions to re-render after the write'
                     ),
                 }
         else:

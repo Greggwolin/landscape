@@ -86,7 +86,7 @@ def test_net_is_calculated_and_never_editable():
 
 def test_deduction_cells_present_and_input_cells_editable():
     cols = {c['key']: c for c in _build()['blocks'][2]['columns']}
-    assert cols['commission']['editable'] is False  # calc
+    assert cols['commission']['editable'] is True  # input (CB9 — editable override cell)
     assert cols['cost_of_sale']['editable'] is False  # calc
     assert cols['sale_date']['editable'] is True  # input
     price_col = next(c for c in _build()['blocks'][1]['columns'] if c['key'] == 'price')
