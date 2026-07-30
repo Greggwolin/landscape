@@ -337,6 +337,20 @@ class ArtifactViewSet(viewsets.ViewSet):
         # to the batch (all-or-report) — they become per-edit errors in pass 2.
         resolved = [(spec, *_resolve_edit_target(schema, spec)) for spec in edits]
 
+        # Stale-cell guard (CC11) — run for the WHOLE batch here, in pass 1,
+        # before any write. Deliberately not inside the pass-2 loop: a landed
+        # write recalculates its own row's derived columns (a sale_date write
+        # refreshes that parcel's commission), so a later edit in the same batch
+        # would fail a staleness check against a value THIS batch legitimately
+        # changed. Checking every edit against the pre-batch state asks the
+        # question that actually matters — was the panel current when the user
+        # staged these — and cannot false-positive on the batch's own work.
+        resolved = [
+            (spec, sr, err if err is not None
+             else (_check_cell_not_stale(sr) if sr is not None else None))
+            for spec, sr, err in resolved
+        ]
+
         # Duplicate-target rejection — a client construction bug. Reject the
         # WHOLE batch up front rather than letting two writes race the same row.
         targets = [
@@ -903,6 +917,7 @@ def _coerce_dcf_value(column, raw_value):
     from apps.landscaper.tools.cashflow_artifact_builder import (
         INTEGER_ASSUMPTION_COLUMNS,
         PERCENT_ASSUMPTION_COLUMNS,
+        percent_bounds_for,
     )
 
     s = str(raw_value).strip() if raw_value is not None else ''
@@ -921,14 +936,17 @@ def _coerce_dcf_value(column, raw_value):
         }
 
     if column in PERCENT_ASSUMPTION_COLUMNS:
-        # Bounds exist only to stop a value the column physically cannot store
-        # (numeric(5,4)/(6,4)) — not to second-guess the unit.
-        if not (-100.0 <= typed <= 1000.0):
+        # Bounds come from the column's OWN numeric precision — not a blanket
+        # number — so an unstorable value is refused here with a plain message
+        # instead of surfacing as a Postgres overflow further down.
+        lo, hi = percent_bounds_for(column)
+        if not (lo <= typed <= hi):
             return None, None, {
                 'success': False, 'error': 'value_out_of_range',
                 'detail': (
-                    f'{column} is entered as a percent (e.g. 6.5 for 6.5%). '
-                    f'{typed} is outside the range this column can store.'
+                    f'{column} is entered as a percent (e.g. 6.5 for 6.5%), and '
+                    f'accepts {lo:g}% to {hi:g}%. {typed:g} is outside what this '
+                    'column can store.'
                 ),
             }
         return typed / 100.0, typed, None
@@ -1166,6 +1184,145 @@ def _dispatch_edit_write(project_id, source_ref, new_value, user_id):
                        'tbl_dcf_analysis.')}
 
 
+# ─── Stale-cell guard (CC11) ────────────────────────────────────────────────
+#
+# An edit is aimed by POSITION — ``blocks/1/rows/3/cells/value`` — and a position
+# is only meaningful for the version of the table it was read from. Several of
+# these schedules REORDER on write: the sales schedule sorts by sale_date, so
+# moving a parcel's date moves its row. If the client posts a path derived from
+# a snapshot the server has since rebuilt, the path resolves to a DIFFERENT row's
+# source_ref, and the write succeeds against a row the user never chose. No
+# error, no clue — the same "reports success, changes the wrong thing" family as
+# the sibling-record trap.
+#
+# It is not hypothetical: CC hit exactly this restoring a sales row during the
+# CC3 regression run — its restore landed on the neighbouring parcel because the
+# edit it was undoing had reordered the table. It caught and repaired it, but the
+# product has the same exposure whenever something else re-renders a schedule
+# between draw and click (Landscaper redrawing from chat, a second panel, a batch
+# staged a minute earlier).
+#
+# The fix is already half-built: every editable cell records ``captured_value``,
+# the value it was displaying when drawn. Nothing read it. Comparing it against
+# what is actually stored, immediately before writing, closes the class for every
+# schedule at once — present and future.
+#
+# Read-only, per (table, row_id, column). Columns are validated against each
+# table's editable set before they reach SQL, so no caller-supplied string is
+# ever interpolated.
+
+_STALE_CHECK_TABLES = {
+    # table: (qualified table, key column, allowed value columns)
+    'core_fin_fact_budget': (
+        'landscape.core_fin_fact_budget', 'fact_id', _EDITABLE_BUDGET_CELL_COLUMNS),
+    'tbl_parcel_sale_assumptions': (
+        'landscape.tbl_parcel_sale_assumptions', 'parcel_id', _EDITABLE_SALE_CELL_COLUMNS),
+    'tbl_dcf_analysis': (
+        'landscape.tbl_dcf_analysis', 'dcf_analysis_id', None),  # None → resolved lazily
+}
+
+
+def _read_current_cell_value(table, row_id, column):
+    """Current stored value for one cell, or ``(None, reason)`` if unreadable.
+
+    Returns ``(value, None)`` on a clean read. A table we don't know how to read,
+    a column outside that table's editable set, or a missing row returns
+    ``(None, reason)`` — the caller then SKIPS the comparison rather than
+    refusing, because an unverifiable cell is not evidence of staleness.
+    """
+    spec = _STALE_CHECK_TABLES.get(table)
+    if spec is None:
+        return None, 'table_not_checkable'
+    qualified, key_column, allowed = spec
+    if allowed is None:
+        from apps.landscaper.tools.cashflow_artifact_builder import (
+            EDITABLE_ASSUMPTION_COLUMNS,
+        )
+        allowed = EDITABLE_ASSUMPTION_COLUMNS
+    if column not in allowed:
+        return None, 'column_not_checkable'
+    try:
+        row_id_int = int(row_id)
+    except (TypeError, ValueError):
+        return None, 'row_id_not_numeric'
+    from django.db import connection as _conn
+    try:
+        with _conn.cursor() as cursor:
+            cursor.execute(
+                f'SELECT {column} FROM {qualified} WHERE {key_column} = %s',
+                [row_id_int],
+            )
+            row = cursor.fetchone()
+    except Exception as exc:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            f'stale-cell read failed for {table}.{column}: {exc}'
+        )
+        return None, 'read_failed'
+    if row is None:
+        return None, 'row_missing'
+    return row[0], None
+
+
+def _values_equivalent(captured, current):
+    """Is the captured display value the same as what is stored now?
+
+    Tolerant on representation, strict on meaning. Numbers compare numerically
+    with a small relative tolerance (a captured float and a stored Decimal are
+    the same value); dates compare as ISO strings; everything else compares as
+    trimmed text. Both-empty is a match.
+    """
+    if captured is None and current is None:
+        return True
+    if captured is None or current is None:
+        return False
+    # Numeric
+    try:
+        a, b = float(captured), float(current)
+        return abs(a - b) <= max(1e-9, abs(b) * 1e-9)
+    except (TypeError, ValueError):
+        pass
+    # Date / datetime → ISO
+    cur = current.isoformat() if hasattr(current, 'isoformat') else str(current)
+    cap = captured.isoformat() if hasattr(captured, 'isoformat') else str(captured)
+    return cur.strip()[:10] == cap.strip()[:10] if 'T' in cur or '-' in cur else cur.strip() == cap.strip()
+
+
+def _check_cell_not_stale(source_ref):
+    """Refuse an edit aimed from a snapshot that no longer matches the row.
+
+    Returns ``None`` when the edit may proceed — which includes every case we
+    cannot verify (no ``captured_value`` on the ref, an unreadable table or
+    column, a row we cannot find). Refusing on an unverifiable cell would break
+    every path that predates the guard; refusing only on a PROVEN mismatch keeps
+    it purely additive.
+    """
+    if 'captured_value' not in source_ref:
+        return None
+    captured = source_ref.get('captured_value')
+    current, reason = _read_current_cell_value(
+        source_ref['table'], source_ref['row_id'], source_ref['column'])
+    if reason is not None:
+        return None
+    if _values_equivalent(captured, current):
+        return None
+    return {
+        'success': False,
+        'error': 'stale_cell',
+        'detail': (
+            f"this cell was showing {captured!r} when the panel was drawn, but "
+            f"{source_ref['table']}.{source_ref['column']} for row "
+            f"{source_ref['row_id']} now holds {current!r}. The panel is out of "
+            'date, so the position you clicked may no longer be the row you '
+            'meant. Nothing was written.'
+        ),
+        'suggested_user_question': (
+            'This schedule changed since it was opened, so I did not write the '
+            'edit — reopen it and try again?'
+        ),
+    }
+
+
 def _apply_one_edit(artifact, spec, user_id):
     """Resolve + write ONE edit. Returns a normalized per-edit result.
 
@@ -1177,6 +1334,11 @@ def _apply_one_edit(artifact, spec, user_id):
     source_ref, err = _resolve_edit_target(artifact.current_state_json, spec)
     if err is not None:
         return {**err, 'success': False}
+    stale = _check_cell_not_stale(source_ref)
+    if stale is not None:
+        return {**stale, 'target': {'table': source_ref['table'],
+                                    'row_id': source_ref['row_id'],
+                                    'column': source_ref['column']}}
     write_result = _dispatch_edit_write(
         artifact.project_id, source_ref, spec.get('new_value'), user_id
     )
