@@ -212,3 +212,5 @@ jobs:
   # deploys and is green) and api-tests had no test:api script and depended on
   # that dead deploy. Re-add a real deploy/API gate only with a configured
   # VERCEL_TOKEN + a real test:api. Tracked alongside #43/#39.
+
+# CC15 probe — throwaway, proves gates run on a stacked PR. Delete with the branch.
