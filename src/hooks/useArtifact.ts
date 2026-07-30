@@ -22,6 +22,7 @@ import type {
   EditTarget,
   JsonPatchOp,
   SourcePointersMap,
+  SourceRef,
 } from '@/types/artifact';
 import { getAuthHeaders } from '@/lib/authHeaders';
 
@@ -277,6 +278,13 @@ export interface ArtifactCommitFieldEditInput {
   cell_path?: string[];
   /** Raw input string from the user. Backend coerces by column type. */
   new_value: string;
+  /** CC13 — the source_ref the client was rendering when the user typed. A
+   *  cell_path is a POSITION, and schedules reorder on write, so a position on
+   *  its own cannot say which row was meant. The server compares this against
+   *  what the path resolves to now and refuses (`row_moved`) if they differ, so
+   *  a click made against a stale view can never write to whichever row has
+   *  since taken that slot. Optional — omitting it keeps the old behaviour. */
+  expected_ref?: SourceRef;
   user_id?: string;
 }
 
@@ -350,6 +358,9 @@ export interface ArtifactBatchEdit {
   /** Or a kv_pair path. Exactly one of cell_path / pair_path per edit. */
   pair_path?: string[];
   new_value: string;
+  /** CC13 — the source_ref this cell was showing when the user staged it. See
+   *  ArtifactCommitFieldEditInput.expected_ref. */
+  expected_ref?: SourceRef;
 }
 
 export interface ArtifactCommitFieldEditsInput {
