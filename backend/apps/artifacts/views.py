@@ -889,6 +889,185 @@ def _write_sale_cell(*, project_id, parcel_id, column, raw_value, user_id=None):
     }
 
 
+def _coerce_dcf_value(column, raw_value):
+    """Coerce a typed assumption cell to its stored form. Pure — no DB.
+
+    Returns ``(stored_value, echoed_value, None)`` or ``(None, None, error)``.
+
+    A PERCENT cell takes a percent: the scale is exactly 100 and there is NO
+    magnitude heuristic. Typing 0.25 into a cell labelled 20.0% stores 0.0025
+    and immediately redisplays as 0.3% — visibly wrong, and correctable —
+    rather than being silently reinterpreted as 25%. Inferring the user's unit
+    from its size is the defect class this slice exists to remove.
+    """
+    from apps.landscaper.tools.cashflow_artifact_builder import (
+        INTEGER_ASSUMPTION_COLUMNS,
+        PERCENT_ASSUMPTION_COLUMNS,
+    )
+
+    s = str(raw_value).strip() if raw_value is not None else ''
+    if s == '':
+        return None, None, {
+            'success': False, 'error': 'invalid_value',
+            'detail': f'{column} cannot be blank — enter a value.',
+        }
+    s = s.replace(',', '').replace('$', '').rstrip('%').strip()
+    try:
+        typed = float(s)
+    except ValueError:
+        return None, None, {
+            'success': False, 'error': 'invalid_value',
+            'detail': f'{column} must be a number; got {raw_value!r}.',
+        }
+
+    if column in PERCENT_ASSUMPTION_COLUMNS:
+        # Bounds exist only to stop a value the column physically cannot store
+        # (numeric(5,4)/(6,4)) — not to second-guess the unit.
+        if not (-100.0 <= typed <= 1000.0):
+            return None, None, {
+                'success': False, 'error': 'value_out_of_range',
+                'detail': (
+                    f'{column} is entered as a percent (e.g. 6.5 for 6.5%). '
+                    f'{typed} is outside the range this column can store.'
+                ),
+            }
+        return typed / 100.0, typed, None
+
+    if column in INTEGER_ASSUMPTION_COLUMNS:
+        if typed != int(typed):
+            return None, None, {
+                'success': False, 'error': 'invalid_value',
+                'detail': f'{column} must be a whole number; got {raw_value!r}.',
+            }
+        if typed < 0:
+            return None, None, {
+                'success': False, 'error': 'value_out_of_range',
+                'detail': f'{column} cannot be negative.',
+            }
+        return int(typed), int(typed), None
+
+    # Currency amount (reserves_per_unit).
+    if typed < 0:
+        return None, None, {
+            'success': False, 'error': 'value_out_of_range',
+            'detail': f'{column} cannot be negative.',
+        }
+    return typed, typed, None
+
+
+def _write_dcf_cell(*, project_id, dcf_analysis_id, column, raw_value, user_id=None):
+    """Write one editable cash-flow assumption cell (CC2).
+
+    Reuses ``handle_update_cashflow_assumption`` in confirm mode — no parallel
+    writer. That tool already validates the column against its own allowlist,
+    writes inside a transaction, and re-reads OUTSIDE the transaction to prove
+    the value landed, so this helper adds only the two things the artifact path
+    needs and the tool cannot know about:
+
+    1. **The sibling-row guard.** ``tbl_dcf_analysis`` is unique on
+       (project_id, property_type) and a project may hold BOTH a ``land_dev``
+       and a ``cre`` row — project 17 does. The engine reads only the row
+       matching the project's type. The tool resolves that row itself, so an
+       edit whose ``source_ref`` points at the OTHER row would be silently
+       redirected and appear to succeed while the cell the user clicked was
+       never the one written. We refuse instead, and say why.
+
+    2. **Percent-unit coercion.** The cell displays and accepts PERCENT units
+       (20.0 = 20%); the column stores a decimal fraction (0.20). The scale is
+       exactly 100 for the declared percent columns and there is NO magnitude
+       heuristic — a typed 0.25 stores 0.0025 and immediately redisplays as
+       0.3%, visibly wrong, rather than being silently "corrected" to 25%.
+       Guessing the user's unit is the defect class this whole slice exists to
+       avoid.
+    """
+    from apps.landscaper.tools.cashflow_artifact_builder import (
+        EDITABLE_ASSUMPTION_COLUMNS,
+        resolve_engine_dcf_id,
+    )
+
+    if column not in EDITABLE_ASSUMPTION_COLUMNS:
+        return {
+            'success': False,
+            'error': 'column_not_writable',
+            'detail': (
+                f'{column!r} is not an editable cash-flow assumption. Editable '
+                f'columns: {sorted(EDITABLE_ASSUMPTION_COLUMNS)}.'
+            ),
+        }
+    if project_id is None:
+        return {
+            'success': False,
+            'error': 'project_required',
+            'detail': 'cash-flow schedule artifact missing project_id',
+        }
+
+    try:
+        ref_id = int(dcf_analysis_id)
+    except (TypeError, ValueError):
+        return {
+            'success': False,
+            'error': 'invalid_row_id',
+            'detail': f'dcf_analysis_id must be an integer; got {dcf_analysis_id!r}',
+        }
+
+    # --- Guard 1: coerce by declared kind (pure). Bad input never reaches the DB.
+    new_value, coerced_value, err = _coerce_dcf_value(column, raw_value)
+    if err is not None:
+        return err
+
+    # --- Guard 2: the ref must point at the row the engine actually reads. ---
+    engine_id = resolve_engine_dcf_id(int(project_id))
+    if engine_id is None:
+        return {
+            'success': False,
+            'error': 'no_dcf_row',
+            'detail': (
+                f'project {project_id} has no cash-flow assumption record to write '
+                'to. Open the cash-flow schedule first, which creates it.'
+            ),
+        }
+    if engine_id != ref_id:
+        return {
+            'success': False,
+            'error': 'stale_dcf_row',
+            'detail': (
+                f'this cell points at assumption record {ref_id}, but the engine '
+                f'now reads record {engine_id} for project {project_id}. Writing '
+                f'{ref_id} would change no number on screen. Re-open the cash-flow '
+                'schedule to refresh the cell, then edit again.'
+            ),
+        }
+
+    from apps.landscaper.tool_executor import handle_update_cashflow_assumption
+
+    result = handle_update_cashflow_assumption(
+        {
+            'field': column,
+            'new_value': new_value,
+            'confirm': True,
+            'reason': f'Inline edit: {column}',
+        },
+        int(project_id),
+        propose_only=False,
+        user_id=user_id,
+    )
+    if not result.get('success'):
+        return {
+            'success': False,
+            'error': 'db_error',
+            'detail': result.get('error') or 'cash-flow assumption write failed',
+        }
+
+    # No stored schedule to keep in step — the engine recomputes every period
+    # from these assumptions on the next read, so there is nothing to recalc
+    # here (unlike budget, which has a trigger, or sales, which has none).
+    return {
+        'success': True,
+        'coerced_value': coerced_value,
+        'meta': {'stored_value': new_value, 'dcf_analysis_id': ref_id},
+    }
+
+
 # ─── Per-edit resolve + dispatch (shared by single + batch commit, CB8) ──────
 #
 # The editing spine has ONE write path. `commit_field_edit` (single) and
@@ -973,10 +1152,18 @@ def _dispatch_edit_write(project_id, source_ref, new_value, user_id):
         return _write_sale_cell(project_id=project_id, parcel_id=row_id,
                                 column=column, raw_value=new_value,
                                 user_id=user_id)
+    if table == 'tbl_dcf_analysis':
+        # CC2: row_id is the dcf_analysis_id the render read. The writer refuses
+        # if the engine now reads a different record (a project may hold both a
+        # land_dev and a cre row — only one is ever consumed).
+        return _write_dcf_cell(project_id=project_id, dcf_analysis_id=row_id,
+                               column=column, raw_value=new_value,
+                               user_id=user_id)
     return {'success': False, 'error': 'table_not_supported',
             'detail': (f"inline-edit write-back is not yet wired for {table!r}. "
                        'Supported source tables: tbl_project, '
-                       'core_fin_fact_budget, tbl_parcel_sale_assumptions.')}
+                       'core_fin_fact_budget, tbl_parcel_sale_assumptions, '
+                       'tbl_dcf_analysis.')}
 
 
 def _apply_one_edit(artifact, spec, user_id):
@@ -1006,7 +1193,13 @@ def _apply_one_edit(artifact, spec, user_id):
 # reads NPV before/after only for these. Budget cells (CB6) change cost timing;
 # parcel sale cells (CB9) change when/what proceeds land. Everything else
 # (project profile) leaves the cash flow untouched, so no read.
-_NPV_IMPACTING_TABLES = {'core_fin_fact_budget', 'tbl_parcel_sale_assumptions'}
+_NPV_IMPACTING_TABLES = {
+    'core_fin_fact_budget',
+    'tbl_parcel_sale_assumptions',
+    # CC2: the discount rate and its neighbours drive NPV directly — a change
+    # here should report what it did to the value, same as a budget change.
+    'tbl_dcf_analysis',
+}
 
 
 def _read_cashflow_npv(project_id):
@@ -1132,6 +1325,32 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                     'detail': (
                         f'project {project_id} has no dated parcel sale '
                         'assumptions to re-render after the write'
+                    ),
+                }
+        elif artifact.tool_name == 'get_cashflow_schedule':
+            # Editing spine (CC2): rebuild the cash-flow schedule from the same
+            # read path the tool uses, so the refreshed artifact shows the
+            # re-run engine (every period, NPV/IRR header) and the version log
+            # records this as a user_edit. Nothing is stored between the
+            # assumption and the grid — the engine recomputes on this read.
+            from apps.landscaper.tools.cashflow_artifact_builder import (
+                build_cashflow_schema_for_project,
+            )
+            project_id = artifact.project_id
+            if project_id is None:
+                return {
+                    'success': False,
+                    'error': 'project_required',
+                    'detail': 'cash-flow schedule artifact missing project_id',
+                }
+            new_schema = build_cashflow_schema_for_project(project_id)
+            if new_schema is None:
+                return {
+                    'success': False,
+                    'error': 'no_cashflow_periods',
+                    'detail': (
+                        f'project {project_id} has no cash-flow periods to '
+                        're-render after the write'
                     ),
                 }
         else:

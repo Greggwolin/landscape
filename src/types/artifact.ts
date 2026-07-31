@@ -61,6 +61,11 @@ export interface TableRow {
   source_ref?: SourceRef;
   /** Per-cell source pointer (opt-in for high-fidelity diff cases). */
   cell_source_refs?: Record<string, SourceRef>;
+  /** Per-cell display format, overriding the column's `format` for this row
+   *  only (CC2). Needed where one column holds mixed units — the cash-flow
+   *  assumptions strip stacks rates, whole periods and dollar amounts in a
+   *  single Value column, so the format cannot live on the column. */
+  cell_formats?: Record<string, 'currency' | 'currency2' | 'number' | 'date' | 'percent'>;
   /** When true, cells in this row can be edited inline via double-click. */
   editable?: boolean;
 }
