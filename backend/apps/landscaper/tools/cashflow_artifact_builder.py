@@ -154,6 +154,33 @@ INTEGER_ASSUMPTION_COLUMNS = frozenset(
     s['column'] for s in _ALL_SPECS if s['column'] and s['kind'] == 'int'
 )
 
+# The largest percent each rate column can physically store, from its own
+# numeric precision on tbl_dcf_analysis. numeric(5,4) tops out at 9.9999 (999.99%);
+# numeric(6,4) at 99.9999 (9999.99%). A single blanket bound let a value through
+# that the column could not hold, so the refusal arrived as a Postgres overflow
+# instead of the plain message the guard is supposed to give (CC3 flagged this).
+# Fails closed either way — this makes it fail closed *legibly*.
+_PCT_MAX_BY_PRECISION = {5: 999.99, 6: 9999.99}
+_PERCENT_COLUMN_PRECISION = {
+    'discount_rate': 6,
+    'exit_cap_rate': 6,
+    'going_in_cap_rate': 6,
+    'selling_costs_pct': 5,
+    'vacancy_rate': 5,
+    'stabilized_vacancy': 5,
+    'credit_loss': 5,
+    'management_fee_pct': 5,
+    'bulk_sale_discount_pct': 5,
+}
+
+
+def percent_bounds_for(column: str) -> tuple:
+    """(min, max) percent this column can store. Unknown columns get the tighter
+    bound — a new percent column is safer refused early than overflowed."""
+    digits = _PERCENT_COLUMN_PRECISION.get(column, 5)
+    hi = _PCT_MAX_BY_PRECISION[digits]
+    return -hi, hi
+
 # Every column this artifact will ever emit a source_ref for. The write path
 # rejects anything outside it before touching the ORM.
 EDITABLE_ASSUMPTION_COLUMNS = frozenset(
