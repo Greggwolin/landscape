@@ -15,6 +15,7 @@ import type {
   KeyValuePair,
   SectionBlock,
   SourcePointersMap,
+  SourceRef,
   TableBlock,
   TableRow,
   TextBlock,
@@ -41,6 +42,10 @@ import styles from './ArtifactRenderer.module.css';
 interface StagedEdit {
   path: string[];
   value: string;
+  /** CC13: the source_ref this cell was showing when the user typed. Sent with
+   *  the commit so the server can refuse if that position now resolves to a
+   *  different row (schedules reorder on write). */
+  expectedRef?: SourceRef;
   /** Inline reason when this cell's commit failed (kept staged + dirty). */
   error?: string;
 }
@@ -48,7 +53,12 @@ interface StagingContextValue {
   /** Keyed by path.join('/'). */
   staged: Record<string, StagedEdit>;
   /** Stage (or unstage, if newValue equals committed) one cell. */
-  stageEdit: (path: string[], newValue: string, committed: string | number | null) => void;
+  stageEdit: (
+    path: string[],
+    newValue: string,
+    committed: string | number | null,
+    expectedRef?: SourceRef,
+  ) => void;
   /** True when at least one cell is staged (used to mark calculated cells stale). */
   active: boolean;
 }
@@ -87,7 +97,12 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
   }, [artifactId]);
 
   const stageEdit = useCallback(
-    (path: string[], newValue: string, committed: string | number | null) => {
+    (
+      path: string[],
+      newValue: string,
+      committed: string | number | null,
+      expectedRef?: SourceRef,
+    ) => {
       const key = stagedKey(path);
       const committedStr = committed == null ? '' : String(committed);
       setStaged((prev) => {
@@ -96,7 +111,7 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
           // Reverted to the committed value — drop it from staging.
           delete next[key];
         } else {
-          next[key] = { path, value: newValue };
+          next[key] = { path, value: newValue, expectedRef };
         }
         return next;
       });
@@ -112,7 +127,11 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     if (!entries.length) return;
     setCommitting(true);
     try {
-      const edits = entries.map((e) => ({ cell_path: e.path, new_value: e.value }));
+      const edits = entries.map((e) => ({
+        cell_path: e.path,
+        new_value: e.value,
+        expected_ref: e.expectedRef,
+      }));
       const resp = await onCommitFieldEdits(edits);
       if (!resp?.success) {
         // Batch-level rejection (e.g. duplicate_target) — keep everything
@@ -950,6 +969,7 @@ function TableBlockRenderer({
                         // which a column-level hint cannot express.
                         format={row.cell_formats?.[col.key] ?? col.format}
                         options={col.options}
+                        expectedRef={cellRef}
                       />
                     </td>
                   );
@@ -1267,6 +1287,10 @@ interface EditableCellProps {
    *  choices rather than a free-text input — the stored value is `value`
    *  (the code), the dropdown shows `label`. */
   options?: Array<{ value: string; label: string }>;
+  /** CC13: the source_ref this cell was rendered from. Sent with the commit so
+   *  a stale click cannot land on whichever row has since moved into this
+   *  position. */
+  expectedRef?: SourceRef;
 }
 
 // Status-pill detection — when a cell's value matches one of these
@@ -1290,7 +1314,7 @@ function _statusBadgeClass(value: unknown): string | null {
   return _STATUS_BADGE_CLASS[probe] ?? null;
 }
 
-function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, format, options }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, format, options, expectedRef }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
   const [saving, setSaving] = useState(false);
@@ -1422,7 +1446,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
     // CB8 staging — stage locally (or un-stage if reverted to committed); no
     // network until the batch Commit.
     if (stagingMode) {
-      staging!.stageEdit(path, nextVal, value);
+      staging!.stageEdit(path, nextVal, value, expectedRef);
       setEditing(false);
       return;
     }
@@ -1432,7 +1456,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
     if (hasSourceRef && onCommitFieldEdit) {
       setSaving(true);
       try {
-        const result = await onCommitFieldEdit(path, nextVal);
+        const result = await onCommitFieldEdit(path, nextVal, expectedRef);
         if (!result?.success) {
           setErrorMsg(
             result?.suggested_user_question

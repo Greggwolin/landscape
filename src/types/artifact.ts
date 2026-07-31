@@ -194,6 +194,12 @@ export interface ArtifactRendererProps {
   onCommitFieldEdit?: (
     pairPath: string[],
     newValue: string,
+    /** CC13 — the source_ref this cell was rendered from. A path is a POSITION,
+     *  and schedules reorder on write, so a position alone cannot say which row
+     *  the user meant. Sending the ref the client was looking at lets the server
+     *  refuse when that position now resolves to a different row. Optional: an
+     *  older client that omits it keeps the previous behaviour. */
+    expectedRef?: SourceRef,
   ) => Promise<{
     success: boolean;
     error?: string;
@@ -208,7 +214,13 @@ export interface ArtifactRendererProps {
    * landed and keeps the failed ones staged with their reason.
    */
   onCommitFieldEdits?: (
-    edits: Array<{ cell_path?: string[]; pair_path?: string[]; new_value: string }>,
+    edits: Array<{
+      cell_path?: string[];
+      pair_path?: string[];
+      new_value: string;
+      /** CC13 — see onCommitFieldEdit. Carried per staged edit. */
+      expected_ref?: SourceRef;
+    }>,
   ) => Promise<{
     success: boolean;
     results?: Array<{

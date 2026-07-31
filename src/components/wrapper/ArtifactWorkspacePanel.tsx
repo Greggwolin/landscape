@@ -195,12 +195,16 @@ export function ArtifactWorkspacePanel({
     artifactId: number,
     path: string[],
     newValue: string,
+    expectedRef?: SourceRef,
   ) => {
     const isCell = path.includes('cells');
     const result = await commitFieldEditMutation.mutateAsync({
       artifactId,
       input: isCell
-        ? { cell_path: path, new_value: newValue }
+        // CC13: send the ref the client was looking at alongside the position,
+        // so a click made against a stale view cannot land on whichever row has
+        // since moved into that slot.
+        ? { cell_path: path, new_value: newValue, expected_ref: expectedRef }
         : { pair_path: path, new_value: newValue },
     });
     if (result?.success && result?.impact_line) {
@@ -549,8 +553,8 @@ export function ArtifactWorkspacePanel({
                 input: { schema_diff: patch, edit_source: 'user_edit' },
               });
             }}
-            onCommitFieldEdit={(pairPath, newValue) =>
-              runCommitFieldEdit(active.artifact_id, pairPath, newValue)
+            onCommitFieldEdit={(pairPath, newValue, expectedRef) =>
+              runCommitFieldEdit(active.artifact_id, pairPath, newValue, expectedRef)
             }
             onPin={(label: string, modificationSpec?: unknown) => {
               // Report artifacts include the current toolbar draft spec
@@ -644,14 +648,14 @@ export function ArtifactWorkspacePanel({
                 },
               });
             }}
-            onCommitFieldEdit={(pairPath, newValue) =>
+            onCommitFieldEdit={(pairPath, newValue, expectedRef) =>
               // Phase 5 / CB6 — write-back path. Used when the edited pair
               // or table cell carries a source_ref. The backend writes the
               // source row, re-builds the artifact via its tool's schema
               // builder, and returns the refreshed snapshot; the mutation's
               // onSuccess invalidates the artifact detail cache so useArtifact
               // refetches. runCommitFieldEdit also captures the impact line.
-              runCommitFieldEdit(active.artifact_id, pairPath, newValue)
+              runCommitFieldEdit(active.artifact_id, pairPath, newValue, expectedRef)
             }
             onCommitFieldEdits={(edits) =>
               // CB8 — batch commit for staged table cell edits.

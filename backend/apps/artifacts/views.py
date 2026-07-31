@@ -220,6 +220,9 @@ class ArtifactViewSet(viewsets.ViewSet):
             'pair_path': body.get('pair_path'),
             'cell_path': body.get('cell_path'),
             'new_value': body.get('new_value'),
+            # CC13 — the row the client believed it was editing. See
+            # _resolve_edit_target; optional, and absent on older clients.
+            'expected_ref': body.get('expected_ref'),
         }
 
         try:
@@ -1136,6 +1139,44 @@ def _resolve_edit_target(schema, spec):
     if not (table and row_id is not None and column):
         return None, {'success': False, 'error': 'incomplete_source_ref',
                       'detail': 'source_ref must carry table, row_id, and column'}
+
+    # CC13 — the click must name the ROW, not just the slot.
+    #
+    # A cell_path is a POSITION, and these schedules REORDER on write (the sales
+    # schedule sorts by sale date). The server rebuilds the artifact after every
+    # write, so comparing stored values alone cannot tell a current click from a
+    # stale one: by the time the second click arrives, the snapshot and the
+    # database agree with each other and disagree only with the screen the user
+    # was looking at. Nothing in the request said which version that was.
+    #
+    # So the client now sends the source_ref it was rendering. If the position
+    # resolves to a different row than the client meant, the view has moved
+    # underneath the user and we refuse rather than write to whichever row took
+    # the slot. Optional by design: a request without it keeps the old behaviour,
+    # so this is additive and no existing caller breaks.
+    expected = spec.get('expected_ref') if isinstance(spec, dict) else None
+    if isinstance(expected, dict) and expected.get('table'):
+        same = (
+            expected.get('table') == table
+            and str(expected.get('row_id')) == str(row_id)
+            and expected.get('column') == column
+        )
+        if not same:
+            return None, {
+                'success': False,
+                'error': 'row_moved',
+                'detail': (
+                    f"this position pointed at {expected.get('table')} row "
+                    f"{expected.get('row_id')} ({expected.get('column')}) on the "
+                    f'screen the edit came from, but now resolves to {table} row '
+                    f'{row_id} ({column}). The schedule reordered, so the row you '
+                    'clicked is no longer in that position. Nothing was written.'
+                ),
+                'suggested_user_question': (
+                    'That row moved after the schedule re-sorted, so I did not '
+                    'write the edit — reopen the schedule and try again?'
+                ),
+            }
     return source_ref, None
 
 
