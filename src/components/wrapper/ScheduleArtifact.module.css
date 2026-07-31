@@ -1,0 +1,405 @@
+/*
+ * ScheduleArtifact — the schedule composition drawn in
+ * BUDGET-ARTIFACT-MOCKUP-2026-07-31.html (rev 9).
+ *
+ * CoreUI tokens only. No hardcoded hex, no Tailwind palette classes, no dark:
+ * variants (project instructions §7). The mockup's dark palette is the app's
+ * own dark theme, so the surface follows the theme rather than pinning one.
+ *
+ * The one strong horizontal line in the whole stack is the rule above the
+ * column headers: everything above it reads as controls, everything below it
+ * reads as data. The control bars themselves are deliberately hairlines so
+ * that boundary is the only thing the eye locks onto (rev 6).
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ─── Header ──────────────────────────────────────────────────────────── */
+
+.head {
+  padding: 11px 14px 12px;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  flex-shrink: 0;
+}
+
+.kicker {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cui-secondary-color);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  min-width: 0;
+}
+
+.titleBadges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* ─── Badges ──────────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-body-color);
+  background: var(--cui-body-bg);
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.badge:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.badgeStatic {
+  cursor: default;
+}
+
+/* Binding chip — exactly one, always visible. */
+.badgeLive {
+  border-color: var(--cui-success-border-subtle, var(--cui-success));
+  color: var(--cui-success);
+  background: var(--cui-success-bg-subtle, transparent);
+  cursor: default;
+}
+
+/* Applied filter / active rung. */
+.badgeOn {
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+  background: var(--cui-primary-bg-subtle, transparent);
+  font-weight: 600;
+}
+
+/* Hidden column — offered, not showing. */
+.badgeGhost {
+  border-style: dashed;
+  color: var(--cui-secondary-color);
+  background: transparent;
+}
+
+.badgeBasis {
+  border-color: transparent;
+  color: var(--cui-secondary-color);
+  cursor: default;
+}
+
+.badgeDrop::after {
+  content: ' ▾';
+  letter-spacing: 0;
+}
+
+/* ─── KPI tile strip ──────────────────────────────────────────────────── */
+
+.kpis {
+  display: flex;
+  border-bottom: 1px solid var(--cui-border-color);
+  flex-shrink: 0;
+}
+
+.kpi {
+  flex: 1;
+  padding: 11px 10px;
+  border-right: 1px solid var(--cui-border-color);
+  text-align: center;
+  min-width: 0;
+}
+
+.kpi:last-child {
+  border-right: 0;
+}
+
+.kpiLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cui-secondary-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpiValue {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Control bars ────────────────────────────────────────────────────── */
+
+.bar {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--cui-border-color);
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  align-items: center;
+  background: var(--cui-secondary-bg);
+  flex-shrink: 0;
+}
+
+.barLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cui-secondary-color);
+  margin-right: 4px;
+  min-width: 46px;
+}
+
+/* ─── Table ───────────────────────────────────────────────────────────── */
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+/* The boundary. Everything above reads as controls; everything below, data. */
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cui-body-color);
+  font-weight: 600;
+  text-align: left;
+  padding: 9px 10px;
+  background: var(--cui-tertiary-bg);
+  border-top: 2px solid var(--cui-primary);
+  border-bottom: 1px solid var(--cui-border-color);
+  white-space: normal;
+}
+
+.table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--cui-border-color);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.right { text-align: right; }
+.center { text-align: center; }
+
+.sectionRow td {
+  background: var(--cui-secondary-bg);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--cui-secondary-color);
+  font-weight: 600;
+}
+
+.subtotalRow td {
+  border-top: 1px solid var(--cui-border-color);
+  font-weight: 600;
+}
+
+.totalRow td {
+  border-top: 2px solid var(--cui-border-color);
+  font-weight: 700;
+}
+
+/* Editable values carry a dashed underline. Nothing else announces itself. */
+.editable {
+  border-bottom: 1px dashed var(--cui-primary);
+  color: var(--cui-primary);
+  cursor: pointer;
+}
+
+/* Computed values are plain and slightly dim, and open their derivation. */
+.computed {
+  color: var(--cui-secondary-color);
+  cursor: help;
+}
+
+.emptyCell {
+  color: var(--cui-secondary-color);
+}
+
+.emptyState {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--cui-secondary-color);
+  font-size: 13px;
+}
+
+/* ─── Truncation, footer ──────────────────────────────────────────────── */
+
+.trunc {
+  padding: 9px 14px;
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--cui-border-color);
+  flex-shrink: 0;
+}
+
+.btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: inherit;
+}
+
+.foot {
+  padding: 9px 14px;
+  border-top: 1px solid var(--cui-border-color);
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.excluded {
+  padding: 7px 14px 0;
+  font-size: 11px;
+  color: var(--cui-warning);
+}
+
+/* ─── Derivation popover ──────────────────────────────────────────────── */
+
+.popShade {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+}
+
+.pop {
+  position: absolute;
+  right: 16px;
+  width: 262px;
+  background: var(--cui-body-bg);
+  border: 1px solid var(--cui-primary);
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  padding: 11px 13px;
+  font-size: 12.5px;
+  z-index: 10;
+}
+
+.popTitle {
+  font-weight: 600;
+  margin-bottom: 7px;
+  color: var(--cui-body-color);
+}
+
+.popList {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+}
+
+.popList dt { color: var(--cui-secondary-color); }
+
+.popList dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.popRule {
+  border-top: 1px solid var(--cui-border-color);
+  margin: 7px 0 6px;
+}
+
+.popFoot {
+  color: var(--cui-secondary-color);
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.hint {
+  padding: 7px 14px;
+  font-size: 11.5px;
+  color: var(--cui-secondary-color);
+  border-top: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+}
