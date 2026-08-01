@@ -14,6 +14,17 @@
 #      files are staged in the index, the commit captures nothing but the
 #      listed generated docs.
 #
+# The allowlist above governs WHAT this job may commit. Nothing governed WHERE,
+# and this job commits onto whatever branch happens to be checked out. The shared
+# checkout is not always on main: two nightly notes (b1349007, d3ca2506) landed on
+# the feature branch fix/artifact-panel-host-route while a session had it checked
+# out. Because GitHub squash-merges, those extra commits then made that branch
+# look unmerged after its PR landed, so it survived the merge and accumulated in
+# the branch list — automation manufacturing an ambiguity a human then has to
+# adjudicate. The branch guard below refuses to run off the nightly branch. It
+# REFUSES rather than switching: a nightly job must never move a working checkout
+# out from under a live session. (LSCMD-CC-BRANCH-CLEANUP-0730-CC7)
+#
 # This replaces the prior `git add -A` / `git add docs/ CLAUDE.md` step in the
 # untracked `nightly-landscape-sync` Cowork skill. On 2026-05-19 that step swept
 # in-flight backend code (ai_handler.py, tool_schemas.py, services.py,
@@ -35,6 +46,11 @@
 #       calling skill can surface it instead of reporting a false success.
 #       (TB25-NIGHTLY-COMMITTER-STALLED-0714: this job silently no-op'd for 19
 #       days when git died on a stale index.lock and the caller read it as pass.)
+#   2 = refused LOUDLY because of WHERE it was run: the checkout is on a branch
+#       other than the nightly branch (default "main", override with
+#       NIGHTLY_COMMIT_BRANCH), or HEAD is detached. Distinct from 1 so the
+#       calling task can tell "wrong branch, nothing was committed" apart from
+#       "the commit was attempted and failed". Nothing is staged or committed.
 
 set -euo pipefail
 shopt -s nullglob
@@ -64,6 +80,29 @@ if [ -e "$INDEX_LOCK" ]; then
     echo "  Clear it and re-run:  rm -f .git/index.lock" >&2
   fi
   exit 1
+fi
+
+# ── Branch guard: resolve the branch BEFORE staging anything. Nightly generated
+#    docs belong on the main line; committing them onto whatever feature branch a
+#    session happened to leave checked out attaches them to in-flight work and —
+#    under squash-merge — leaves that branch looking unmerged forever (see the
+#    header). Runs before the --dry-run path as well, so the refusal is testable
+#    without committing. Refuses; never switches branches.
+NIGHTLY_BRANCH="${NIGHTLY_COMMIT_BRANCH:-main}"
+if ! CURRENT_BRANCH="$(git symbolic-ref --quiet --short HEAD)"; then
+  echo "FB-304 BRANCH ABORT: HEAD is detached — no branch is checked out." >&2
+  echo "  Nightly generated docs must land on '$NIGHTLY_BRANCH'; refusing to commit here." >&2
+  echo "  Fix: 'git checkout $NIGHTLY_BRANCH' in this checkout, then re-run." >&2
+  exit 2
+fi
+if [ "$CURRENT_BRANCH" != "$NIGHTLY_BRANCH" ]; then
+  echo "FB-304 BRANCH ABORT: this checkout is on '$CURRENT_BRANCH', not '$NIGHTLY_BRANCH'." >&2
+  echo "  Nightly generated docs must land on '$NIGHTLY_BRANCH'. Committing them onto" >&2
+  echo "  '$CURRENT_BRANCH' would attach them to in-flight work and leave that branch" >&2
+  echo "  looking unmerged after its PR squash-merges." >&2
+  echo "  NOT switching branches automatically — a live session may be using this checkout." >&2
+  echo "  Fix: land or park the work on '$CURRENT_BRANCH', check out '$NIGHTLY_BRANCH', re-run." >&2
+  exit 2
 fi
 
 # ── Allowlist: purely-generated artifacts the nightly job legitimately produces.
