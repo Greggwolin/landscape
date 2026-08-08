@@ -1505,6 +1505,24 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                         're-render after the write'
                     ),
                 }
+            # The view specification lives on the same artifact record and must
+            # move with the write, or the two halves of one budget artifact
+            # would disagree — the exact failure this programme has been closing.
+            try:
+                from apps.landscaper.tools.budget_artifact_builder import (
+                    build_budget_view_config_for_project,
+                )
+                view_config = build_budget_view_config_for_project(project_id)
+                if view_config:
+                    params = dict(artifact.params_json or {})
+                    params['budget_view_config'] = view_config
+                    artifact.params_json = params
+                    artifact.save(update_fields=['params_json'])
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    'budget view specification refresh failed after write'
+                )
         elif artifact.tool_name == 'get_sales_schedule':
             # Editing spine (CB9): rebuild the sales schedule from the same read
             # path the tool uses so the refreshed artifact shows the recalculated

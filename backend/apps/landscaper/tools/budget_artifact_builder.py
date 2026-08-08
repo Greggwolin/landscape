@@ -219,7 +219,11 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
             SELECT f.fact_id, f.category_id, c.category_name,
                    f.uom_code, f.qty, f.rate, f.amount,
                    f.start_date, f.end_date, f.notes,
-                   f.start_period, f.periods_to_complete, f.end_period
+                   f.start_period, f.periods_to_complete, f.end_period,
+                   -- Added for the view specification (budget slice 1). Purely
+                   -- additive: the block-schema builder reads named keys, so
+                   -- extra keys on each record cannot change what it emits.
+                   f.division_id, f.activity, f.internal_memo
             FROM landscape.core_fin_fact_budget f
             LEFT JOIN landscape.core_unit_cost_category c
                 ON f.category_id = c.category_id
@@ -286,6 +290,32 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
     }
 
 
+def build_budget_view_config_for_project(project_id: int) -> Optional[Dict[str, Any]]:
+    """Build the budget artifact's VIEW SPECIFICATION for a project.
+
+    Separate from the block schema on purpose. The block schema is what the
+    generic renderer and the editing spine already consume and must keep
+    working unchanged; the view specification is the settled 31 July design —
+    level chips read from project configuration, detail rungs, grouping,
+    derivation, provenance footer. Both are stored on the same artifact record,
+    so there is one budget surface, not two.
+
+    Returns ``None`` when the project has no budget line items.
+    """
+    data = fetch_budget_schedule_data(project_id)
+    if not data['records']:
+        return None
+    from .schedule_view_spec import build_budget_view_config, fetch_project_levels
+    return build_budget_view_config(
+        project_id=project_id,
+        project_name=data['project_name'],
+        records=data['records'],
+        total_budget=data['total_budget'],
+        lot_count=data['lot_count'],
+        levels=fetch_project_levels(project_id),
+    )
+
+
 def build_budget_schema_for_project(project_id: int) -> Optional[Dict[str, Any]]:
     """Fetch + build the fixed budget-artifact schema for a project.
 
@@ -343,6 +373,33 @@ def create_budget_artifact(
     title = f'{project_name} — Development Budget' if project_name \
         else 'Development Budget'
 
+    # The view specification (budget slice 1) rides alongside the block schema
+    # on the SAME artifact record. The panel prefers it when present and falls
+    # back to the blocks for artifacts saved before this existed — so nothing
+    # regresses and there is never a second budget surface. If building it
+    # fails the artifact still renders the old way; a view that cannot be built
+    # must not take the budget down with it.
+    view_config: Optional[Dict[str, Any]] = None
+    try:
+        from .schedule_view_spec import (
+            build_budget_view_config,
+            fetch_project_levels,
+        )
+        view_config = build_budget_view_config(
+            project_id=project_id,
+            project_name=project_name,
+            records=records,
+            total_budget=total_budget,
+            lot_count=lot_count,
+            levels=fetch_project_levels(project_id),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception('budget_artifact_builder: view specification failed')
+
+    params: Dict[str, Any] = {'server_rendered': True}
+    if view_config:
+        params['budget_view_config'] = view_config
+
     try:
         return create_artifact_record(
             title=title,
@@ -352,7 +409,7 @@ def create_budget_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_budget_schedule',
-            params_json={'server_rendered': True},
+            params_json=params,
             dedup_key='budget:line_item_detail',
             prior_tool_calls=['get_budget_schedule'],
         )
