@@ -12,9 +12,21 @@ name: Preview Environment
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches:
-      - main
-      - work
+    # NO base-branch filter, deliberately (CC15).
+    #
+    # `branches:` filters on the PR's BASE. Restricting it to main/work meant a
+    # STACKED pull request — one opened against another feature branch — ran no
+    # backend tests, no build, no migrations. Only the Vercel checks fired, and
+    # a green-looking PR page said nothing about whether the code compiled.
+    #
+    # That is not theoretical: on 2026-07-30 three stacked PRs (#236 → #237 →
+    # #238) sat open with every backend gate silently skipped, and a real
+    # TypeScript compile failure — four uses of an un-imported type — reached a
+    # PR because its typecheck never ran. It was caught by hand, downstream.
+    #
+    # Every pull request gets gated. A stacked PR is exactly the one most likely
+    # to be merged on the strength of a green check mark nobody looked closely
+    # at, so it is the last place to skip the gates.
 
 env:
   NODE_VERSION: '20'

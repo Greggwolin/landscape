@@ -47,23 +47,52 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-# ── Pre-flight: a stale .git/index.lock blocks every git write. That is exactly
-#    how this job failed unnoticed for 19 days (TB25): git died with a bare
-#    "Unable to create '.git/index.lock'" fatal that the caller swallowed as a
-#    success. Detect it up front and fail LOUDLY and specifically, rather than
-#    let a git write die mid-run with a message nobody surfaces. Runs before the
-#    --dry-run path too, since that also writes the index.
+# ── Pre-flight (both checks below run before the --dry-run path too, since a
+#    dry run also writes the index and can therefore leave a lock behind).
 INDEX_LOCK="$REPO_ROOT/.git/index.lock"
+
+# ── Pre-flight 0: can this environment DELETE inside .git/?
+#    (LSCMD-NIGHTLYLOCK-0808) The Cowork sandbox mounts the host repo in a mode
+#    that permits create but denies unlink inside .git/. Git can therefore make
+#    .git/index.lock and then cannot remove it — poisoning the repo with a lock
+#    only the host can clear. That is the real cause of the 2026-07-31 → 08-07
+#    outage: every nightly run left a fresh lock, and the next run aborted on it.
+#    Probe FIRST, before any git command creates a lock, and refuse to run at all
+#    in an environment that cannot clean up after itself. The probe reuses one
+#    fixed filename so at most a single inert stray file can ever exist.
+UNLINK_PROBE="$REPO_ROOT/.git/.fb304-unlink-probe"
+: > "$UNLINK_PROBE" 2>/dev/null || {
+  echo "FB-304 ABORT: cannot write inside $REPO_ROOT/.git — wrong path or permissions." >&2
+  exit 1
+}
+if ! rm -f "$UNLINK_PROBE" 2>/dev/null || [ -e "$UNLINK_PROBE" ]; then
+  echo "FB-304 ABORT: this environment can CREATE but not DELETE files in .git/." >&2
+  echo "    $REPO_ROOT/.git  (unlink denied — this is the Cowork sandbox mount)" >&2
+  echo "  Running git here would leave an index.lock that only the host can clear," >&2
+  echo "  blocking every future git write. Refusing to run rather than poison the repo." >&2
+  echo "  Run this committer ON THE HOST (Desktop Commander / a real terminal) instead." >&2
+  exit 1
+fi
+
+# ── Pre-flight 1: a stale .git/index.lock blocks every git write. That is exactly
+#    how this job failed unnoticed for 19 days (TB25) and again for 8 nights
+#    (LSCMD-NIGHTLYLOCK-0808). Unlink capability is now proven above, so a lock
+#    with no git process behind it is self-healed here rather than escalated to a
+#    human — an abort that requires a manual `rm` is an outage every time it fires.
 if [ -e "$INDEX_LOCK" ]; then
   if pgrep -x git >/dev/null 2>&1; then
     echo "FB-304 ABORT: $INDEX_LOCK is held by a running git process — not stale." >&2
     echo "  A real git operation is in progress; re-run once it completes." >&2
-  else
-    echo "FB-304 ABORT: stale git index lock is blocking all git writes:" >&2
-    echo "    $INDEX_LOCK  (no git process is running, so this lock is stale)" >&2
-    echo "  Clear it and re-run:  rm -f .git/index.lock" >&2
+    exit 1
   fi
-  exit 1
+  echo "FB-304 committer: clearing a stale git index lock (no git process running):" >&2
+  echo "    $INDEX_LOCK" >&2
+  rm -f "$INDEX_LOCK"
+  if [ -e "$INDEX_LOCK" ]; then
+    echo "FB-304 ABORT: failed to remove the stale lock; git writes remain blocked." >&2
+    exit 1
+  fi
+  echo "FB-304 committer: stale lock cleared; continuing." >&2
 fi
 
 # ── Allowlist: purely-generated artifacts the nightly job legitimately produces.
