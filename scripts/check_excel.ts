@@ -1,8 +1,14 @@
 #!/usr/bin/env tsx
 
+import { join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import * as xlsx from 'xlsx';
 
-const workbook = xlsx.readFile('/Users/5150east/landscape/uploads/Benchmark_UnitCost_Seed.xlsx');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = resolve(__filename, '..');
+const projectRoot = resolve(__dirname, '..');
+
+const workbook = xlsx.readFile(join(projectRoot, 'backend', 'uploads', 'Benchmark_UnitCost_Seed.xlsx'));
 const sheet = workbook.Sheets[workbook.SheetNames[0]!]!;
 const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, raw: true }) as unknown[][];
 
