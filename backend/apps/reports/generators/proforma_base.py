@@ -261,11 +261,17 @@ def build_proforma_model(
     rows: List[Dict[str, Any]] = []
     notes: List[str] = []
 
-    def addrow(label, kind, values=None, indent=0):
+    def addrow(label, kind, values=None, indent=0, total=None):
+        """Add a row. `total` defaults to the sum of the period cells — correct for
+        every flow row. Pass it explicitly for a RUNNING-BALANCE row, where each
+        cell already holds the total to date and summing them is meaningless
+        (PD15 Fix 5 / PD14 Defect A1: the Cumulative row's Total read −$92M on a
+        deal whose closing cumulative is −$41.6M)."""
         vals = values if values is not None else {k: 0.0 for k in order}
         rows.append({
             'label': label, 'kind': kind, 'indent': indent,
-            'values': vals, 'total': sum(vals.values()),
+            'values': vals,
+            'total': sum(vals.values()) if total is None else total,
         })
 
     if not periods or not sections:
@@ -344,7 +350,24 @@ def build_proforma_model(
     for k in order:
         running += net_by_bucket[k]
         cum_vals[k] = running
-    addrow('Cumulative Cash Flow', 'cumulative', cum_vals)
+    # Running balance: the Total IS the closing (final-period) cumulative, not the
+    # sum of the per-period balances. `running` holds exactly that after the loop.
+    # This is the only running-balance row in the proforma family — every other row
+    # (sections, subtotals, Leveraged Cash Flow, Net Sale Reversion) is a per-period
+    # flow whose sum across periods is the correct Total.
+    addrow('Cumulative Cash Flow', 'cumulative', cum_vals,
+           total=(running if order else 0.0))
+
+    # PD15 Fix 6: when the engine floored the exit at zero because terminal income
+    # is negative, say so on the face of the schedule. A bare $0 reversion line
+    # reads as "no sale modeled"; the note says the sale was modeled and produced
+    # nothing to capitalize.
+    _exit = envelope.get('exitAnalysis') or {}
+    if _exit.get('exitNotMeaningful'):
+        notes.append(
+            _exit.get('exitNotMeaningfulReason')
+            or 'Terminal NOI is negative — reversion floored at $0'
+        )
 
     return {'buckets': buckets, 'rows': rows, 'notes': notes, 'empty': False}
 
@@ -485,6 +508,12 @@ def render_proforma_pdf(model: Dict[str, Any], title: str, subtitle: str) -> byt
             elements.append(Spacer(1, 4))
         elements.append(_build_chunk_table(model, chunk, page_w, item_w, total_w, styles))
 
+    # Model-level notes (e.g. the PD15 zero-floored-exit note) print under the
+    # schedule so the PDF carries the same caveat the preview does.
+    for note in model.get('notes') or []:
+        elements.append(Spacer(1, 8))
+        elements.append(Paragraph(f'<i>Note: {note}</i>', styles['left']))
+
     return build_pdf(elements, orientation=orientation)
 
 
@@ -592,7 +621,11 @@ class ProformaReportBase(PreviewBaseGenerator):
         )
         sections = [self.make_kpi_section('Summary', self._kpi_cards(env, summary))]
         sections += proforma_preview_sections(model, heading=self.report_name)
-        for note in self._notes(env):
+        # Model notes first (they describe the numbers just rendered), then any
+        # per-report notes. Reading model['notes'] here rather than in _notes()
+        # means a subclass override (RPT_19) can't accidentally drop the PD15
+        # zero-floored-exit caveat.
+        for note in list(model.get('notes') or []) + list(self._notes(env)):
             sections.append(self.make_text_section('Note', note))
         result['sections'] = sections
         return result

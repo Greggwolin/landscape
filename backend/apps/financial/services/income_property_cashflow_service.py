@@ -24,7 +24,10 @@ from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
 from apps.financial.models_debt import Loan, exclude_dead_loans
-from apps.financial.services.dcf_calculation_service import DCFCalculationService
+from apps.financial.services.dcf_calculation_service import (
+    DCFCalculationService,
+    EXIT_NOT_MEANINGFUL_REASON,
+)
 from apps.calculations.engines.debt_service_engine import (
     DebtServiceEngine,
     TermLoanParams,
@@ -162,6 +165,13 @@ class IncomePropertyCashFlowService:
             'netReversionAfterDebt': round(net_reversion - loan_payoff, 2),
             'holdPeriodMonths': period_count,
         }
+        # PD15 Fix 6: carry the zero-floored-exit flag into the envelope so every
+        # renderer downstream (proforma family, cash-flow artifact) can print the
+        # reason the reversion line reads $0 instead of showing a bare zero.
+        if exit_analysis.get('exit_not_meaningful'):
+            exit_analysis_response['exitNotMeaningful'] = True
+            exit_analysis_response['exitNotMeaningfulReason'] = exit_analysis.get(
+                'exit_not_meaningful_reason') or EXIT_NOT_MEANINGFUL_REASON
 
         return {
             'projectId': self.project_id,

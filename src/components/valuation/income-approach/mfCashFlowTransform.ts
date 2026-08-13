@@ -81,6 +81,9 @@ export interface MFDcfMonthlyApiResponse {
     pv_reversion: number;
     terminal_is_post_reno?: boolean;
     terminal_reno_premium?: number;
+    // PD15 Fix 6 — zero-floored exit on non-positive terminal NOI.
+    exit_not_meaningful?: boolean;
+    exit_not_meaningful_reason?: string;
   };
   terminal_year?: {
     gpr: number;
