@@ -5,8 +5,43 @@ Maps to landscape.tbl_loan and related junction tables.
 """
 
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
 
 from .models_periods import CalculationPeriod
+
+
+# Loan statuses that take a loan OUT of the analysis. Deliberately a denylist,
+# not an allowlist: an unrecognized future status stays IN the calculation and
+# shows up as a visibly wrong number, rather than silently dropping a loan from
+# equity sizing. Compared case-insensitively; NULL status is always included
+# (tbl_loan.status is nullable with DEFAULT 'active').
+DEAD_LOAN_STATUSES = frozenset({
+    'paid_off',
+    'payoff',
+    'closed',
+    'rejected',
+    'cancelled',
+    'denied',
+    'declined',
+    'void',
+})
+
+# Equivalent predicate for raw-SQL readers. Keep in sync with DEAD_LOAN_STATUSES.
+DEAD_LOAN_STATUSES_SQL = "(status IS NULL OR LOWER(status) NOT IN (%s))" % (
+    ', '.join("'%s'" % s for s in sorted(DEAD_LOAN_STATUSES))
+)
+
+
+def exclude_dead_loans(queryset):
+    """Drop loans whose status marks them as no longer part of the deal.
+
+    Use this on every Loan queryset feeding a calculation (equity sizing,
+    debt service, payoff). Display-only readers may show all statuses.
+    """
+    return queryset.annotate(_status_lc=Lower('status')).filter(
+        Q(_status_lc__isnull=True) | ~Q(_status_lc__in=DEAD_LOAN_STATUSES)
+    )
 
 
 class Loan(models.Model):

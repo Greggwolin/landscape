@@ -722,7 +722,10 @@ class BudgetItem(models.Model):
         blank=True,
         help_text='Flexible attributes (assumptions, drivers, etc.)'
     )
-    is_active = models.BooleanField(default=True)
+    # NOTE: core_fin_fact_budget has no is_active column. A field was declared
+    # here and filtered on in several call sites, which made every one of those
+    # queries a ProgrammingError. Do NOT re-add it — the progressive-disclosure
+    # work introduces a separate exclusion mechanism rather than reusing this name.
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=100, null=True, blank=True)
@@ -744,9 +747,7 @@ class BudgetItem(models.Model):
 
     def get_children_total(self):
         """Get sum of all child budget items."""
-        return self.child_items.filter(
-            is_active=True
-        ).aggregate(
+        return self.child_items.aggregate(
             total=models.Sum('budgeted_amount')
         )['total'] or Decimal('0.00')
 
@@ -763,7 +764,6 @@ class BudgetItem(models.Model):
         """
         qs = BudgetItem.objects.filter(
             project=self.project,
-            is_active=True,
             is_rollup=False  # Only sum direct entries, not rollups
         )
 
@@ -899,7 +899,8 @@ class ActualItem(models.Model):
     # Metadata
     notes = models.TextField(null=True, blank=True)
     attributes = models.JSONField(default=dict, blank=True)
-    is_active = models.BooleanField(default=True)
+    # NOTE: core_fin_fact_actual has no is_active column — see the matching
+    # note on BudgetItem. Do not re-add.
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=100, null=True, blank=True)

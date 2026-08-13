@@ -238,11 +238,32 @@ class DCFCalculationService:
                 'relet_lag_months': va_row[10],
             }
 
+    def _active_opex_discriminator(self) -> str:
+        """Resolve the project's active operating-statement scenario.
+
+        tbl_operating_expenses rows are tagged with statement_discriminator
+        (T3_ANNUALIZED / CURRENT_PRO_FORMA / POST_RENO_PRO_FORMA / 'default'
+        / ...). Summing across ALL discriminators double-counts expenses for
+        any project carrying more than one statement, so the opex query in
+        _get_base_data must filter to the active one.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT active_opex_discriminator
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+                LIMIT 1
+            """, [self.project_id])
+            row = cursor.fetchone()
+            return row[0] if row and row[0] else 'default'
+
     def _get_base_data(self) -> Dict[str, Any]:
         """
         Get base data for DCF projections.
         Returns current rents, operating expenses, unit count, etc.
         """
+        discriminator = self._active_opex_discriminator()
+
         with connection.cursor() as cursor:
             # Get property summary
             cursor.execute("""
@@ -304,12 +325,17 @@ class DCFCalculationService:
                 if ut_rent_row:
                     current_annual_rent = float(ut_rent_row[0])
 
-            # Get operating expenses
+            # Get operating expenses — filtered to the project's active
+            # statement scenario. Without this filter a project carrying both
+            # a T-12 and a pro-forma sums BOTH statements into base_opex.
+            # NULL rows are legacy/untagged and always count as part of the
+            # active statement (same pattern as year1_noi_calculator).
             cursor.execute("""
                 SELECT COALESCE(SUM(annual_amount), 0) as total_opex
                 FROM landscape.tbl_operating_expenses
                 WHERE project_id = %s
-            """, [self.project_id])
+                  AND (statement_discriminator = %s OR statement_discriminator IS NULL)
+            """, [self.project_id, discriminator])
             opex_row = cursor.fetchone()
             base_opex = float(opex_row[0]) if opex_row else 0
 
