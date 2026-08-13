@@ -379,8 +379,8 @@ class CalculationService:
             Dictionary with IRR calculation results
         """
         project = Project.objects.get(project_id=project_id)
-        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
-        actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
+        budget_items = BudgetItem.objects.filter(project_id=project_id)
+        actual_items = ActualItem.objects.filter(project_id=project_id)
         
         data = prepare_irr_calculation_data(project, list(budget_items), list(actual_items))
 
@@ -430,7 +430,7 @@ class CalculationService:
             Dictionary with NPV calculation results
         """
         project = Project.objects.get(project_id=project_id)
-        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
+        budget_items = BudgetItem.objects.filter(project_id=project_id)
         
         data = prepare_npv_calculation_data(project, list(budget_items), discount_rate)
 
@@ -479,8 +479,8 @@ class CalculationService:
             Dictionary with all project metrics
         """
         project = Project.objects.get(project_id=project_id)
-        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
-        actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
+        budget_items = BudgetItem.objects.filter(project_id=project_id)
+        actual_items = ActualItem.objects.filter(project_id=project_id)
         
         # Get budget summary
         total_budget = sum(float(item.budgeted_amount or 0) for item in budget_items)
@@ -539,12 +539,12 @@ class CalculationService:
             Dictionary with cash flow projection
         """
         project = Project.objects.get(project_id=project_id)
-        budget_items = BudgetItem.objects.filter(project_id=project_id, is_active=True)
+        budget_items = BudgetItem.objects.filter(project_id=project_id)
         
         cashflows = convert_budget_items_to_cashflows(list(budget_items))
         
         if include_actuals:
-            actual_items = ActualItem.objects.filter(project_id=project_id, is_active=True)
+            actual_items = ActualItem.objects.filter(project_id=project_id)
             for item in actual_items:
                 cashflows.append({
                     'period': item.fiscal_period,

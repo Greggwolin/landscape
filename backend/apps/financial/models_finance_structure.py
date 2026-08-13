@@ -141,7 +141,6 @@ class FinanceStructure(models.Model):
         from .models import BudgetItem
         return BudgetItem.objects.filter(
             finance_structure=self,
-            is_active=True
         ).aggregate(
             total=models.Sum('budgeted_amount')
         )['total'] or Decimal('0.00')

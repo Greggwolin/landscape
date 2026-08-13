@@ -177,7 +177,6 @@ class BudgetItemSerializer(serializers.ModelSerializer):
             # Metadata
             'notes',
             'attributes',
-            'is_active',
             'created_at',
             'updated_at',
             'created_by',
@@ -389,7 +388,6 @@ class ActualItemSerializer(serializers.ModelSerializer):
             'variance_pct',
             'notes',
             'attributes',
-            'is_active',
             'created_at',
             'updated_at',
             'created_by',

@@ -23,7 +23,7 @@ from django.db import connection
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
-from apps.financial.models_debt import Loan
+from apps.financial.models_debt import Loan, exclude_dead_loans
 from apps.financial.services.dcf_calculation_service import DCFCalculationService
 from apps.calculations.engines.debt_service_engine import (
     DebtServiceEngine,
@@ -885,8 +885,9 @@ class IncomePropertyCashFlowService:
 
         closing_pct = self._get_closing_cost_pct(self.project_id)
 
-        # Sum all loan amounts for this project
-        loans = Loan.objects.filter(project_id=self.project_id)
+        # Sum all loan amounts for this project. Loans whose status marks them
+        # as dead (paid off / cancelled / rejected) must not offset equity.
+        loans = exclude_dead_loans(Loan.objects.filter(project_id=self.project_id))
         total_loan = sum(
             (l.loan_amount or l.commitment_amount or Decimal('0'))
             for l in loans
@@ -971,9 +972,11 @@ class IncomePropertyCashFlowService:
         (outstanding balance at the last period for reversion analysis).
         """
         term_loans = list(
-            Loan.objects.filter(
-                project_id=self.project_id,
-                structure_type='TERM',
+            exclude_dead_loans(
+                Loan.objects.filter(
+                    project_id=self.project_id,
+                    structure_type='TERM',
+                )
             )
         )
 
