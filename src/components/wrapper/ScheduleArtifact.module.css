@@ -234,7 +234,10 @@
   font-size: 9.5px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--cui-body-color);
+  /* Column labels sit on the dark boundary band, so they take the light
+     token, not body colour. Applies to every topic that renders through this
+     component — budget, sales, cash flow, rent roll, capitalization. */
+  color: var(--cui-white, #fff);
   font-weight: 600;
   text-align: left;
   padding: 9px 10px;
@@ -254,6 +257,13 @@
 
 .right { text-align: right; }
 .center { text-align: center; }
+
+/* Headers follow their column: numbers right, text left, centred stays centred.
+   `.table thead th` sets text-align:left and outranks a bare `.right`, so the
+   header alignment has to be stated at the same specificity or every label
+   sits left regardless of the data under it. */
+.table thead th.right { text-align: right; }
+.table thead th.center { text-align: center; }
 
 .sectionRow td {
   background: var(--cui-secondary-bg);
@@ -402,4 +412,45 @@
   color: var(--cui-secondary-color);
   border-top: 1px solid var(--cui-border-color);
   background: var(--cui-secondary-bg);
+}
+
+/* Line items sit inboard of their group label, so the grouping reads as a
+   hierarchy rather than a flat list. Standard and Detail rungs only — the
+   Summary rung is already one row per group and has nothing to indent. */
+.tableGrouped tbody tr:not(.sectionRow):not(.subtotalRow):not(.totalRow) td:first-child {
+  padding-left: 26px;
+}
+
+/* A group heading is a control: it opens and closes its lines. */
+.sectionClickable { cursor: pointer; user-select: none; }
+.sectionClickable:hover td { background: var(--cui-tertiary-bg); }
+.sectionClickable:focus-visible { outline: 2px solid var(--cui-primary); outline-offset: -2px; }
+
+.caret {
+  display: inline-block;
+  width: 12px;
+  margin-right: 4px;
+  color: var(--cui-secondary-color);
+}
+
+/* How many lines are inside, so a closed group says what it is hiding. */
+.sectionCount {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+  font-size: 9.5px;
+  letter-spacing: 0;
+}
+
+/* The subtotal sitting on a closed group heading reads as a number, not a label. */
+.sectionRow td.right { font-variant-numeric: tabular-nums; text-transform: none; font-size: 12px; }
+
+/* The hierarchy column. Quieter than the description it sits beside — it is
+   context for the row, not the subject of it. */
+.hier {
+  color: var(--cui-secondary-color);
+  white-space: nowrap;
 }

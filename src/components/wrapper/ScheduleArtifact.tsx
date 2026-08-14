@@ -166,20 +166,21 @@ function formatTimestamp(iso: string): string {
 export function ScheduleArtifact({ config, onClose }: Props) {
   // The view specification, held as state. Chat composes it; these controls
   // tune what came back.
-  const [scope, setScope] = useState<Record<number, number>>({});
+  // A level holds a SET of chosen members, not one. Selecting two villages
+  // means both, and the arithmetic below sums across them.
+  const [scope, setScope] = useState<Record<number, number[]>>({});
   const [rung, setRung] = useState<string>(config.default_rung);
   const [grouping, setGrouping] = useState<string>(config.default_grouping);
   const [extraColumns, setExtraColumns] = useState<string[]>([]);
-  const [showAll, setShowAll] = useState(false);
   const [derivationRow, setDerivationRow] = useState<ScheduleRow | null>(null);
   const [editHint, setEditHint] = useState<string | null>(null);
 
   /* Rows in scope. Scope addresses LEVELS, never names. */
   const visibleRows = useMemo(() => {
-    const picked = Object.entries(scope);
+    const picked = Object.entries(scope).filter(([, ids]) => ids.length > 0);
     if (picked.length === 0) return config.rows;
     return config.rows.filter((row) =>
-      picked.every(([level, divisionId]) => row.scope?.[level] === divisionId));
+      picked.every(([level, ids]) => ids.includes(row.scope?.[level] as number)));
   }, [config.rows, scope]);
 
   /* Level chip rows. A level appears only once the level above it has been
@@ -187,17 +188,18 @@ export function ScheduleArtifact({ config, onClose }: Props) {
    * members of the level across the whole project. */
   const levelRows = useMemo(() => {
     const out: { level: ScheduleLevel; members: ScheduleLevelMember[] }[] = [];
-    let parentId: number | null = null;
+    let parentIds: number[] = [];
     for (let i = 0; i < config.levels.length; i += 1) {
       const level = config.levels[i];
       const members = i === 0
         ? level.members
-        : level.members.filter((m) => m.parent_id === parentId);
+        : level.members.filter((m) => m.parent_id !== null
+            && (parentIds as number[]).includes(m.parent_id));
       if (members.length === 0) break;
       out.push({ level, members });
       const picked = scope[level.level];
-      if (picked === undefined) break;
-      parentId = picked;
+      if (!picked || picked.length === 0) break;
+      parentIds = picked;
     }
     return out;
   }, [config.levels, scope]);
@@ -205,9 +207,11 @@ export function ScheduleArtifact({ config, onClose }: Props) {
   const scopeLabel = useMemo(() => {
     const parts: string[] = [];
     for (const { level, members } of levelRows) {
-      const picked = scope[level.level];
-      const member = members.find((m) => m.id === picked);
-      if (member) parts.push(member.label);
+      const picked = scope[level.level] ?? [];
+      const labels = members
+        .filter((m) => picked.includes(m.id))
+        .map((m) => composeMember(level.label, m.label));
+      if (labels.length) parts.push(labels.join(' + '));
     }
     return parts.join(' · ');
   }, [levelRows, scope]);
@@ -244,6 +248,65 @@ export function ScheduleArtifact({ config, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRows, grouping]);
 
+  /* The hierarchy column — always first, and its contents follow the filter.
+   *
+   * It shows the levels the filter has NOT pinned. Pick one Village and the
+   * Village drops out of the cell (it is in the title now) leaving the Phase;
+   * pin the Phase too and the column disappears entirely, which is the same
+   * rule every other column obeys — anything constant belongs in the title.
+   * Labels come from the project's own configuration, never from a hard-coded
+   * word: level 1 here is called Village even though its members are named
+   * "Area 1".."Area 4", which is exactly the trap this rule exists to avoid.
+   */
+  const HIER_KEY = '__hier';
+
+  /* A member is stored as a number; its name is the level's own label plus that
+   * number. Compose it here so renaming a level in project setup renames every
+   * member with it, and nothing anywhere hard-codes the word. A member with no
+   * number is a real name (a village called "Riverbend") and stands alone. */
+  const composeMember = (levelLabel: string, member: string) =>
+    /\d/.test(member) ? `${levelLabel} ${member}` : member;
+
+  const memberLabel = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const level of config.levels) {
+      for (const m of level.members) {
+        map[`${level.level}:${m.id}`] = composeMember(level.label, m.label);
+      }
+    }
+    return map;
+  }, [config.levels]);
+
+  /* A level is shown when the filter has not narrowed it to a single member. */
+  const openLevels = useMemo(
+    () => config.levels
+      .map((l) => l.level)
+      .filter((lv) => (scope[lv] ?? []).length !== 1),
+    [config.levels, scope],
+  );
+
+  const hierPath = (row: ScheduleRow) => openLevels
+    .map((lv) => memberLabel[`${lv}:${row.scope?.[lv]}`])
+    .filter(Boolean)
+    .join(' \u00b7 ');
+
+  const hierHeader = useMemo(() => {
+    const labels = config.levels
+      .filter((l) => openLevels.includes(l.level))
+      .map((l) => l.label);
+    return labels.join(' \u00b7 ');
+  }, [config.levels, openLevels]);
+
+  /* It earns its place on the same terms as everything else: only if the rows
+   * actually differ on it. */
+  const showHier = useMemo(() => {
+    if (openLevels.length === 0) return false;
+    const seen = new Set(visibleRows.map(hierPath));
+    seen.delete('');
+    return seen.size > 1;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleRows, openLevels, memberLabel]);
+
   /* Which columns earn their place. A column belongs when it VARIES across the
    * visible rows; anything constant is in the title instead. */
   const activeColumns = useMemo(() => {
@@ -251,10 +314,14 @@ export function ScheduleArtifact({ config, onClose }: Props) {
     for (const key of extraColumns) if (!keys.includes(key)) keys.push(key);
     const distinct = (key: string) =>
       new Set(visibleRows.map((r) => String(r.cells[key] ?? ''))).size;
-    return keys
+    const cols = keys
       .filter((key) => {
         // Drop a constant dimension — it is not telling you anything the title
         // is not already telling you.
+        // An explicitly requested column always shows. The constant-drop rule
+        // below is an automatic tidy-up, not a veto over what was asked for —
+        // asking for Stage and getting nothing is indistinguishable from broken.
+        if (extraColumns.includes(key)) return true;
         if ((key === 'category' || key === 'stage') && visibleRows.length > 1) {
           return distinct(key) > 1;
         }
@@ -262,7 +329,13 @@ export function ScheduleArtifact({ config, onClose }: Props) {
       })
       .map((key) => config.columns.find((c) => c.key === key))
       .filter((c): c is ScheduleColumn => Boolean(c));
-  }, [config.columns, config.rung_columns, rung, extraColumns, visibleRows]);
+    if (showHier) {
+      cols.unshift({ key: HIER_KEY, label: hierHeader, align: 'left', kind: 'text' });
+    }
+    return cols;
+     
+  }, [config.columns, config.rung_columns, rung, extraColumns, visibleRows,
+      showHier, hierHeader]);
 
   /* Line rows, grouped into sections with subtotals. */
   const sections = useMemo(() => {
@@ -283,23 +356,17 @@ export function ScheduleArtifact({ config, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRows, grouping, scopeTotal]);
 
-  /* Truncation. Panel width cannot hold thirty lines; expanding shows all. */
   const lineCount = visibleRows.length;
-  const truncated = !showAll && rung !== 'summary' && lineCount > config.truncate_at;
-  const shownSections = useMemo(() => {
-    if (!truncated) return sections;
-    let budget = config.truncate_at;
-    const out: typeof sections = [];
-    for (const section of sections) {
-      if (budget <= 0) break;
-      const rows = section.rows.slice(0, budget);
-      budget -= rows.length;
-      out.push({ ...section, rows });
-    }
-    return out;
-  }, [sections, truncated, config.truncate_at]);
 
-  const shownCount = shownSections.reduce((n, s) => n + s.rows.length, 0);
+  /* Groups collapse. A schedule opens showing its groups and their totals, and
+   * you open the one you want — which is how you read a schedule on paper.
+   * This replaces the old truncate-and-Show-all behaviour: an arbitrary cut at
+   * N rows hid whichever lines happened to fall past the cut, with no way to
+   * tell what was missing or to reach one group without loading everything. */
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggleSection = (label: string) =>
+    setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
+  const isOpen = (label: string) => (label ? expanded[label] === true : true);
 
   /* KPI tiles. They follow the filter, not the whole project — a scoped figure
    * never wears an unscoped label. */
@@ -336,16 +403,20 @@ export function ScheduleArtifact({ config, onClose }: Props) {
 
   const toggleScope = (level: number, id: number) => {
     setScope((prev) => {
-      const next: Record<number, number> = {};
-      // Releasing a level releases every level beneath it — the chip row for a
-      // child level cannot outlive its parent's selection.
+      const next: Record<number, number[]> = {};
+      // Releasing or changing a level releases every level beneath it — the chip
+      // row for a child level cannot outlive its parent's selection, and a new
+      // parent set may not contain the children already picked.
       for (const [key, value] of Object.entries(prev)) {
         if (Number(key) < level) next[Number(key)] = value;
       }
-      if (prev[level] !== id) next[level] = id;
+      const current = prev[level] ?? [];
+      const toggled = current.includes(id)
+        ? current.filter((v) => v !== id)
+        : [...current, id];
+      if (toggled.length > 0) next[level] = toggled;
       return next;
     });
-    setShowAll(false);
   };
 
   const toggleColumn = (key: string) => {
@@ -355,6 +426,9 @@ export function ScheduleArtifact({ config, onClose }: Props) {
   };
 
   const renderCell = (row: ScheduleRow, column: ScheduleColumn) => {
+    if (column.key === HIER_KEY) {
+      return <td key={column.key} className={styles.hier}>{hierPath(row)}</td>;
+    }
     const raw = row.cells[column.key];
     const numeric = column.kind === 'number' || column.kind === 'computed';
     const align = column.align === 'right' ? styles.right
@@ -404,6 +478,11 @@ export function ScheduleArtifact({ config, onClose }: Props) {
   };
 
   const colCount = rung === 'summary' ? 3 : activeColumns.length;
+  /* A total belongs under the numbers it totals. Spanning to the last column
+   * put it under Duration, which reads as a duration. */
+  const amountAt = activeColumns.findIndex((c) => c.key === 'amount');
+  const labelSpan = Math.max(1, amountAt < 0 ? colCount - 1 : amountAt);
+  const trailingSpan = amountAt < 0 ? 0 : colCount - amountAt - 1;
 
   return (
     <div className={styles.root} style={{ position: 'relative' }}>
@@ -450,7 +529,7 @@ export function ScheduleArtifact({ config, onClose }: Props) {
             <button
               type="button"
               key={member.id}
-              className={`${styles.badge}${scope[level.level] === member.id
+              className={`${styles.badge}${(scope[level.level] ?? []).includes(member.id)
                 ? ` ${styles.badgeOn}` : ''}`}
               onClick={() => toggleScope(level.level, member.id)}
             >
@@ -490,7 +569,7 @@ export function ScheduleArtifact({ config, onClose }: Props) {
             type="button"
             key={value}
             className={`${styles.badge}${rung === value ? ` ${styles.badgeOn}` : ''}`}
-            onClick={() => { setRung(value); setShowAll(false); }}
+            onClick={() => setRung(value)}
           >
             {value.charAt(0).toUpperCase() + value.slice(1)}
           </button>
@@ -547,7 +626,7 @@ export function ScheduleArtifact({ config, onClose }: Props) {
             </tbody>
           </table>
         ) : (
-          <table className={styles.table}>
+          <table className={`${styles.table} ${styles.tableGrouped}`}>
             <thead>
               <tr>
                 {activeColumns.map((column) => (
@@ -562,34 +641,61 @@ export function ScheduleArtifact({ config, onClose }: Props) {
               </tr>
             </thead>
             <tbody>
-              {shownSections.map((section) => (
+              {sections.map((section) => {
+                const open = isOpen(section.label);
+                return (
                 <React.Fragment key={section.label || 'all'}>
                   {section.label && (
-                    <tr className={styles.sectionRow}>
-                      <td colSpan={colCount}>{section.label}</td>
+                    <tr
+                      className={`${styles.sectionRow} ${styles.sectionClickable}`}
+                      onClick={() => toggleSection(section.label)}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={open}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleSection(section.label);
+                        }
+                      }}
+                    >
+                      <td colSpan={labelSpan}>
+                        <span className={styles.caret}>{open ? '\u25be' : '\u25b8'}</span>
+                        {section.label}
+                        <span className={styles.sectionCount}>
+                          {section.rows.length}
+                        </span>
+                      </td>
+                      {/* A closed group still shows its number — collapsing
+                          hides the detail, never the total. */}
+                      <td className={styles.right}>{formatNumber(section.subtotal)}</td>
+                      {trailingSpan > 0 && <td colSpan={trailingSpan} />}
                     </tr>
                   )}
-                  {section.rows.map((row) => (
+                  {open && section.rows.map((row) => (
                     <tr key={row.id}>
                       {activeColumns.map((column) => renderCell(row, column))}
                     </tr>
                   ))}
-                  {section.label && !truncated && (
+                  {section.label && open && (
                     <tr className={styles.subtotalRow}>
-                      <td colSpan={Math.max(1, colCount - 1)}>
+                      <td colSpan={labelSpan}>
                         {section.label} subtotal
                       </td>
                       <td className={styles.right}>{formatNumber(section.subtotal)}</td>
+                      {trailingSpan > 0 && <td colSpan={trailingSpan} />}
                     </tr>
                   )}
                 </React.Fragment>
-              ))}
-              {!truncated && (
+                );
+              })}
+              {(
                 <tr className={styles.totalRow}>
-                  <td colSpan={Math.max(1, colCount - 1)}>
+                  <td colSpan={labelSpan}>
                     {isScoped ? `${scopeLabel} total` : 'Total'}
                   </td>
                   <td className={styles.right}>{formatNumber(scopeTotal)}</td>
+                  {trailingSpan > 0 && <td colSpan={trailingSpan} />}
                 </tr>
               )}
             </tbody>
@@ -597,14 +703,6 @@ export function ScheduleArtifact({ config, onClose }: Props) {
         )}
       </div>
 
-      {truncated && (
-        <div className={styles.trunc}>
-          <span>Showing {shownCount} of {lineCount} line items</span>
-          <button type="button" className={styles.btn} onClick={() => setShowAll(true)}>
-            Show all
-          </button>
-        </div>
-      )}
 
       {editHint && <div className={styles.hint}>{editHint}</div>}
 

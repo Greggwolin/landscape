@@ -51,6 +51,7 @@ engine or it waits.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -70,6 +71,26 @@ def _num(value: Any) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+
+_LEADING_WORDS = re.compile(r'^[A-Za-z][A-Za-z\s&/\-]*?\s*(?=[\d])')
+
+
+def _member_number(display_name: Optional[str], code: Optional[str],
+                   division_id: int) -> str:
+    """The member's identifier, with any baked-in level name removed.
+
+    ``Area 1`` -> ``1`` · ``Parcel 1.101`` -> ``1.101`` · ``1.1`` -> ``1.1``
+
+    A name with no digits at all is a genuine name rather than a numbered
+    member (someone called a village "Riverbend"), and is returned untouched.
+    """
+    raw = (display_name or '').strip()
+    if raw:
+        stripped = _LEADING_WORDS.sub('', raw).strip()
+        return stripped or raw
+    return (code or f'#{division_id}').strip()
 
 
 def fetch_project_levels(project_id: int) -> List[Dict[str, Any]]:
@@ -112,7 +133,18 @@ def fetch_project_levels(project_id: int) -> List[Dict[str, Any]]:
             {
                 'id': row[0],
                 'tier': row[1],
-                'label': row[2] or row[3] or f'#{row[0]}',
+                # A member is a NUMBER. Its name is composed at render time from
+                # the level's own label plus that number, which is what makes
+                # renaming a level in project setup rename every member with it.
+                #
+                # `display_name` cannot be trusted for this: it holds a string
+                # baked when the row was created, so project 9's level-1 members
+                # read "Area 1".."Area 4" under a level the user has since named
+                # "Village", and its level-3 members read "Parcel 1.101" under a
+                # level already called Parcel. Level 2 escaped only because its
+                # stored value happens to be the bare number. Strip any leading
+                # words and keep the identifier.
+                'label': _member_number(row[2], row[3], row[0]),
                 'parent_id': row[4],
             }
             for row in cursor.fetchall()
