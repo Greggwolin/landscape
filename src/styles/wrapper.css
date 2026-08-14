@@ -2980,3 +2980,109 @@
  * shell convention (chat panel is always dark — see --w-panel-bg comment
  * above). So the tile text/contrasts inside the panel stay tuned for a
  * dark background regardless of theme. */
+
+/* ── Plan stage card ────────────────────────────────────────────────────────
+   Shown on a document that intake read as a drawing. Its job is to state what
+   the drawing is, show what led to that reading, and carry the confirmation —
+   nothing is measured from a drawing until a person has confirmed it.
+   Theme tokens only; inherits dark mode from the wrapper shell.            */
+
+.w-plan-card {
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--w-border);
+  border-radius: 6px;
+  background: var(--w-bg-surface);
+}
+
+.w-plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.w-plan-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--w-text-tertiary);
+}
+
+/* The one thing worth seeing from across the room: may this be priced from? */
+.w-plan-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.w-plan-badge.is-measurable {
+  color: var(--cui-success, #2e7d32);
+  border-color: var(--cui-success, #2e7d32);
+}
+
+.w-plan-badge.is-approximate {
+  color: var(--cui-warning, #b26a00);
+  border-color: var(--cui-warning, #b26a00);
+}
+
+.w-plan-card-read {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--w-text-primary);
+}
+
+.w-plan-card-evidence {
+  margin: 0 0 8px;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--w-text-secondary);
+}
+
+.w-plan-card-ask {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--w-text-secondary);
+}
+
+.w-plan-card-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.w-plan-card-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 3px 6px;
+  font-size: 13px;
+  color: var(--w-text-primary);
+  background: var(--w-bg-input);
+  border: 1px solid var(--w-border);
+  border-radius: 4px;
+}
+
+.w-plan-card-select:focus {
+  outline: none;
+  border-color: var(--w-border-hover);
+}
+
+.w-plan-card-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--w-text-secondary);
+}
+
+.w-plan-card-error {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--cui-danger, #c62828);
+}

@@ -195,8 +195,21 @@ export const dmsDb = {
       throw new Error(`Document ${docId} not found`);
     }
 
-    const oldProfile = currentDoc[0].profile_json;
-    
+    const oldProfile = (currentDoc[0].profile_json ?? {}) as Record<string, any>;
+
+    // Merge, do not replace.
+    //
+    // Callers send only the keys they own — the profile form sends its six
+    // fields and nothing else — so writing `newProfile` straight over the
+    // column silently deleted everything else stored there. That is how a
+    // plan document's stage reading disappeared the first time anyone edited
+    // that document's profile.
+    //
+    // Clearing a field still works: the form always sends its own keys, so an
+    // emptied field arrives as an empty value and overwrites. Only keys the
+    // caller never mentioned survive, which is the intent.
+    const mergedProfile = { ...oldProfile, ...newProfile };
+
     // Determine changed fields
     const changedFields: string[] = [];
     for (const key in newProfile) {
@@ -213,7 +226,7 @@ export const dmsDb = {
     const updatedDoc = newDocType
       ? await sql`
           UPDATE landscape.core_doc
-          SET profile_json = ${JSON.stringify(newProfile)},
+          SET profile_json = ${JSON.stringify(mergedProfile)},
               doc_type = ${newDocType},
               updated_by = ${changedBy || null},
               updated_at = NOW()
@@ -222,7 +235,7 @@ export const dmsDb = {
         `
       : await sql`
           UPDATE landscape.core_doc
-          SET profile_json = ${JSON.stringify(newProfile)},
+          SET profile_json = ${JSON.stringify(mergedProfile)},
               updated_by = ${changedBy || null},
               updated_at = NOW()
           WHERE doc_id = ${docId}
@@ -233,12 +246,12 @@ export const dmsDb = {
     if (changedFields.length > 0) {
       await sql`
         INSERT INTO landscape.dms_profile_audit (
-          doc_id, changed_by, change_type, old_profile_json, 
+          doc_id, changed_by, change_type, old_profile_json,
           new_profile_json, changed_fields, change_reason
         )
         VALUES (
           ${docId}, ${changedBy || null}, 'profile_update',
-          ${JSON.stringify(oldProfile)}, ${JSON.stringify(newProfile)},
+          ${JSON.stringify(oldProfile)}, ${JSON.stringify(mergedProfile)},
           ${changedFields}, ${changeReason || null}
         )
       `;
