@@ -284,7 +284,8 @@
 .table th {
   /* Header row per tabular formatting standard: bold, with a thin black
      bottom border separating headers from data. */
-  padding: 8px 12px;
+  /* PD28 Fix 1 (item 3): compact density, Loan Card scale. */
+  padding: 4px 10px;
   text-align: left;
   font-size: 12px;
   font-weight: 700;
@@ -299,7 +300,8 @@
 }
 
 .table td {
-  padding: 6px 12px;
+  /* PD28 Fix 1 (item 3): was 6px 12px — line-item rows read too tall. */
+  padding: 2px 10px;
   border-bottom: 0;
   white-space: nowrap;
   vertical-align: middle;
@@ -386,8 +388,10 @@
    Numeric cells are bold (they're acting as column headers in this row);
    the label cell is regular weight. */
 .sectionDividerRow td {
-  padding-top: 12px;
-  padding-bottom: 4px;
+  /* PD28 Fix 1 (item 3): keep the breathing room ABOVE a section (it is the
+     visual separator) but tighten it; was 12px/4px. */
+  padding-top: 8px;
+  padding-bottom: 2px;
   font-size: 13px;
 }
 
@@ -427,8 +431,9 @@
    border, small top padding. Indent applied via .depth1. */
 .subsectionRow td {
   font-weight: 400;
-  padding-top: 6px;
-  padding-bottom: 2px;
+  /* PD28 Fix 1 (item 3): was 6px/2px. */
+  padding-top: 4px;
+  padding-bottom: 1px;
 }
 
 /* Indent depths — applied to the label column. When the table has a drift

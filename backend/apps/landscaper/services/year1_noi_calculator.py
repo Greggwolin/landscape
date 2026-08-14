@@ -252,9 +252,10 @@ class Year1BuyerNOICalculator:
             if unit_count == 0 or monthly_rent == 0:
                 cursor.execute("""
                     SELECT
-                        COALESCE(SUM(COALESCE(unit_count, total_units, 0)), 0) as unit_count,
-                        COALESCE(SUM(COALESCE(unit_count, total_units, 0) * COALESCE(avg_square_feet, 0)), 0) as total_sf,
-                        COALESCE(SUM(COALESCE(unit_count, total_units, 0) * COALESCE(current_market_rent, market_rent, 0)), 0) as total_monthly_rent
+                        -- PD28 Fix 3: total_units is canonical; unit_count is deprecated.
+                        COALESCE(SUM(COALESCE(total_units, 0)), 0) as unit_count,
+                        COALESCE(SUM(COALESCE(total_units, 0) * COALESCE(avg_square_feet, 0)), 0) as total_sf,
+                        COALESCE(SUM(COALESCE(total_units, 0) * COALESCE(current_market_rent, market_rent, 0)), 0) as total_monthly_rent
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [self.project_id])
