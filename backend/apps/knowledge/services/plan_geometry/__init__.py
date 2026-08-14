@@ -34,7 +34,24 @@ from .plat_vector import (
 )
 from .lot_match import MatchedLot, LotMatchResult, match_lots
 
+from .plan_classify import (
+    PLAN_DOC_TYPE,
+    PlanVerdict,
+    classify_plan,
+    is_plan_document,
+)
+from .intake import (
+    AWAITING_OCR,
+    PlanIntake,
+    apply_to_document,
+    inspect_upload,
+    verdict_to_profile,
+)
+
 __all__ = [
+    "PLAN_DOC_TYPE", "PlanVerdict", "classify_plan", "is_plan_document",
+    "AWAITING_OCR", "PlanIntake", "apply_to_document", "inspect_upload",
+    "verdict_to_profile",
     "PlanStage",
     "TRUST_FOR_MONEY",
     "SitePlanSegmenter",

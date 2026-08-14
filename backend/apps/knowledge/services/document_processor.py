@@ -15,6 +15,7 @@ from django.db import connection, transaction
 from .text_extraction import extract_text_from_url
 from .chunking import chunk_document_with_sections
 from .embedding_storage import store_embedding
+from .plan_geometry.intake import AWAITING_OCR, apply_to_document, inspect_upload
 from ..models import KnowledgeEmbedding
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,10 @@ class DocumentProcessor:
 
             if status == 'extracting':
                 updates.append("processing_started_at = NOW()")
-            elif status in ('ready', 'failed', 'skipped'):
+            elif status in ('ready', 'failed', 'skipped', AWAITING_OCR):
+                # awaiting_ocr is terminal for this run: the pipeline has done
+                # everything it can until OCR exists. Leaving completed_at null
+                # would leave the document reading as perpetually in progress.
                 updates.append("processing_completed_at = NOW()")
 
             if error:
@@ -121,8 +125,42 @@ class DocumentProcessor:
             self._update_status(doc_id, 'extracting')
 
             extracted_text, extract_error = extract_text_from_url(storage_uri, mime_type)
+            extraction_failed = bool(extract_error or not extracted_text)
 
-            if extract_error or not extracted_text:
+            # === STEP 1b: Is this a drawing? ===
+            # Nothing upstream of here knows what a plan is. auto_classify_document
+            # runs only on the knowledge-library route, so on a project upload the
+            # type is whatever the user picked in the tray. This step fires for
+            # every upload whichever route it came in by, so it is where a drawing
+            # gets recognised and its stage read.
+            intake = inspect_upload(
+                doc_name=doc_name or '',
+                extracted_text=extracted_text or '',
+                extraction_failed=extraction_failed,
+            )
+            if intake.is_plan:
+                with connection.cursor() as cursor:
+                    apply_to_document(cursor, doc_id, intake)
+                if intake.doc_type:
+                    # Keep the chunk and embedding tags in step with the row we
+                    # just rewrote, so the document and its chunks agree on type.
+                    doc_type = intake.doc_type
+
+            if extraction_failed:
+                # A plan with no text layer is not a bad document — it is a scan,
+                # which is the ordinary case for a plat rather than an edge case.
+                # Parking it as awaiting_ocr instead of failed is the difference
+                # between someone looking at it again and nobody ever doing so.
+                if intake.is_plan:
+                    logger.info(
+                        f"[doc_id={doc_id}] plan with no readable text layer "
+                        f"-> {AWAITING_OCR}"
+                    )
+                    self._update_status(doc_id, AWAITING_OCR, intake.message)
+                    result['status'] = AWAITING_OCR
+                    result['error'] = intake.message
+                    return result
+
                 error_msg = extract_error or 'No text extracted'
                 logger.warning(f"[doc_id={doc_id}] Extraction failed: {error_msg}")
                 self._update_status(doc_id, 'failed', error_msg)
