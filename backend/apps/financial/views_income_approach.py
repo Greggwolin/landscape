@@ -98,12 +98,14 @@ def _get_income_approach_data(project_id: int) -> dict:
                 unit_count = int(mf_row[0])
                 total_sf = float(mf_row[1])
 
-        # Fallback to unit types
+        # Fallback to unit types.
+        # PD28 Fix 3: total_units is canonical (see dcf_calculation_service).
+        # unit_count is deprecated and NULL on 119 rows across 23 projects.
         if unit_count == 0:
             cursor.execute("""
                 SELECT
-                    COALESCE(SUM(unit_count), 0)::int as unit_count,
-                    COALESCE(SUM(unit_count * avg_square_feet), 0)::numeric as total_sf
+                    COALESCE(SUM(total_units), 0)::int as unit_count,
+                    COALESCE(SUM(total_units * avg_square_feet), 0)::numeric as total_sf
                 FROM landscape.tbl_multifamily_unit_type
                 WHERE project_id = %s
             """, [project_id])
@@ -142,9 +144,10 @@ def _get_income_approach_data(project_id: int) -> dict:
         if t12_gpr == 0 and forward_gpr == 0:
             cursor.execute("""
                 SELECT
-                    COALESCE(SUM(unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as t12_gpr,
-                    COALESCE(SUM(unit_count * COALESCE(market_rent, current_market_rent, current_rent_avg, 0)), 0) * 12 as forward_gpr,
-                    COALESCE(SUM(unit_count), 0) as unit_count
+                    -- PD28 Fix 3: total_units is canonical; unit_count is deprecated.
+                    COALESCE(SUM(total_units * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as t12_gpr,
+                    COALESCE(SUM(total_units * COALESCE(market_rent, current_market_rent, current_rent_avg, 0)), 0) * 12 as forward_gpr,
+                    COALESCE(SUM(total_units), 0) as unit_count
                 FROM landscape.tbl_multifamily_unit_type
                 WHERE project_id = %s
             """, [project_id])
@@ -160,12 +163,13 @@ def _get_income_approach_data(project_id: int) -> dict:
             SELECT
                 unit_type_code as line_item_key,
                 unit_type_name as label,
-                unit_count,
+                -- PD28 Fix 3: total_units is canonical; unit_count is deprecated.
+                total_units as unit_count,
                 avg_square_feet,
                 COALESCE(current_rent_avg, current_market_rent, market_rent, 0) as current_rent,
                 COALESCE(market_rent, current_market_rent, current_rent_avg, 0) as market_rent,
-                (unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0) * 12) as current_annual,
-                (unit_count * COALESCE(market_rent, current_market_rent, current_rent_avg, 0) * 12) as market_annual
+                (total_units * COALESCE(current_rent_avg, current_market_rent, market_rent, 0) * 12) as current_annual,
+                (total_units * COALESCE(market_rent, current_market_rent, current_rent_avg, 0) * 12) as market_annual
             FROM landscape.tbl_multifamily_unit_type
             WHERE project_id = %s
             ORDER BY unit_type_code

@@ -784,49 +784,50 @@ function TableBlockRenderer({
   const staging = useContext(StagingContext);
   const hasAnySourceRefs = block.rows.some((r) => Boolean(r.source_ref || r.cell_source_refs));
 
-  // When the table has section_divider rows, those rows act as inline
-  // section headers — the section name goes in col 0, the column labels
-  // (Annual / $/Unit / etc.) go in the numeric cells of that same row.
-  // The standalone <thead> column header row is suppressed in that case
-  // because its labels are now embedded in each section_divider row.
-  const hasSectionDividers = block.rows.some(
-    (r) => classifyRow(r, block.columns) === 'section_divider',
-  );
-
+  // PD28 Fix 1 (Gregg's PD31 markup, items 1 + 2): the column labels ALWAYS
+  // render in a real <thead> at the top of the table.
+  //
+  // Previously the <thead> was suppressed whenever ANY section_divider row
+  // existed, and the labels were embedded in the FIRST such row instead. On a
+  // statement whose income lines precede the first label-only row — the
+  // "Cash Flow — Annual" artifact (RPT_18) — that put "Total / 2026 / 2027…"
+  // mid-table on the OPERATING EXPENSES divider, with nothing above the income
+  // section at all. Gregg read the 10-year Total column as year one, which is
+  // exactly the misread that render invites.
+  //
+  // Consequence, and the point of item 2: section_divider rows now have ONE
+  // treatment everywhere — section name in col 0, blank numeric cells — instead
+  // of the first one looking different from all the others.
   return (
     <div className={styles.tableWrap}>
       {block.title && <div className={styles.tableTitle}>{block.title}</div>}
       <table className={styles.table}>
-        {!hasSectionDividers && (
-          <thead>
-            <tr>
-              {hasAnySourceRefs && <th className={styles.driftCell} aria-label="drift" />}
-              {block.columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={alignClass(col.align)}
-                  // size: undefined per CLAUDE.md tabular formatting rules
-                >
-                  {_renderTwoLineHeader(col.label)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-        )}
+        <thead>
+          <tr>
+            {hasAnySourceRefs && <th className={styles.driftCell} aria-label="drift" />}
+            {block.columns.map((col) => (
+              <th
+                key={col.key}
+                className={alignClass(col.align)}
+                // size: undefined per CLAUDE.md tabular formatting rules
+              >
+                {_renderTwoLineHeader(col.label)}
+              </th>
+            ))}
+          </tr>
+        </thead>
         <tbody>
           {(() => {
             // Stateful pass over rows so line-item depth depends on whether
             // we're currently inside a subsection. Section dividers and
             // subtotals/totals reset the subsection context.
             //
-            // `firstSectionDividerSeen` controls column-label rendering on
-            // section_divider rows. Only the first one shows column labels
-            // (Annual / $/Unit) in its numeric cells — subsequent section
-            // dividers (e.g., Operating Expenses after Income) show only
-            // the section name with blank numeric cells, so the column
-            // labels don't repeat down the artifact.
+            // PD28 Fix 1: column labels live in the <thead> above, so EVERY
+            // section_divider renders the same way — section name in col 0,
+            // blank numeric cells. The old first-divider-is-special branch is
+            // gone; nothing about a divider's appearance depends on its
+            // position in the table any more.
             let inSubsection = false;
-            let firstSectionDividerSeen = false;
             return block.rows.map((row, rIdx) => {
               const rowPath = [...blockPath, 'rows', String(rIdx)];
               const rowPathStr = rowPath.join('/');
@@ -837,7 +838,6 @@ function TableBlockRenderer({
 
               const kind = classifyRow(row, block.columns);
               let depth = 0;
-              const isFirstSectionDivider = kind === 'section_divider' && !firstSectionDividerSeen;
               switch (kind) {
                 case 'section_divider':
                 case 'subtotal':
@@ -853,15 +853,12 @@ function TableBlockRenderer({
                   depth = inSubsection ? 2 : 1;
                   break;
               }
-              if (kind === 'section_divider') {
-                firstSectionDividerSeen = true;
-              }
-
               const rowClass = [
+                // Every divider gets both classes: sectionDividerNoHeader is
+                // what blanks the numeric cells and drops the underline, and
+                // it now applies uniformly (PD28 Fix 1, item 2).
                 kind === 'section_divider' ? styles.sectionDividerRow : '',
-                kind === 'section_divider' && !isFirstSectionDivider
-                  ? styles.sectionDividerNoHeader
-                  : '',
+                kind === 'section_divider' ? styles.sectionDividerNoHeader : '',
                 kind === 'subsection' ? styles.subsectionRow : '',
                 kind === 'subtotal' ? styles.subtotalRow : '',
                 kind === 'grand_total' ? styles.grandTotalRow : '',
@@ -897,21 +894,18 @@ function TableBlockRenderer({
                   const cellPath = [...rowPath, 'cells', col.key];
                   const isLabelCol = col.key === labelKey;
 
-                  // Section divider rows: label cell shows section name.
-                  // Numeric cells show column labels (Annual / $/Unit) ONLY
-                  // on the FIRST section_divider — subsequent ones leave
-                  // numeric cells blank so the column header doesn't repeat
-                  // down the artifact. `isFirstSectionDivider` was captured
-                  // BEFORE flipping the flag earlier in this row's pass.
+                  // Section divider rows: label cell shows the section name;
+                  // numeric cells are always blank. PD28 Fix 1 — the column
+                  // labels now live in the <thead> at the top of the table, so
+                  // no divider carries them and every divider looks the same
+                  // regardless of where it falls in the row order.
                   if (kind === 'section_divider') {
                     return (
                       <td
                         key={col.key}
                         className={alignClass(col.align)}
                       >
-                        {isLabelCol
-                          ? cellValue ?? ''
-                          : isFirstSectionDivider ? col.label : ''}
+                        {isLabelCol ? cellValue ?? '' : ''}
                       </td>
                     );
                   }

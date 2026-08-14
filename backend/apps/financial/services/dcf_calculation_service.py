@@ -316,12 +316,19 @@ class DCFCalculationService:
                     unit_count = int(mf_row[0])
                     total_sf = float(mf_row[1])
 
-            # Fallback to unit types
+            # Fallback to unit types.
+            # PD28 Fix 3: reads total_units, NOT unit_count. tbl_multifamily_unit_type
+            # carries both; total_units is the canonical one (populated on every row
+            # of every project, and what the extraction writes and the rent-roll
+            # artifact displays), while unit_count is NULL on 119 rows across 23
+            # projects. Summing the NULL column returned 0 units and, below, $0 of
+            # income on a property with fully populated rents — the Lynn Villa
+            # zero-income bug. unit_count is deprecated; do not read it here again.
             if unit_count == 0:
                 cursor.execute("""
                     SELECT
-                        COALESCE(SUM(unit_count), 0)::int as unit_count,
-                        COALESCE(SUM(unit_count * avg_square_feet), 0)::numeric as total_sf
+                        COALESCE(SUM(total_units), 0)::int as unit_count,
+                        COALESCE(SUM(total_units * avg_square_feet), 0)::numeric as total_sf
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [self.project_id])
@@ -342,7 +349,7 @@ class DCFCalculationService:
             # Fallback to unit types (floor plan matrix)
             if current_annual_rent == 0:
                 cursor.execute("""
-                    SELECT COALESCE(SUM(unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as annual_rent
+                    SELECT COALESCE(SUM(total_units * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as annual_rent
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [self.project_id])
