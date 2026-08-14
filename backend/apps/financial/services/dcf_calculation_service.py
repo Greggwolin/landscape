@@ -31,6 +31,31 @@ from apps.projects.models import Project
 from .income_approach_service import IncomeApproachDataService
 
 
+# PD15 Fix 6 (PD14 Defect A2) — a deal whose terminal year loses money has no
+# meaningful capitalized exit. Dividing a negative NOI by a positive cap rate
+# produced a large NEGATIVE reversion (Lynn Villa: −$31M) that the model then
+# reported as a sale price, and selling costs were charged on it as well. Per
+# Gregg's ruling the exit is floored at zero and the result carries a flag so
+# every renderer can say WHY the line reads $0 instead of silently showing it.
+EXIT_NOT_MEANINGFUL_REASON = 'Terminal NOI is negative — reversion floored at $0'
+
+
+def _exit_value_or_floor(terminal_noi: float, cap_rate: float) -> tuple:
+    """Capitalized terminal value, floored at zero when terminal income is
+    non-positive.
+
+    Returns ``(exit_value, exit_not_meaningful)``. For a POSITIVE terminal NOI the
+    returned value is the identical expression used before this guard existed
+    (``terminal_noi / cap_rate`` when the cap rate is positive, else 0), so
+    positive-NOI behaviour is unchanged. Each call site keeps its own
+    selling-cost arithmetic — a zero exit value carries zero selling costs and a
+    zero net reversion through either formulation.
+    """
+    if terminal_noi <= 0:
+        return 0.0, True
+    return (terminal_noi / cap_rate if cap_rate > 0 else 0.0), False
+
+
 def build_renovation_schedule(
     total_units: int,
     avg_unit_sf: float,
@@ -468,7 +493,8 @@ class DCFCalculationService:
         terminal_total_opex = terminal_base_opex + terminal_mgmt_fee + terminal_reserves
 
         terminal_noi = terminal_egi - terminal_total_opex
-        exit_value = terminal_noi / terminal_cap_rate if terminal_cap_rate > 0 else 0
+        # PD15 Fix 6: non-positive terminal NOI → no meaningful capitalized exit.
+        exit_value, exit_not_meaningful = _exit_value_or_floor(terminal_noi, terminal_cap_rate)
         selling_costs = exit_value * selling_costs_pct
         net_reversion = exit_value - selling_costs
 
@@ -482,7 +508,10 @@ class DCFCalculationService:
             'selling_costs': round(selling_costs, 2),
             'net_reversion': round(net_reversion, 2),
             'pv_reversion': round(pv_reversion, 2),
+            'exit_not_meaningful': exit_not_meaningful,
         }
+        if exit_not_meaningful:
+            exit_analysis['exit_not_meaningful_reason'] = EXIT_NOT_MEANINGFUL_REASON
 
         # Calculate present value (sum of all discounted cash flows)
         pv_of_noi = sum(p['pv_noi'] for p in projections)
@@ -661,8 +690,11 @@ class DCFCalculationService:
             for year, noi in enumerate(noi_series)
         )
 
-        # Terminal value (pre-computed terminal NOI)
-        exit_value = terminal_noi / exit_cap_rate if exit_cap_rate > 0 else 0
+        # Terminal value (pre-computed terminal NOI). PD15 Fix 6: floored at zero
+        # when terminal income is non-positive, so every cell of the sensitivity
+        # matrix shows the PV of the NOI strip alone rather than a grid of
+        # negative "sale prices" that vary with the cap rate.
+        exit_value, _ = _exit_value_or_floor(terminal_noi, exit_cap_rate)
         net_reversion = exit_value * (1 - selling_costs_pct)
 
         # PV of reversion
@@ -879,7 +911,9 @@ class DCFCalculationService:
         # Value-add context for response
         terminal_is_post_reno = reno_schedule is not None
 
-        exit_value = terminal_annual_noi / terminal_cap_rate if terminal_cap_rate > 0 else 0
+        # PD15 Fix 6: non-positive terminal NOI → no meaningful capitalized exit.
+        exit_value, exit_not_meaningful = _exit_value_or_floor(
+            terminal_annual_noi, terminal_cap_rate)
         selling_costs = exit_value * selling_costs_pct
         net_reversion = exit_value - selling_costs
 
@@ -893,7 +927,10 @@ class DCFCalculationService:
             'selling_costs': round(selling_costs, 2),
             'net_reversion': round(net_reversion, 2),
             'pv_reversion': round(pv_reversion, 2),
+            'exit_not_meaningful': exit_not_meaningful,
         }
+        if exit_not_meaningful:
+            exit_analysis['exit_not_meaningful_reason'] = EXIT_NOT_MEANINGFUL_REASON
 
         # Terminal year line-item breakdown for frontend Year N+1 column
         terminal_year = {

@@ -9085,6 +9085,7 @@ def handle_get_cashflow_schedule(
             property_type=data['property_type'],
             dcf_row=data['dcf_row'],
             growth_set_names=data['growth_set_names'],
+            exit_note=data.get('exit_note'),  # PD15 Fix 6
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
         )
@@ -16196,19 +16197,41 @@ def _select_document_id_for_request(
 
     return best_doc_id
 
+# PD15 Fix 3 — the document status vocabulary, read from live data 2026-08-13.
+# core_doc.status ∈ {draft, processing, indexed}; dms_extract_queue.status ∈
+# {pending, completed, failed}. There is NO 'active' or 'archived' status — a
+# document leaves the library through core_doc.deleted_at, nothing else.
+#
+# The trap this closes (PD14 turn 1): status_filter was applied to q.status
+# unconditionally, so a plausible guess like 'active' — or ANY core_doc status —
+# produced `q.status = 'active'`, zero rows, and the model concluded the project
+# had no documents on file. Now the filter is routed to the column that actually
+# owns the value, an unrecognized value degrades to "no filter" with a note
+# instead of a silent empty list, and soft-deleted rows are excluded.
+_DOC_STATUS_VALUES = ('draft', 'processing', 'indexed')
+_EXTRACTION_STATUS_VALUES = ('pending', 'completed', 'failed')
+# Umbrella values: every live (non-deleted) document, whatever its status.
+_ALL_DOCUMENTS_FILTERS = ('all', 'active')
+
+
 def get_project_documents(
     project_id: int,
     status_filter: str = "all"
 ) -> Dict[str, Any]:
     """
-    List all documents uploaded to a project.
+    List all documents uploaded to a project. Soft-deleted documents are excluded.
 
     Prioritizes documents with 'completed' extraction status (readable content).
     Deduplicates by document name, keeping the version with best extraction status.
 
     Args:
         project_id: Project ID to list documents for
-        status_filter: Optional filter: 'indexed', 'pending', 'failed', or 'all'
+        status_filter: One of —
+            'all' / 'active'                     → every live document (default)
+            'draft' | 'processing' | 'indexed'   → core_doc.status
+            'pending' | 'completed' | 'failed'   → extraction (dms_extract_queue) status
+            Anything else is ignored (all live documents are returned) and reported
+            back in `filter_ignored` rather than silently returning zero rows.
 
     Returns:
         Dict with documents list and count, sorted by readiness for extraction
@@ -16241,12 +16264,28 @@ def get_project_documents(
                 FROM landscape.core_doc d
                 LEFT JOIN landscape.dms_extract_queue q ON q.doc_id = d.doc_id
                 WHERE d.project_id = %s
+                  AND d.deleted_at IS NULL
             """
             params = [project_id]
 
-            if status_filter != "all":
+            requested = (status_filter or 'all').strip().lower()
+            filter_ignored = None
+            if requested in _ALL_DOCUMENTS_FILTERS:
+                pass  # umbrella: every live document
+            elif requested in _DOC_STATUS_VALUES:
+                query += " AND d.status = %s"
+                params.append(requested)
+            elif requested in _EXTRACTION_STATUS_VALUES:
                 query += " AND q.status = %s"
-                params.append(status_filter)
+                params.append(requested)
+            else:
+                # Never answer a guessed filter with a silent empty list — that is
+                # what made the model report "no documents on file" (PD14 turn 1).
+                filter_ignored = (
+                    f"status_filter={status_filter!r} is not a recognized value; "
+                    f"returned ALL live documents instead. Valid values: "
+                    f"{', '.join(_ALL_DOCUMENTS_FILTERS + _DOC_STATUS_VALUES + _EXTRACTION_STATUS_VALUES)}."
+                )
 
             # Order by priority first (completed docs first), then by date
             query += " ORDER BY priority ASC, d.created_at DESC LIMIT 100"
@@ -16297,12 +16336,21 @@ def get_project_documents(
         # Sort final list: recommended first, then by embedding count
         documents.sort(key=lambda x: (not x.get('recommended', False), -x.get('embedding_count', 0)))
 
-        return {
+        message = (
+            f"Found {len(documents)} unique documents. Documents marked 'recommended' "
+            "have completed extraction and are ready for content reading."
+        )
+        result = {
             'success': True,
             'documents': documents,
             'count': len(documents),
-            'message': f"Found {len(documents)} unique documents. Documents marked 'recommended' have completed extraction and are ready for content reading."
+            'status_filter_applied': requested,
+            'message': message,
         }
+        if filter_ignored:
+            result['filter_ignored'] = filter_ignored
+            result['message'] = f"{message} NOTE: {filter_ignored}"
+        return result
 
     except Exception as e:
         logger.error(f"Error getting project documents: {e}")

@@ -426,6 +426,13 @@ export interface DCFExitAnalysis {
   selling_costs: number;
   net_reversion: number;
   pv_reversion: number;
+  /**
+   * PD15 Fix 6 — set when terminal NOI is non-positive, in which case the engine
+   * floors exit_value / selling_costs / net_reversion at 0 instead of emitting a
+   * negative "sale price". Renderers must show the reason next to the $0.
+   */
+  exit_not_meaningful?: boolean;
+  exit_not_meaningful_reason?: string;
 }
 
 /**

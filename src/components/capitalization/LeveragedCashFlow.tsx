@@ -88,6 +88,10 @@ interface ExitAnalysis {
   stabilizedValue?: number;
   pendingRenoOffset?: number;
   adjustedExitValue?: number;
+  // PD15 Fix 6 — set when terminal NOI is non-positive and the engine floored the
+  // exit at $0 rather than emitting a negative sale price.
+  exitNotMeaningful?: boolean;
+  exitNotMeaningfulReason?: string;
 }
 
 interface CashFlowResponse {
@@ -1756,6 +1760,16 @@ export default function LeveragedCashFlow({
                     {formatLCFCurrency(exitAnalysis.netReversionAfterDebt)}
                   </td>
                 </tr>
+                {/* PD15 Fix 6: a $0 reversion needs its reason on the face of the
+                    modal, or it reads as "no sale modeled". */}
+                {exitAnalysis.exitNotMeaningful && (
+                  <tr>
+                    <td colSpan={2} style={{ padding: '8px 0 0', color: 'var(--cui-warning)', fontSize: '0.75rem' }}>
+                      {exitAnalysis.exitNotMeaningfulReason
+                        || 'Terminal NOI is negative — reversion floored at $0'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </CModalBody>
