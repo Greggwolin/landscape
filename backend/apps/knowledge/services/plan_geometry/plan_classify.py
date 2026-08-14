@@ -237,15 +237,38 @@ def classify_plan(
 
     # 2 — the sheet's own title. Beats body text; overrides a recording guess
     #     only when it names an even later instrument.
+    #
+    #     The title block is the best evidence there is, but the caller often
+    #     cannot supply it — `document_processor` has the extracted text and the
+    #     file name and nothing else. So a name-only match is worth 0.6, below
+    #     the bar for trusting it, UNLESS the sheet itself says the same thing:
+    #     a file called "…Preliminary Plat…" whose body also reads PRELIMINARY
+    #     PLAT is two independent sources agreeing, and that is worth 0.85.
+    #
+    #     Agreement must be on the same stage. A final plat's body quotes the
+    #     preliminary plat it superseded, so "both mention a preplat" is not
+    #     agreement — and the `st.value > stage.value` guard below keeps the
+    #     recorded reading on top regardless.
     haystack = f"{title_text}\n{filename}" if title_text else filename
     for pat, st in _TITLES:
         m = pat.search(haystack)
         if not m:
             continue
         if stage is None or st.value > stage.value:
+            if title_text:
+                score = 0.9
+                note = f"Titled “{m.group(0).strip()}”."
+            elif pat.search(text[:4000]):
+                score = 0.85
+                note = (
+                    f"Named “{m.group(0).strip()}”, and the sheet itself says the same."
+                )
+            else:
+                score = 0.6
+                note = f"Named “{m.group(0).strip()}” — from the file name only."
             stage = st
-            confidence = max(confidence, 0.9 if title_text else 0.6)
-            evidence.append(f"Titled “{m.group(0).strip()}”.")
+            confidence = max(confidence, score)
+            evidence.append(note)
         break
 
     # 3 — body title, weaker: a plat quotes its own predecessor, so first match wins

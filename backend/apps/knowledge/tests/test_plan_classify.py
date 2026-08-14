@@ -241,6 +241,56 @@ def test_the_stored_stage_is_the_integer_that_must_never_be_renumbered():
     assert verdict_to_profile(r.verdict)["stage"] == int(PlanStage.FINAL_PLAT) == 60
 
 
+# ── corroboration: two sources agreeing ─────────────────────────────────────
+
+
+def test_name_and_sheet_agreeing_is_enough_without_a_title_block():
+    """
+    `document_processor` has the extracted text and the file name, and no way
+    to read the title block. Measured cost of that: the 2021 Red Valley
+    preliminary plat dropped from 0.90 and trusted to 0.60 and needing
+    confirmation — a real document losing its standing to a plumbing detail.
+    Two independent sources saying the same thing restores it.
+    """
+    v = classify_plan(PRELIM_PLAT, "Red Valley Ranch Preliminary Plat FNL 11.2.21.pdf")
+    assert v.stage is PlanStage.PRELIMINARY_PLAT
+    assert v.confidence >= 0.75
+    assert v.trusted_for_money is True
+    assert v.needs_confirmation is False
+
+
+def test_the_file_name_alone_is_not_enough():
+    """A name is a claim, not evidence. Without the sheet agreeing, it asks."""
+    bare = """
+    SCALE 1" = 100'   SHEET 2 OF 4   MATCHLINE
+    BASIS OF BEARINGS   R/W   8' PUE
+    """
+    v = classify_plan(bare, "Red Valley Ranch Preliminary Plat.pdf")
+    assert v.stage is PlanStage.PRELIMINARY_PLAT
+    assert v.confidence < 0.75
+    assert v.trusted_for_money is False
+    assert v.needs_confirmation is True
+
+
+def test_corroboration_cannot_promote_a_construction_plan():
+    """
+    The safety property must survive the corroboration rule. A paving plan is
+    named "Paving Plan" — which matches no drawing title — so there is nothing
+    for the sheet to corroborate, and its case number still only buys 0.5.
+    """
+    v = classify_plan(PAVING_PLAN, "Paving Plan - Red Valley Ranch Phase 1 - 2nd Submittal.pdf")
+    assert v.trusted_for_money is False
+    assert v.needs_confirmation is True
+
+
+def test_a_final_plat_quoting_its_preplat_is_still_a_final_plat():
+    """Corroboration must not let the superseded name win on a recorded sheet."""
+    body = FINAL_PLAT + "\nSUPERSEDES THE PRELIMINARY PLAT RECORDED AS SUB17-07\n"
+    v = classify_plan(body, "Red Valley Ranch Preliminary Plat reference copy.pdf")
+    assert v.stage is PlanStage.FINAL_PLAT
+    assert v.trusted_for_money is True
+
+
 # ── the wiring: what the pipeline actually does ─────────────────────────────
 #
 # The tests above prove intake reaches the right verdict. These two prove the
