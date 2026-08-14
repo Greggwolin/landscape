@@ -283,11 +283,23 @@ def create_artifact_record(
                 # callers don't need to special-case dedup hits.
                 # Also refresh the artifact title / pointers in case the
                 # tool produced a different label this run.
+                _dedup_update_fields = {
+                    'title': title[:255],
+                    'source_pointers_json': pointers,
+                    'edit_target_json': edit_target,
+                    'last_edited_at': _now(),
+                }
+                # params_json carries the view specification (budget slice 1).
+                # Omitting it here meant a dedup hit refreshed the schema but
+                # kept the OLD params forever — so any project that already had
+                # a budget artifact could never receive budget_view_config and
+                # silently kept rendering through the legacy block renderer.
+                # Same reasoning as full_schema above: a fresh tool fetch is the
+                # authoritative snapshot, params included.
+                if params_json is not None:
+                    _dedup_update_fields['params_json'] = params_json
                 Artifact.objects.filter(pk=existing.artifact_id).update(
-                    title=title[:255],
-                    source_pointers_json=pointers,
-                    edit_target_json=edit_target,
-                    last_edited_at=_now(),
+                    **_dedup_update_fields
                 )
                 return {
                     'success': True,
