@@ -40,6 +40,13 @@ from .plan_classify import (
     classify_plan,
     is_plan_document,
 )
+from .lot_dimensions import (
+    FrontageBasis,
+    LotDimensions,
+    measure_lot,
+    measure_lots,
+    total_frontage,
+)
 from .intake import (
     AWAITING_OCR,
     PlanIntake,
@@ -49,6 +56,8 @@ from .intake import (
 )
 
 __all__ = [
+    "FrontageBasis", "LotDimensions", "measure_lot", "measure_lots",
+    "total_frontage",
     "PLAN_DOC_TYPE", "PlanVerdict", "classify_plan", "is_plan_document",
     "AWAITING_OCR", "PlanIntake", "apply_to_document", "inspect_upload",
     "verdict_to_profile",
