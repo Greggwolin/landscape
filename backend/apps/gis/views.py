@@ -13,7 +13,12 @@ from rest_framework.response import Response
 from apps.projects.models import Project
 from apps.projects.permissions import user_can_access_project
 from .serializers import GeoJSONSerializer, BoundarySerializer
-from .parcel_services import COUNTY_PARCEL_SERVICES, normalize_county_code, ParcelServiceConfig
+from .parcel_services import (
+    COUNTY_PARCEL_SERVICES,
+    ParcelServiceConfig,
+    apn_candidates,
+    normalize_county_code,
+)
 
 MAX_PARCEL_FEATURES = 5000
 
@@ -179,6 +184,37 @@ def _fetch_arcgis_geojson(
     return {"type": "FeatureCollection", "features": features}
 
 
+def _acres_from_geometry(geometry: Optional[Dict[str, Any]]) -> Optional[float]:
+    """Acreage measured off the parcel outline, for services that publish none.
+
+    Geometry arrives in EPSG:4326 (outSR=4326 is set on every query), where
+    coordinates are degrees and planar area is meaningless — a degree of
+    longitude is ~40% shorter at this latitude than a degree of latitude. So
+    measure geodesically on the ellipsoid rather than treating lat/lon as a
+    plane.
+
+    Returns None on anything it cannot measure; the caller renders blank, which
+    is what happened before this existed.
+    """
+    if not geometry:
+        return None
+    try:
+        from pyproj import Geod
+        from shapely.geometry import shape
+
+        geom = shape(geometry)
+        if geom.is_empty:
+            return None
+        # WGS84 ellipsoid; geometry_area_perimeter returns signed m² (sign
+        # follows ring orientation, hence abs()).
+        area_m2, _perimeter = Geod(ellps="WGS84").geometry_area_perimeter(geom)
+        acres = abs(area_m2) / 4046.8564224
+        return round(acres, 2) if acres > 0 else None
+    except Exception:
+        # Never let an unmeasurable outline fail the whole parcel query.
+        return None
+
+
 def _normalize_feature_collection(
     county_code: str,
     service: ParcelServiceConfig,
@@ -202,7 +238,15 @@ def _normalize_feature_collection(
             "county": county_code,
             "owner": props.get(service.owner_field),
             "address": props.get(service.address_field),
-            "acres": props.get(service.acres_field),
+            # MK22: acres_field is None on extracts that publish no acreage
+            # column (City of Maricopa). props.get(None) is None rather than an
+            # error, so nothing broke — the acreage just rendered blank. Fall
+            # back to measuring the geometry we already have.
+            "acres": (
+                props.get(service.acres_field)
+                if service.acres_field
+                else _acres_from_geometry(feature.get("geometry"))
+            ),
             "use_code": props.get(service.use_code_field),
             "use_desc": props.get(service.use_desc_field),
         }
@@ -265,8 +309,14 @@ def parcel_query(request):
 
     where_clause = "1=1"
     if parcel_id:
-        safe_id = str(parcel_id).replace("'", "''")
-        where_clause = f"{service.id_field} = '{safe_id}'"
+        # MK22: ask for every spelling of the APN, not just the one we hold.
+        # Projects store 502-07-001-0; the City of Maricopa publishes
+        # 502070010. An exact-equality lookup returns zero rows and is
+        # indistinguishable on screen from "the county has no record of this
+        # parcel" — which is exactly how this presented.
+        candidates = apn_candidates(parcel_id) or [str(parcel_id)]
+        quoted = ", ".join("'" + c.replace("'", "''") + "'" for c in candidates)
+        where_clause = f"{service.id_field} IN ({quoted})"
 
     try:
         fc = _fetch_arcgis_geojson(service, where=where_clause, bounds=bounds)

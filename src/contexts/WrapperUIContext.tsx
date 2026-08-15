@@ -186,7 +186,12 @@ export interface ExcelAuditArtifactConfig {
 }
 
 /** Which view the project right panel is showing — artifacts workspace or documents. */
-export type ProjectRightPanelView = 'artifacts' | 'documents';
+// MK22: 'map' joins the two original views. The map used to be a route
+// (/w/projects/[id]/map) that replaced the whole right surface, toggle
+// included — so once it opened there was no way back to Artifacts or
+// Documents. It is now a third view of the same panel; the route still works
+// and is still what chat-driven navigation targets.
+export type ProjectRightPanelView = 'artifacts' | 'documents' | 'map';
 
 interface WrapperUIContextValue {
   chatOpen: boolean;

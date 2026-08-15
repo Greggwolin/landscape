@@ -77,7 +77,7 @@ import {
   nudgeCorners,
   type DrapeCommand,
 } from '@/lib/gis/drapeCommandBridge';
-import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
+import { COUNTY_PARCEL_SERVICES, sameApn, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
 import { useMarketCompetitors, type MarketCompetitiveProject } from '@/hooks/useMarketData';
@@ -399,6 +399,14 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     const layer = group?.layers.find((entry) => entry.id === 'tax-parcels');
     return Boolean(layer?.visible);
   }, [layers]);
+  // Maricopa-only ON PURPOSE, and it must stay that way (checked MK22).
+  // This does NOT gate the parcel boundary — that comes from the queried
+  // `taxParcels` features and draws for every county. What it gates is a
+  // RASTER tile layer proxied from the Maricopa County Assessor's own
+  // ParcelOutline service (/api/gis/parcel-outline-tile, host-whitelisted to
+  // gis.mcassessor.maricopa.gov). Those tiles depict Maricopa County ground
+  // only; switching them on for Pinal would request Maricopa imagery over
+  // Pinal and draw either nothing or the wrong lines.
   const parcelOutlineEnabled = resolvedCounty === 'maricopa' && taxParcelsLayerVisible;
   const isLosAngelesCounty = useMemo(() => {
     const value = typeof projectCounty === 'string' ? projectCounty.toLowerCase() : '';
@@ -2036,6 +2044,27 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     const resolved = typeof candidate === 'string' ? candidate.trim() : '';
     return resolved || profileApn;
   }, [project, profileApn]);
+
+  // MK22 — which of the county's parcels is THIS project's. Counties publish
+  // the number in their own spelling: we store 502-07-001-0, the City of
+  // Maricopa publishes 502070010. Compared as typed they never match, and the
+  // parcel simply never highlighted — indistinguishable from the county having
+  // no record of it. sameApn normalises both sides before comparing.
+  const subjectTaxParcelIds = useMemo(() => {
+    if (!subjectApn || !taxParcels?.features?.length) return [] as string[];
+    const ids: string[] = [];
+    for (const feature of taxParcels.features) {
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      // parcel_id is set on every feature by the Django normaliser; the raw
+      // service field is also present and differs per county.
+      const candidates = [props.parcel_id, props.APN, props.AIN, props.parcel_number];
+      if (candidates.some((c) => typeof c === 'string' && sameApn(c, subjectApn))) {
+        const id = typeof props.parcel_id === 'string' ? props.parcel_id : String(feature.id ?? '');
+        if (id) ids.push(id);
+      }
+    }
+    return ids;
+  }, [subjectApn, taxParcels]);
 
   useEffect(() => {
     if (!subjectApn || !isDevelopmentProject || mapLocationOverride) return;
@@ -3684,6 +3713,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           projectBoundary={projectBoundary}
           taxParcels={taxParcels}
           selectedTaxParcelIds={selectedTaxParcelIds}
+          subjectTaxParcelIds={subjectTaxParcelIds}
           parcelOutlineEnabled={parcelOutlineEnabled}
           saleComps={saleComps}
           rentComps={rentComps}

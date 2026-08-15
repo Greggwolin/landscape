@@ -136,6 +136,9 @@ export interface MapCanvasProps {
   projectBoundary?: GeoJSON.Feature | null;
   taxParcels?: GeoJSON.FeatureCollection | null;
   selectedTaxParcelIds?: string[];
+  /** parcel_id values of the project's OWN parcel(s), matched through
+   *  sameApn so 502-07-001-0 finds 502070010 (MK22). */
+  subjectTaxParcelIds?: string[];
   parcelOutlineEnabled?: boolean;
   saleComps?: GeoJSON.FeatureCollection | null;
   rentComps?: GeoJSON.FeatureCollection | null;

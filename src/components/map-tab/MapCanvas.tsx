@@ -345,6 +345,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     projectBoundary,
     taxParcels,
     selectedTaxParcelIds,
+    subjectTaxParcelIds,
     parcelOutlineEnabled,
     saleComps,
     rentComps,
@@ -819,13 +820,19 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     const selectedFillId = 'tax-parcels-selected-fill';
     const selectedHighlightId = 'tax-parcels-selected-highlight';
     const selectedLineId = 'tax-parcels-selected-line';
+    const subjectFillId = 'tax-parcels-subject-fill';
+    const subjectLineId = 'tax-parcels-subject-line';
 
-    // Clean up previous
+    // Clean up previous. Every layer added below must be removed here — this
+    // effect re-runs on every parcel/selection change, and a layer left behind
+    // makes addLayer throw on the next pass (MK22 added the two subject ones).
     safeRemoveLayer(map.current, fillId);
     safeRemoveLayer(map.current, lineId);
     safeRemoveLayer(map.current, selectedFillId);
     safeRemoveLayer(map.current, selectedHighlightId);
     safeRemoveLayer(map.current, selectedLineId);
+    safeRemoveLayer(map.current, subjectFillId);
+    safeRemoveLayer(map.current, subjectLineId);
     safeRemoveSource(map.current, srcId);
 
     // Check layer visibility
@@ -869,6 +876,40 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         'line-opacity': 1,
       },
     });
+
+    // MK22 — the project's OWN parcel, drawn before the selection layers so a
+    // deliberate click still reads on top of it. Gregg's ask was that the
+    // project's parcel be distinguishable among the county's; until now the
+    // tax-parcel layers only ever distinguished what the user had clicked.
+    // The ids are matched in MapTab through sameApn (502-07-001-0 vs
+    // 502070010), so this filter is a plain membership test on parcel_id.
+    const subjectIds = (subjectTaxParcelIds ?? []).filter(Boolean);
+    if (subjectIds.length > 0) {
+      map.current.addLayer({
+        id: subjectFillId,
+        type: 'fill',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'fill-color': LAYER_COLORS.siteBoundary,
+          'fill-opacity': 0.22,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', subjectIds]],
+      });
+
+      map.current.addLayer({
+        id: subjectLineId,
+        type: 'line',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': LAYER_COLORS.siteBoundary,
+          'line-width': 2.4,
+          'line-opacity': 1,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', subjectIds]],
+      });
+    }
 
     const selectedIds = (selectedTaxParcelIds ?? []).filter(Boolean);
     if (selectedIds.length > 0) {
@@ -993,7 +1034,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     };
 
      
-  }, [mapLoaded, styleRevision, taxParcels, layers, selectedTaxParcelIds, activeTool]);
+  }, [mapLoaded, styleRevision, taxParcels, layers, selectedTaxParcelIds, subjectTaxParcelIds, activeTool]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // LA County Parcel Overlays (subject + comps)

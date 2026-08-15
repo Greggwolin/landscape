@@ -8,6 +8,7 @@ import { ExcelAuditArtifact } from './ExcelAuditArtifact';
 import { ArtifactWorkspacePanel } from './ArtifactWorkspacePanel';
 import { WrapperHeader } from './WrapperHeader';
 import { ProjectDocumentsBody } from './ProjectDocumentsBody';
+import { PanelMapView } from './PanelMapView';
 import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
@@ -177,6 +178,22 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
             >
               Documents
             </button>
+            {/* MK22 — Map as a third view. Only on the project surface:
+                PanelMapView calls useWrapperProject, which throws without a
+                WrapperProjectProvider, and the dashboard renders this panel
+                without one. showViewToggle is set on the project page only. */}
+            {showViewToggle && (
+              <>
+                <span className="prp-toggle-sep" aria-hidden>|</span>
+                <button
+                  type="button"
+                  className={`prp-toggle-btn${projectRightPanelView === 'map' ? ' is-active' : ''}`}
+                  onClick={() => setProjectRightPanelView('map')}
+                >
+                  Map
+                </button>
+              </>
+            )}
           </div>
         }
         trailing={
@@ -213,6 +230,12 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
         <div className="project-right-panel-body project-right-panel-body--documents">
           <ProjectDocumentsBody projectId={projectId} />
         </div>
+      ) : projectRightPanelView === 'map' && showViewToggle ? (
+        // MK22 — the live map, keeping the toggle above it. Guarded by
+        // showViewToggle for the same reason the button is; if the view
+        // somehow persists onto the dashboard, this falls through to the
+        // artifacts branch rather than throwing on a missing project context.
+        <PanelMapView />
       ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} takeoverMode />
       ) : activeLocationBrief ? (
