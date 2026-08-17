@@ -1285,6 +1285,11 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             layers: group.layers.map((layer) => {
               if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
               if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
+              // MK24 §3 — this 0 is HARDCODED, not a measured empty. Nothing
+              // in MapTab fetches land sales, so the layer has no source to
+              // count. It still lists at (0) alongside Sale Comps and Rent
+              // Comps, which is the honest reading today: none on this
+              // project. Wire it to a real query when land sales get one.
               if (layer.id === 'land-sales') return { ...layer, count: 0 };
               return layer;
             }),
@@ -2065,6 +2070,115 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     }
     return ids;
   }, [subjectApn, taxParcels]);
+
+  // ── MK24 §1: the project location point ──────────────────────────────────
+  //
+  // The point is a working estimate that improves as the deal is understood:
+  // a general point for the site, then the centre of the attached parcels,
+  // then wherever a person drops it. Each step persists.
+  //
+  // Precedence, strongest first (Gregg, 2026-08-17):
+  //     manual > parcel > geocoded > typed   (NULL = legacy, weakest)
+  //
+  // A stronger source is never overwritten automatically, so a correction
+  // survives a later parcel attach instead of vanishing silently.
+  const LOCATION_SOURCE_RANK: Record<string, number> = useMemo(
+    () => ({ manual: 4, parcel: 3, geocoded: 2, typed: 1 }),
+    []
+  );
+
+  const currentLocationSource = useMemo(() => {
+    const raw = (project as Record<string, unknown>).location_source;
+    return typeof raw === 'string' && raw ? raw : null;
+  }, [project]);
+
+  const persistProjectLocation = useCallback(
+    async (lng: number, lat: number, source: 'manual' | 'parcel') => {
+      // Never let a weaker source overwrite a stronger one. A hand-placed
+      // point outranks everything, so an automatic parcel move stops here.
+      const incoming = LOCATION_SOURCE_RANK[source] ?? 0;
+      const existing = currentLocationSource
+        ? LOCATION_SOURCE_RANK[currentLocationSource] ?? 0
+        : 0;
+      if (source !== 'manual' && incoming <= existing) return;
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({
+            location_lat: lat,
+            location_lon: lng,
+            location_source: source,
+          }),
+        });
+        if (!res.ok) throw new Error(`PATCH failed (${res.status})`);
+        // Re-read so anything keyed off the project centre (demographics
+        // rings, competitor radius, sf-comps) picks the new point up rather
+        // than leaving a stale ring behind.
+        onProjectUpdated?.();
+      } catch (error) {
+        console.warn('Failed to persist project location:', error);
+      }
+    },
+    [projectId, currentLocationSource, LOCATION_SOURCE_RANK, onProjectUpdated]
+  );
+
+  // Dropped by hand — the most authoritative source there is.
+  const handleProjectLocationMoved = useCallback(
+    (lng: number, lat: number) => {
+      void persistProjectLocation(lng, lat, 'manual');
+    },
+    [persistProjectLocation]
+  );
+
+  // Parcels attached → move the point to their combined centre. ALL of the
+  // project's parcels, not just the primary APN: apn_secondary exists and a
+  // project may hold several, so the centre of one parcel is the wrong point
+  // for a multi-parcel site. Blocked by persistProjectLocation when the point
+  // was placed by hand.
+  const parcelCentroidKey = useMemo(
+    () => subjectTaxParcelIds.join('|'),
+    [subjectTaxParcelIds]
+  );
+
+  useEffect(() => {
+    if (!subjectTaxParcelIds.length || !taxParcels?.features?.length) return;
+    if (currentLocationSource === 'manual') return;
+
+    const own = taxParcels.features.filter((f) => {
+      const id = (f.properties as Record<string, unknown> | null)?.parcel_id;
+      return typeof id === 'string' && subjectTaxParcelIds.includes(id);
+    });
+    if (!own.length) return;
+
+    // Area-weighted centre would be better on wildly unequal parcels; the mean
+    // of the vertex centroids is what the attach flow already implies and is
+    // adequate for placing a marker.
+    let sumLng = 0;
+    let sumLat = 0;
+    let count = 0;
+    for (const feature of own) {
+      try {
+        const c = turf.centroid(feature as turf.AllGeoJSON);
+        const coords = c?.geometry?.coordinates;
+        if (!Array.isArray(coords) || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) {
+          continue;
+        }
+        sumLng += coords[0];
+        sumLat += coords[1];
+        count += 1;
+      } catch {
+        // An unusable outline just doesn't vote.
+      }
+    }
+    if (!count) return;
+
+    void persistProjectLocation(sumLng / count, sumLat / count, 'parcel');
+    // parcelCentroidKey collapses the id array to a stable string so this
+    // fires when the SET of attached parcels changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcelCentroidKey, currentLocationSource]);
 
   useEffect(() => {
     if (!subjectApn || !isDevelopmentProject || mapLocationOverride) return;
@@ -3714,6 +3828,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           taxParcels={taxParcels}
           selectedTaxParcelIds={selectedTaxParcelIds}
           subjectTaxParcelIds={subjectTaxParcelIds}
+          onProjectLocationMoved={handleProjectLocationMoved}
           parcelOutlineEnabled={parcelOutlineEnabled}
           saleComps={saleComps}
           rentComps={rentComps}

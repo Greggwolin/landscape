@@ -346,6 +346,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     taxParcels,
     selectedTaxParcelIds,
     subjectTaxParcelIds,
+    onProjectLocationMoved,
     parcelOutlineEnabled,
     saleComps,
     rentComps,
@@ -1676,10 +1677,33 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       ])
     );
 
-    subjectMarkerRef.current = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
+    // MK24 §1 — the point is a working estimate, so it can be corrected by
+    // hand. Draggable only when the caller supplies a handler to persist it;
+    // without one the marker stays fixed exactly as before.
+    const canMove = typeof onProjectLocationMoved === 'function';
+    if (canMove) markerEl.style.cursor = 'grab';
+
+    subjectMarkerRef.current = new maplibregl.Marker({
+      element: markerEl,
+      anchor: 'center',
+      draggable: canMove,
+    })
       .setLngLat([center[0], center[1]])
       .setPopup(subjectPopup)
       .addTo(map.current);
+
+    if (canMove) {
+      // Persist on DROP only. dragend fires once; 'drag' fires every frame and
+      // would write on each one.
+      subjectMarkerRef.current.on('dragstart', () => {
+        markerEl.style.cursor = 'grabbing';
+      });
+      subjectMarkerRef.current.on('dragend', () => {
+        markerEl.style.cursor = 'grab';
+        const dropped = subjectMarkerRef.current?.getLngLat();
+        if (dropped) onProjectLocationMoved?.(dropped.lng, dropped.lat);
+      });
+    }
 
     markerEl.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -1692,7 +1716,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       subjectMarkerRef.current?.remove();
       subjectMarkerRef.current = null;
     };
-  }, [mapLoaded, styleRevision, center]);
+  }, [mapLoaded, styleRevision, center, onProjectLocationMoved]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Parcel-association (P2 / Gesture B): draggable subject pin.

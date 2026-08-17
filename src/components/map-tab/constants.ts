@@ -22,8 +22,10 @@ export const BASEMAP_OPTIONS: { value: BasemapStyle; label: string }[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const LAYER_COLORS = {
-  // Project boundary layers
-  siteBoundary: '#f59e0b',
+  // Project boundary layers.
+  // Bright yellow, not amber: the boundary has to stay legible over satellite
+  // imagery of bare desert ground, which is itself amber (Gregg, 2026-08-14).
+  siteBoundary: '#facc15',
   taxParcels: '#3b82f6',
   planParcels: '#10b981',
 

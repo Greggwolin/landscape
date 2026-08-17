@@ -139,6 +139,10 @@ export interface MapCanvasProps {
   /** parcel_id values of the project's OWN parcel(s), matched through
    *  sameApn so 502-07-001-0 finds 502070010 (MK22). */
   subjectTaxParcelIds?: string[];
+  /** MK24 §1 — the subject marker was dragged and DROPPED here. Fires once,
+   *  on dragend, not on every drag frame; the caller persists it as a
+   *  hand-placed point. Omit to leave the marker fixed, as it was. */
+  onProjectLocationMoved?: (lng: number, lat: number) => void;
   parcelOutlineEnabled?: boolean;
   saleComps?: GeoJSON.FeatureCollection | null;
   rentComps?: GeoJSON.FeatureCollection | null;

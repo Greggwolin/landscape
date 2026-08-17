@@ -61,6 +61,30 @@ const DOC_TYPE_LABELS: Record<string, string> = {
   pdf: 'PDF',
 };
 
+/**
+ * Newest-first, by whichever of updated_at / created_at is later (MK24 §4).
+ *
+ * "Recent" has to mean recently *touched*, not just recently uploaded — a
+ * document renamed or reprocessed today belongs at the top alongside one added
+ * today. Rows carrying neither timestamp sort last rather than jumping to the
+ * front on an unparseable date.
+ */
+function sortByMostRecent<T>(rows: T[]): T[] {
+  const stamp = (row: T): number => {
+    const record = row as unknown as Record<string, unknown>;
+    let best = 0;
+    for (const key of ['updated_at', 'created_at'] as const) {
+      const value = record[key];
+      if (typeof value !== 'string') continue;
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed) && parsed > best) best = parsed;
+    }
+    return best;
+  };
+  // Copy first — sort mutates, and the caller hands us the fetched array.
+  return [...rows].sort((a, b) => stamp(b) - stamp(a));
+}
+
 function docTypeLabel(docType: string): string {
   return DOC_TYPE_LABELS[docType] ?? docType;
 }
@@ -114,7 +138,7 @@ interface ArtifactWorkspacePanelProps {
  */
 export function ArtifactWorkspacePanel({
   projectId,
-  documentsLabel = 'Project Documents',
+  documentsLabel = 'Recent Documents',
   includeUnassigned,
   takeoverMode = false,
 }: ArtifactWorkspacePanelProps) {
@@ -325,13 +349,20 @@ export function ArtifactWorkspacePanel({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
-        if (Array.isArray(data)) {
-          setDocuments(data);
-        } else if (Array.isArray(data?.results)) {
-          setDocuments(data.results);
-        } else if (Array.isArray(data?.documents)) {
-          setDocuments(data.documents);
-        }
+        // MK24 §4 — the heading says "Recent Documents", so the list has to
+        // BE recent. The API returns them in its own order (no ordering is
+        // requested), and a heading promising recency over an arbitrary list
+        // is worse than the old heading. Sort newest-first on whichever of
+        // updated_at / created_at is later, so an edited document rises the
+        // same way a newly added one does.
+        const rows = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.results)
+            ? data.results
+            : Array.isArray(data?.documents)
+              ? data.documents
+              : null;
+        if (rows) setDocuments(sortByMostRecent(rows));
       })
       .catch(() => { /* swallow — empty state shows */ })
       .finally(() => {

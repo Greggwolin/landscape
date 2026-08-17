@@ -259,6 +259,16 @@
   font-size: 11px;
 }
 
+/* A count of zero (MK24 §3). Deliberately quieter than a real count, not
+   louder: "(0)" is telling you this data has not been added yet, which is a
+   prompt to go and add it — not an error. Muted and italic reads as an absence;
+   anything warning-coloured would read as something being wrong. */
+.layer-item-count.is-empty {
+  color: var(--cui-secondary-color, #9ca3af);
+  opacity: 0.55;
+  font-style: italic;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Draw Tools Section
    ───────────────────────────────────────────────────────────────────────────── */

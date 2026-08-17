@@ -56,6 +56,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     activeMapArtifact,
     activeExcelAudit,
     activeArtifactId,
+    projectRightPanelView,
     setActiveLocationBrief,
     setActiveMapArtifact,
     setActiveExcelAudit,
@@ -108,7 +109,14 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const hasActiveArtifact = activeArtifactId != null;
+    // MK24 §5 — selecting Map collapses the left sidebar for the same reason
+    // an artifact takeover does: the content wants the screen. It restores the
+    // sidebar to whatever he had on the way out, via the snapshot refs already
+    // here, so a sidebar he deliberately widened comes back that width. The
+    // sidebar can still be reopened by hand while the map is showing — that
+    // path already exists for artifact takeover and is untouched.
+    const inMapView = projectRightPanelView === 'map';
+    const hasActiveArtifact = activeArtifactId != null || inMapView;
 
     if (hasActiveArtifact && !inTakeoverMode.current) {
       // Entering takeover. Snapshot current panel + sidebar state.
@@ -146,7 +154,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       inTakeoverMode.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeArtifactId]);
+  }, [activeArtifactId, projectRightPanelView]);
 
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.

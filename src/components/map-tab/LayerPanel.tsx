@@ -103,8 +103,16 @@ function SortableLayerRow({
         >
           {layer.label}
         </span>
-        {layer.count !== undefined && layer.count > 0 && (
-          <span className="layer-item-count">({layer.count})</span>
+        {/* Zero is not nothing to say — it is the layer telling you this data
+            has never been added to the project. Hiding the count at zero makes
+            "none yet" look identical to "not a counted layer" (Gregg, 2026-08-14). */}
+        {layer.count !== undefined && (
+          <span
+            className={`layer-item-count${layer.count === 0 ? ' is-empty' : ''}`}
+            title={layer.count === 0 ? 'None added to this project yet' : undefined}
+          >
+            ({layer.count})
+          </span>
         )}
       </label>
     </div>
