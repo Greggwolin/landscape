@@ -6,7 +6,7 @@
 
 ## Summary
 
-Quiet day (Saturday). No commits. Uncommitted work in progress on the `feature/plan-geometry` branch from the Aug 14 plan geometry extraction pipeline build. No nightly sync ran on Aug 15 either.
+Quiet day (Saturday). No new commits today (Aug 16's only commit is the prior nightly doc sync). Yesterday's Pinal county parcels fix (MK22, `ee649216`, 9 files +323 lines) was the last feature work — it fixed the Pinal parcel query endpoint, added geodesic acreage measurement, APN normalization, and subject-parcel highlighting on the map. Uncommitted refinements on `feature/plan-geometry` branch add a safety split for `trusted_for_money` (classifier belief vs. user permission) and a new lot table module.
 
 ---
 
@@ -31,8 +31,8 @@ Quiet day (Saturday). No commits. Uncommitted work in progress on the `feature/p
 8 modified files, several untracked:
 - `CLAUDE.md` — plan geometry extraction pipeline documentation added to session history and architecture sections (+27/−1)
 - `backend/apps/knowledge/services/plan_geometry/__init__.py` — module init updates (+9)
-- `backend/apps/knowledge/services/plan_geometry/intake.py` — intake recognition tweaks (+9/−1)
-- `backend/apps/knowledge/services/plan_geometry/plan_classify.py` — classification logic refinements (+18/−4)
+- `backend/apps/knowledge/services/plan_geometry/intake.py` — safety split: `trusted_for_money` now always written `False` in profile; only user confirmation may set it `True`. New `stage_is_measurable` field carries the classifier's belief separately (+9/−1)
+- `backend/apps/knowledge/services/plan_geometry/plan_classify.py` — docstring clarification: `trusted_for_money` is the classifier's view, not permission; permission lives in `verdict_to_profile` (+18/−4)
 - `backend/apps/knowledge/tests/test_plan_classify.py` — additional test coverage (+17)
 - `docs/PROJECT_INSTRUCTIONS_CHANGELOG.md` — changelog entries (+38)
 - `src/components/map-tab/LayerPanel.tsx` — layer panel adjustments (+12/−2)
