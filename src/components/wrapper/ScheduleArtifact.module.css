@@ -142,6 +142,17 @@
   background: transparent;
 }
 
+/* A level member whose parent has not been picked yet. Shown so the filter
+ * reveals the shape of the project up front, but not yet selectable. Solid
+ * border, not dashed — dashed already means "offered, not showing" on the
+ * column chips, which is a different thing. Dimmed but legible: the shared
+ * .badge:disabled rule above supplies the opacity and the cursor. */
+.badgeLocked {
+  border-color: var(--cui-border-color-translucent, var(--cui-border-color));
+  color: var(--cui-secondary-color);
+  background: transparent;
+}
+
 .badgeBasis {
   border-color: transparent;
   color: var(--cui-secondary-color);

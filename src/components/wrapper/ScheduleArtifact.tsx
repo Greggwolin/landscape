@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import styles from './ScheduleArtifact.module.css';
 import { hierCellText, hierHeaderLabels } from './hierPath';
 import { withExtraColumns } from './columnOrder';
+import { buildLevelRows } from './levelRows';
 
 /**
  * ScheduleArtifact — one topic plus one view specification.
@@ -185,26 +186,14 @@ export function ScheduleArtifact({ config, onClose }: Props) {
       picked.every(([level, ids]) => ids.includes(row.scope?.[level] as number)));
   }, [config.rows, scope]);
 
-  /* Level chip rows. A level appears only once the level above it has been
-   * picked, and its members are always scoped to that choice — never all
-   * members of the level across the whole project. */
-  const levelRows = useMemo(() => {
-    const out: { level: ScheduleLevel; members: ScheduleLevelMember[] }[] = [];
-    let parentIds: number[] = [];
-    for (let i = 0; i < config.levels.length; i += 1) {
-      const level = config.levels[i];
-      const members = i === 0
-        ? level.members
-        : level.members.filter((m) => m.parent_id !== null
-            && (parentIds as number[]).includes(m.parent_id));
-      if (members.length === 0) break;
-      out.push({ level, members });
-      const picked = scope[level.level];
-      if (!picked || picked.length === 0) break;
-      parentIds = picked;
-    }
-    return out;
-  }, [config.levels, scope]);
+  /* Level chip rows. Level 2 is built up front — ghosted until a level-1 member
+   * is picked — so the filter shows that a second level exists instead of
+   * hiding it. Level 3 and below still wait for their parent. See
+   * ./levelRows.ts for the rule and its tests. */
+  const levelRows = useMemo(
+    () => buildLevelRows<ScheduleLevelMember, ScheduleLevel>(config.levels, scope),
+    [config.levels, scope],
+  );
 
   const scopeLabel = useMemo(() => {
     const parts: string[] = [];
@@ -542,20 +531,32 @@ export function ScheduleArtifact({ config, onClose }: Props) {
       </div>
 
       {/* ── Level chip rows — labels read from the project's own setup ── */}
-      {levelRows.map(({ level, members }) => (
+      {levelRows.map(({ level, members, enabledIds }) => (
         <div className={styles.bar} key={level.level}>
           <span className={styles.barLabel}>{level.label}</span>
-          {members.map((member) => (
-            <button
-              type="button"
-              key={member.id}
-              className={`${styles.badge}${(scope[level.level] ?? []).includes(member.id)
-                ? ` ${styles.badgeOn}` : ''}`}
-              onClick={() => toggleScope(level.level, member.id)}
-            >
-              {member.label}
-            </button>
-          ))}
+          {members.map((member) => {
+            // A member whose parent is not picked stays on screen, ghosted and
+            // genuinely disabled — the real attribute, not just the class, so
+            // it announces itself and toggleScope cannot be reached.
+            const selectable = enabledIds.has(member.id);
+            const on = (scope[level.level] ?? []).includes(member.id);
+            return (
+              <button
+                type="button"
+                key={member.id}
+                disabled={!selectable}
+                title={selectable
+                  ? undefined
+                  : `Pick a ${config.levels[0].label} to choose a ${level.label}`}
+                className={`${styles.badge} ${on
+                  ? styles.badgeOn
+                  : (!selectable ? styles.badgeLocked : '')}`}
+                onClick={() => toggleScope(level.level, member.id)}
+              >
+                {member.label}
+              </button>
+            );
+          })}
         </div>
       ))}
 
