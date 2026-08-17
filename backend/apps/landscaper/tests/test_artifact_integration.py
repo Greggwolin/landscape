@@ -255,13 +255,9 @@ class ArtifactDedupParamsMergeTests(TestCase):
             c.execute('TRUNCATE landscape.tbl_artifact RESTART IDENTITY CASCADE')
 
     def _stored_params(self, artifact_id):
-        with connection.cursor() as c:
-            c.execute(
-                'SELECT params_json FROM landscape.tbl_artifact '
-                'WHERE artifact_id = %s',
-                [artifact_id],
-            )
-            return c.fetchone()[0]
+        # Read through the ORM, not a raw cursor: JSONField handles the JSONB
+        # decode, whereas the raw cursor hands back the undecoded column.
+        return Artifact.objects.get(pk=artifact_id).params_json
 
     def _patch_params(self, artifact_id, params):
         """Stand in for the ArtifactPatchSerializer PATCH route, which is how
