@@ -106,6 +106,25 @@ export const CATEGORIES_BY_FEATURE_TYPE: Record<
 // Default Layer State
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * How Comparable Unit Sales pins are coloured — by where each sale price falls
+ * among the OTHER comps currently on the map.
+ *
+ * The thresholds are the 25th and 75th percentiles of the filtered set, not
+ * fixed dollar amounts, so they move when the radius / days / year filters
+ * change. A pin can therefore change colour without the sale changing: it is a
+ * statement about that sale's position in this comp set, not a price band.
+ *
+ * Exported so the legend and the map read the same three values. They were
+ * inline literals in MapTab's recentSales memo, which is exactly how a legend
+ * ends up describing colours the map no longer uses.
+ */
+export const RECENT_SALES_PRICE_TIERS = {
+  low: { color: '#22c55e', label: 'Lower quarter' },
+  mid: { color: '#eab308', label: 'Middle half' },
+  high: { color: '#ef4444', label: 'Upper quarter' },
+} as const;
+
 export function getDefaultLayerGroups(isDevelopment = false): LayerGroup[] {
   return [
     // LOCATION (MK28 §2) — the land itself and its context. Group id stays

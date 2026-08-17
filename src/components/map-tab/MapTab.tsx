@@ -53,7 +53,7 @@ import {
   writeStoredLayerOrder,
 } from '@/lib/maps/layerOrder';
 import { DEFAULT_TERRAIN_CONFIG } from '@/lib/maps/terrain';
-import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './constants';
+import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, RECENT_SALES_PRICE_TIERS } from './constants';
 import {
   useDemographics,
   DEMOGRAPHIC_FIELDS,
@@ -877,17 +877,60 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // row; the income-property equivalent (rent-comps) has no comparable filter
   // API yet, so it gets no controls rather than dead ones.
   const renderLayerExtra = useCallback(
-    (layerId: string) =>
-      layerId === 'recent-sales' ? (
+    (layerId: string) => {
+      if (layerId !== 'recent-sales') return null;
+
+      // The pins are coloured by price RANK within the comps currently shown,
+      // so the legend quotes the live 25th/75th-percentile thresholds rather
+      // than naming a colour. Without the numbers "Upper quarter" says nothing
+      // about what a red pin costs — and because the thresholds move with the
+      // filters, a fixed caption would be wrong as soon as the radius changed.
+      const p25 = sfCompsData?.stats?.p25Price ?? null;
+      const p75 = sfCompsData?.stats?.p75Price ?? null;
+      const money = (v: number) => `$${Math.round(v).toLocaleString()}`;
+      const bands: Array<{ color: string; label: string; range: string }> = [
+        {
+          ...RECENT_SALES_PRICE_TIERS.low,
+          range: p25 != null ? `up to ${money(p25)}` : '',
+        },
+        {
+          ...RECENT_SALES_PRICE_TIERS.mid,
+          range: p25 != null && p75 != null ? `${money(p25)} – ${money(p75)}` : '',
+        },
+        {
+          ...RECENT_SALES_PRICE_TIERS.high,
+          range: p75 != null ? `${money(p75)} and up` : '',
+        },
+      ];
+
+      return (
         <div className="layer-item-extra">
           <SfCompsFilterControls
             filters={sfFilters}
             onFiltersChange={setSfFilters}
             compact
           />
+          {/* Only while the layer is actually drawn — a legend for pins that
+              are not on screen is noise. */}
+          {recentSalesLayerVisible && (
+            <div className="layer-legend">
+              <div className="layer-legend-title">Sale price vs. these comps</div>
+              {bands.map((band) => (
+                <div key={band.label} className="layer-legend-row">
+                  <span
+                    className="layer-legend-swatch"
+                    style={{ backgroundColor: band.color }}
+                  />
+                  <span className="layer-legend-label">{band.label}</span>
+                  {band.range && <span className="layer-legend-range">{band.range}</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ) : null,
-    [sfFilters]
+      );
+    },
+    [sfFilters, sfCompsData, recentSalesLayerVisible]
   );
 
   const recentSales = useMemo<FeatureCollection | null>(() => {
@@ -899,10 +942,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     const features = sfCompsData.comps
       .filter((comp) => Number.isFinite(comp.lat) && Number.isFinite(comp.lng))
       .map((comp, i) => {
-        // Color by price tier: green = below 25th %ile, yellow = 25-75th, red = above 75th
-        let tierColor = '#eab308'; // yellow (mid)
-        if (comp.salePrice <= p25) tierColor = '#22c55e'; // green (low)
-        else if (comp.salePrice >= p75) tierColor = '#ef4444'; // red (high)
+        // Colour by where this price sits among the comps CURRENTLY shown —
+        // lower quarter / middle half / upper quarter. Shared with the legend
+        // (RECENT_SALES_PRICE_TIERS) so the two cannot describe different
+        // colours.
+        let tierColor: string = RECENT_SALES_PRICE_TIERS.mid.color;
+        if (comp.salePrice <= p25) tierColor = RECENT_SALES_PRICE_TIERS.low.color;
+        else if (comp.salePrice >= p75) tierColor = RECENT_SALES_PRICE_TIERS.high.color;
 
         const priceFmt = comp.salePrice ? `$${comp.salePrice.toLocaleString()}` : '';
         const psfFmt = comp.pricePerSqft ? `$${Math.round(comp.pricePerSqft)}/sf` : '';

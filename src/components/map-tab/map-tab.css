@@ -298,6 +298,53 @@
   margin-bottom: 1px !important;
 }
 
+/* Legend for a layer whose colours carry meaning (Comparable Unit Sales price
+   tiers). Sits under that layer's row, only while the layer is drawn. Quiet by
+   default — it explains the map, it is not part of it. */
+.layer-legend {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--cui-border-color, #2d2d3a);
+}
+
+.layer-legend-title {
+  font-size: 10px;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 3px;
+}
+
+.layer-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--cui-body-color, #e5e5e5);
+}
+
+.layer-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.layer-legend-label {
+  flex-shrink: 0;
+}
+
+/* The dollar thresholds are the point of the legend, but they are secondary to
+   the colour they explain — muted, and allowed to truncate rather than wrap the
+   row onto two lines in a narrow rail. */
+.layer-legend-range {
+  margin-left: auto;
+  color: var(--cui-secondary-color, #9ca3af);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* A count of zero (MK24 §3). Deliberately quieter than a real count, not
    louder: "(0)" is telling you this data has not been added yet, which is a
    prompt to go and add it — not an error. Muted and italic reads as an absence;
