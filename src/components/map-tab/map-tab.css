@@ -33,7 +33,7 @@
   /* Width is set inline and drag-adjustable (see MapTab). The values here are
      only the fallback for any surface that renders the rail without it. */
   width: 264px;
-  min-width: 200px;
+  min-width: 240px;
   background: var(--cui-card-bg, #1a1a24);
   border-right: 1px solid var(--cui-border-color, #2d2d3a);
   display: flex;
@@ -301,7 +301,12 @@
    so it reads as part of that row rather than a new section, and kept tight so
    three inputs don't push the rest of the tree off screen. */
 .layer-item-extra {
-  padding: 2px 6px 6px 14px;
+  /* Indent to the LAYER LABEL, not the row edge, so the controls read as
+     belonging to Comparable Unit Sales rather than to the group. 64px is the
+     row's own offset, summed from its parts: 4px item padding + 16px drag
+     handle + 4px flex gap + 40px of checkbox, colour swatch and their gaps.
+     Keep this in step if those change. */
+  padding: 2px 6px 8px 64px;
 }
 
 .layer-item-extra .form-control-sm {
@@ -321,8 +326,18 @@
    numbers of different widths read as ragged in a grid this tight. */
 .sfcomps-filters-compact {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  /* Each column is only as wide as its own label — "Radius (mi)" is wider than
+     "Days" and there is no reason for their boxes to match. 1fr stretched all
+     three across the full rail, which put the fields under the drag handles
+     rather than under the layer they belong to (Gregg, 2026-08-17). */
+  /* Explicit widths rather than max-content: a number input contributes its
+     own intrinsic width (~170px) to intrinsic sizing, so max-content would
+     size the columns to the INPUTS and stretch the row again. These are sized
+     to the labels at 10px — "Radius (mi)" is the widest at ~55px, "Days" the
+     narrowest. */
+  grid-template-columns: 60px 46px 38px;
+  justify-content: start;
+  gap: 5px;
 }
 
 .sfcomps-filters-compact > div {
@@ -337,6 +352,7 @@
 
 .sfcomps-filters-compact input {
   width: 100%;
+  min-width: 0;
   text-align: center;
   /* Spinners eat most of the width at this size and the value is centred
      around them, so drop them and let the number have the column. */

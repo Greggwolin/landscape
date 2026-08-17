@@ -111,7 +111,9 @@ export const CATEGORIES_BY_FEATURE_TYPE: Record<
 // user can drag it from here. Bounds: narrow enough to reclaim the map, never
 // so wide the map is squeezed out.
 export const MAP_SIDEBAR_DEFAULT_WIDTH = 264;
-export const MAP_SIDEBAR_MIN_WIDTH = 200;
+// 240, not 200: the Comparable Unit Sales filter row needs 64px of indent plus
+// ~154px of columns, and below this the labels would clip against the rail edge.
+export const MAP_SIDEBAR_MIN_WIDTH = 240;
 export const MAP_SIDEBAR_MAX_WIDTH = 520;
 
 /**
