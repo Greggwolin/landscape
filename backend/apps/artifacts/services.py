@@ -54,6 +54,61 @@ def _coerce_user_id(user_id: Any) -> str:
     return str(user_id)[:50]
 
 
+_CARRIED_EVIDENCE = ('entered', 'benchmark')
+
+
+def _merge_dedup_params(stored: Any, fresh: Any) -> dict:
+    """Merge a fresh tool's ``params_json`` over the stored one on a dedup hit.
+
+    ``params_json`` is NOT purely tool-authored, which is why a dedup refresh
+    cannot simply replace it:
+
+      - The report toolbar's pin / save-as-new-version path PATCHes the user's
+        view state (``modification_spec`` — visible columns, order, rename,
+        sort) into this same object. A wholesale replace threw that away on
+        the next plain re-ask of the report.
+      - The clarification apply service flips each answered step's ``evidence``
+        from 'assumed' to 'entered'/'benchmark' and persists it here so the
+        badge survives a reload. The builder rebuilds evidence from the model's
+        tool arguments (default 'assumed') and never reads the DB, so a re-fire
+        on the same thread would revert answered steps and re-ask the user for
+        figures they have already supplied.
+
+    Everything else the tools own still refreshes — the fresh params win on
+    every key they carry. That is the point of the dedup refresh and must not
+    be weakened: a stale ``budget_view_config`` / ``map_config`` /
+    ``location_brief_config`` is the exact failure this path exists to close.
+    """
+    _stored = stored if isinstance(stored, dict) else {}
+    _fresh = fresh if isinstance(fresh, dict) else {}
+
+    # Shallow merge, fresh wins.
+    merged = {**_stored, **_fresh}
+
+    # Carry answered-step evidence forward by step id. The fresh config still
+    # wins on question text, targets, options and any newly added steps — only
+    # the user-supplied evidence badge is preserved.
+    fresh_cfg = _fresh.get('clarification_config')
+    if isinstance(fresh_cfg, dict):
+        prior_evidence = {
+            s.get('id'): s.get('evidence')
+            for s in ((_stored.get('clarification_config') or {}).get('steps') or [])
+            if isinstance(s, dict) and s.get('evidence') in _CARRIED_EVIDENCE
+        }
+        if prior_evidence:
+            # Copy before writing — never mutate the caller's params_json.
+            cfg = dict(fresh_cfg)
+            cfg['steps'] = [
+                {**s, 'evidence': prior_evidence[s['id']]}
+                if isinstance(s, dict) and s.get('id') in prior_evidence
+                else s
+                for s in (cfg.get('steps') or [])
+            ]
+            merged['clarification_config'] = cfg
+
+    return merged
+
+
 def _next_version_seq(artifact_id: int) -> int:
     last = (
         ArtifactVersion.objects
@@ -295,9 +350,15 @@ def create_artifact_record(
                 # a budget artifact could never receive budget_view_config and
                 # silently kept rendering through the legacy block renderer.
                 # Same reasoning as full_schema above: a fresh tool fetch is the
-                # authoritative snapshot, params included.
+                # authoritative snapshot — but only of the keys the TOOL owns.
+                # Other code paths write user-owned state into this same object
+                # after creation, so merge rather than replace. See
+                # _merge_dedup_params for what is preserved and why.
                 if params_json is not None:
-                    _dedup_update_fields['params_json'] = params_json
+                    _dedup_update_fields['params_json'] = _merge_dedup_params(
+                        stored=existing.params_json,
+                        fresh=params_json,
+                    )
                 Artifact.objects.filter(pk=existing.artifact_id).update(
                     **_dedup_update_fields
                 )
