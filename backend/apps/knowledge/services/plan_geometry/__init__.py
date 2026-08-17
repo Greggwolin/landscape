@@ -40,6 +40,18 @@ from .plan_classify import (
     classify_plan,
     is_plan_document,
 )
+from .plan_reader import (
+    PlanReading,
+    find_lot_sheets,
+    read_plan,
+)
+from .lot_table import (
+    DerivedOutline,
+    LotAreaTable,
+    compare_to_drawn_labels,
+    derive_missing_lots,
+    read_lot_area_table,
+)
 from .lot_dimensions import (
     FrontageBasis,
     LotDimensions,
@@ -56,6 +68,9 @@ from .intake import (
 )
 
 __all__ = [
+    "PlanReading", "read_plan", "find_lot_sheets",
+    "LotAreaTable", "read_lot_area_table", "compare_to_drawn_labels",
+    "DerivedOutline", "derive_missing_lots",
     "FrontageBasis", "LotDimensions", "measure_lot", "measure_lots",
     "total_frontage",
     "PLAN_DOC_TYPE", "PlanVerdict", "classify_plan", "is_plan_document",

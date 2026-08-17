@@ -148,13 +148,17 @@ class PlanVerdict:
     @property
     def trusted_for_money(self) -> bool:
         """
-        False whenever the stage is unknown OR only guessed.
+        The CLASSIFIER's view: a known stage, confidently read, whose geometry
+        is survey-accurate. False when the stage is unknown or only guessed —
+        a stage read off a case number scores 0.5 and can easily be wrong, as a
+        paving plan carrying the subdivision's own case number demonstrates.
 
-        Both halves matter. A stage read off a case number scores 0.5 and can
-        easily be wrong — a paving plan carries the subdivision's case number
-        and is not a plat at all. Letting a guess at a trusted stage authorise
-        a dollar figure is precisely the failure this module exists to stop, so
-        a stage that has not been confirmed never counts as survey-accurate.
+        **This is not permission.** It says the machine believes the drawing is
+        survey-accurate; it does not say a person has agreed. Permission needs
+        both, and lives in `verdict_to_profile`, which never writes it true —
+        only a human confirming the drawing can set it. Conflating the two is
+        how an unconfirmed plat would end up authorising a dollar figure, which
+        is the failure this module exists to stop.
         """
         if self.stage is None or self.confidence < _CONFIDENT:
             return False

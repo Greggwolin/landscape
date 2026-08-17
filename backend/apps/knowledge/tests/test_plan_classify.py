@@ -370,3 +370,20 @@ def test_pipeline_still_fails_a_scanned_document_that_is_not_a_drawing():
 
     # Nothing was refiled — the document's type is left alone.
     assert "doc_type = COALESCE" not in sql
+
+
+def test_the_stored_payload_never_grants_money_use_before_a_person_confirms():
+    """
+    The gap this closes: the classifier's `trusted_for_money` says the machine
+    believes the drawing is survey-accurate. It does not say anyone agreed.
+    Storing the machine's belief under that name would let a writer reading it
+    price a plat nobody had confirmed — the exact failure the module exists to
+    prevent. So the stored field is two fields, and the permission one is
+    written false without exception.
+    """
+    v = classify_plan(FINAL_PLAT, "plat.pdf", _title(FINAL_PLAT))
+    assert v.trusted_for_money is True          # the classifier is sure
+    p = verdict_to_profile(v)
+    assert p["stage_is_measurable"] is True     # ...and says so, under its own name
+    assert p["trusted_for_money"] is False      # ...but grants nothing
+    assert p["confirmed_by_user"] is False

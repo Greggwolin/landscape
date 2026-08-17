@@ -82,7 +82,14 @@ def verdict_to_profile(verdict: PlanVerdict) -> dict[str, Any]:
         "stage": int(verdict.stage) if verdict.stage else None,
         "stage_label": verdict.stage_label,
         "confidence": verdict.confidence,
-        "trusted_for_money": verdict.trusted_for_money,
+        # What the classifier believes about the drawing...
+        "stage_is_measurable": verdict.trusted_for_money,
+        # ...and, separately, whether anything may be priced from it. Written
+        # false without exception: reading a plat is not the same as a person
+        # agreeing it is one, and only the confirm action may set this true.
+        # Without the split, a writer reading `trusted_for_money` would
+        # authorise money use on a drawing nobody had confirmed.
+        "trusted_for_money": False,
         "needs_confirmation": verdict.needs_confirmation,
         "evidence": verdict.evidence,
         "confirmed_by_user": False,
