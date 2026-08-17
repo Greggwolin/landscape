@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import styles from './ScheduleArtifact.module.css';
 import { hierCellText, hierHeaderLabels } from './hierPath';
+import { withExtraColumns } from './columnOrder';
 
 /**
  * ScheduleArtifact — one topic plus one view specification.
@@ -322,8 +323,15 @@ export function ScheduleArtifact({ config, onClose }: Props) {
   /* Which columns earn their place. A column belongs when it VARIES across the
    * visible rows; anything constant is in the title instead. */
   const activeColumns = useMemo(() => {
-    const keys = [...(config.rung_columns[rung] ?? config.rung_columns.standard ?? [])];
-    for (const key of extraColumns) if (!keys.includes(key)) keys.push(key);
+    // An extra takes its canonical place in the reading order, not the end of
+    // the row: turning Stage on puts it between Category and Description, where
+    // config.columns says it belongs. Insertion, never a sort — see
+    // ./columnOrder.ts for why the summary rung makes a sort unsafe.
+    const keys = withExtraColumns(
+      config.rung_columns[rung] ?? config.rung_columns.standard ?? [],
+      extraColumns,
+      config.columns,
+    );
     const distinct = (key: string) =>
       new Set(visibleRows.map((r) => String(r.cells[key] ?? ''))).size;
     const cols = keys
