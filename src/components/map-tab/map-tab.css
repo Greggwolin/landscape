@@ -60,9 +60,18 @@
   padding: 8px 0;
 }
 
-/* Layer Group */
+/* Layer Group — each one is a SECTION, matching the County Parcels /
+   Draw-Measure treatment further down the rail: a rule above it, its own
+   header row with a chevron, contents beneath (Gregg, 2026-08-17). */
 .layer-group {
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  border-top: 1px solid var(--cui-border-color, #2d2d3a);
+  padding: 4px 0 6px;
+}
+
+/* No rule above the first section — it would double the panel's own edge. */
+.layer-group:first-child {
+  border-top: none;
 }
 
 .layer-group-header {
@@ -70,12 +79,12 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 16px;
+  padding: 6px 10px;
   background: none;
   border: none;
   color: var(--cui-body-color, #e5e5e5);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: background-color 0.15s;
   text-align: left;
@@ -103,11 +112,15 @@
 
 /* Layer Items */
 .layer-group-items {
-  padding-left: 24px;
+  /* Was 24px. The chevron already signals the nesting; a second indent this
+     deep just cost label width and wrapped every two-word layer name. */
+  padding-left: 6px;
 }
 
 .layer-item {
-  padding: 4px 16px 4px 8px;
+  /* Was 4px 16px 4px 8px — the 16px right gutter bought nothing and the rows
+     are the widest thing in the rail. */
+  padding: 3px 6px 3px 4px;
 }
 
 /* Draggable data-layer rows: grip handle sits left of the existing controls. */
@@ -264,7 +277,7 @@
    so it reads as part of that row rather than a new section, and kept tight so
    three inputs don't push the rest of the tree off screen. */
 .layer-item-extra {
-  padding: 2px 8px 8px 26px;
+  padding: 2px 6px 6px 14px;
 }
 
 .layer-item-extra .form-control-sm {
