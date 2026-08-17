@@ -95,14 +95,17 @@ def _merge_dedup_params(stored: Any, fresh: Any) -> dict:
             for s in ((_stored.get('clarification_config') or {}).get('steps') or [])
             if isinstance(s, dict) and s.get('evidence') in _CARRIED_EVIDENCE
         }
-        if prior_evidence:
+        fresh_steps = fresh_cfg.get('steps')
+        if prior_evidence and isinstance(fresh_steps, list):
             # Copy before writing — never mutate the caller's params_json.
+            # Only rewrite an actual list; a config without steps passes
+            # through untouched rather than gaining a key no tool sent.
             cfg = dict(fresh_cfg)
             cfg['steps'] = [
                 {**s, 'evidence': prior_evidence[s['id']]}
                 if isinstance(s, dict) and s.get('id') in prior_evidence
                 else s
-                for s in (cfg.get('steps') or [])
+                for s in fresh_steps
             ]
             merged['clarification_config'] = cfg
 

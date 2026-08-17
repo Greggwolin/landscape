@@ -15,6 +15,18 @@ Manual one-shot setup against the existing test DB:
 
     psql "$DATABASE_URL" -d test_land_v2 -c 'CREATE SCHEMA IF NOT EXISTS landscape'
     DATABASE_URL="<test-db-url>" node scripts/run-migrations.mjs
+
+LAYER (ArtifactDedupParamsMergeTests): wiring — that create_artifact_record's
+dedup branch calls _merge_dedup_params with the stored row's params and persists
+the result. The pure-logic layer for that helper, which runs with no DB and no
+skip guard, is apps/artifacts/tests/test_dedup_params_merge.py.
+
+CAUTION: the skipUnless guard above calls _artifact_tables_present() at IMPORT
+time, so it inspects whatever DATABASE_URL points at — the dev database — not
+the test database pytest builds. On any environment whose dev DB lacks
+landscape.tbl_artifact, every test in this module silently skips. That includes
+CI, whose backend-tests job uses an empty throwaway Postgres. Filed as a
+follow-up; see the LSCMD-BA-DEDUPPARAMS-0814-BA1 PR.
 """
 
 from __future__ import annotations
