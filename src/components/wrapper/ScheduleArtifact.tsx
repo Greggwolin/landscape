@@ -263,9 +263,15 @@ export function ScheduleArtifact({ config, onClose }: Props) {
   /* A member is stored as a number; its name is the level's own label plus that
    * number. Compose it here so renaming a level in project setup renames every
    * member with it, and nothing anywhere hard-codes the word. A member with no
-   * number is a real name (a village called "Riverbend") and stands alone. */
-  const composeMember = (levelLabel: string, member: string) =>
-    /\d/.test(member) ? `${levelLabel} ${member}` : member;
+   * number is a real name (a village called "Riverbend") and stands alone.
+   *
+   * A function declaration, not a const arrow: scopeLabel's useMemo above calls
+   * this during render, so a const would still be in its temporal dead zone and
+   * throw the moment a filter is actually applied. It closes over nothing,
+   * which is what makes hoisting safe here. */
+  function composeMember(levelLabel: string, member: string) {
+    return /\d/.test(member) ? `${levelLabel} ${member}` : member;
+  }
 
   const memberLabel = useMemo(() => {
     const map: Record<string, string> = {};
