@@ -51,6 +51,10 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
   const currentYear = new Date().getFullYear();
 
   const [draftRadius, setDraftRadius] = useState(String(filters.radiusMiles));
+  // The radius box shows its unit ("3 mi"), which means it cannot be a number
+  // input — those hold numbers only. It is a text field, and the suffix is
+  // dropped while it has focus so you are never editing around it.
+  const [radiusFocused, setRadiusFocused] = useState(false);
   const [draftDays, setDraftDays] = useState(String(filters.soldWithinDays));
   const [draftMinYear, setDraftMinYear] = useState(
     filters.minYearBuilt ? String(filters.minYearBuilt) : ''
@@ -95,6 +99,14 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
     }
   }, [draftMinYear, filters, currentYear, onFiltersChange]);
 
+  // "3 mi" when idle, the bare number while editing, "- mi" when there is no
+  // value to show.
+  const radiusDisplay = radiusFocused
+    ? draftRadius
+    : Number.isFinite(filters.radiusMiles)
+      ? `${filters.radiusMiles} mi`
+      : '- mi';
+
   const onEnter = (commit: () => void) => (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       commit();
@@ -111,14 +123,20 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
       }
     >
       <div>
-        <label className="text-muted small d-block mb-1">Radius (mi)</label>
+        <label className="text-muted small d-block mb-1">Radius</label>
         <input
-          type="number"
-          min={0.5}
-          step={0.5}
-          value={draftRadius}
+          type="text"
+          inputMode="decimal"
+          value={radiusDisplay}
+          onFocus={() => {
+            setRadiusFocused(true);
+            setDraftRadius(String(filters.radiusMiles));
+          }}
           onChange={(e) => setDraftRadius(e.target.value)}
-          onBlur={commitRadius}
+          onBlur={() => {
+            setRadiusFocused(false);
+            commitRadius();
+          }}
           onKeyDown={onEnter(commitRadius)}
           className="form-control form-control-sm"
           style={{ width: compact ? undefined : 70 }}

@@ -332,10 +332,11 @@
      rather than under the layer they belong to (Gregg, 2026-08-17). */
   /* Explicit widths rather than max-content: a number input contributes its
      own intrinsic width (~170px) to intrinsic sizing, so max-content would
-     size the columns to the INPUTS and stretch the row again. These are sized
-     to the labels at 10px — "Radius (mi)" is the widest at ~55px, "Days" the
-     narrowest. */
-  grid-template-columns: 60px 46px 38px;
+     size the columns to the INPUTS and stretch the row again.
+     All three equal now that the radius box shows "3 mi" instead of carrying
+     "(mi)" in its label — 46px fits "Build Yr", the longest of the three
+     labels, at 10px. */
+  grid-template-columns: repeat(3, 46px);
   justify-content: start;
   gap: 5px;
 }
