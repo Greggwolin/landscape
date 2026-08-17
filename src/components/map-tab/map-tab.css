@@ -30,14 +30,31 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 .map-tab-sidebar {
-  width: 240px;
-  min-width: 240px;
+  /* Width is set inline and drag-adjustable (see MapTab). The values here are
+     only the fallback for any surface that renders the rail without it. */
+  width: 264px;
+  min-width: 200px;
   background: var(--cui-card-bg, #1a1a24);
   border-right: 1px solid var(--cui-border-color, #2d2d3a);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0; /* Allow flex shrinking */
+}
+
+/* Drag handle between the rail and the map. 4px of hit area, invisible until
+   hovered — the col-resize cursor is what announces it, the same way the
+   artifacts panel's handle works. */
+.map-tab-sidebar-handle {
+  flex: 0 0 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.15s;
+}
+
+.map-tab-sidebar-handle:hover,
+.map-tab-sidebar-handle:active {
+  background: var(--cui-primary, #5c6bc0);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

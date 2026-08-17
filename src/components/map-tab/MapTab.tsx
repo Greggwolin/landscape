@@ -53,7 +53,9 @@ import {
   writeStoredLayerOrder,
 } from '@/lib/maps/layerOrder';
 import { DEFAULT_TERRAIN_CONFIG } from '@/lib/maps/terrain';
-import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, RECENT_SALES_PRICE_TIERS } from './constants';
+import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM,
+  RECENT_SALES_PRICE_TIERS, MAP_SIDEBAR_DEFAULT_WIDTH, MAP_SIDEBAR_MIN_WIDTH,
+  MAP_SIDEBAR_MAX_WIDTH } from './constants';
 import {
   useDemographics,
   DEMOGRAPHIC_FIELDS,
@@ -325,6 +327,45 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // which froze the tree at that first guess: a land development kept the
   // income-property rows (rental comparables instead of home resales, no Plan
   // Parcels) for the life of the mount. Rebuild when the answer changes.
+  // ── Left panel width ──────────────────────────────────────────────────────
+  // Was a fixed 240px in CSS. Default is now 264 (10% wider) and the user can
+  // drag it: the rail carries layer names, counts, filters and a legend, and
+  // how much room those need depends on the project and the display.
+  //
+  // Same pointer pattern as the artifacts panel's own handle — pointermove on
+  // the document so the drag survives leaving the 4px strip, released on
+  // pointerup. Clamped so it can be neither unusably narrow nor wide enough to
+  // squeeze the map out.
+  const [sidebarWidth, setSidebarWidth] = useState(MAP_SIDEBAR_DEFAULT_WIDTH);
+  const sidebarResizing = useRef(false);
+  const sidebarStartX = useRef(0);
+  const sidebarStartWidth = useRef(0);
+
+  const handleSidebarResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      sidebarResizing.current = true;
+      sidebarStartX.current = e.clientX;
+      sidebarStartWidth.current = sidebarWidth;
+
+      const onMove = (ev: PointerEvent) => {
+        if (!sidebarResizing.current) return;
+        const next = sidebarStartWidth.current + (ev.clientX - sidebarStartX.current);
+        setSidebarWidth(
+          Math.min(Math.max(next, MAP_SIDEBAR_MIN_WIDTH), MAP_SIDEBAR_MAX_WIDTH)
+        );
+      };
+      const onUp = () => {
+        sidebarResizing.current = false;
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    },
+    [sidebarWidth]
+  );
+
   const builtForDevelopment = useRef(isDevelopmentProject);
   useEffect(() => {
     if (builtForDevelopment.current === isDevelopmentProject) return;
@@ -3469,7 +3510,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   return (
     <div className="map-tab">
       {/* ─── Sidebar: Layers + Draw Tools ─── */}
-      <div className="map-tab-sidebar">
+      <div
+        className="map-tab-sidebar"
+        style={{ width: sidebarWidth, minWidth: sidebarWidth }}
+      >
         <LayerPanel
           layers={panelLayerState}
           onToggleLayer={handleToggleLayer}
@@ -3911,6 +3955,17 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       </div>
 
       {/* ─── Map Content Area ─── */}
+      {/* Drag to resize the rail. Sits between the two so it never overlaps
+          either; the cursor is the only affordance, as with the artifacts
+          panel handle. */}
+      <div
+        className="map-tab-sidebar-handle"
+        onPointerDown={handleSidebarResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize layer panel"
+      />
+
       <div className="map-tab-content">
         <MapCanvas
           ref={mapCanvasRef}

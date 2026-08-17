@@ -106,6 +106,14 @@ export const CATEGORIES_BY_FEATURE_TYPE: Record<
 // Default Layer State
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Left layer rail. 264 is the old fixed 240 plus 10% (Gregg, 2026-08-17); the
+// rail now carries layer names, counts, per-layer filters and a legend, so the
+// user can drag it from here. Bounds: narrow enough to reclaim the map, never
+// so wide the map is squeezed out.
+export const MAP_SIDEBAR_DEFAULT_WIDTH = 264;
+export const MAP_SIDEBAR_MIN_WIDTH = 200;
+export const MAP_SIDEBAR_MAX_WIDTH = 520;
+
 /**
  * How Comparable Unit Sales pins are coloured — by where each sale price falls
  * among the OTHER comps currently on the map.
