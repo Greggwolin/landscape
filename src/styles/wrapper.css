@@ -3086,3 +3086,22 @@
   font-size: 12px;
   color: var(--cui-danger, #c62828);
 }
+
+/* What the read said (MK34). Shown verbatim — these are full sentences written
+   for a person, so they wrap rather than truncate. Neutral while reading,
+   confirming when it worked, and muted-warning when it refused: a refusal is a
+   correct outcome, not a failure, so it must not look like an error. */
+.w-plan-card-apply {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--cui-secondary-color, #9ca3af);
+}
+
+.w-plan-card-apply.is-done {
+  color: var(--cui-success, #2e7d32);
+}
+
+.w-plan-card-apply.is-blocked {
+  color: var(--cui-warning, #e0a800);
+}

@@ -57,6 +57,15 @@ export function PlanStageCard({ docId, plan, onConfirmed }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(Boolean(plan.confirmed_by_user));
+  // MK34 — what the read is doing, and what it said when it finished. The
+  // messages come back written for a person and are shown verbatim; they are
+  // the whole point of the endpoint and must not be summarised here.
+  const [applyState, setApplyState] = useState<string | null>(
+    (plan as { apply?: { state?: string } }).apply?.state ?? null,
+  );
+  const [applyMessage, setApplyMessage] = useState<string | null>(
+    (plan as { apply?: { message?: string } }).apply?.message ?? null,
+  );
 
   if (!plan?.is_plan) return null;
 
@@ -90,11 +99,55 @@ export function PlanStageCard({ docId, plan, onConfirmed }: Props) {
       if (!response.ok) throw new Error(String(response.status));
       setConfirmed(true);
       onConfirmed?.();
+
+      // Confirming is permission to read. Ask for the read; the endpoint
+      // answers immediately (202) and does the ~10s work in the background,
+      // so poll the document until it stops saying "reading".
+      setApplyState('reading');
+      setApplyMessage('Reading the drawing…');
+      const applyRes = await fetch(`/api/knowledge/documents/${docId}/apply-plan/`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      });
+      const applyBody = await applyRes.json().catch(() => null);
+      if (applyBody?.message) setApplyMessage(applyBody.message);
+      if (applyBody?.state) setApplyState(applyBody.state);
+      if (applyBody?.state === 'reading') void pollApply();
     } catch {
       setError('Could not save that. Try again.');
+      setApplyState(null);
+      setApplyMessage(null);
     } finally {
       setSaving(false);
     }
+  };
+
+  /** Poll the document's profile until the read finishes. Bounded: a plat
+   *  takes ~10s, so 60 tries at 2s is a generous ceiling rather than a loop
+   *  that spins forever if the worker dies. */
+  const pollApply = async () => {
+    for (let i = 0; i < 60; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const res = await fetch(`/api/dms/documents/${docId}/profile`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) continue;
+        const body = await res.json();
+        const apply = body?.profile?.plan?.apply ?? body?.plan?.apply;
+        if (apply?.state && apply.state !== 'reading') {
+          setApplyState(apply.state);
+          setApplyMessage(apply.message ?? null);
+          // The project just gained parcels — let the host refresh.
+          if (apply.state === 'done') onConfirmed?.();
+          return;
+        }
+      } catch {
+        /* transient — keep polling until the ceiling */
+      }
+    }
+    setApplyState('failed');
+    setApplyMessage('The read is taking longer than expected. Reload to see where it got to.');
   };
 
   return (
@@ -144,9 +197,13 @@ export function PlanStageCard({ docId, plan, onConfirmed }: Props) {
             <button
               className="btn btn-primary btn-sm"
               onClick={handleConfirm}
-              disabled={choice === '' || saving}
+              // MK34: not pressable while saving OR while the read runs. The
+              // writer supersedes rather than duplicating, so a second press is
+              // not destructive — but someone watching nothing happen will
+              // press again, and should not have to wonder.
+              disabled={choice === '' || saving || applyState === 'reading'}
             >
-              {saving ? 'Saving…' : 'Confirm'}
+              {saving ? 'Saving…' : applyState === 'reading' ? 'Reading…' : 'Confirm'}
             </button>
           </div>
           {picked && !picked.measurable && (
@@ -165,6 +222,19 @@ export function PlanStageCard({ docId, plan, onConfirmed }: Props) {
       )}
 
       {error && <p className="w-plan-card-error">{error}</p>}
+
+      {/* What the read said — shown verbatim. These messages are written for a
+          person to act on ("Confirm what this drawing is before anything is
+          measured from it"), and paraphrasing them would lose the reason. */}
+      {applyMessage && (
+        <p
+          className={`w-plan-card-apply${applyState === 'done' ? ' is-done' : ''}${
+            applyState === 'blocked' || applyState === 'failed' ? ' is-blocked' : ''
+          }`}
+        >
+          {applyMessage}
+        </p>
+      )}
     </div>
   );
 }

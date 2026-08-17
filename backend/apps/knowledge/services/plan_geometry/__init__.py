@@ -40,6 +40,11 @@ from .plan_classify import (
     classify_plan,
     is_plan_document,
 )
+from .apply_plan import (
+    ApplyOutcome,
+    apply_confirmed_plan,
+    why_not_ready,
+)
 from .plan_reader import (
     PlanReading,
     find_lot_sheets,
@@ -68,6 +73,7 @@ from .intake import (
 )
 
 __all__ = [
+    "ApplyOutcome", "apply_confirmed_plan", "why_not_ready",
     "PlanReading", "read_plan", "find_lot_sheets",
     "LotAreaTable", "read_lot_area_table", "compare_to_drawn_labels",
     "DerivedOutline", "derive_missing_lots",
