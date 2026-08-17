@@ -8,6 +8,14 @@ export interface WrapperProject {
   project_type_code?: string;
   project_type?: string;
   property_subtype?: string;
+  // How the project is being analysed. MapTab derives isDevelopmentProject
+  // from these, and WITHOUT them a land-development project reads as an income
+  // property in the /w/ shell: it loses Plan Parcels and gets the rental
+  // comparables row instead of home resales, filters and all. Red Valley is
+  // analysis_perspective = DEVELOPMENT in the database and was rendering as
+  // neither (2026-08-17).
+  analysis_perspective?: string | null;
+  analysis_type?: string | null;
   // Location — needed by the Map tab so it centers on the saved location
   // instead of treating the project as having no home (causes auto-fit zoom-out).
   location_lat?: number | null;

@@ -319,6 +319,18 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const [activeTool, setActiveTool] = useState<DrawTool>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups(isDevelopmentProject));
+
+  // The project arrives asynchronously, so isDevelopmentProject is false on the
+  // first render and may flip once it lands. useState's initialiser runs ONCE,
+  // which froze the tree at that first guess: a land development kept the
+  // income-property rows (rental comparables instead of home resales, no Plan
+  // Parcels) for the life of the mount. Rebuild when the answer changes.
+  const builtForDevelopment = useRef(isDevelopmentProject);
+  useEffect(() => {
+    if (builtForDevelopment.current === isDevelopmentProject) return;
+    builtForDevelopment.current = isDevelopmentProject;
+    setLayers(getDefaultLayerGroups(isDevelopmentProject));
+  }, [isDevelopmentProject]);
   // Terrain: hillshade relief on by default (subtle, from the free DEM); the
   // dramatic 3D tilt is opt-in. Both survive basemap switches (see MapCanvas).
   const [hillshadeEnabled, setHillshadeEnabled] = useState(true);

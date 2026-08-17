@@ -39,6 +39,10 @@ export default function WrapperProjectLayout({
             project_type_code: data.project_type_code ?? undefined,
             project_type: data.project_type ?? undefined,
             property_subtype: data.property_subtype ?? undefined,
+            // Without these the Map tab cannot tell a land development from an
+            // income property and silently treats every project as the latter.
+            analysis_perspective: data.analysis_perspective ?? null,
+            analysis_type: data.analysis_type ?? null,
             // Pass the saved location through so the Map tab centers on it
             // (without these, hasResolvedCenter stays false → auto-fit zoom-out).
             location_lat: data.location_lat ?? null,

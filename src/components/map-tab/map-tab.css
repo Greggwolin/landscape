@@ -10,8 +10,15 @@
 
 .map-tab {
   display: flex;
-  /* Fill remaining viewport height below tab bar */
-  height: calc(100vh - var(--cui-header-height, 56px) - 120px);
+  /* FILL the container rather than guessing at the viewport.
+     This was `height: calc(100vh - 56px - 120px)` — an estimate of the classic
+     tab's chrome. In the /w/ panel the chrome is different (panel header +
+     Artifacts|Documents|Map toggle), so the guess came up short and left a
+     band of dead space beneath the map (Gregg, 2026-08-17). flex:1 inside the
+     panel's flex column fills exactly; height:100% covers a non-flex parent;
+     min-height keeps it usable if neither resolves to anything. */
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 500px;
   background: var(--cui-body-bg, #121218);
   border-radius: 8px;

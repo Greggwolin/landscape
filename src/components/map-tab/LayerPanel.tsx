@@ -230,7 +230,12 @@ export function LayerPanel({
                 pinned Annotations group. */}
             {group.expanded && (
               <div className="layer-group-items">
-                {dragEnabled && !isAnnotations ? (
+                {/* Annotations rows are reorderable too (Gregg, 2026-08-17).
+                    They were excluded because the group also hosts the named
+                    drawn shapes below, which are pinned — but that is a reason
+                    to pin THOSE, not to deny the three category toggles the
+                    handle every other layer row has. */}
+                {dragEnabled ? (
                   <DndContext
                     // Stable, per-group id so @dnd-kit's generated
                     // `aria-describedby` (DndDescribedBy-N) is deterministic
