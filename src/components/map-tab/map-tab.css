@@ -315,51 +315,87 @@
   margin-bottom: 1px !important;
 }
 
-/* Legend for a layer whose colours carry meaning (Comparable Unit Sales price
-   tiers). Sits under that layer's row, only while the layer is drawn. Quiet by
-   default — it explains the map, it is not part of it. */
-.layer-legend {
-  margin-top: 6px;
-  padding-top: 5px;
-  border-top: 1px dashed var(--cui-border-color, #2d2d3a);
+/* The three sale filters, three-across in the narrow rail (Gregg, 2026-08-17).
+   Equal columns so the row always fits whatever the rail width is, and both
+   the label and the value are centred over their own column — left-aligned
+   numbers of different widths read as ragged in a grid this tight. */
+.sfcomps-filters-compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
 }
 
-.layer-legend-title {
+.sfcomps-filters-compact > div {
+  min-width: 0;
+}
+
+.sfcomps-filters-compact label {
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sfcomps-filters-compact input {
+  width: 100%;
+  text-align: center;
+  /* Spinners eat most of the width at this size and the value is centred
+     around them, so drop them and let the number have the column. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.sfcomps-filters-compact input::-webkit-outer-spin-button,
+.sfcomps-filters-compact input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Sale-price legend, ON THE MAP (Gregg, 2026-08-17) — it explains the pins, so
+   it belongs where the pins are rather than in the rail. Bottom-left: clear of
+   the display controls top-left, the MapLibre nav top-right, and the scale bar
+   and attribution bottom-right. Same card treatment as the display controls so
+   the two read as one family. */
+.map-tab-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 10px;
+  z-index: 5;
+  padding: 7px 9px;
+  background: var(--cui-card-bg, rgba(26, 26, 36, 0.92));
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none; /* never steal a click meant for the map */
+}
+
+.map-tab-legend-title {
   font-size: 10px;
   color: var(--cui-secondary-color, #9ca3af);
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
-.layer-legend-row {
+.map-tab-legend-row {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--cui-body-color, #e5e5e5);
+  white-space: nowrap;
 }
 
-.layer-legend-swatch {
+.map-tab-legend-swatch {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.layer-legend-label {
-  flex-shrink: 0;
-}
-
-/* The dollar thresholds are the point of the legend, but they are secondary to
-   the colour they explain — muted, and allowed to truncate rather than wrap the
-   row onto two lines in a narrow rail. */
-.layer-legend-range {
+.map-tab-legend-range {
   margin-left: auto;
+  padding-left: 10px;
   color: var(--cui-secondary-color, #9ca3af);
   font-size: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* A count of zero (MK24 §3). Deliberately quieter than a real count, not

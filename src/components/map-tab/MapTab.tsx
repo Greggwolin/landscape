@@ -918,61 +918,38 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // row; the income-property equivalent (rent-comps) has no comparable filter
   // API yet, so it gets no controls rather than dead ones.
   const renderLayerExtra = useCallback(
-    (layerId: string) => {
-      if (layerId !== 'recent-sales') return null;
-
-      // The pins are coloured by price RANK within the comps currently shown,
-      // so the legend quotes the live 25th/75th-percentile thresholds rather
-      // than naming a colour. Without the numbers "Upper quarter" says nothing
-      // about what a red pin costs — and because the thresholds move with the
-      // filters, a fixed caption would be wrong as soon as the radius changed.
-      const p25 = sfCompsData?.stats?.p25Price ?? null;
-      const p75 = sfCompsData?.stats?.p75Price ?? null;
-      const money = (v: number) => `$${Math.round(v).toLocaleString()}`;
-      const bands: Array<{ color: string; label: string; range: string }> = [
-        {
-          ...RECENT_SALES_PRICE_TIERS.low,
-          range: p25 != null ? `up to ${money(p25)}` : '',
-        },
-        {
-          ...RECENT_SALES_PRICE_TIERS.mid,
-          range: p25 != null && p75 != null ? `${money(p25)} – ${money(p75)}` : '',
-        },
-        {
-          ...RECENT_SALES_PRICE_TIERS.high,
-          range: p75 != null ? `${money(p75)} and up` : '',
-        },
-      ];
-
-      return (
+    (layerId: string) =>
+      layerId === 'recent-sales' ? (
         <div className="layer-item-extra">
           <SfCompsFilterControls
             filters={sfFilters}
             onFiltersChange={setSfFilters}
             compact
           />
-          {/* Only while the layer is actually drawn — a legend for pins that
-              are not on screen is noise. */}
-          {recentSalesLayerVisible && (
-            <div className="layer-legend">
-              <div className="layer-legend-title">Sale price vs. these comps</div>
-              {bands.map((band) => (
-                <div key={band.label} className="layer-legend-row">
-                  <span
-                    className="layer-legend-swatch"
-                    style={{ backgroundColor: band.color }}
-                  />
-                  <span className="layer-legend-label">{band.label}</span>
-                  {band.range && <span className="layer-legend-range">{band.range}</span>}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      );
-    },
-    [sfFilters, sfCompsData, recentSalesLayerVisible]
+      ) : null,
+    [sfFilters]
   );
+
+  // The legend belongs ON the map, not in the rail (Gregg, 2026-08-17) — it
+  // explains what you are looking at, so it should sit where you are looking.
+  // Thresholds are the live 25th/75th percentiles of the filtered set, so they
+  // move with the filters; naming the colours alone would say nothing about
+  // what a red pin costs.
+  const recentSalesLegend = useMemo(() => {
+    if (!recentSalesLayerVisible || !sfCompsData?.comps?.length) return null;
+    const p25 = sfCompsData.stats?.p25Price ?? null;
+    const p75 = sfCompsData.stats?.p75Price ?? null;
+    const money = (v: number) => `$${Math.round(v).toLocaleString()}`;
+    return [
+      { ...RECENT_SALES_PRICE_TIERS.low, range: p25 != null ? `up to ${money(p25)}` : '' },
+      {
+        ...RECENT_SALES_PRICE_TIERS.mid,
+        range: p25 != null && p75 != null ? `${money(p25)} – ${money(p75)}` : '',
+      },
+      { ...RECENT_SALES_PRICE_TIERS.high, range: p75 != null ? `${money(p75)} and up` : '' },
+    ];
+  }, [recentSalesLayerVisible, sfCompsData]);
 
   const recentSales = useMemo<FeatureCollection | null>(() => {
     if (!recentSalesLayerVisible || !sfCompsData?.comps?.length) return null;
@@ -4068,6 +4045,24 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             </div>
           )}
         </div>
+
+        {/* Sale-price legend, on the map itself so it sits where the pins are.
+            Only while the layer is drawn and there is something to explain. */}
+        {recentSalesLegend && (
+          <div className="map-tab-legend">
+            <div className="map-tab-legend-title">Sale price vs. these comps</div>
+            {recentSalesLegend.map((band) => (
+              <div key={band.label} className="map-tab-legend-row">
+                <span
+                  className="map-tab-legend-swatch"
+                  style={{ backgroundColor: band.color }}
+                />
+                <span className="map-tab-legend-label">{band.label}</span>
+                {band.range && <span className="map-tab-legend-range">{band.range}</span>}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* FB-323: in-map competitor detail drawer */}
         <CompetitorDetailPanel

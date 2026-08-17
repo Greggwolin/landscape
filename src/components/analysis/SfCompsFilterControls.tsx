@@ -19,7 +19,8 @@ interface Props {
   onFiltersChange: (next: SfCompsFilters) => void;
   /** Optional trailing content — the comp count, a spinner, etc. */
   trailing?: React.ReactNode;
-  /** Stack vertically for a narrow rail instead of the tile's wide row. */
+  /** Tight three-across layout for a narrow rail, instead of the tile's wide
+   *  row with fixed input widths. */
   compact?: boolean;
 }
 
@@ -105,7 +106,7 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
     <div
       className={
         compact
-          ? 'd-flex flex-column gap-2'
+          ? 'sfcomps-filters-compact'
           : 'd-flex flex-wrap gap-3 align-items-end mb-3'
       }
     >
@@ -120,11 +121,11 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
           onBlur={commitRadius}
           onKeyDown={onEnter(commitRadius)}
           className="form-control form-control-sm"
-          style={{ width: compact ? '100%' : 70 }}
+          style={{ width: compact ? undefined : 70 }}
         />
       </div>
       <div>
-        <label className="text-muted small d-block mb-1">Min Year Built</label>
+        <label className="text-muted small d-block mb-1">Build Yr</label>
         <input
           type="number"
           min={1900}
@@ -135,7 +136,7 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
           onBlur={commitMinYear}
           onKeyDown={onEnter(commitMinYear)}
           className="form-control form-control-sm"
-          style={{ width: compact ? '100%' : 90 }}
+          style={{ width: compact ? undefined : 90 }}
         />
       </div>
       <div>
@@ -150,7 +151,7 @@ export function SfCompsFilterControls({ filters, onFiltersChange, trailing, comp
           onBlur={commitDays}
           onKeyDown={onEnter(commitDays)}
           className="form-control form-control-sm"
-          style={{ width: compact ? '100%' : 70 }}
+          style={{ width: compact ? undefined : 70 }}
         />
       </div>
       {trailing ? (
