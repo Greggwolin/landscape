@@ -337,6 +337,24 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
       if (page === 'projects') {
         router.push('/w/projects');
+      } else if (page === 'map') {
+        // THE NAV MAP IS NOT A PROJECT'S MAP (Gregg, 2026-08-17).
+        //
+        // It used to fall through to the project-scoped branch below, which
+        // resolves `projectId ?? lastProjectId` — so once you had opened a
+        // project, this icon dragged you back to that project's map from
+        // anywhere, including the dashboard where it is the only place the
+        // icon appears. Opening the nav map on the dashboard landed you in
+        // Red Valley.
+        //
+        // It is meant to be a clean map: any location, parcel selection for
+        // projects that do not exist yet. That surface does not exist yet —
+        // MapTab is project-bound throughout (every fetch and every write is
+        // scoped to one) — so until it is built this goes to the project
+        // picker, which at least states that a project is being chosen rather
+        // than silently assuming one.
+        if (projectId) router.push(`/w/projects/${projectId}/map`);
+        else router.push('/w/projects?goto=map');
       } else if (projectScoped.includes(page)) {
         // FB-308: a project-scoped page (Reports, Map) needs a project. With one
         // active, go straight there; with none, send the user to the project
