@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import styles from './ScheduleArtifact.module.css';
+import { hierCellText, hierHeaderLabels } from './hierPath';
 
 /**
  * ScheduleArtifact — one topic plus one view specification.
@@ -262,8 +263,12 @@ export function ScheduleArtifact({ config, onClose }: Props) {
 
   /* A member is stored as a number; its name is the level's own label plus that
    * number. Compose it here so renaming a level in project setup renames every
-   * member with it, and nothing anywhere hard-codes the word. A member with no
-   * number is a real name (a village called "Riverbend") and stands alone.
+   * member with it, and nothing anywhere hard-codes the word. Members are ALWAYS
+   * numbers — there is no facility for naming an individual member. The label is
+   * the configurable part, and it belongs to the level, shared by every member
+   * of it. The digit test below is not a name/number branch: it guards legacy
+   * baked strings in the stored data, where the label was already folded into
+   * the member and prefixing again would double it.
    *
    * A function declaration, not a const arrow: scopeLabel's useMemo above calls
    * this during render, so a const would still be in its temporal dead zone and
@@ -291,17 +296,18 @@ export function ScheduleArtifact({ config, onClose }: Props) {
     [config.levels, scope],
   );
 
-  const hierPath = (row: ScheduleRow) => openLevels
-    .map((lv) => memberLabel[`${lv}:${row.scope?.[lv]}`])
-    .filter(Boolean)
-    .join(' \u00b7 ');
+  /* Only the deepest segment. A member number carries its own ancestry \u2014 the
+   * `1` in Phase `1.2` IS Village 1 \u2014 so naming the ancestor as well states it
+   * twice. See ./hierPath.ts for the rule and its tests. */
+  const hierPath = (row: ScheduleRow) =>
+    hierCellText(openLevels, row.scope, memberLabel);
 
-  const hierHeader = useMemo(() => {
-    const labels = config.levels
-      .filter((l) => openLevels.includes(l.level))
-      .map((l) => l.label);
-    return labels.join(' \u00b7 ');
-  }, [config.levels, openLevels]);
+  /* The header names only the levels the cells actually end on, not every open
+   * level: if every row bottoms out at phase, the column is Phase. */
+  const hierHeader = useMemo(
+    () => hierHeaderLabels(visibleRows, openLevels, memberLabel, config.levels),
+    [visibleRows, openLevels, memberLabel, config.levels],
+  );
 
   /* It earns its place on the same terms as everything else: only if the rows
    * actually differ on it. */
