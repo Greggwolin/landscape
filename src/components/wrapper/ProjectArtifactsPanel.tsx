@@ -18,7 +18,18 @@ const MAX_ARTIFACTS_WIDTH = 1600;
 // MK24 §5/§6 — widths as a share of the viewport rather than fixed pixels.
 // The map wants the screen; the artifacts rail wants to sit beside the chat.
 const ARTIFACTS_VIEWPORT_SHARE = 0.25;
-const MAP_VIEWPORT_SHARE = 0.7;
+// MK28 §1 — 60%, down from MK24's 70%.
+//
+// PROVISIONAL, and part of the panel-width design Gregg has already flagged as
+// unfinished. 70% was chosen when the map was thought of as taking the screen;
+// it shares the row with the chat, and `.wrapper-main` is `flex: 1` with no
+// min-width on the chat column, so the chat gives up whatever the panel takes.
+// At 70% on a 1440px display the chat is left about 380px INCLUDING padding —
+// narrower than the 420px this panel itself treats as a sensible default —
+// which is where "the chat gets squeezed out" comes from. 60% leaves roughly
+// 530px: the map still clearly has the majority, and the chat is still a chat.
+// Revisit with the rest of the width rules.
+const MAP_VIEWPORT_SHARE = 0.6;
 
 /** A viewport share in pixels, clamped to the panel's existing bounds. */
 function widthForShare(share: number): number {

@@ -80,6 +80,11 @@ import {
 import { COUNTY_PARCEL_SERVICES, sameApn, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
+import {
+  SfCompsFilterControls,
+  SF_COMPS_DEFAULT_FILTERS,
+  type SfCompsFilters,
+} from '@/components/analysis/SfCompsFilterControls';
 import { useMarketCompetitors, type MarketCompetitiveProject } from '@/hooks/useMarketData';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
@@ -845,10 +850,33 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   // Match the Property > Market screen's default search window (3 mi / 180 days)
   // so the map's Recent Sales count agrees with the Market screen's comp count.
-  const { data: sfCompsData } = useSfComps(projectId, {
-    radiusMiles: 3,
-    soldWithinDays: 180,
-  });
+  // MK28 §2 — Comparable Unit Sales is filterable here, as it already is on
+  // the classic Market tab. This map hardcoded {3, 180} and took no filter
+  // input at all: the capability was never wired to this surface, not lost
+  // from it. Same controls (SfCompsFilterControls) and same defaults as the
+  // tile, so the two cannot drift in convention; the state is per-surface —
+  // see that component's note on why it is not lifted into a context.
+  const [sfFilters, setSfFilters] = useState<SfCompsFilters>(SF_COMPS_DEFAULT_FILTERS);
+  const { data: sfCompsData } = useSfComps(projectId, sfFilters);
+
+  // The filters sit under the Comparable Unit Sales row itself rather than in
+  // a separate panel, so the count above them moves as they change — that
+  // adjacency is the whole point. `recent-sales` is the land-dev id for that
+  // row; the income-property equivalent (rent-comps) has no comparable filter
+  // API yet, so it gets no controls rather than dead ones.
+  const renderLayerExtra = useCallback(
+    (layerId: string) =>
+      layerId === 'recent-sales' ? (
+        <div className="layer-item-extra">
+          <SfCompsFilterControls
+            filters={sfFilters}
+            onFiltersChange={setSfFilters}
+            compact
+          />
+        </div>
+      ) : null,
+    [sfFilters]
+  );
 
   const recentSales = useMemo<FeatureCollection | null>(() => {
     if (!recentSalesLayerVisible || !sfCompsData?.comps?.length) return null;
@@ -1275,26 +1303,16 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               }
               if (layer.id === 'tax-parcels') return { ...layer, count: taxParcels?.features?.length ?? 0 };
               if (layer.id === 'site-boundary') return { ...layer, count: hasProjectLocation ? 1 : 0 };
+              // MK28 §2 — demo rings moved into Location. Rings are drawn from
+              // the project centre rather than fetched as features, so the
+              // count is "is there a centre to draw them around".
+              if (layer.id === 'demo-rings') return { ...layer, count: hasProjectLocation ? 1 : 0 };
               return layer;
             }),
           };
         }
-        if (group.id === 'comparables') {
-          return {
-            ...group,
-            layers: group.layers.map((layer) => {
-              if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
-              if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
-              // MK24 §3 — this 0 is HARDCODED, not a measured empty. Nothing
-              // in MapTab fetches land sales, so the layer has no source to
-              // count. It still lists at (0) alongside Sale Comps and Rent
-              // Comps, which is the honest reading today: none on this
-              // project. Wire it to a real query when land sales get one.
-              if (layer.id === 'land-sales') return { ...layer, count: 0 };
-              return layer;
-            }),
-          };
-        }
+        // MK28 §2 — the 'comparables' group is gone; its layers now live in
+        // Market under their new labels, so every count is assigned here.
         if (group.id === 'market') {
           const sfCount = sfCompsData?.comps?.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)).length ?? 0;
           const compCount = competitorData?.filter((c) => {
@@ -1305,7 +1323,18 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           return {
             ...group,
             layers: group.layers.map((layer) => {
+              // Comparable Sales — whichever id this project type uses.
+              if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
+              // MK24 §3 — this 0 is HARDCODED, not a measured empty. Nothing
+              // in MapTab fetches land sales, so the layer has no source to
+              // count. Wire it to a real query when land sales get one.
+              if (layer.id === 'land-sales') return { ...layer, count: 0 };
+              // Comparable Unit Sales — SFR resales (land) or rentals (income).
               if (layer.id === 'recent-sales') return { ...layer, count: sfCount };
+              if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
+              // Placeholder — nothing fetches permits (MK28 §2). Reports 0 so
+              // it lists as a named, visibly empty row rather than blank.
+              if (layer.id === 'building-permits') return { ...layer, count: 0 };
               if (layer.id === 'competitive-projects') return { ...layer, count: compCount };
               return layer;
             }),
@@ -3378,6 +3407,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onToggleLayer={handleToggleLayer}
           onToggleGroup={handleToggleGroup}
           onZoomToLayer={handleZoomToLayer}
+          renderLayerExtra={renderLayerExtra}
           sitePlans={sitePlansForLegend}
           onToggleSitePlan={handleToggleSitePlanVisibility}
           onEditSitePlan={handleEditSitePlan}

@@ -102,7 +102,7 @@ interface CenterChatPanelProps {
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
 export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat, availableScreens }: CenterChatPanelProps) {
-  const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
+  const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext, setProjectRightPanelView } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -601,6 +601,33 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         folder: pendingRestore.folder,
         tab: pendingRestore.tab,
       });
+    } else if (
+      pendingRestore.route &&
+      projectId &&
+      pendingRestore.route === `/w/projects/${projectId}/map` &&
+      pathname.startsWith(`/w/projects/${projectId}`)
+    ) {
+      // MK28 §1 — THE CHAT IS NEVER DISPLACED BY A DESTINATION.
+      //
+      // A thread's remembered destination says what to show BESIDE the chat,
+      // not what to replace it with. This branch used to push
+      // /w/projects/{id}/map, where <main> is `flex: 1` with no min-width on
+      // the chat column — so the chat that had just opened was squeezed away.
+      // Starting a new conversation did it too: a thread with nothing recorded
+      // still resolves a destination through the pageContext fallback
+      // (destinationFromPageContext maps pageContext 'map' → that route), so a
+      // chat begun while the map was showing inherited one.
+      //
+      // Since MK24 the map is also a VIEW of the project panel, so the same
+      // intent can be satisfied without moving: open it beside the chat.
+      //
+      // Deliberately narrow — only this project's own map route, and only
+      // while already on this project's surface. The route itself still works
+      // by direct URL, from another project, and from chat-driven
+      // navigate_to_screen, which is a different intent (the user asked to go
+      // there, rather than a thread being reopened).
+      setProjectRightPanelView('map');
+      if (!artifactsOpen) toggleArtifacts();
     } else if (pendingRestore.route && pendingRestore.route !== pathname) {
       // Guarded on pathname: reopening a map thread while already on the map
       // must not re-push the route and remount the map underneath the user.
@@ -625,7 +652,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     // returns you to the map; the overlay is already at 30% because that was
     // saved when it happened. Re-applying would be a bug, not a restoration.
     clearRestore();
-  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore, activeThreadId, projectId]);
+  }, [pendingRestore, setActiveArtifactId, artifactsOpen, toggleArtifacts, pathname, clearRestore, activeThreadId, projectId, setProjectRightPanelView]);
 
   // Bridge the existing handleActiveThreadChange so it ALSO updates our
   // local activeThreadId — the upload path needs it for unassigned uploads.

@@ -115,7 +115,14 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     // here, so a sidebar he deliberately widened comes back that width. The
     // sidebar can still be reopened by hand while the map is showing — that
     // path already exists for artifact takeover and is untouched.
-    const inMapView = projectRightPanelView === 'map';
+    // MK28 §1 — only when the PANEL is actually on screen. projectRightPanelView
+    // is global state, so MK24 keyed the sidebar collapse on it alone and the
+    // takeover also fired on /w/projects/{id}/map, where ProjectArtifactsPanel
+    // is not rendered at all (the route supplies its own map through <main>).
+    // That is the half-width Gregg saw after reopening the panel: a takeover
+    // running for a panel that was not there.
+    const isProjectRootRoute = /^\/w\/projects\/\d+\/?$/.test(pathname);
+    const inMapView = projectRightPanelView === 'map' && isProjectRootRoute;
     const hasActiveArtifact = activeArtifactId != null || inMapView;
 
     if (hasActiveArtifact && !inTakeoverMode.current) {
@@ -154,7 +161,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       inTakeoverMode.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeArtifactId, projectRightPanelView]);
+  }, [activeArtifactId, projectRightPanelView, pathname]);
 
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.

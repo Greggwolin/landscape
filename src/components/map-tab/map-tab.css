@@ -259,6 +259,25 @@
   font-size: 11px;
 }
 
+/* Controls that belong to a specific layer, rendered directly beneath its row
+   (MK28 §2 — the Comparable Unit Sales filters). Indented to the layer's label
+   so it reads as part of that row rather than a new section, and kept tight so
+   three inputs don't push the rest of the tree off screen. */
+.layer-item-extra {
+  padding: 2px 8px 8px 26px;
+}
+
+.layer-item-extra .form-control-sm {
+  font-size: 11px;
+  padding: 2px 6px;
+  height: 24px;
+}
+
+.layer-item-extra label {
+  font-size: 10px;
+  margin-bottom: 1px !important;
+}
+
 /* A count of zero (MK24 §3). Deliberately quieter than a real count, not
    louder: "(0)" is telling you this data has not been added yet, which is a
    prompt to go and add it — not an error. Muted and italic reads as an absence;

@@ -135,6 +135,7 @@ export function LayerPanel({
   onEditAnnotation,
   onRemoveAnnotation,
   onReorderLayer,
+  renderLayerExtra,
 }: LayerPanelProps) {
   // "Overlays" is its own legend section (saved overlays carry per-plan
   // actions the generic layer rows don't). Local expand state — there's no
@@ -195,7 +196,10 @@ export function LayerPanel({
 
   return (
     <div className="layer-panel">
-      <div className="layer-panel-header">Layers</div>
+      {/* MK28 §2 — "Location", not "Layers". Gregg's framing: this panel is
+          about the land and its context, with Market as a sibling group
+          beside it, rather than a generic list of layers. */}
+      <div className="layer-panel-header">Location</div>
 
       <div className="layer-panel-content">
         {layers.groups.map((group) => {
@@ -241,27 +245,31 @@ export function LayerPanel({
                       strategy={verticalListSortingStrategy}
                     >
                       {group.layers.map((layer) => (
-                        <SortableLayerRow
-                          key={layer.id}
-                          group={group}
-                          layer={layer}
-                          dragEnabled
-                          onToggleLayer={onToggleLayer}
-                          onZoomToLayer={onZoomToLayer}
-                        />
+                        <React.Fragment key={layer.id}>
+                          <SortableLayerRow
+                            group={group}
+                            layer={layer}
+                            dragEnabled
+                            onToggleLayer={onToggleLayer}
+                            onZoomToLayer={onZoomToLayer}
+                          />
+                          {renderLayerExtra?.(layer.id)}
+                        </React.Fragment>
                       ))}
                     </SortableContext>
                   </DndContext>
                 ) : (
                   group.layers.map((layer) => (
-                    <SortableLayerRow
-                      key={layer.id}
-                      group={group}
-                      layer={layer}
-                      dragEnabled={false}
-                      onToggleLayer={onToggleLayer}
-                      onZoomToLayer={onZoomToLayer}
-                    />
+                    <React.Fragment key={layer.id}>
+                      <SortableLayerRow
+                        group={group}
+                        layer={layer}
+                        dragEnabled={false}
+                        onToggleLayer={onToggleLayer}
+                        onZoomToLayer={onZoomToLayer}
+                      />
+                      {renderLayerExtra?.(layer.id)}
+                    </React.Fragment>
                   ))
                 )}
 

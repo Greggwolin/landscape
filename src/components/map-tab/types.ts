@@ -210,6 +210,10 @@ export interface LayerPanelProps {
   onToggleLayer: (groupId: LayerGroupId, layerId: string) => void;
   onToggleGroup: (groupId: LayerGroupId) => void;
   onZoomToLayer: (groupId: LayerGroupId, layerId: string) => void;
+  /** MK28 §2 — extra content rendered directly beneath a given layer row,
+   *  e.g. the Comparable Unit Sales filters. Return null for layers that have
+   *  none; the panel renders nothing rather than an empty container. */
+  renderLayerExtra?: (layerId: string) => React.ReactNode;
   /** Saved site plans surfaced in the legend (optional — omit to hide section). */
   sitePlans?: SitePlanLegendItem[];
   onToggleSitePlan?: (overlayId: number) => void;

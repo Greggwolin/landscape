@@ -1,6 +1,8 @@
 /* Housing Price Comparables tile for Land projects */
 'use client';
 
+import { SfCompsFilterControls } from './SfCompsFilterControls';
+
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -99,18 +101,8 @@ export function SfCompsTile({ projectId, title = 'Housing Price Comparables', fi
 
   const currentYear = new Date().getFullYear();
 
-  // Draft values for the input fields (updated on every keystroke)
-  const [draftRadius, setDraftRadius] = useState<string>(String(committed.radiusMiles));
-  const [draftDays, setDraftDays] = useState<string>(String(committed.soldWithinDays));
-  const [draftMinYear, setDraftMinYear] = useState<string>(committed.minYearBuilt ? String(committed.minYearBuilt) : '');
   const [showAllSales, setShowAllSales] = useState(false);
 
-  // Keep the draft inputs in sync if committed filters change from outside (controlled mode).
-  useEffect(() => {
-    setDraftRadius(String(committed.radiusMiles));
-    setDraftDays(String(committed.soldWithinDays));
-    setDraftMinYear(committed.minYearBuilt ? String(committed.minYearBuilt) : '');
-  }, [committed.radiusMiles, committed.soldWithinDays, committed.minYearBuilt]);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useSfComps(projectId, {
     radiusMiles,
@@ -118,62 +110,11 @@ export function SfCompsTile({ projectId, title = 'Housing Price Comparables', fi
     ...(minYearBuilt !== undefined ? { minYearBuilt } : {})
   });
 
-  // Commit radius value on blur or Enter
-  const commitRadius = useCallback(() => {
-    const value = parseFloat(draftRadius);
-    if (Number.isFinite(value) && value >= 0.5) {
-      commitFilters({ ...committed, radiusMiles: value });
-    } else {
-      // Reset to current value if invalid
-      setDraftRadius(String(radiusMiles));
-    }
-  }, [draftRadius, radiusMiles, committed, commitFilters]);
 
-  // Commit days value on blur or Enter
-  const commitDays = useCallback(() => {
-    const value = parseInt(draftDays, 10);
-    if (Number.isFinite(value) && value >= 30) {
-      commitFilters({ ...committed, soldWithinDays: value });
-    } else {
-      // Reset to current value if invalid
-      setDraftDays(String(soldWithinDays));
-    }
-  }, [draftDays, soldWithinDays, committed, commitFilters]);
 
-  const commitMinYear = useCallback(() => {
-    const trimmed = draftMinYear.trim();
-    if (trimmed.length === 0) {
-      commitFilters({ ...committed, minYearBuilt: undefined });
-      return;
-    }
-    const value = parseInt(trimmed, 10);
-    if (Number.isFinite(value) && value >= 1900 && value <= currentYear) {
-      commitFilters({ ...committed, minYearBuilt: value });
-    } else {
-      setDraftMinYear(minYearBuilt ? String(minYearBuilt) : '');
-    }
-  }, [draftMinYear, minYearBuilt, currentYear, committed, commitFilters]);
 
-  const handleRadiusKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      commitRadius();
-      (e.target as HTMLInputElement).blur();
-    }
-  }, [commitRadius]);
 
-  const handleDaysKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      commitDays();
-      (e.target as HTMLInputElement).blur();
-    }
-  }, [commitDays]);
 
-  const handleMinYearKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      commitMinYear();
-      (e.target as HTMLInputElement).blur();
-    }
-  }, [commitMinYear]);
 
   const sortedComps = useMemo(() => {
     if (!data?.comps) return [];
@@ -328,67 +269,31 @@ export function SfCompsTile({ projectId, title = 'Housing Price Comparables', fi
 
         {!isLoading && !isError && data && (
           <>
-            <div className="d-flex flex-wrap gap-3 align-items-end mb-3">
-              <div>
-                <label className="text-muted small d-block mb-1">Radius (mi)</label>
-                <input
-                  type="number"
-                  min={0.5}
-                  step={0.5}
-                  value={draftRadius}
-                  onChange={(e) => setDraftRadius(e.target.value)}
-                  onBlur={commitRadius}
-                  onKeyDown={handleRadiusKeyDown}
-                  className="form-control form-control-sm"
-                  style={{ width: 70 }}
-                />
-              </div>
-              <div>
-                <label className="text-muted small d-block mb-1">Min Year Built</label>
-                <input
-                  type="number"
-                  min={1900}
-                  max={currentYear}
-                  placeholder="YYYY"
-                  value={draftMinYear}
-                  onChange={(e) => setDraftMinYear(e.target.value)}
-                  onBlur={commitMinYear}
-                  onKeyDown={handleMinYearKeyDown}
-                  className="form-control form-control-sm"
-                  style={{ width: 90 }}
-                />
-              </div>
-              <div>
-                <label className="text-muted small d-block mb-1">Days</label>
-                <input
-                  type="number"
-                  min={30}
-                  max={365}
-                  step={30}
-                  value={draftDays}
-                  onChange={(e) => setDraftDays(e.target.value)}
-                  onBlur={commitDays}
-                  onKeyDown={handleDaysKeyDown}
-                  className="form-control form-control-sm"
-                  style={{ width: 70 }}
-                />
-              </div>
-              <div className="d-flex align-items-center gap-2" style={{ paddingBottom: 6 }}>
-                <span className="text-muted small">
-                  {isFetching ? 'Updating…' : `${data.stats.count} comps`}
-                </span>
-                {data.stats.count > 10 && (
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm p-0"
-                    onClick={() => setShowAllSales((prev) => !prev)}
-                    style={{ color: 'var(--cui-primary)', textDecoration: 'none' }}
-                  >
-                    {showAllSales ? 'Hide All Sales' : 'Show All Sales'}
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* MK28 §2 — the SAME controls the map's Comparable Unit Sales
+                layer renders. Extracted so the two cannot drift in validation
+                or defaults; see SfCompsFilterControls for why the STATE is
+                still per-surface. */}
+            <SfCompsFilterControls
+              filters={committed}
+              onFiltersChange={commitFilters}
+              trailing={
+                <>
+                  <span className="text-muted small">
+                    {isFetching ? 'Updating…' : `${data.stats.count} comps`}
+                  </span>
+                  {data.stats.count > 10 && (
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm p-0"
+                      onClick={() => setShowAllSales((prev) => !prev)}
+                      style={{ color: 'var(--cui-primary)', textDecoration: 'none' }}
+                    >
+                      {showAllSales ? 'Hide All Sales' : 'Show All Sales'}
+                    </button>
+                  )}
+                </>
+              }
+            />
 
             {renderStats()}
 
