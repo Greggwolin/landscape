@@ -31,13 +31,22 @@ const ARTIFACTS_VIEWPORT_SHARE = 0.25;
 // Revisit with the rest of the width rules.
 const MAP_VIEWPORT_SHARE = 0.6;
 
-/** A viewport share in pixels, clamped to the panel's existing bounds. */
+/** A viewport share in pixels.
+ *
+ * The upper bound is the LARGER of the legacy pixel cap and the requested
+ * share. MAX_ARTIFACTS_WIDTH (1600) was chosen for artifact takeover, and on a
+ * wide display it silently ate the map's share: 60% of a 3200px screen is
+ * 1920, clamped down to 1600, which lands back at ~50% — exactly the "it only
+ * opens at 50%" Gregg reported after MK28 set it to 60%. A share is a
+ * deliberate instruction about proportion; a constant tuned for a different
+ * purpose should not quietly overrule it. The lower bound still applies, so a
+ * narrow window cannot produce an unusable sliver.
+ */
 function widthForShare(share: number): number {
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
-  return Math.min(
-    Math.max(Math.round(vw * share), MIN_ARTIFACTS_WIDTH),
-    MAX_ARTIFACTS_WIDTH
-  );
+  const wanted = Math.round(vw * share);
+  const upper = Math.max(MAX_ARTIFACTS_WIDTH, wanted);
+  return Math.min(Math.max(wanted, MIN_ARTIFACTS_WIDTH), upper);
 }
 
 // ── Seam for per-artifact width rules ───────────────────────────────────────

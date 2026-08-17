@@ -3381,10 +3381,20 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         if (!isDevelopmentProject) {
           filteredLayers = filteredLayers.filter((layer) => layer.id !== 'plan-parcels');
         }
-        filteredLayers = filteredLayers.filter((layer) => {
-          if (layer.id === 'tax-parcels') return true;
-          return layer.count === undefined || layer.count > 0;
-        });
+        // A ZERO COUNT IS KEPT, not filtered away.
+        //
+        // This used to drop every layer whose count was 0 (tax-parcels alone
+        // was exempted), and then drop any group left empty. That silently
+        // defeated the whole point of showing "(0)": MK24 made the panel
+        // render a zero count with a muted style, and this deleted those rows
+        // before the panel ever saw them. The visible symptom was the entire
+        // Market group missing on Red Valley — Comparable Sales, Comparable
+        // Unit Sales and Building Permits are all legitimately 0 there, so all
+        // three were removed and the group went with them (reported with a
+        // screenshot, 2026-08-17). Plan Parcels disappeared the same way.
+        //
+        // "None yet" and "not a thing this project tracks" must not look
+        // identical, and a named empty row is the only way to tell them apart.
         return {
           ...group,
           layers: filteredLayers,

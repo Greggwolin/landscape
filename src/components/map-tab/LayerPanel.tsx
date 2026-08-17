@@ -196,10 +196,13 @@ export function LayerPanel({
 
   return (
     <div className="layer-panel">
-      {/* MK28 §2 — "Location", not "Layers". Gregg's framing: this panel is
-          about the land and its context, with Market as a sibling group
-          beside it, rather than a generic list of layers. */}
-      <div className="layer-panel-header">Location</div>
+      {/* No panel-level header (2026-08-17). It said "Location" while the
+          first GROUP also said "Location", so the layers read as nested one
+          level deeper than they are — Gregg: "the main Location header should
+          be collapseable and the layers below do NOT need to be in a second
+          grouping". The groups themselves are the masters now: Location,
+          Market, Annotations, each collapsible by its own chevron, each with
+          its layers directly beneath it. */}
 
       <div className="layer-panel-content">
         {layers.groups.map((group) => {
