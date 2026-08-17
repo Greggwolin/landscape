@@ -210,6 +210,14 @@ export function DCFView({
               <span style={{ color: 'var(--cui-body-color)' }}>Net Reversion</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(exit_analysis.net_reversion)}</span>
             </div>
+            {/* PD15 Fix 6: say WHY the exit reads $0 — a bare zero reads as
+                "no sale modeled" rather than "nothing left to capitalize". */}
+            {exit_analysis.exit_not_meaningful && (
+              <div style={{ color: 'var(--cui-warning)', fontSize: '0.8125rem', paddingTop: '0.25rem' }}>
+                {exit_analysis.exit_not_meaningful_reason
+                  || 'Terminal NOI is negative — reversion floored at $0'}
+              </div>
+            )}
           </div>
         </div>
 

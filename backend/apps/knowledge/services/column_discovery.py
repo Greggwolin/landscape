@@ -549,6 +549,28 @@ def _match_column_to_field(
     # Strip punctuation for prefix matching (e.g., "Delinquent Rent as of 9/30/2025")
     normalized_clean = re.sub(r'[^\w\s]', ' ', normalized).strip()
 
+    # POST-RENO GUARD (PD28 Fix 4) — a column headed "Post-Reno Rent",
+    # "Renovated Rent", "Upgraded Rent" etc. is a VALUE-ADD rent, not a current
+    # market rent. Left alone it matches market_rent on the partial/word-overlap
+    # passes below (every one of those headers contains "rent"), which is how
+    # the Dec-2025 extraction wrote the OM's post-reno rents into
+    # current_market_rent on Lynn Villa.
+    #
+    # Gregg's convention ruling (2026-08-13): in a no-renovation analysis the
+    # current in-place rents ARE the market rents; post-reno rents apply only
+    # when the value-add program is on. Until there is a structured per-plan
+    # home for them (explicitly out of scope here), the cheap correct move is to
+    # refuse the mapping and let the column surface unmapped in the workbench —
+    # a visible "we don't know where this goes" beats a silent wrong write.
+    if _POST_RENO_RENT_RE.search(normalized_clean):
+        logger.warning(
+            "[_match_column_to_field] '%s' looks like a POST-RENOVATION rent — "
+            "not mapped to a current/market rent field (PD28 Fix 4). Map it "
+            "manually if this project's value-add program is on.",
+            column_name,
+        )
+        return None, MappingConfidence.NONE
+
     # EXCLUSION CHECK — skip standard field matching if column starts with an
     # exclusion prefix. These columns contain keywords like "rent" or "balance"
     # but are NOT standard rent roll fields (they're delinquency, YTD totals, etc.)
@@ -593,6 +615,18 @@ COMPOUND_PATTERNS = [
         'note': 'Compound Bed/Bath column — splits into Beds (integer) + Baths (decimal). Plan auto-derives from Bed/Bath.',
     },
 ]
+
+# PD28 Fix 4 — post-renovation rent headers. Requires BOTH a renovation cue and
+# a rent/price cue so "Renovation Status" or "Reno Date" (which have their own
+# proper mappings) are untouched; only a *rent* column carrying post-reno
+# vocabulary is refused. Deliberately narrow: this is a v1 staging guard, not a
+# mapping feature.
+_POST_RENO_RENT_RE = re.compile(
+    r'\b(?:post[\s_-]*reno\w*|after[\s_-]*reno\w*|reno(?:vated|vation)?|'
+    r'renov\w*|upgraded|premium|classic[\s_-]*to[\s_-]*reno\w*)\b'
+    r'(?=.*\b(?:rent|rate|price|pro[\s_-]*forma)\b)',
+    re.IGNORECASE,
+)
 
 # Patterns for columns that should be skipped (computed totals, summaries)
 SKIP_PATTERNS = re.compile(

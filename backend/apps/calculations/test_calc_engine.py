@@ -54,7 +54,6 @@ class ConverterTests(TestCase):
             fiscal_year=2025,
             fiscal_period=1,
             budgeted_amount=Decimal('100000'),
-            is_active=True
         )
 
         cashflows = convert_budget_items_to_cashflows([budget_item])
@@ -73,7 +72,6 @@ class ConverterTests(TestCase):
                 fiscal_year=2025,
                 fiscal_period=i,
                 budgeted_amount=Decimal('50000'),
-                is_active=True
             )
             for i in range(1, 5)
         ]
@@ -107,7 +105,6 @@ class CalculationServiceTests(TestCase):
                 fiscal_year=2025,
                 fiscal_period=i,
                 budgeted_amount=Decimal('100000') if i <= 6 else Decimal('-150000'),
-                is_active=True
             )
 
     def test_generate_cashflow_projection(self):
@@ -173,7 +170,6 @@ class InvestmentMetricRegressionTests(TestCase):
                 fiscal_year=2025,
                 fiscal_period=i,
                 budgeted_amount=Decimal('100000'),
-                is_active=True,
             )
         for i in range(7, 13):
             BudgetItem.objects.create(
@@ -183,7 +179,6 @@ class InvestmentMetricRegressionTests(TestCase):
                 fiscal_year=2025,
                 fiscal_period=i,
                 budgeted_amount=Decimal('150000'),
-                is_active=True,
             )
 
     def test_irr_returns_an_actual_number(self):
@@ -252,7 +247,6 @@ class InvestmentMetricRegressionTests(TestCase):
                 fiscal_year=2025,
                 fiscal_period=i,
                 budgeted_amount=Decimal('100000'),
-                is_active=True,
             )
 
         result = CalculationService.calculate_project_metrics(barren.project_id)
@@ -316,7 +310,6 @@ class APIEndpointTests(TestCase):
                 fiscal_year=2025,
                 fiscal_period=i,
                 budgeted_amount=Decimal('50000'),
-                is_active=True
             )
 
     def test_irr_endpoint(self):

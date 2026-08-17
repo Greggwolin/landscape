@@ -9,7 +9,7 @@ import logging
 import os
 import time
 from decimal import Decimal
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 from dotenv import load_dotenv
 
@@ -1903,6 +1903,24 @@ For manual extraction (more control):
 1. Use get_document_content to read the document
 2. Use bulk_update_fields to update specific fields
 3. Report what you updated
+
+NEVER OFFER WHAT YOU CANNOT DO:
+- Only offer an action a REGISTERED TOOL performs. If no tool does it, say so — do not offer.
+- Before offering a document-derived action, VERIFY the document and its extraction exist
+  (get_project_documents → get_document_content / get_document_assertions). Never assume.
+- Populating units from a document runs analyze_rent_roll_columns → confirm_column_mapping and
+  REQUIRES a rent-roll extraction to be present. If the extraction holds only unit types (or no
+  unit-level rows), say exactly that and stop — do NOT offer to populate units from it.
+- READ THE TARGET BEFORE OFFERING TO WRITE IT. Before offering to populate/import/update any
+  project table from a document, first READ what is already there (unit types → get_unit_types;
+  operating expenses → get_operating_statement; comps → get_expense_comparables / comp tools;
+  or get_data_completeness). Then answer in the workbench's own vocabulary:
+    • MATCH    — already populated and it agrees with the document. Say so, show the figures,
+                 offer NOTHING. Never offer to write data that is already correct.
+    • CONFLICT — populated but differs. Name the specific differences (row, stored vs document)
+                 and offer RECONCILIATION, not a blind overwrite.
+    • NEW      — genuinely empty. Only here do you offer a plain "want me to populate this?"
+  An offer that ignores current state is a defect even when the underlying tool would succeed.
 
 RENT ROLL EXTRACTION BEHAVIOR:
 
@@ -3956,6 +3974,104 @@ def _figure_is_sourced(mag: float, is_pct: bool, sourced: set) -> bool:
     return False
 
 
+# ── Guard post-processing: redact the figures, keep the reply (PD15 Fix 1) ────
+# Before PD15 a guard hit threw the model's ENTIRE reply away and substituted one
+# fixed sentence. PD14 turn 2 showed the harm: the model had produced the correct
+# finding ("the OM's extraction contains unit types only, no unit-level rent
+# roll") and the guard destroyed it, so the user learned nothing. The detection
+# logic is unchanged (financial_artifact_guard.py lazily imports the same
+# _MONEY_OR_PCT_RE / _FIN_CLAIM_KW / _NUMBERS_PRODUCING_PREFIXES vocabulary and
+# must stay behaviourally identical) — only what happens AFTER a hit changed.
+_REDACTION_PLACEHOLDER = '[figure withheld — not verified against project data]'
+
+_GUARD_FALLBACK_QUESTION = (
+    "I don't have those figures from the project's data yet — want me to open "
+    "the screen that shows them, or run the calculation? I won't estimate them."
+)
+
+# Consecutive-fire escalation (PD15 Fix 2). With Fix 1 in place the reply itself
+# already differs turn to turn, so this is the backstop that guarantees the user
+# never reads the identical sentence twice in a row.
+_GUARD_ESCALATION_NOTE = (
+    "I withheld the figures above rather than repeat them: they appear in the "
+    "document or in my own reading, but nothing I can query returned them, so I "
+    "can't confirm they're this project's numbers. Everything not marked "
+    "withheld is what I can actually confirm. Tell me which figure matters and "
+    "I'll open the screen that holds it or run the calculation that produces it."
+)
+
+
+def _redact_unsourced_figures(text: str, sourced: set) -> Tuple[str, int]:
+    """Replace each money/percent/multiple token that traces to nothing the tools
+    returned with the withheld placeholder, leaving all other text intact.
+
+    Mirrors `_has_unsourced_figure`'s per-figure test exactly, so a token is
+    redacted on precisely the condition that made the guard fire. When no
+    numbers-producing tool ran, `sourced` is empty and every figure is redacted —
+    which is the correct reading of that regime, not an accident.
+
+    Returns (redacted_text, number_of_tokens_redacted).
+    """
+    if not text:
+        return text or '', 0
+    parts: List[str] = []
+    cursor = 0
+    redacted = 0
+    for m in _MONEY_OR_PCT_RE.finditer(text):
+        tok = m.group(0)
+        mags = _num_magnitudes(tok)
+        if not mags:
+            continue
+        is_pct = '%' in tok
+        if all(_figure_is_sourced(v, is_pct, sourced) for v in mags):
+            continue  # this figure DOES trace — never touch it
+        parts.append(text[cursor:m.start()])
+        parts.append(_REDACTION_PLACEHOLDER)
+        cursor = m.end()
+        redacted += 1
+    if not redacted:
+        return text, 0
+    parts.append(text[cursor:])
+    return ''.join(parts), redacted
+
+
+def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
+    """True when the immediately previous assistant turn was itself guard-blocked.
+
+    Callers hand `get_landscaper_response` a plain [{'role','content'}] history
+    (see `_build_message_history_with_tool_context`), so the metadata flag isn't
+    in-band. Read it when a caller does supply one, otherwise fall back to the
+    marks a blocked reply always leaves in its own text.
+    """
+    for msg in reversed(list(messages or [])):
+        role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
+        if role != 'assistant':
+            continue
+        if isinstance(msg, dict):
+            meta = msg.get('metadata')
+            if isinstance(meta, dict) and meta.get('fabrication_guard_blocked'):
+                return True
+        content = (msg.get('content') if isinstance(msg, dict)
+                   else getattr(msg, 'content', '')) or ''
+        content = content if isinstance(content, str) else str(content)
+        return (_REDACTION_PLACEHOLDER in content
+                or _GUARD_FALLBACK_QUESTION in content)
+    return False
+
+
+def _compose_guarded_reply(content: str, sourced: set,
+                           escalate: bool) -> Tuple[str, int]:
+    """The reply the user sees after a guard hit: their answer with the unsourced
+    figures blanked, then the guard's question (or, on a repeat fire, the
+    plain-language explanation of what was withheld and why)."""
+    redacted_text, redacted_count = _redact_unsourced_figures(content, sourced)
+    tail = _GUARD_ESCALATION_NOTE if escalate else _GUARD_FALLBACK_QUESTION
+    body = (redacted_text or '').rstrip()
+    if not body:
+        return tail, redacted_count
+    return f'{body}\n\n---\n{tail}', redacted_count
+
+
 def _fabrication_guard_trace(content: str, tool_calls: list,
                              tool_outputs: Optional[list] = None) -> Dict[str, Any]:
     """Structured, bounded trace explaining which figures did not source.
@@ -5222,14 +5338,23 @@ def get_landscaper_response(
                         'or call the relevant calculate_/get_ tool and report ONLY its returned '
                         'figures, then answer.'
                     ),
-                    'suggested_user_question': (
-                        "I don't have those figures from the project's data yet — want me to open "
-                        "the screen that shows them, or run the calculation? I won't estimate them."
-                    ),
+                    'suggested_user_question': _GUARD_FALLBACK_QUESTION,
                     'trace': guard_trace,
                 }
-                final_content = guard_envelope['suggested_user_question']
+                # PD15 Fix 1/2: keep the model's finding, blank only the figures
+                # that trace to nothing, then append the guard's question — or,
+                # when the previous assistant turn was also blocked, the
+                # escalated explanation so the user never reads the same
+                # sentence twice.
+                _escalate = _prior_reply_was_guard_blocked(messages)
+                _sourced = (_collect_sourced_numbers(tool_executions)
+                            if _strict else set())
+                final_content, _redacted_count = _compose_guarded_reply(
+                    final_content, _sourced, _escalate)
+                guard_envelope['redacted_figures'] = _redacted_count
+                guard_envelope['escalated'] = _escalate
                 metadata['fabrication_guard_blocked'] = True
+                metadata['redacted_figures'] = _redacted_count
                 metadata['fabrication_guard'] = guard_envelope
         except Exception as _fg_err:  # never let the guard break a response
             logger.error("[FabricationGuard] guard error (passing original content through): %s", _fg_err)

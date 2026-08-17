@@ -104,7 +104,6 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
         # Build query filters
         qs = self.get_queryset().filter(
             project_id=project_id,
-            is_active=True
         )
 
         # Apply optional filters
@@ -169,7 +168,6 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
         # Build base query
         qs = BudgetItem.objects.filter(
             project_id=project_id,
-            is_active=True,
             is_rollup=False  # Only sum direct entries
         )
 
@@ -234,7 +232,6 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset().filter(
             container_id=container_id,
-            is_active=True
         )
 
         # Apply optional filters
@@ -357,7 +354,6 @@ class ActualItemViewSet(viewsets.ModelViewSet):
 
         qs = self.get_queryset().filter(
             project_id=project_id,
-            is_active=True
         )
 
         # Apply filters
@@ -398,7 +394,6 @@ class ActualItemViewSet(viewsets.ModelViewSet):
         budget_items = BudgetItem.objects.filter(
             project_id=project_id,
             fiscal_year=int(fiscal_year),
-            is_active=True,
             is_rollup=False
         ).values('category', 'subcategory', 'line_item_name', 'fiscal_year', 'fiscal_period').annotate(
             budgeted_amount=Sum('budgeted_amount')
@@ -408,7 +403,6 @@ class ActualItemViewSet(viewsets.ModelViewSet):
         actual_items = ActualItem.objects.filter(
             project_id=project_id,
             fiscal_year=int(fiscal_year),
-            is_active=True
         ).values('category', 'subcategory', 'line_item_name', 'fiscal_year', 'fiscal_period').annotate(
             actual_amount=Sum('actual_amount')
         )

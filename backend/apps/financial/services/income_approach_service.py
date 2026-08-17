@@ -408,8 +408,67 @@ class IncomeApproachDataService:
                 'band_equity_dividend_rate': band_equity,
             }
 
+    # PD28 Fix 2 — the four valuation inputs tbl_dcf_analysis OWNS but the engine
+    # never read. get_dcf_parameters() only ever pulled hold period / discount /
+    # exit cap / selling costs from that table, so a value the user stored here
+    # was silently outranked by the OM-extracted tbl_project_assumption row:
+    # Lynn Villa had vacancy_rate = 0.0200 on record and rendered 3.0%, because
+    # physical_vacancy_pct = 0.03 came later in the merge and overwrote it.
+    #
+    # (tbl_dcf_analysis column, assumption key the engine consumes)
+    _VALUATION_OVERRIDE_COLUMNS = (
+        ('vacancy_rate', 'vacancy_rate'),
+        ('credit_loss', 'credit_loss_rate'),
+        ('management_fee_pct', 'management_fee_pct'),
+        ('reserves_per_unit', 'replacement_reserves_per_unit'),
+    )
+
+    def get_valuation_overrides(self) -> Dict[str, Any]:
+        """Explicit user-set valuation inputs from tbl_dcf_analysis.
+
+        Returns ONLY the columns that are non-NULL. A NULL column is not an
+        opinion — it means "nothing was set here", so the key is absent and the
+        caller keeps whatever the extraction layer supplied. That is what makes
+        the three-tier precedence work without discarding extracted data.
+        """
+        overrides: Dict[str, Any] = {}
+        columns = ', '.join(col for col, _key in self._VALUATION_OVERRIDE_COLUMNS)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    SELECT {columns}
+                    FROM landscape.tbl_dcf_analysis
+                    WHERE project_id = %s
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """, [self.project_id])
+                row = cursor.fetchone()
+        except Exception:
+            # Never let a missing/renamed column break the whole assumption read;
+            # degrade to the pre-PD28 behaviour rather than 500 the cash flow.
+            return overrides
+
+        if not row:
+            return overrides
+
+        for (_col, key), value in zip(self._VALUATION_OVERRIDE_COLUMNS, row):
+            if value is None:
+                continue
+            overrides[key] = self._decimal_to_float(value, self.DEFAULTS[key])
+        return overrides
+
     def get_all_assumptions(self) -> Dict[str, Any]:
-        """Aggregate all assumptions into single response."""
+        """Aggregate all assumptions into single response.
+
+        Precedence (PD28 Fix 2), lowest to highest:
+          1. engine DEFAULTS        — the constants in this class
+          2. tbl_project_assumption — what the OM extraction wrote
+          3. tbl_dcf_analysis       — what the USER explicitly set
+
+        Dict spread means later keys win, so the override read goes last. Only
+        the four keys in _VALUATION_OVERRIDE_COLUMNS participate, and only when
+        non-NULL — every other assumption resolves exactly as it did before.
+        """
         dcf = self.get_dcf_parameters()
         vacancy = self.get_vacancy_assumptions()
         growth = self.get_growth_rates()
@@ -422,6 +481,8 @@ class IncomeApproachDataService:
             **growth,
             **operating,
             **cap,
+            # An explicit user setting beats the extracted value beneath it.
+            **self.get_valuation_overrides(),
         }
 
     def update_dcf_parameters(self, updates: Dict[str, Any]) -> bool:

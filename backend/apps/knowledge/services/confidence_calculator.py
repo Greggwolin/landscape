@@ -147,7 +147,7 @@ def _calculate_unit_completeness(project_id: int) -> Tuple[int, str]:
             cursor.execute("""
                 SELECT
                     COUNT(*) as total,
-                    SUM(COALESCE(unit_count, 0)) as total_units,
+                    SUM(COALESCE(total_units, 0)) as total_units,  -- PD28 Fix 3: canonical
                     COUNT(CASE WHEN market_rent IS NOT NULL THEN 1 END) as with_market_rent,
                     COUNT(CASE WHEN avg_square_feet IS NOT NULL THEN 1 END) as with_sqft
                 FROM landscape.tbl_multifamily_unit_type

@@ -171,11 +171,28 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "get_project_documents",
-        "description": "List all uploaded documents for this project.",
+        "description": (
+            "List all uploaded documents for this project. Soft-deleted documents are "
+            "always excluded. Omit status_filter (or pass 'all') unless you specifically "
+            "need one status — there is NO 'active' status in the data; 'active' is "
+            "accepted only as a synonym for 'all'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "status_filter": {"type": "string"},
+                "status_filter": {
+                    "type": "string",
+                    "enum": ["all", "active", "draft", "processing", "indexed",
+                             "pending", "completed", "failed"],
+                    "description": (
+                        "Default 'all'. 'all'/'active' = every live document. "
+                        "Document statuses: 'draft' (uploaded, not indexed), 'processing', "
+                        "'indexed'. Extraction statuses: 'pending', 'completed', 'failed'. "
+                        "An unrecognized value returns ALL live documents plus a "
+                        "'filter_ignored' note — an empty list therefore means the project "
+                        "genuinely has no documents, never a bad filter."
+                    ),
+                },
             },
         },
     },

@@ -31,6 +31,31 @@ from apps.projects.models import Project
 from .income_approach_service import IncomeApproachDataService
 
 
+# PD15 Fix 6 (PD14 Defect A2) — a deal whose terminal year loses money has no
+# meaningful capitalized exit. Dividing a negative NOI by a positive cap rate
+# produced a large NEGATIVE reversion (Lynn Villa: −$31M) that the model then
+# reported as a sale price, and selling costs were charged on it as well. Per
+# Gregg's ruling the exit is floored at zero and the result carries a flag so
+# every renderer can say WHY the line reads $0 instead of silently showing it.
+EXIT_NOT_MEANINGFUL_REASON = 'Terminal NOI is negative — reversion floored at $0'
+
+
+def _exit_value_or_floor(terminal_noi: float, cap_rate: float) -> tuple:
+    """Capitalized terminal value, floored at zero when terminal income is
+    non-positive.
+
+    Returns ``(exit_value, exit_not_meaningful)``. For a POSITIVE terminal NOI the
+    returned value is the identical expression used before this guard existed
+    (``terminal_noi / cap_rate`` when the cap rate is positive, else 0), so
+    positive-NOI behaviour is unchanged. Each call site keeps its own
+    selling-cost arithmetic — a zero exit value carries zero selling costs and a
+    zero net reversion through either formulation.
+    """
+    if terminal_noi <= 0:
+        return 0.0, True
+    return (terminal_noi / cap_rate if cap_rate > 0 else 0.0), False
+
+
 def build_renovation_schedule(
     total_units: int,
     avg_unit_sf: float,
@@ -238,11 +263,32 @@ class DCFCalculationService:
                 'relet_lag_months': va_row[10],
             }
 
+    def _active_opex_discriminator(self) -> str:
+        """Resolve the project's active operating-statement scenario.
+
+        tbl_operating_expenses rows are tagged with statement_discriminator
+        (T3_ANNUALIZED / CURRENT_PRO_FORMA / POST_RENO_PRO_FORMA / 'default'
+        / ...). Summing across ALL discriminators double-counts expenses for
+        any project carrying more than one statement, so the opex query in
+        _get_base_data must filter to the active one.
+        """
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT active_opex_discriminator
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+                LIMIT 1
+            """, [self.project_id])
+            row = cursor.fetchone()
+            return row[0] if row and row[0] else 'default'
+
     def _get_base_data(self) -> Dict[str, Any]:
         """
         Get base data for DCF projections.
         Returns current rents, operating expenses, unit count, etc.
         """
+        discriminator = self._active_opex_discriminator()
+
         with connection.cursor() as cursor:
             # Get property summary
             cursor.execute("""
@@ -270,12 +316,19 @@ class DCFCalculationService:
                     unit_count = int(mf_row[0])
                     total_sf = float(mf_row[1])
 
-            # Fallback to unit types
+            # Fallback to unit types.
+            # PD28 Fix 3: reads total_units, NOT unit_count. tbl_multifamily_unit_type
+            # carries both; total_units is the canonical one (populated on every row
+            # of every project, and what the extraction writes and the rent-roll
+            # artifact displays), while unit_count is NULL on 119 rows across 23
+            # projects. Summing the NULL column returned 0 units and, below, $0 of
+            # income on a property with fully populated rents — the Lynn Villa
+            # zero-income bug. unit_count is deprecated; do not read it here again.
             if unit_count == 0:
                 cursor.execute("""
                     SELECT
-                        COALESCE(SUM(unit_count), 0)::int as unit_count,
-                        COALESCE(SUM(unit_count * avg_square_feet), 0)::numeric as total_sf
+                        COALESCE(SUM(total_units), 0)::int as unit_count,
+                        COALESCE(SUM(total_units * avg_square_feet), 0)::numeric as total_sf
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [self.project_id])
@@ -296,7 +349,7 @@ class DCFCalculationService:
             # Fallback to unit types (floor plan matrix)
             if current_annual_rent == 0:
                 cursor.execute("""
-                    SELECT COALESCE(SUM(unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as annual_rent
+                    SELECT COALESCE(SUM(total_units * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as annual_rent
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [self.project_id])
@@ -304,12 +357,17 @@ class DCFCalculationService:
                 if ut_rent_row:
                     current_annual_rent = float(ut_rent_row[0])
 
-            # Get operating expenses
+            # Get operating expenses — filtered to the project's active
+            # statement scenario. Without this filter a project carrying both
+            # a T-12 and a pro-forma sums BOTH statements into base_opex.
+            # NULL rows are legacy/untagged and always count as part of the
+            # active statement (same pattern as year1_noi_calculator).
             cursor.execute("""
                 SELECT COALESCE(SUM(annual_amount), 0) as total_opex
                 FROM landscape.tbl_operating_expenses
                 WHERE project_id = %s
-            """, [self.project_id])
+                  AND (statement_discriminator = %s OR statement_discriminator IS NULL)
+            """, [self.project_id, discriminator])
             opex_row = cursor.fetchone()
             base_opex = float(opex_row[0]) if opex_row else 0
 
@@ -442,7 +500,8 @@ class DCFCalculationService:
         terminal_total_opex = terminal_base_opex + terminal_mgmt_fee + terminal_reserves
 
         terminal_noi = terminal_egi - terminal_total_opex
-        exit_value = terminal_noi / terminal_cap_rate if terminal_cap_rate > 0 else 0
+        # PD15 Fix 6: non-positive terminal NOI → no meaningful capitalized exit.
+        exit_value, exit_not_meaningful = _exit_value_or_floor(terminal_noi, terminal_cap_rate)
         selling_costs = exit_value * selling_costs_pct
         net_reversion = exit_value - selling_costs
 
@@ -456,7 +515,10 @@ class DCFCalculationService:
             'selling_costs': round(selling_costs, 2),
             'net_reversion': round(net_reversion, 2),
             'pv_reversion': round(pv_reversion, 2),
+            'exit_not_meaningful': exit_not_meaningful,
         }
+        if exit_not_meaningful:
+            exit_analysis['exit_not_meaningful_reason'] = EXIT_NOT_MEANINGFUL_REASON
 
         # Calculate present value (sum of all discounted cash flows)
         pv_of_noi = sum(p['pv_noi'] for p in projections)
@@ -635,8 +697,11 @@ class DCFCalculationService:
             for year, noi in enumerate(noi_series)
         )
 
-        # Terminal value (pre-computed terminal NOI)
-        exit_value = terminal_noi / exit_cap_rate if exit_cap_rate > 0 else 0
+        # Terminal value (pre-computed terminal NOI). PD15 Fix 6: floored at zero
+        # when terminal income is non-positive, so every cell of the sensitivity
+        # matrix shows the PV of the NOI strip alone rather than a grid of
+        # negative "sale prices" that vary with the cap rate.
+        exit_value, _ = _exit_value_or_floor(terminal_noi, exit_cap_rate)
         net_reversion = exit_value * (1 - selling_costs_pct)
 
         # PV of reversion
@@ -853,7 +918,9 @@ class DCFCalculationService:
         # Value-add context for response
         terminal_is_post_reno = reno_schedule is not None
 
-        exit_value = terminal_annual_noi / terminal_cap_rate if terminal_cap_rate > 0 else 0
+        # PD15 Fix 6: non-positive terminal NOI → no meaningful capitalized exit.
+        exit_value, exit_not_meaningful = _exit_value_or_floor(
+            terminal_annual_noi, terminal_cap_rate)
         selling_costs = exit_value * selling_costs_pct
         net_reversion = exit_value - selling_costs
 
@@ -867,7 +934,10 @@ class DCFCalculationService:
             'selling_costs': round(selling_costs, 2),
             'net_reversion': round(net_reversion, 2),
             'pv_reversion': round(pv_reversion, 2),
+            'exit_not_meaningful': exit_not_meaningful,
         }
+        if exit_not_meaningful:
+            exit_analysis['exit_not_meaningful_reason'] = EXIT_NOT_MEANINGFUL_REASON
 
         # Terminal year line-item breakdown for frontend Year N+1 column
         terminal_year = {

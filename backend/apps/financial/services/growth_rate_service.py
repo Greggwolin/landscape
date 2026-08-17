@@ -77,13 +77,15 @@ class GrowthRateService:
             columns = [col[0] for col in cursor.description]
             set_data = dict(zip(columns, row))
 
-            # Get steps ordered by step_number
+            # Get steps ordered by step_number.
+            # NOTE: the live column is thru_period, not to_period. It is
+            # aliased here so the returned dict keeps its documented shape.
             cursor.execute("""
                 SELECT
                     step_id,
                     step_number,
                     from_period,
-                    to_period,
+                    thru_period AS to_period,
                     rate
                 FROM landscape.core_fin_growth_rate_steps
                 WHERE set_id = %s
@@ -103,7 +105,7 @@ class GrowthRateService:
         Get the applicable growth rate for a specific period.
 
         Handles stepped rates by finding the step where:
-        - from_period <= period AND (to_period IS NULL OR to_period >= period)
+        - from_period <= period AND (thru_period IS NULL OR thru_period >= period)
 
         Args:
             set_id: The growth rate set ID
@@ -122,7 +124,7 @@ class GrowthRateService:
                 FROM landscape.core_fin_growth_rate_steps
                 WHERE set_id = %s
                   AND from_period <= %s
-                  AND (to_period IS NULL OR to_period >= %s)
+                  AND (thru_period IS NULL OR thru_period >= %s)
                 ORDER BY step_number DESC
                 LIMIT 1
             """, [set_id, period, period])

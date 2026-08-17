@@ -23,6 +23,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 import logging
 
+from apps.financial.models_debt import DEAD_LOAN_STATUSES_SQL
+
 # Import numpy-financial for loan amortization (same library used by financial_engine)
 try:
     import numpy_financial as npf
@@ -162,8 +164,10 @@ class MultifamilyCashFlowAdapter:
             estimated_opex = unit_count_for_opex * 5500
             opex = (estimated_opex,)
 
-            # Load loan (PERMANENT type preferred)
-            cursor.execute("""
+            # Load loan (PERMANENT type preferred). Dead-status loans are
+            # excluded so a paid-off/cancelled loan can never be picked as the
+            # project's debt — see DEAD_LOAN_STATUSES in financial.models_debt.
+            cursor.execute(f"""
                 SELECT
                     COALESCE(loan_amount, commitment_amount) as loan_amount,
                     interest_rate_pct as interest_rate_pct,
@@ -172,6 +176,7 @@ class MultifamilyCashFlowAdapter:
                 FROM landscape.tbl_loan
                 WHERE project_id = %s
                   AND loan_type IN ('PERMANENT', 'BRIDGE')
+                  AND {DEAD_LOAN_STATUSES_SQL}
                 ORDER BY
                     CASE loan_type WHEN 'PERMANENT' THEN 1 WHEN 'BRIDGE' THEN 2 ELSE 3 END
                 LIMIT 1

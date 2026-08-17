@@ -376,11 +376,22 @@ def fetch_cashflow_schedule_data(project_id: int) -> Dict[str, Any]:
     ]
     growth_set_names = _fetch_growth_set_names([i for i in set_ids if i])
 
+    # PD15 Fix 6: the engine floors the exit at $0 when terminal income is
+    # negative. Carry its reason to the artifact so the Reversion column reading
+    # zero is explained on the card rather than left to be misread as "no exit".
+    _exit = envelope.get('exitAnalysis') or {}
+    exit_note = (
+        (_exit.get('exitNotMeaningfulReason')
+         or 'Terminal NOI is negative — reversion floored at $0')
+        if _exit.get('exitNotMeaningful') else None
+    )
+
     is_income = project_type_code in INCOME_PROPERTY_TYPE_CODES
     return {
         'project_name': project_name,
         'project_type_code': project_type_code,
         'property_type': property_type,
+        'exit_note': exit_note,
         'rows': rows,
         'assumptions': assumptions,
         'results': results,
@@ -483,6 +494,7 @@ def build_cashflow_artifact_schema(
     dcf_row: Optional[Dict[str, Any]] = None,
     growth_set_names: Optional[Dict[int, str]] = None,
     captured_at: Optional[str] = None,
+    exit_note: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build the fixed cash-flow-artifact schema (KPI header + assumptions strip +
     period grid).
@@ -558,8 +570,18 @@ def build_cashflow_artifact_schema(
             cells['reversion'] = _num(r.get('reversion'))
         period_rows.append({'id': f'p{idx}', 'cells': cells})
 
+    blocks: List[Dict[str, Any]] = []
+    if exit_note:
+        # PD15 Fix 6 — one visible line, above the numbers it explains.
+        blocks.append({
+            'id': 'cashflow_exit_note',
+            'type': 'text',
+            'variant': 'callout',
+            'content': exit_note,
+        })
+
     return {
-        'blocks': [
+        'blocks': blocks + [
             {
                 'id': 'cashflow_kpis',
                 'type': 'key_value_grid',
@@ -605,6 +627,7 @@ def build_cashflow_schema_for_project(project_id: int) -> Optional[Dict[str, Any
         property_type=data['property_type'],
         dcf_row=data['dcf_row'],
         growth_set_names=data['growth_set_names'],
+        exit_note=data.get('exit_note'),
     )
 
 
@@ -621,6 +644,7 @@ def create_cashflow_artifact(
     property_type: str = 'cre',
     dcf_row: Optional[Dict[str, Any]] = None,
     growth_set_names: Optional[Dict[int, str]] = None,
+    exit_note: Optional[str] = None,
     user_id: Any = None,
     thread_id: Any = None,
 ) -> Dict[str, Any]:
@@ -651,6 +675,7 @@ def create_cashflow_artifact(
         property_type=property_type,
         dcf_row=dcf_row,
         growth_set_names=growth_set_names,
+        exit_note=exit_note,
     )
     title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
 

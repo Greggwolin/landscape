@@ -17,6 +17,7 @@ Output:
 - program_summary: High-level program metrics
 """
 
+import logging
 import math
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Optional
@@ -26,6 +27,9 @@ from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
 from apps.multifamily.models import MultifamilyUnit, ValueAddAssumptions
+from apps.financial.services.growth_rate_service import GrowthRateService
+
+logger = logging.getLogger(__name__)
 
 
 class RenovationScheduleService:
@@ -181,7 +185,10 @@ class RenovationScheduleService:
             except Exception:
                 pass
 
-            # Try growth rate sets from DCF analysis
+            # Try growth rate sets from DCF analysis. Rates are resolved
+            # through GrowthRateService — the one canonical reader for
+            # core_fin_growth_rate_steps — rather than a local query, so the
+            # column names can't drift out from under this service again.
             try:
                 cursor.execute("""
                     SELECT income_growth_set_id, expense_growth_set_id
@@ -190,23 +197,30 @@ class RenovationScheduleService:
                     ORDER BY updated_at DESC LIMIT 1
                 """, [self.project_id])
                 row = cursor.fetchone()
-                if row:
-                    for set_id, target_key in [
-                        (row[0], 'income_growth_rate'),
-                        (row[1], 'expense_growth_rate'),
-                    ]:
-                        if set_id:
-                            cursor.execute("""
-                                SELECT rate_value
-                                FROM landscape.core_fin_growth_rate_steps
-                                WHERE set_id = %s
-                                ORDER BY period_index ASC LIMIT 1
-                            """, [set_id])
-                            rate_row = cursor.fetchone()
-                            if rate_row and rate_row[0]:
-                                defaults[target_key] = float(rate_row[0])
             except Exception:
-                pass
+                logger.warning(
+                    'Renovation schedule: could not read growth set ids for '
+                    'project %s; falling back to assumption/default rates.',
+                    self.project_id, exc_info=True,
+                )
+                row = None
+
+        if row:
+            for set_id, target_key in [
+                (row[0], 'income_growth_rate'),
+                (row[1], 'expense_growth_rate'),
+            ]:
+                if not set_id:
+                    continue
+                rate = GrowthRateService.get_flat_rate(set_id)
+                if rate:
+                    defaults[target_key] = float(rate)
+                else:
+                    logger.warning(
+                        'Renovation schedule: growth set %s for project %s '
+                        'resolved to no rate; keeping %s=%s.',
+                        set_id, self.project_id, target_key, defaults[target_key],
+                    )
 
         return defaults
 

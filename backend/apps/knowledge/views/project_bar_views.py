@@ -183,7 +183,7 @@ def _get_vitals(project_id: int, project_basics: Dict[str, Any]) -> Dict[str, An
             if is_multifamily or not is_land_dev:
                 # Try multifamily unit types
                 cursor.execute("""
-                    SELECT COALESCE(SUM(COALESCE(unit_count, total_units, 0)), 0)
+                    SELECT COALESCE(SUM(COALESCE(total_units, 0)), 0)  -- PD28 Fix 3: canonical
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [project_id])
@@ -211,7 +211,7 @@ def _get_vitals(project_id: int, project_basics: Dict[str, Any]) -> Dict[str, An
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT COALESCE(SUM(
-                    COALESCE(unit_count, total_units, 0) * COALESCE(avg_square_feet, 0)
+                    COALESCE(total_units, 0) * COALESCE(avg_square_feet, 0)  -- PD28 Fix 3
                 ), 0)
                 FROM landscape.tbl_multifamily_unit_type
                 WHERE project_id = %s
@@ -368,7 +368,8 @@ def _score_property_section(project_id: int, project_basics: Dict[str, Any]) -> 
             cursor.execute("""
                 SELECT
                     COUNT(*) as type_count,
-                    COALESCE(SUM(COALESCE(unit_count, total_units, 0)), 0) as total_units,
+                    -- PD28 Fix 3: total_units is canonical; unit_count is deprecated.
+                    COALESCE(SUM(COALESCE(total_units, 0)), 0) as total_units,
                     COUNT(CASE WHEN market_rent IS NOT NULL OR current_market_rent IS NOT NULL THEN 1 END) as with_rent,
                     COUNT(CASE WHEN avg_square_feet IS NOT NULL THEN 1 END) as with_sqft
                 FROM landscape.tbl_multifamily_unit_type

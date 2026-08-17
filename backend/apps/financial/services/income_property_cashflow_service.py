@@ -23,8 +23,11 @@ from django.db import connection
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
-from apps.financial.models_debt import Loan
-from apps.financial.services.dcf_calculation_service import DCFCalculationService
+from apps.financial.models_debt import Loan, exclude_dead_loans
+from apps.financial.services.dcf_calculation_service import (
+    DCFCalculationService,
+    EXIT_NOT_MEANINGFUL_REASON,
+)
 from apps.calculations.engines.debt_service_engine import (
     DebtServiceEngine,
     TermLoanParams,
@@ -162,6 +165,13 @@ class IncomePropertyCashFlowService:
             'netReversionAfterDebt': round(net_reversion - loan_payoff, 2),
             'holdPeriodMonths': period_count,
         }
+        # PD15 Fix 6: carry the zero-floored-exit flag into the envelope so every
+        # renderer downstream (proforma family, cash-flow artifact) can print the
+        # reason the reversion line reads $0 instead of showing a bare zero.
+        if exit_analysis.get('exit_not_meaningful'):
+            exit_analysis_response['exitNotMeaningful'] = True
+            exit_analysis_response['exitNotMeaningfulReason'] = exit_analysis.get(
+                'exit_not_meaningful_reason') or EXIT_NOT_MEANINGFUL_REASON
 
         return {
             'projectId': self.project_id,
@@ -885,8 +895,9 @@ class IncomePropertyCashFlowService:
 
         closing_pct = self._get_closing_cost_pct(self.project_id)
 
-        # Sum all loan amounts for this project
-        loans = Loan.objects.filter(project_id=self.project_id)
+        # Sum all loan amounts for this project. Loans whose status marks them
+        # as dead (paid off / cancelled / rejected) must not offset equity.
+        loans = exclude_dead_loans(Loan.objects.filter(project_id=self.project_id))
         total_loan = sum(
             (l.loan_amount or l.commitment_amount or Decimal('0'))
             for l in loans
@@ -971,9 +982,11 @@ class IncomePropertyCashFlowService:
         (outstanding balance at the last period for reversion analysis).
         """
         term_loans = list(
-            Loan.objects.filter(
-                project_id=self.project_id,
-                structure_type='TERM',
+            exclude_dead_loans(
+                Loan.objects.filter(
+                    project_id=self.project_id,
+                    structure_type='TERM',
+                )
             )
         )
 

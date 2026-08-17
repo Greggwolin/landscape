@@ -228,10 +228,14 @@ def operations_data(request, project_id):
                     total_sf = _to_float(urow[1])
 
             if not unit_count:
+                # PD28 Fix 3: total_units is canonical. The old
+                # COALESCE(unit_count, total_units) preferred the deprecated
+                # column, so the 36 rows where the two disagree resolved to the
+                # count the rent roll does NOT display.
                 cursor.execute("""
                     SELECT
-                        COALESCE(SUM(COALESCE(unit_count, total_units, 0)), 0),
-                        COALESCE(SUM(COALESCE(unit_count, total_units, 0) * COALESCE(avg_square_feet, 0)), 0)
+                        COALESCE(SUM(COALESCE(total_units, 0)), 0),
+                        COALESCE(SUM(COALESCE(total_units, 0) * COALESCE(avg_square_feet, 0)), 0)
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [project_id])
@@ -309,7 +313,7 @@ def operations_data(request, project_id):
                 cursor.execute("""
                     SELECT
                         COALESCE(unit_type_code, unit_type_name, 'Unit') as unit_type,
-                        COALESCE(unit_count, total_units, 0) as unit_count,
+                        COALESCE(total_units, 0) as unit_count,  -- PD28 Fix 3: canonical
                         COALESCE(avg_square_feet, 0) as avg_unit_sf,
                         COALESCE(market_rent, current_market_rent, 0) as market_rent
                     FROM landscape.tbl_multifamily_unit_type

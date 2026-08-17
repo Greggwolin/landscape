@@ -156,12 +156,13 @@ class IncomeAnalysisDetector:
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT
-                    COALESCE(SUM(COALESCE(unit_count, total_units, 0)), 0) as unit_count,
-                    COALESCE(SUM(COALESCE(unit_count, total_units, 0)), 0) as units_with_market_rent,
+                    -- PD28 Fix 3: total_units is canonical; unit_count is deprecated.
+                    COALESCE(SUM(COALESCE(total_units, 0)), 0) as unit_count,
+                    COALESCE(SUM(COALESCE(total_units, 0)), 0) as units_with_market_rent,
                     0 as units_with_current_rent,
                     0 as units_with_lease_dates,
                     0 as total_current_monthly,
-                    COALESCE(SUM(COALESCE(unit_count, total_units, 0) * COALESCE(current_market_rent, market_rent, 0)), 0) as total_market_monthly,
+                    COALESCE(SUM(COALESCE(total_units, 0) * COALESCE(current_market_rent, market_rent, 0)), 0) as total_market_monthly,
                     NULL as avg_current_rent,
                     AVG(COALESCE(current_market_rent, market_rent)) FILTER (WHERE COALESCE(current_market_rent, market_rent, 0) > 0) as avg_market_rent,
                     0 as active_leases,
