@@ -11,6 +11,17 @@
  * @version 2.3
  * @created 2026-01-23
  * @updated 2026-02-08 - Renamed from StudioContent to ProjectContentRouter
+ *
+ * ── SHELL STATUS (verified 2026-08-18, LSCMD-BC-SHELLSTATUS-0818-BC2) ──────
+ * LOAD-BEARING. This router is the shared screen tree for the classic surface
+ * it lives under, /studio, and /design — three of the four project shells
+ * import it and render its output. (The chat-first /w/ surface is the
+ * exception: it renders its own tree — ProjectArtifactsPanel, CenterChatPanel,
+ * the modal registry — and does not import this router.) It is not legacy and
+ * it is not reference: removing or breaking it takes down three of the four
+ * shells. Alpha readiness is also measured against the classic surface (see
+ * CLAUDE.md). Four shells is deliberate, not drift — see the shell table in
+ * CLAUDE.md before proposing to consolidate them.
  */
 
 'use client';

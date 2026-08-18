@@ -1,5 +1,24 @@
 'use client';
 
+/**
+ * The chat-first project shell — /w/... — THE working surface.
+ *
+ *   LEFT  : <WrapperSidebar>        — global nav, search, threads, recents
+ *   CENTER: <CenterChatPanel>       — Landscaper chat (the primary navigation)
+ *   RIGHT  : <ArtifactWorkspacePanel> / routed project content
+ *
+ * ── SHELL STATUS (verified 2026-08-18, LSCMD-BC-SHELLSTATUS-0818-BC2) ──────
+ * ACTIVE. Settled as the working project surface 2026-07-19 (PR #181) and the
+ * default landing after login. Sixteen changes since that date, against one for
+ * /studio and none for /design. New product surfaces belong here.
+ * Renders its own component tree — WrapperSidebar, CenterChatPanel,
+ * ArtifactWorkspacePanel — independent of the classic tree. Unlike /studio and
+ * /design, this shell does NOT import ProjectContentRouter (verified by grep,
+ * corrects an assumption this note originally carried); that router is
+ * load-bearing for the other three shells, not this one.
+ * Four shells is deliberate, not drift — see the shell table in CLAUDE.md.
+ */
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';

@@ -17,6 +17,15 @@
  * Project sourcing mirrors the classic /projects/[id] page exactly (cache via
  * useProjectContext + direct fallback fetch), so the rail tree and the routed
  * content match the legacy surface for every project type.
+ *
+ * ── SHELL STATUS (verified 2026-08-18, LSCMD-BC-SHELLSTATUS-0818-BC2) ──────
+ * PARKED — deterministic fallback, kept deliberately. De-emphasized 2026-07-19
+ * (PR #181) when the chat-first /w/ surface was settled on as the working
+ * project surface. Reachable by direct URL only; nothing in the nav links here.
+ * One change since that date. Fully functional and NOT to be deleted: it is the
+ * quiet fallback for cases the chat surface cannot render deterministically.
+ * Do not build new product surfaces here — build them in /w/.
+ * Four shells is deliberate — see the shell table in CLAUDE.md.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
