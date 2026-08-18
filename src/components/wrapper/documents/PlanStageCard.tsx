@@ -16,6 +16,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { PlanPreviewWindow } from './PlanPreviewWindow';
 
 /**
  * The read lives on the Django side; the profile read/write does not.
@@ -75,6 +76,7 @@ export function PlanStageCard({ docId, plan, onConfirmed }: Props) {
   const [applyState, setApplyState] = useState<string | null>(
     (plan as { apply?: { state?: string } }).apply?.state ?? null,
   );
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [applyMessage, setApplyMessage] = useState<string | null>(
     (plan as { apply?: { message?: string } }).apply?.message ?? null,
   );
@@ -327,6 +329,23 @@ export function PlanStageCard({ docId, plan, onConfirmed }: Props) {
             Read the drawing
           </button>
         </div>
+      )}
+
+      {/* The one way in. The card is what reports the read, so it is what
+          offers to show it — and because both surfaces that render a plan card
+          render THIS component, the control appears in the documents panel and
+          the overlay preview together or not at all. Do not add a second entry
+          point elsewhere. */}
+      {applyState === 'done' && (
+        <div className="w-plan-card-controls">
+          <button className="btn btn-secondary btn-sm" onClick={() => setPreviewOpen(true)}>
+            Show the proposed geometry
+          </button>
+        </div>
+      )}
+
+      {previewOpen && (
+        <PlanPreviewWindow docId={docId} onClose={() => setPreviewOpen(false)} />
       )}
 
       {error && <p className="w-plan-card-error">{error}</p>}

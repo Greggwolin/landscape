@@ -81,6 +81,13 @@ SQFT_PER_ACRE = 43_560.0
 MIN_LOTS_PER_PARCEL = 5
 
 #: How an outline was obtained. Mirrors the CHECK constraint on the table.
+#: How a lot's geometry was established. NOTE (MK51, 2026-08-18): "derived" is
+#: currently over-reported — `plan_reader` labels every unmatched lot "derived",
+#: including lots that were never derived and have no outline at all (40 of 286
+#: on the Red Valley plat). A reader of this column cannot tell a rebuilt lot
+#: from an absent one. Adding a third value is a schema-visible change and
+#: belongs in its own prompt; until then derive the distinction from whether a
+#: ring exists, as `plan_preview_views.build_preview` does.
 VALID_SOURCES = ("read", "derived")
 
 

@@ -66,7 +66,7 @@ from .parcel_rollup import DerivedLot
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["PlanReading", "read_plan", "find_lot_sheets"]
+__all__ = ["PlanReading", "SheetScan", "read_plan", "find_lot_sheets", "scan_sheets"]
 
 #: A sheet needs at least this many lot labels to be a lot sheet. A cover or
 #: notes sheet carries a couple of dozen stray numbers; a lot sheet carries
@@ -107,6 +107,15 @@ class PlanReading:
     label_disagreements: dict[str, list[int]] = field(default_factory=dict)
     #: Runs of lots that could not be rebuilt, each with a plain-English reason.
     refusals: list[tuple[list[int], str]] = field(default_factory=list)
+    #: page index -> lot number -> ring, IN PAGE COORDINATES (PyMuPDF points,
+    #: origin top-left, y down). Kept, not dropped: measuring needed these and
+    #: then discarded them, which left "which sheet did the other 42 come from"
+    #: answerable only by re-reading the drawing. Emphatically NOT world
+    #: coordinates — see `ring_3857`, which stays null until georeferencing.
+    rings_by_sheet: dict[int, dict[int, list]] = field(default_factory=dict)
+    #: Every page of the drawing with its lot-sheet verdict, so a page that was
+    #: never examined can be shown as excluded rather than simply missing.
+    sheet_scans: list["SheetScan"] = field(default_factory=list)
 
     @property
     def lot_count(self) -> int:
@@ -152,6 +161,59 @@ class PlanReading:
         )
 
 
+@dataclass(frozen=True)
+class SheetScan:
+    """Why one page was, or was not, taken for a lot sheet.
+
+    `find_lot_sheets` decided this already and wrote it to the log. A log is
+    not a place a person looks when a sheet they expected is missing from a
+    preview, so the same verdict is returned as data. The preview shows the
+    excluded pages and the reason, because "that sheet is not in the list" and
+    "that sheet has no lots" are different facts and only one of them is a
+    problem with the drawing.
+    """
+
+    page: int
+    labels: int
+    labels_per_column: float
+    is_lot_sheet: bool
+    reason: str
+
+
+def scan_sheets(doc, number_range: tuple[int, int] = _LOT_NUMBER_RANGE) -> list[SheetScan]:
+    """Every page of the drawing, with the lot-sheet verdict for each."""
+    out: list[SheetScan] = []
+    for page_index in range(len(doc)):
+        labels = lot_number_tokens(doc[page_index], *number_range)
+        if len(labels) < _MIN_LABELS_PER_SHEET:
+            out.append(SheetScan(
+                page=page_index, labels=len(labels), labels_per_column=0.0,
+                is_lot_sheet=False,
+                reason=(f"{len(labels)} lot-like numbers, fewer than the "
+                        f"{_MIN_LABELS_PER_SHEET} a lot sheet carries — read as a "
+                        "cover, notes or detail sheet"),
+            ))
+            continue
+        xs = sorted(point.x for _, point in labels)
+        columns = 1 + sum(1 for a, b in zip(xs, xs[1:]) if b - a > _COLUMN_GAP_PT)
+        per_column = len(labels) / columns
+        if per_column > _MAX_LABELS_PER_COLUMN:
+            out.append(SheetScan(
+                page=page_index, labels=len(labels), labels_per_column=per_column,
+                is_lot_sheet=False,
+                reason=(f"{len(labels)} numbers but {per_column:.1f} per column — "
+                        "stacked in columns, so this is a table, not lots drawn "
+                        "on a sheet"),
+            ))
+            continue
+        out.append(SheetScan(
+            page=page_index, labels=len(labels), labels_per_column=per_column,
+            is_lot_sheet=True,
+            reason=f"{len(labels)} lot numbers scattered across the sheet",
+        ))
+    return out
+
+
 def find_lot_sheets(doc, number_range: tuple[int, int] = _LOT_NUMBER_RANGE) -> list[int]:
     """
     The sheets a plat draws its lots on, found by counting lot labels.
@@ -160,21 +222,11 @@ def find_lot_sheets(doc, number_range: tuple[int, int] = _LOT_NUMBER_RANGE) -> l
     rather than guessing, which is the honest answer for a cover page or a
     detail sheet handed in on its own.
     """
-    counts = {}
-    for page_index in range(len(doc)):
-        labels = lot_number_tokens(doc[page_index], *number_range)
-        if len(labels) < _MIN_LABELS_PER_SHEET:
-            continue
-        xs = sorted(point.x for _, point in labels)
-        columns = 1 + sum(1 for a, b in zip(xs, xs[1:]) if b - a > _COLUMN_GAP_PT)
-        per_column = len(labels) / columns
-        if per_column > _MAX_LABELS_PER_COLUMN:
-            logger.info(
-                "sheet %d has %d numbers but %.1f per column — a table, not lots",
-                page_index + 1, len(labels), per_column,
-            )
-            continue
-        counts[page_index] = len(labels)
+    scans = scan_sheets(doc, number_range)
+    for scan in scans:
+        if not scan.is_lot_sheet and scan.labels >= _MIN_LABELS_PER_SHEET:
+            logger.info("sheet %d: %s", scan.page + 1, scan.reason)
+    counts = {s.page: s.labels for s in scans if s.is_lot_sheet}
     logger.info("lot sheets: %s", {k + 1: v for k, v in counts.items()} or "none found")
     return sorted(counts)
 
@@ -200,12 +252,16 @@ def read_plan(
         table = read_lot_area_table(doc)
         if not table.areas:
             logger.info("no lot area table found — nothing to read")
-            return PlanReading(table=table)
+            return PlanReading(table=table, sheet_scans=scan_sheets(doc, number_range))
 
-        lot_sheets = list(sheets) if sheets is not None else find_lot_sheets(doc, number_range)
+        scans = scan_sheets(doc, number_range)
+        # An explicit `sheets` argument overrides detection (tests, and a caller
+        # who genuinely knows better) — but the scan is still reported, so the
+        # window can show what detection WOULD have said.
+        lot_sheets = list(sheets) if sheets is not None else [s.page for s in scans if s.is_lot_sheet]
         if not lot_sheets:
             logger.info("a lot area table but no sheets drawing lots")
-            return PlanReading(table=table)
+            return PlanReading(table=table, sheet_scans=scans)
 
         # Compare like with like. A lot sheet carries plenty of large text that
         # is not a lot number — sheet numbers, a tract's digits, a fragment of a
@@ -264,6 +320,20 @@ def read_plan(
                     width_ft=dims.width_ft if dims else None,
                     depth_ft=dims.depth_ft if dims else None,
                     page=pages.get(number),
+                    # KNOWN WRONG (recorded MK51, 2026-08-18): this says
+                    # "derived" for every lot that was not matched — including
+                    # the ones that were never derived either and have no
+                    # outline at all. On the Red Valley plat that is 40 of 286
+                    # lots recorded as derived when nothing derived them, which
+                    # is a false statement sitting in a stored column.
+                    #
+                    # Not corrected here because `parcel_rollup` validates this
+                    # against VALID_SOURCES and writes it, so a third value is a
+                    # schema-visible change and belongs in its own prompt. The
+                    # preview window computes the honest three-way state from
+                    # ring presence instead — see
+                    # `plan_preview_views.build_preview`. Anything else reading
+                    # this column should do the same until it is fixed.
                     source="read" if number in {m.number for m in match.matched} else "derived",
                 )
             )
@@ -272,6 +342,12 @@ def read_plan(
             table=table,
             lots=lots,
             sheets=lot_sheets,
+            # Every lot sheet gets a key, including one that recovered nothing.
+            # rings_by_sheet is a defaultdict populated only where a ring
+            # exists, so keying off it would drop an empty sheet silently —
+            # which is the single failure the preview window exists to catch.
+            rings_by_sheet={page: dict(rings_by_sheet.get(page, {})) for page in lot_sheets},
+            sheet_scans=scans,
             scale_ft_per_inch=match.scale_ft_per_inch,
             scale_is_round=match.scale_is_round,
             label_disagreements=disagreements,
