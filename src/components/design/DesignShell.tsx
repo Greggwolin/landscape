@@ -26,6 +26,18 @@
  * Project sourcing mirrors the classic /projects/[id] page exactly (cache via
  * useProjectContext + direct fallback fetch), so the rail tree and the routed
  * content match the legacy surface for every project type.
+ *
+ * ── SHELL STATUS (verified 2026-08-18, LSCMD-BC-SHELLSTATUS-0818-BC2) ──────
+ * REFERENCE — a visual restyle of StudioShell, kept for comparison. Built
+ * 2026-07-17 (PR #170/#171); untouched since. Reachable by direct URL only;
+ * nothing in the nav links here. Owns five files and no logic of its own —
+ * every substantive component it renders is imported.
+ * Kept deliberately at Gregg's direction (2026-08-18) as a visual reference for
+ * the July design language. Do not build product here, and do not delete it —
+ * three prior passes have proposed retiring it and been overruled.
+ * The design-session record behind it (reference design, artifact kit, handoff
+ * and invariants) is parked on branch archive/design-shell-0718.
+ * Four shells is deliberate — see the shell table in CLAUDE.md.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';

@@ -567,6 +567,22 @@ Django uses DRF serializers with consistent envelope:
 
 ### Navigation Architecture
 
+**Four project shells coexist on `main`. This is deliberate, not drift.** Each has a status
+note in its own shell file. Verified 2026-08-18 (`LSCMD-BC-SHELLSTATUS-0818-BC2`); commit
+counts are since 2026-07-19, when the chat-first surface was settled on (PR #181).
+
+| Shell | Route | Status | Changes since 07-19 | Reachable |
+|---|---|---|---|---|
+| Chat-first | `/w/...` | **ACTIVE** — build new surfaces here | 16 | default after login |
+| Classic | `/projects/[projectId]` | **LOAD-BEARING** — its `ProjectContentRouter` is imported by `/studio` and `/design` (not by `/w/`, which renders its own independent tree); alpha readiness is measured here | 4 | `?mode=classic` |
+| Studio | `/studio/[projectId]` | **PARKED** — deterministic fallback, kept | 1 | direct URL only |
+| Design | `/design/[projectId]` | **REFERENCE** — visual restyle of studio, kept for comparison | 0 | direct URL only |
+
+Studio and design own five files each (page, layout, sidebar, stylesheet, shell) and no logic
+of their own — everything substantive is imported. Keeping them costs almost nothing; deleting
+them would reclaim almost nothing. **Three separate passes have proposed consolidating these
+and been overruled. Read this table before proposing a fourth.**
+
 The application has two coexisting navigation surfaces. Active development is on the chat-first surface; the legacy folder/tab surface is retained but no longer the design target.
 
 **Primary (chat-first / unified UI) — `/w/` route layer.** This is the target experience and the active line of work on `feature/unified-ui`. Three-panel shell: left sidebar (project list + recent threads), center Landscaper chat, right context-aware artifacts/content panel. Routes include `/w/projects`, `/w/projects/[projectId]`, `/w/chat`, `/w/chat/[threadId]`, `/w/admin`, `/w/help`, `/w/tools`, `/w/landscaper-ai`. See the "Chat Canvas / Unified UI" section below for component-level detail.
