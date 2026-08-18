@@ -789,6 +789,30 @@ Two distinct failure modes — treat separately:
 - CoStar sale comp extractor: `backend/apps/knowledge/services/costar_extractor.py` — specialized extraction pipeline for CoStar export PDFs, routes through `extraction_service.py` with dedicated field mappings and `extraction_writer.py` for DB persistence
 - User Guide corpus: the in-app User Guide is now a `user_guide`-domain document in `tbl_platform_knowledge`, ingested via `python manage.py ingest_guide_corpus` from `backend/data/guide_corpus.json` (regenerate with `scripts/guide/export-guide-corpus.ts` on guide edits)
 
+### Plan Geometry Extraction (Added 2026-08-14)
+
+Automatic extraction of lot/parcel geometry from uploaded project drawings (plats, site plans). Entire pipeline lives in `backend/apps/knowledge/services/plan_geometry/`.
+
+**Modules:**
+- `plan_classify.py` — classifies drawing type (preliminary plat, final plat, site plan, etc.) with multi-source agreement logic
+- `intake.py` — recognizes drawings on upload, triggers classification
+- `stages.py` — plan stage definitions and progression
+- `plat_vector.py` — vector path extraction from plat PDFs via PyMuPDF
+- `siteplan_raster.py` — raster contour extraction from site plan images
+- `lot_dimensions.py` — extracts lot width, depth, street-facing edge from geometry
+- `lot_match.py` — matches extracted lots to existing parcels in the project
+- `parcel_rollup.py` — aggregates individual lot outlines into parcel-level summaries
+- `calibration.py` — calibration for plan geometry measurement
+- `georeference.py` — georeferencing extracted geometry to real-world coordinates
+
+**Database:** `gis_plan_lot` table (migration `20260814_create_gis_plan_lot.up.sql`) — stores extracted lot outlines with geometry, dimensions, matched parcel references, and provenance.
+
+**Frontend:** `PlanStageCard.tsx` in `src/components/wrapper/documents/` — shows classified drawing type in the DMS detail panel with confirmation controls.
+
+**Management command:** `import_plan_lots` — CLI for importing plan lot data.
+
+**Status:** Code-complete, not yet integration-tested on a real uploaded plat. No Landscaper tools registered for this pipeline yet — extraction runs on upload via the classification pipeline.
+
 ### Valuation Engine Status
 
 - **Sales Comparison:** Full CRUD, adjustment matrix, property-type-specific tables
@@ -1063,7 +1087,8 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-07-28 — Artifact editing spine + thread destination persistence: CB6 (#224) single budget cell writable e2e with optimistic locking; CB8 (#227) batch commit — stage several edits, land as one set; TA1 (#226) thread destination persistence (new `landscaper_thread_last_destination` table + Django CRUD + frontend hook); CB3–CB5 (#221–#223) relay sweep + fabrication guard widened to income-property + land-sales vocabulary; CB7 (#225) planning-activity log fix; TA5 (2 commits) artifact routing for schedule tools; #228 LayerPanel hydration fix. Landed since (2026-07-29/30): CB10 UOM picklist editing (#232), CB9 sales-schedule editable cells (#229), CB12–CB14 sales recalc fixes (#231/#233/#234), TA5 artifact host-route fix (#230). Tool count unchanged at 285 registered / 282 advertised.*
+*Last audit: 2026-08-14 (nightly sync) — Plan geometry extraction pipeline: entire new subsystem (`backend/apps/knowledge/services/plan_geometry/`, 10 modules, ~3,000+ lines) for auto-classifying uploaded drawings (plats, site plans), extracting lot geometry (vector from plats, raster from site plans), computing lot dimensions, and rolling up into parcel summaries. New `gis_plan_lot` table + `PlanStageCard` frontend component. Valuation fixes: fabrication guard preserves blocked replies; proforma cumulative total double-count fixed; DCF exit values floored to zero; authoritative assumptions hierarchy for income approach; canonical unit count. 8 new test files (~2,100 lines). Tool count unchanged at 285 registered / 282 advertised.*
+*Prior audit: 2026-07-28 — Artifact editing spine + thread destination persistence: CB6 (#224) single budget cell writable e2e with optimistic locking; CB8 (#227) batch commit — stage several edits, land as one set; TA1 (#226) thread destination persistence (new `landscaper_thread_last_destination` table + Django CRUD + frontend hook); CB3–CB5 (#221–#223) relay sweep + fabrication guard widened to income-property + land-sales vocabulary; CB7 (#225) planning-activity log fix; TA5 (2 commits) artifact routing for schedule tools; #228 LayerPanel hydration fix. Landed since (2026-07-29/30): CB10 UOM picklist editing (#232), CB9 sales-schedule editable cells (#229), CB12–CB14 sales recalc fixes (#231/#233/#234), TA5 artifact host-route fix (#230). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-07-27 — Nightly sync: +`review_budget_variance` tool (CB2 §3, PR #220); clarification Phase 3b Apply+review+modal-target (#219); SS18 drape false-success fix — persist actions now server-side (#218); FB-304 commit-msg hook recurrence guard. Tool count 284→285 registered, 281→282 advertised.*
 *Prior audit: 2026-07-24 — SS16 drape-by-chat merged + tool-count reconciled (LSCMD-SS-DRAPE-TOOL-WIRE-0724 / LSCMD-SS-MERGE-1516-0724): new `control_map_overlay` tool gives the SS14 site-plan drape workflow a chat door — drape / fit-to-target / set-opacity / scale / rotate / set-warp-mode (4-corner ↔ TPS) / nudge / lock / unlock / save, targeting selected parcels or a drawn polygon (falls back to free-drape when no geometry). Thin bridge: the tool returns an `overlay_command` {action, target, params}; `CenterChatPanel` latches it + navigates + fires a `landscaper:control_map_overlay` CustomEvent; `MapTab` drains it (same seam as `extract_plan_image`) and drives the shipped SS14 handlers — no new map machinery. Registered UNIVERSAL + map page context; no DB write in the tool (persistence is the client Save through the ownership-guarded overlay endpoints). New front-end `drapeCommandBridge.ts` (latch + `resolveDrapeTargetGeometry` + `nudgeCorners`). Tests: tool payload/validation (pytest, 13) + bridge target-resolution/nudge/latch (jest, 8). Count reconciled by direct registry inspection on the merged tree: advertised 280 → 281, registered 283 → 284 (the +1 is `control_map_overlay`). SS15 read-only TPS parity (#214) merged alongside. Also landed just prior on main: deterministic schedule artifacts + `open_clarification` + TPS warp overlays (see prior audit).*
 *Prior audit: 2026-07-24 — Deterministic schedule artifacts + clarification tool + TPS warp overlays: 5 new deterministic base-artifact tools (`get_budget_schedule`, `get_sales_schedule`, `get_cashflow_schedule`, `get_capitalization_schedule`, `get_rent_roll_schedule`) — each pulls real project data and renders a tabular artifact, eliminating LLM-composed financial tables; `open_clarification` tool (Phase 1 clarification artifacts — structured multi-option cards); TPS thin-plate-spline warp for site-plan overlays (SS14/SS15, migration `20260724_overlay_warp_scale_lock`); cost-of-sale component itemization (legal/closing/title breakout); map-feature vertex edit persistence fix. Registered executors 277 → 283; advertised 274 → 280.*
