@@ -71,7 +71,14 @@ _TOUCH_PT = 2.5
 
 
 class FrontageBasis:
-    """How a lot's frontage was decided — carried so a total can be audited."""
+    """How a lot's frontage was decided — carried so a total can be audited.
+
+    Note that frontage is not measured independently: it IS one of the two
+    oriented-box dimensions, chosen by the party-line test. So anything applied
+    to those dimensions applies to every parcel's frontage total as well — which
+    is how the removed `grow_pt` deduction came to shorten Red Valley's frontage
+    by about 0.69 ft on each of 246 measured lots.
+    """
 
     PARTY_LINES = "party_lines"      #: neighbours on both sides; strongest
     ONE_NEIGHBOUR = "one_neighbour"  #: end of a row; still directional
@@ -164,21 +171,39 @@ def measure_lot(
     ring: Ring,
     ft_per_pt: float,
     neighbours: Iterable[Ring] = (),
-    grow_pt: float = 0.5,
 ) -> LotDimensions:
     """
     Measure one lot. `neighbours` are the outlines of nearby lots, used only to
     find shared side lines; passing none yields `frontage_ft = None`.
 
-    `grow_pt` is the gap-closing growth applied during recovery, removed here
-    so a lot does not read a foot wider than it is.
+    Measures the ring that was recovered, and deducts nothing from it.
+
+    There used to be a `grow_pt` deduction here, subtracting the gap-closing
+    growth from both axes "so a lot does not read a foot wider than it is". It
+    was a correction for something that never happens. `extend_ends` lengthens a
+    segment ALONG ITS OWN DIRECTION, and extending a line's ends does not move
+    where it crosses a perpendicular line — so the enclosed face is not
+    inflated, and there is nothing to take back.
+
+    The measurement said so plainly and it went unread for months. Recovered
+    polygon areas agree with the plat's stated areas at a median ratio of
+    1.0000, while the deduction left 224 of 238 lots with a bounding rectangle
+    SMALLER THAN THE POLYGON IT BOUNDS — lot 128 came out 4,928 sq ft around a
+    5,039 sq ft shape. A bounding box cannot be smaller than what it bounds, so
+    the deduction was removing something that was never added. Undeducted, that
+    lot measures 42.0 x 120.0 ft against a plat that states 42.00 x 120.00.
+
+    The parameter is gone rather than defaulted to zero: a knob for a correction
+    that never applies is an invitation to set it again. `test_lot_dimensions`
+    now asserts the bounding rectangle is never smaller than its polygon, which
+    is the cheap invariant that would have caught this the day it landed.
     """
     from shapely.geometry import Polygon
 
     poly = Polygon(ring)
     long_pt, short_pt, long_heading = _oriented_box(ring)
-    long_ft = max(0.0, long_pt - 2 * grow_pt) * ft_per_pt
-    short_ft = max(0.0, short_pt - 2 * grow_pt) * ft_per_pt
+    long_ft = long_pt * ft_per_pt
+    short_ft = short_pt * ft_per_pt
     area = poly.area * ft_per_pt * ft_per_pt
     rotation = min(long_heading % 90.0, 90.0 - (long_heading % 90.0))
 
@@ -235,7 +260,6 @@ def measure_lot(
 def measure_lots(
     rings: dict[int, Ring],
     ft_per_pt: float,
-    grow_pt: float = 0.5,
     neighbour_radius_pt: float = 400.0,
 ) -> dict[int, LotDimensions]:
     """
@@ -254,7 +278,7 @@ def measure_lots(
             rings[m] for m, p in polys.items()
             if m != n and p.centroid.distance(here) <= neighbour_radius_pt
         ]
-        out[n] = measure_lot(n, ring, ft_per_pt, near, grow_pt)
+        out[n] = measure_lot(n, ring, ft_per_pt, near)
     return out
 
 
