@@ -19,6 +19,7 @@ import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
+import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -498,6 +499,24 @@ export function ArtifactWorkspacePanel({
                 .clarification_config
             }
             artifactId={active.artifact_id}
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_budget_schedule' &&
+          active.params_json &&
+          (active.params_json as { budget_view_config?: unknown }).budget_view_config ? (
+          // Budget artifact slice 1 (chat EB, 2026-07-31). The settled design is
+          // a topic plus a VIEW SPECIFICATION — level chips read from the
+          // project's own configuration, detail rungs, grouping, derivation,
+          // provenance footer — none of which the four-block grammar can carry.
+          // The specification rides in params_json.budget_view_config on the
+          // SAME artifact record as the block schema, so there is one budget
+          // surface: artifacts saved before this existed fall through to the
+          // block renderer below and are unaffected.
+          <ScheduleArtifact
+            config={
+              (active.params_json as { budget_view_config: ScheduleViewConfig })
+                .budget_view_config
+            }
             onClose={() => setActiveArtifactId(null)}
           />
         ) : active.tool_name === 'generate_location_brief' &&

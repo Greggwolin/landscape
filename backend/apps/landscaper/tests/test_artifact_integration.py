@@ -15,6 +15,18 @@ Manual one-shot setup against the existing test DB:
 
     psql "$DATABASE_URL" -d test_land_v2 -c 'CREATE SCHEMA IF NOT EXISTS landscape'
     DATABASE_URL="<test-db-url>" node scripts/run-migrations.mjs
+
+LAYER (ArtifactDedupParamsMergeTests): wiring — that create_artifact_record's
+dedup branch calls _merge_dedup_params with the stored row's params and persists
+the result. The pure-logic layer for that helper, which runs with no DB and no
+skip guard, is apps/artifacts/tests/test_dedup_params_merge.py.
+
+CAUTION: the skipUnless guard above calls _artifact_tables_present() at IMPORT
+time, so it inspects whatever DATABASE_URL points at — the dev database — not
+the test database pytest builds. On any environment whose dev DB lacks
+landscape.tbl_artifact, every test in this module silently skips. That includes
+CI, whose backend-tests job uses an empty throwaway Postgres. Filed as a
+follow-up; see the LSCMD-BA-DEDUPPARAMS-0814-BA1 PR.
 """
 
 from __future__ import annotations
@@ -24,7 +36,9 @@ import unittest
 from django.db import connection
 from django.test import TestCase
 
+from apps.artifacts.models import Artifact
 from apps.artifacts.services import (
+    _merge_dedup_params,
     create_artifact_record,
     find_dependent_artifacts_records,
     get_artifact_history_records,
@@ -225,6 +239,246 @@ class ArtifactServiceIntegrationTests(TestCase):
             changed_rows=[{'table': 'core_fin_fact_actual', 'row_id': 1}],
         )
         self.assertEqual(result['dependent_artifacts'], [])
+
+
+@unittest.skipUnless(
+    _artifact_tables_present(),
+    'landscape.tbl_artifact not present in test DB',
+)
+class ArtifactDedupParamsMergeTests(TestCase):
+    """A dedup refresh must refresh tool-owned params without destroying the
+    user-owned state other code paths write into the same object.
+
+    ``params_json`` has two classes of key:
+
+      - tool-owned (``budget_view_config``, ``map_config``, ``report_name``…)
+        — a fresh tool fetch is authoritative and MUST win, or a project that
+        already has an artifact never receives the current view spec.
+      - user-owned (``modification_spec`` from the report toolbar's pin /
+        save-version PATCH; ``clarification_config.steps[].evidence`` flipped
+        by the clarification apply service) — the tool has no idea these exist
+        and would silently revert them.
+    """
+
+    PROJECT_ID = 999_998
+
+    def setUp(self):
+        with connection.cursor() as c:
+            c.execute('TRUNCATE landscape.tbl_artifact RESTART IDENTITY CASCADE')
+
+    def _stored_params(self, artifact_id):
+        # Read through the ORM, not a raw cursor: JSONField handles the JSONB
+        # decode, whereas the raw cursor hands back the undecoded column.
+        return Artifact.objects.get(pk=artifact_id).params_json
+
+    def _patch_params(self, artifact_id, params):
+        """Stand in for the ArtifactPatchSerializer PATCH route, which is how
+        the report toolbar persists the user's view state."""
+        Artifact.objects.filter(pk=artifact_id).update(params_json=params)
+
+    # ── report toolbar view state ────────────────────────────────────────
+
+    def test_report_modification_spec_survives_plain_reask(self):
+        """Hide two columns, save the view, then just ask for the report again.
+
+        The re-ask carries no modification_spec (the model never sees one), so
+        a wholesale params replace silently discarded the saved view.
+        """
+        created = create_artifact_record(
+            title='Example Report',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='render_report_as_artifact',
+            dedup_key='RPT_XX',
+            params_json={
+                'report_code': 'RPT_XX',
+                'project_id': self.PROJECT_ID,
+                'report_name': 'Example Report',
+            },
+        )
+        self.assertTrue(created['success'])
+        artifact_id = created['artifact_id']
+
+        spec = {
+            'visible_columns': ['unit', 'rent'],
+            'sort': {'column': 'unit', 'direction': 'asc'},
+        }
+        params = dict(self._stored_params(artifact_id))
+        params['modification_spec'] = spec
+        self._patch_params(artifact_id, params)
+
+        refreshed = create_artifact_record(
+            title='Example Report (Renamed)',
+            schema=_minimal_doc([{'type': 'text', 'id': 't2', 'content': 'fresh'}]),
+            project_id=self.PROJECT_ID,
+            tool_name='render_report_as_artifact',
+            dedup_key='RPT_XX',
+            params_json={
+                'report_code': 'RPT_XX',
+                'project_id': self.PROJECT_ID,
+                'report_name': 'Example Report (Renamed)',
+            },
+        )
+        self.assertTrue(refreshed['success'])
+        self.assertTrue(refreshed['dedup_hit'])
+        self.assertEqual(refreshed['artifact_id'], artifact_id)
+
+        stored = self._stored_params(artifact_id)
+        # User-owned: preserved.
+        self.assertEqual(stored['modification_spec'], spec)
+        # Tool-owned: refreshed.
+        self.assertEqual(stored['report_name'], 'Example Report (Renamed)')
+
+    # ── the 02a10d2f fix must not regress ────────────────────────────────
+
+    def test_budget_view_config_still_refreshes_on_dedup_hit(self):
+        """Tool-owned keys are still replaced by the fresh fetch. A stale view
+        spec is the exact failure 02a10d2f exists to close — the merge must not
+        weaken it."""
+        created = create_artifact_record(
+            title='Budget Schedule',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='get_budget_schedule',
+            dedup_key='budget:line_item_detail',
+            params_json={
+                'server_rendered': True,
+                'budget_view_config': {'version': 1, 'columns': ['a']},
+            },
+        )
+        self.assertTrue(created['success'])
+        artifact_id = created['artifact_id']
+
+        refreshed = create_artifact_record(
+            title='Budget Schedule',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='get_budget_schedule',
+            dedup_key='budget:line_item_detail',
+            params_json={
+                'server_rendered': True,
+                'budget_view_config': {'version': 2, 'columns': ['a', 'b']},
+            },
+        )
+        self.assertTrue(refreshed['dedup_hit'])
+
+        stored = self._stored_params(artifact_id)
+        self.assertEqual(
+            stored['budget_view_config'], {'version': 2, 'columns': ['a', 'b']}
+        )
+
+    # ── clarification evidence flips ─────────────────────────────────────
+
+    def test_clarification_evidence_flips_carry_forward(self):
+        """The apply service flips an answered step to 'entered'. The builder
+        rebuilds every step from the model's tool args (default 'assumed') and
+        never reads the DB, so a re-fire on the same thread would re-ask for a
+        figure the user already supplied."""
+        dedup_key = 'clarification:thread-1'
+        created = create_artifact_record(
+            title='Clarify assumptions',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='open_clarification',
+            dedup_key=dedup_key,
+            params_json={
+                'server_rendered': True,
+                'clarification_config': {
+                    'steps': [
+                        {'id': 'step1', 'question': 'Cap rate?', 'evidence': 'assumed'},
+                        {'id': 'step2', 'question': 'Vacancy?', 'evidence': 'assumed'},
+                    ],
+                },
+            },
+        )
+        self.assertTrue(created['success'])
+        artifact_id = created['artifact_id']
+
+        # The apply service answers step1.
+        params = dict(self._stored_params(artifact_id))
+        params['clarification_config']['steps'][0]['evidence'] = 'entered'
+        self._patch_params(artifact_id, params)
+
+        fresh_config = {
+            'steps': [
+                {'id': 'step1', 'question': 'Cap rate (%)?', 'evidence': 'assumed'},
+                {'id': 'step2', 'question': 'Vacancy?', 'evidence': 'assumed'},
+                {'id': 'step3', 'question': 'Exit year?', 'evidence': 'assumed'},
+            ],
+        }
+        refreshed = create_artifact_record(
+            title='Clarify assumptions',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='open_clarification',
+            dedup_key=dedup_key,
+            params_json={
+                'server_rendered': True,
+                'clarification_config': fresh_config,
+            },
+        )
+        self.assertTrue(refreshed['dedup_hit'])
+
+        steps = self._stored_params(artifact_id)['clarification_config']['steps']
+        by_id = {s['id']: s for s in steps}
+        # The answered step keeps its flip...
+        self.assertEqual(by_id['step1']['evidence'], 'entered')
+        # ...while the fresh config still wins on question text...
+        self.assertEqual(by_id['step1']['question'], 'Cap rate (%)?')
+        # ...unanswered steps stay assumed, and new steps appear.
+        self.assertEqual(by_id['step2']['evidence'], 'assumed')
+        self.assertEqual(by_id['step3']['evidence'], 'assumed')
+        self.assertEqual(len(steps), 3)
+
+        # The caller's dict must not have been mutated in place.
+        self.assertEqual(fresh_config['steps'][0]['evidence'], 'assumed')
+
+    # ── degenerate params ────────────────────────────────────────────────
+
+    def test_none_and_empty_params_are_safe(self):
+        """params_json=None leaves stored params untouched; an empty stored
+        dict merges cleanly."""
+        created = create_artifact_record(
+            title='Sales Schedule',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='get_sales_schedule',
+            dedup_key='sales:schedule_detail',
+            params_json={'server_rendered': True, 'keep_me': 1},
+        )
+        artifact_id = created['artifact_id']
+
+        # None → no params write at all.
+        create_artifact_record(
+            title='Sales Schedule',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='get_sales_schedule',
+            dedup_key='sales:schedule_detail',
+            params_json=None,
+        )
+        self.assertEqual(
+            self._stored_params(artifact_id), {'server_rendered': True, 'keep_me': 1}
+        )
+
+        # Empty stored dict merges cleanly (no KeyError, fresh wins).
+        self._patch_params(artifact_id, {})
+        create_artifact_record(
+            title='Sales Schedule',
+            schema=_minimal_doc(),
+            project_id=self.PROJECT_ID,
+            tool_name='get_sales_schedule',
+            dedup_key='sales:schedule_detail',
+            params_json={'server_rendered': True},
+        )
+        self.assertEqual(self._stored_params(artifact_id), {'server_rendered': True})
+
+    def test_merge_helper_tolerates_non_dict_params(self):
+        """A row whose params_json is a list/None (legacy or hand-edited) must
+        not blow up the dedup path."""
+        self.assertEqual(_merge_dedup_params(stored=None, fresh={'a': 1}), {'a': 1})
+        self.assertEqual(_merge_dedup_params(stored=['x'], fresh={'a': 1}), {'a': 1})
+        self.assertEqual(_merge_dedup_params(stored={'a': 1}, fresh=None), {'a': 1})
 
 
 @unittest.skipUnless(
