@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FilePreviewer } from './FilePreviewer';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { PlanStageCard, type PlanProfile } from '@/components/wrapper/documents/PlanStageCard';
 
 /**
  * DocumentPreviewModal — overlay preview for the artifacts-panel
@@ -43,6 +44,10 @@ interface DocDetail {
   mime_type: string | null;
   original_filename: string | null;
   doc_name?: string | null;
+  /** Intake's reading of a drawing lives under `plan`. Carried here so the
+   *  confirmation can happen wherever the document is opened — see the band
+   *  below the header. */
+  profile_json?: Record<string, unknown> | null;
 }
 
 const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -88,6 +93,7 @@ export function DocumentPreviewModal({ docId, filename, onClose }: DocumentPrevi
               mime_type: data?.mime_type ?? null,
               original_filename: data?.original_filename ?? null,
               doc_name: data?.doc_name ?? null,
+              profile_json: data?.profile_json ?? null,
             });
             setLoading(false);
           }
@@ -110,6 +116,7 @@ export function DocumentPreviewModal({ docId, filename, onClose }: DocumentPrevi
             mime_type: data?.mime_type ?? null,
             original_filename: data?.original_filename ?? null,
             doc_name: data?.doc_name ?? null,
+            profile_json: data?.profile_json ?? null,
           });
           setLoading(false);
         }
@@ -157,6 +164,9 @@ export function DocumentPreviewModal({ docId, filename, onClose }: DocumentPrevi
 
   const displayName = detail?.original_filename || detail?.doc_name || filename || `Document ${docId}`;
   const mimeBadge = detail?.mime_type || '—';
+  const planProfile = (detail?.profile_json as Record<string, unknown> | undefined)?.plan as
+    | PlanProfile
+    | undefined;
 
   const overlay = (
     <div
@@ -251,6 +261,26 @@ export function DocumentPreviewModal({ docId, filename, onClose }: DocumentPrevi
             ×
           </button>
         </div>
+
+        {/* What this drawing is, and the confirmation.
+            The card was originally only in the DMS detail panel, so opening a
+            plat from anywhere else — the documents rail, an artifact, a search
+            result — showed the sheet with no way to confirm it, which is where
+            the read is gated. It sits above the preview rather than below it:
+            a person who has just opened a 3 MB plat should not have to scroll
+            past the drawing to find the one control that does anything. */}
+        {planProfile?.is_plan && (
+          <div
+            style={{
+              padding: '10px 16px',
+              borderBottom: '1px solid var(--w-border, #323a49)',
+              background: 'var(--w-bg-surface, #1a1e28)',
+              flexShrink: 0,
+            }}
+          >
+            <PlanStageCard key={docId} docId={String(docId)} plan={planProfile} />
+          </div>
+        )}
 
         {/* Body */}
         <div

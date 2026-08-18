@@ -33,8 +33,8 @@ from typing import Any, Optional
 
 from django.db import connection, transaction
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from apps.projects.permissions import user_can_access_project
 
@@ -169,10 +169,20 @@ def _read_and_apply(doc_id: int, doc: dict[str, Any]) -> None:
         )
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def apply_plan_to_project(request, doc_id: int):
-    """Read a confirmed drawing into its project."""
+    """Read a confirmed drawing into its project.
+
+    A DRF view, not a plain Django one, and the distinction is load-bearing:
+    the ownership gate below asks whether ``request.user`` is authenticated,
+    and only DRF's authentication runs on the way in. As a plain
+    ``@csrf_exempt`` view this received a perfectly good bearer token, never
+    looked at it, saw an anonymous user, and returned "Project not found" —
+    which the card could only report as the reader being unreachable. Every
+    other project-scoped write endpoint (apps.gis parcel_query, boundary_set)
+    is wired this way; this one was the exception.
+    """
     with connection.cursor() as cursor:
         doc = _load_doc(cursor, int(doc_id))
 

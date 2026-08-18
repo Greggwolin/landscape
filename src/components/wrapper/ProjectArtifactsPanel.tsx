@@ -94,14 +94,16 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
   } = useWrapperUI();
 
   // Draggable width (LEFT-edge handle, dragging left widens the panel)
-  // MK24 §6 — 25% of the viewport, not a fixed 420px. Lazy initialiser so the
-  // first paint is already the right size; falls back to the old constant
-  // during SSR, where there is no window to measure.
-  const [panelWidth, setPanelWidth] = useState(() =>
-    typeof window === 'undefined'
-      ? DEFAULT_ARTIFACTS_WIDTH
-      : widthForShare(ARTIFACTS_VIEWPORT_SHARE)
-  );
+  // MK24 §6 — 25% of the viewport, not a fixed 420px.
+  //
+  // The first render must NOT measure the window. This started as a lazy
+  // initialiser branching on `typeof window`, which is the textbook cause of a
+  // hydration mismatch: the server has no window and renders the constant, the
+  // browser measures and renders a share of the viewport, React finds two
+  // different widths for the same element and gives up reconciling that
+  // subtree. So both sides start from the constant and the viewport share is
+  // applied just after mount, one frame later.
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_ARTIFACTS_WIDTH);
   // Once he has dragged the panel, the drag is authoritative — no automatic
   // sizing (including the per-artifact seam above) may override it.
   const hasUserDragged = useRef(false);
@@ -117,6 +119,17 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
   const preTakeoverWidth = useRef<number | null>(null);
   const inTakeoverMode = useRef(false);
   const takeoverMode = activeArtifactId != null;
+
+  // The opening width, applied one frame after mount — see the note on the
+  // panelWidth state above for why it cannot be measured during the first
+  // render. Runs once: this is the size the panel opens at, not a responsive
+  // rule, and re-running it on viewport changes would yank a panel the user
+  // had deliberately sized.
+  useEffect(() => {
+    if (hasUserDragged.current || inTakeoverMode.current) return;
+    setPanelWidth(widthForShare(ARTIFACTS_VIEWPORT_SHARE));
+     
+  }, []);
 
   useEffect(() => {
     // MK24 §5 — the map is a takeover too, just a wider one (70% rather than
