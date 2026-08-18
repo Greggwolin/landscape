@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# harness artifacts — present in every worktree, noise in every audit (BC1)
+.claude-flow/
+.claude/proven-config*.json
+
 # next.js
 /.next/
 /out/

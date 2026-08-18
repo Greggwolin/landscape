@@ -14,6 +14,17 @@
 #      files are staged in the index, the commit captures nothing but the
 #      listed generated docs.
 #
+# The allowlist above governs WHAT this job may commit. Nothing governed WHERE,
+# and this job commits onto whatever branch happens to be checked out. The shared
+# checkout is not always on main: two nightly notes (b1349007, d3ca2506) landed on
+# the feature branch fix/artifact-panel-host-route while a session had it checked
+# out. Because GitHub squash-merges, those extra commits then made that branch
+# look unmerged after its PR landed, so it survived the merge and accumulated in
+# the branch list — automation manufacturing an ambiguity a human then has to
+# adjudicate. The branch guard below refuses to run off the nightly branch. It
+# REFUSES rather than switching: a nightly job must never move a working checkout
+# out from under a live session. (LSCMD-CC-BRANCH-CLEANUP-0730-CC7)
+#
 # This replaces the prior `git add -A` / `git add docs/ CLAUDE.md` step in the
 # untracked `nightly-landscape-sync` Cowork skill. On 2026-05-19 that step swept
 # in-flight backend code (ai_handler.py, tool_schemas.py, services.py,
@@ -35,6 +46,11 @@
 #       calling skill can surface it instead of reporting a false success.
 #       (TB25-NIGHTLY-COMMITTER-STALLED-0714: this job silently no-op'd for 19
 #       days when git died on a stale index.lock and the caller read it as pass.)
+#   2 = refused LOUDLY because of WHERE it was run: the checkout is on a branch
+#       other than the nightly branch (default "main", override with
+#       NIGHTLY_COMMIT_BRANCH), or HEAD is detached. Distinct from 1 so the
+#       calling task can tell "wrong branch, nothing was committed" apart from
+#       "the commit was attempted and failed". Nothing is staged or committed.
 
 set -euo pipefail
 shopt -s nullglob
@@ -47,23 +63,75 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-# ── Pre-flight: a stale .git/index.lock blocks every git write. That is exactly
-#    how this job failed unnoticed for 19 days (TB25): git died with a bare
-#    "Unable to create '.git/index.lock'" fatal that the caller swallowed as a
-#    success. Detect it up front and fail LOUDLY and specifically, rather than
-#    let a git write die mid-run with a message nobody surfaces. Runs before the
-#    --dry-run path too, since that also writes the index.
+# ── Pre-flight (both checks below run before the --dry-run path too, since a
+#    dry run also writes the index and can therefore leave a lock behind).
 INDEX_LOCK="$REPO_ROOT/.git/index.lock"
+
+# ── Pre-flight 0: can this environment DELETE inside .git/?
+#    (LSCMD-NIGHTLYLOCK-0808) The Cowork sandbox mounts the host repo in a mode
+#    that permits create but denies unlink inside .git/. Git can therefore make
+#    .git/index.lock and then cannot remove it — poisoning the repo with a lock
+#    only the host can clear. That is the real cause of the 2026-07-31 → 08-07
+#    outage: every nightly run left a fresh lock, and the next run aborted on it.
+#    Probe FIRST, before any git command creates a lock, and refuse to run at all
+#    in an environment that cannot clean up after itself. The probe reuses one
+#    fixed filename so at most a single inert stray file can ever exist.
+UNLINK_PROBE="$REPO_ROOT/.git/.fb304-unlink-probe"
+: > "$UNLINK_PROBE" 2>/dev/null || {
+  echo "FB-304 ABORT: cannot write inside $REPO_ROOT/.git — wrong path or permissions." >&2
+  exit 1
+}
+if ! rm -f "$UNLINK_PROBE" 2>/dev/null || [ -e "$UNLINK_PROBE" ]; then
+  echo "FB-304 ABORT: this environment can CREATE but not DELETE files in .git/." >&2
+  echo "    $REPO_ROOT/.git  (unlink denied — this is the Cowork sandbox mount)" >&2
+  echo "  Running git here would leave an index.lock that only the host can clear," >&2
+  echo "  blocking every future git write. Refusing to run rather than poison the repo." >&2
+  echo "  Run this committer ON THE HOST (Desktop Commander / a real terminal) instead." >&2
+  exit 1
+fi
+
+# ── Pre-flight 1: a stale .git/index.lock blocks every git write. That is exactly
+#    how this job failed unnoticed for 19 days (TB25) and again for 8 nights
+#    (LSCMD-NIGHTLYLOCK-0808). Unlink capability is now proven above, so a lock
+#    with no git process behind it is self-healed here rather than escalated to a
+#    human — an abort that requires a manual `rm` is an outage every time it fires.
 if [ -e "$INDEX_LOCK" ]; then
   if pgrep -x git >/dev/null 2>&1; then
     echo "FB-304 ABORT: $INDEX_LOCK is held by a running git process — not stale." >&2
     echo "  A real git operation is in progress; re-run once it completes." >&2
-  else
-    echo "FB-304 ABORT: stale git index lock is blocking all git writes:" >&2
-    echo "    $INDEX_LOCK  (no git process is running, so this lock is stale)" >&2
-    echo "  Clear it and re-run:  rm -f .git/index.lock" >&2
+    exit 1
   fi
-  exit 1
+  echo "FB-304 committer: clearing a stale git index lock (no git process running):" >&2
+  echo "    $INDEX_LOCK" >&2
+  rm -f "$INDEX_LOCK"
+  if [ -e "$INDEX_LOCK" ]; then
+    echo "FB-304 ABORT: failed to remove the stale lock; git writes remain blocked." >&2
+    exit 1
+  fi
+  echo "FB-304 committer: stale lock cleared; continuing." >&2
+fi
+
+# ── Branch guard: resolve the branch BEFORE staging anything. Nightly generated
+#    docs belong on the main line; committing them onto whatever feature branch a
+#    session happened to leave checked out attaches them to in-flight work and —
+#    under squash-merge — leaves that branch looking unmerged forever (see the
+#    header). Runs before the --dry-run path as well, so the refusal is testable
+#    without committing. Refuses; never switches branches.
+NIGHTLY_BRANCH="${NIGHTLY_COMMIT_BRANCH:-main}"
+if ! CURRENT_BRANCH="$(git symbolic-ref --quiet --short HEAD)"; then
+  echo "FB-304 BRANCH ABORT: HEAD is detached — no branch is checked out." >&2
+  echo "  Nightly generated docs must land on '$NIGHTLY_BRANCH'; refusing to commit here." >&2
+  echo "  Fix: 'git checkout $NIGHTLY_BRANCH' in this checkout, then re-run." >&2
+  exit 2
+fi
+if [ "$CURRENT_BRANCH" != "$NIGHTLY_BRANCH" ]; then
+  echo "FB-304 BRANCH ABORT: this checkout is on '$CURRENT_BRANCH', not '$NIGHTLY_BRANCH'." >&2
+  echo "  Nightly generated docs must land on '$NIGHTLY_BRANCH'. Committing them onto" >&2
+  echo "  '$CURRENT_BRANCH' would attach them to in-flight work and leave that branch" >&2
+  echo "  looking unmerged after its PR squash-merges." >&2
+  echo "  NOT switching branches automatically — a live session may be using this checkout." >&2
+  echo "  Fix: land or park the work on '$CURRENT_BRANCH', check out '$NIGHTLY_BRANCH', re-run." >&2
+  exit 2
 fi
 
 # ── Allowlist: purely-generated artifacts the nightly job legitimately produces.

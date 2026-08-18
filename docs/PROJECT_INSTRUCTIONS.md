@@ -1,9 +1,9 @@
 # Landscape — Project Instructions
-**Version:** 5.0 — 2026-08-14
-**What changed:** Same rules, roughly a quarter shorter — the version-by-version changelog moved out to the changelog file this document already names, repeated explanations merged, and the old session-management and handoff-template sections replaced by one standard continuity section. Major bump because the structure changed, not the rules.
-**Prior:** the project-instructions field was at 4.9.0 (2026-08-05); this rewrite was made from that copy. Nothing in it was discarded without being listed in the accompanying cuts file.
+**Version:** 5.1 — 2026-08-18
+**What changed:** One rule change. §4.10.4's carve-out widened from documentation and generated artifacts to also cover non-behavioral infrastructure — CI configuration, repository housekeeping scripts, git plumbing. That class of change had no path to merge under §4.10 as written, which is why PRs #235 and #239 sat green and unmerged for 19 days before a branch-cleanup pass landed them by hand under this same reasoning. See §4.10.4 for the full rule and the test that bounds it.
+**Prior:** 5.0 (2026-08-14) — structural rewrite, no rule changes; see the changelog for that entry.
 
-> **The two copies are currently forked and this version closes it (§0.4).** The repository master was still at **v4.8.0 (2026-07-28)** and has no §24 at all — it never received the Claudine status feed. Paste this version into **both** the project-instructions field and the repository master. Do not merge them; this file is the superset.
+> **This version also closes the §0.4 mirroring gap it inherited.** The repository master had remained at v4.8.0 since 2026-07-28 while the project-instructions field moved to v5.0 on 2026-08-14 — four days where any repo-reading session followed July's rules. That gap is closed by this commit landing v5.0's full content plus the §4.10.4 amendment directly to `main`, rather than waiting on the separate open PR that was carrying v5.0 alone. Paste this version into the project-instructions field per §0.4 — one paste covers both surfaces.
 
 ---
 
@@ -238,7 +238,7 @@ The "2–4 specific things" line is the acceptance test, written by the person w
 
 **4.10.3 Cowork's obligation before the handoff.** Cowork writes the code into the working tree and states, in plain English in chat, how Gregg runs it and what he should see. Gregg tests local-first — that is the review environment until §4.10.5 lands.
 
-**4.10.4 Carve-out — documentation and generated artifacts only.** Nightly doc syncs, health-check notes, session logs, and instruction-file edits may merge without a look; they change no running behavior. Everything that changes what the app does — front-end, back-end, tools, schema, prompts, guards — is inside the rule. "It's only a one-line prompt tweak" is not a carve-out; the 22 July what-if chain was five such changes.
+**4.10.4 Carve-out — documentation, generated artifacts, and non-behavioral infrastructure.** Nightly doc syncs, health-check notes, session logs, and instruction-file edits may merge without a look; they change no running behavior. So may build and CI configuration, repository housekeeping scripts, and git plumbing — changes that alter how the work is built, tested, or filed, but not what the application does. These have no surface to review, and holding them behind a review that cannot happen is how three fixes sat green and unmerged for nineteen days. **Everything that changes what the app does — front-end, back-end, tools, schema, prompts, guards — stays inside the rule.** "It's only a one-line prompt tweak" is not a carve-out; the 22 July what-if chain was five such changes. The test is not size, it is whether Gregg could see the difference by using the app.
 
 **4.10.5 The tool half is separately tracked.** The preview URL stays useless for review until a demo dataset loads into the schema-only preview branch. Until then §4.10 is enforced by local testing alone. When it lands, §4.10 does not relax — the review moves from Gregg's machine to a link, and the merge still waits for him.
 
