@@ -16,6 +16,7 @@
 # harness artifacts — present in every worktree, noise in every audit (BC1)
 .claude-flow/
 .claude/proven-config*.json
+.claude/.proven-config-version
 
 # next.js
 /.next/
