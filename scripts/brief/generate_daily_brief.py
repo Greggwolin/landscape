@@ -299,6 +299,74 @@ def gather_aged_uncommitted(stale_after_days: int = 2,
     }
 
 
+def gather_stale_prs(min_age_days: int = 3) -> list[dict]:
+    """Open PRs sitting ≥ min_age_days (BC1). A green, unreviewable PR has no
+    other alarm — §4.10 gates merges on Gregg looking at it, but nothing ever
+    said a green PR had been waiting. PRs #235 and #239 sat 19 days on exactly
+    this blind spot before a branch-cleanup pass caught them by hand.
+
+    Returns rows sorted oldest-first:
+        {
+          'number': int, 'title': str, 'summary': str (plain-English, no
+              bare number/hash — §22.6.3), 'branch': str, 'days': int,
+          'ci': 'green' | 'red' | 'pending' | 'draft',
+          'url': str,
+        }
+    Returns [] (not an exception) if `gh` is unavailable or unauthenticated —
+    this section degrades silently rather than breaking the whole brief.
+    """
+    try:
+        out = subprocess.run(
+            ['gh', 'pr', 'list', '--repo', 'Greggwolin/landscape', '--state', 'open',
+             '--json', 'number,title,headRefName,createdAt,isDraft,statusCheckRollup,url'],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+        )
+        if out.returncode != 0:
+            return []
+        prs = json.loads(out.stdout)
+    except Exception:
+        return []
+
+    now = datetime.now(timezone.utc)
+    rows: list[dict] = []
+    for pr in prs:
+        try:
+            created = datetime.fromisoformat(pr['createdAt'].replace('Z', '+00:00'))
+        except Exception:
+            continue
+        days = (now - created).days
+        if days < min_age_days:
+            continue
+
+        if pr.get('isDraft'):
+            ci = 'draft'
+        else:
+            conclusions = [
+                c.get('conclusion') for c in (pr.get('statusCheckRollup') or [])
+                if c.get('conclusion') is not None or c.get('status') == 'COMPLETED'
+            ]
+            statuses = [c.get('status') for c in (pr.get('statusCheckRollup') or [])]
+            if any(c == 'FAILURE' for c in conclusions):
+                ci = 'red'
+            elif any(s and s != 'COMPLETED' for s in statuses) or not conclusions:
+                ci = 'pending'
+            else:
+                ci = 'green'
+
+        rows.append({
+            'number': pr['number'],
+            'title': pr['title'],
+            'summary': strip_commit_prefix(pr['title']) or pr['title'],
+            'branch': pr['headRefName'],
+            'days': days,
+            'ci': ci,
+            'url': pr.get('url', ''),
+        })
+
+    rows.sort(key=lambda r: r['days'], reverse=True)
+    return rows
+
+
 def _commits_ahead_of_main(branch: str) -> int:
     out = _git('rev-list', '--count', f'main..{branch}').strip()
     try:
@@ -641,6 +709,13 @@ h2 {
 }
 .system-status .stale { color: #b45309; font-size: 14px; }
 .system-status .ok { color: #047857; font-size: 14px; }
+.item.pr-alarm { border-left: 4px solid #dc2626; background: #fef2f2; }
+.item.pr-normal { border-left: 3px solid #94a3b8; }
+.pr-alarm-tag {
+  display: inline-block; background: #fee2e2; color: #991b1b;
+  padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+  margin-left: 8px;
+}
 .footer {
   margin-top: 48px; padding-top: 16px;
   border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;
@@ -950,6 +1025,43 @@ def render_aged_uncommitted(audit: dict) -> str:
     return ''.join(parts)
 
 
+def render_stale_prs(rows: list[dict]) -> str:
+    """§22.6.3 — every entry is a sentence, never a bare number or hash.
+    Green-and-idle reads as the alarm (BC1's whole reason for existing);
+    red/draft are shown but styled as ordinary status, not urgency.
+    """
+    if not rows:
+        return '<div class="empty">No PRs open 3+ days.</div>'
+
+    ci_label = {
+        'green': 'All checks green',
+        'red': 'Checks failing',
+        'pending': 'Checks running',
+        'draft': 'Draft',
+    }
+
+    def _row(pr: dict) -> str:
+        days = pr['days']
+        day_word = 'day' if days == 1 else 'days'
+        css_class = 'item pr-alarm' if pr['ci'] == 'green' else 'item pr-normal'
+        label = ci_label.get(pr['ci'], pr['ci'])
+        alarm_tag = (
+            '<span class="pr-alarm-tag">green and idle — nothing else will '
+            'flag this</span>' if pr['ci'] == 'green' else ''
+        )
+        return (
+            f'<div class="{css_class}"><div class="body">'
+            f'<div class="what">#{pr["number"]} — {_esc(pr["summary"])} '
+            f'<span style="color:#64748b;">'
+            f'(open {days} {day_word}, branch <code>{_esc(pr["branch"])}</code>)'
+            f'</span></div>'
+            f'<div class="meta"><strong>{label}</strong>{alarm_tag}</div>'
+            f'</div></div>'
+        )
+
+    return ''.join(_row(pr) for pr in rows)
+
+
 def render_system_status(health: dict, today: date) -> str:
     if health['status'] == 'fresh':
         failures = health.get('failures') or []
@@ -992,6 +1104,7 @@ def render_html(*, today: date, branch: str, open_feedback: list[dict],
                 resolved_recent: list[dict], wip_rows: list[dict],
                 sessions: list[dict], worktree_count: int,
                 uncommitted: dict, aged_uncommitted: dict,
+                stale_prs: list[dict],
                 health: dict) -> str:
     in_progress_count = sum(1 for r in open_feedback if r['status'] == 'in_progress')
     summary = render_summary(
@@ -1026,6 +1139,8 @@ def render_html(*, today: date, branch: str, open_feedback: list[dict],
 {render_uncommitted(uncommitted)}
 <h2>Uncommitted ≥ 2 days (aged)</h2>
 {render_aged_uncommitted(aged_uncommitted)}
+<h2>PRs open ≥ 3 days ({len(stale_prs)})</h2>
+{render_stale_prs(stale_prs)}
 <h2>System Status</h2>
 {render_system_status(health, today)}
 <div class="footer">
@@ -1062,6 +1177,7 @@ def main() -> int:
     health = gather_health_status()
     uncommitted = gather_uncommitted_summary()
     aged_uncommitted = gather_aged_uncommitted()
+    stale_prs = gather_stale_prs()
     wip_rows = gather_wip_branches()
     sessions = gather_sessions_3day(today)
     worktree_count = count_worktrees()
@@ -1080,6 +1196,7 @@ def main() -> int:
         worktree_count=worktree_count,
         uncommitted=uncommitted,
         aged_uncommitted=aged_uncommitted,
+        stale_prs=stale_prs,
         health=health,
     )
     dated, current = write_outputs(html, today)
@@ -1087,7 +1204,8 @@ def main() -> int:
     print(f"[brief] open={len(open_feedback)} in_progress="
           f"{sum(1 for r in open_feedback if r['status']=='in_progress')} "
           f"resolved_recent={len(resolved_recent)} wip={len(wip_rows)} "
-          f"sessions={len(sessions)} health={health['status']}", file=sys.stderr)
+          f"sessions={len(sessions)} stale_prs={len(stale_prs)} "
+          f"health={health['status']}", file=sys.stderr)
     return 0
 
 
