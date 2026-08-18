@@ -113,6 +113,11 @@ class MatchedLot:
     stated_sqft: int
     #: Gap tolerance, in points, that this lot needed in order to close.
     gap_used_pt: float
+    #: How this lot was established. "traced" — its own number sat inside its
+    #: own recovered face. "positional" — the face was recovered but carried no
+    #: number, and was identified by walking the chain between two named
+    #: neighbours (see `lot_infill`).
+    source: str = "traced"
 
     @property
     def error(self) -> float:
@@ -126,6 +131,9 @@ class LotMatchResult:
     unresolved: list[int] = field(default_factory=list)
     #: Square feet per square point.
     scale_sqft_per_pt2: float = 0.0
+    #: Runs the positional infill refused whole, with a plain-English reason.
+    #: Reported, never silently dropped: a refusal is the mechanism working.
+    infill_refusals: list = field(default_factory=list)
 
     @property
     def scale_ft_per_inch(self) -> float:
@@ -292,23 +300,86 @@ def lot_number_tokens(page, lo: int, hi: int, min_height_pt: float = 13.0):
     return out
 
 
-def _sole_occupancy(faces, tokens):
-    """Largest face holding this lot's number and no other lot's number."""
+def ambiguous_numbers(tokens) -> set:
+    """Lot numbers this sheet prints more than once.
+
+    A CAD export can emit the WRONG number rather than no number: on the Red
+    Valley plat, lots 256, 306 and 316 each carry their left-hand neighbour's
+    label in the text layer, so "255", "305" and "315" each appear twice while
+    256/306/316 appear not at all.
+
+    That is worse than a missing label, because it does not fail — it succeeds
+    wrongly. Sole occupancy takes the last token it sees, so lot 255 was
+    matched to lot 256's outline, and since both lots are 42 x 120 the area
+    gate agreed with it exactly. A number that appears twice identifies
+    nothing, so both of its faces are handed to the positional infill to be
+    resolved from their neighbours instead.
+    """
+    import collections
+
+    counts = collections.Counter(v for v, _ in tokens)
+    return {v for v, n in counts.items() if n > 1}
+
+
+def _sole_occupancy(faces, tokens, all_candidates: bool = False):
+    """Largest face holding this lot's number and no other lot's number.
+
+    With ``all_candidates``, returns every qualifying face per lot instead of
+    only the largest. The largest remains the primary answer — the fallback in
+    `match_lots` consults the rest only for lots the primary already failed to
+    place, so no lot that places today can be re-decided by it.
+    """
     from shapely.strtree import STRtree
 
     tree = STRtree([t[1] for t in tokens])
+    ambiguous = ambiguous_numbers(tokens)
     found: dict[int, object] = {}
+    every: dict[int, list] = {}
     for value, point in tokens:
+        if value in ambiguous:
+            # Cannot identify a face — see `ambiguous_numbers`. Still counted as
+            # an occupant below, because a face holding two labels is a merged
+            # region whether or not either label can be trusted.
+            continue
         best = None
         for face in faces:
             if not face.contains(point):
                 continue
             occupants = sum(1 for i in tree.query(face) if face.contains(tokens[i][1]))
-            if occupants == 1 and (best is None or face.area > best.area):
+            if occupants != 1:
+                continue
+            every.setdefault(value, []).append(face)
+            if best is None or face.area > best.area:
                 best = face
         if best is not None:
             found[value] = best
-    return found
+    return every if all_candidates else found
+
+
+def unnamed_faces(faces, tokens):
+    """Faces carrying no lot number at all.
+
+    These are the shapes a CAD export orphaned by flattening their label into
+    line-work. `_sole_occupancy` cannot see them — it walks tokens, and these
+    have none — so they are collected separately for `lot_infill` to name from
+    the numbering of their neighbours.
+    """
+    from shapely.strtree import STRtree
+
+    if not tokens:
+        return list(faces)
+    tree = STRtree([t[1] for t in tokens])
+    ambiguous = ambiguous_numbers(tokens)
+    # A face whose only label is a duplicated number is unidentified, not
+    # identified — it belongs here so the chain can name it from its
+    # neighbours, which is the only evidence left once the label is untrustworthy.
+    return [
+        f for f in faces
+        if not any(
+            tokens[i][0] not in ambiguous and f.contains(tokens[i][1])
+            for i in tree.query(f)
+        )
+    ]
 
 
 # ------------------------------------------------------------------- API
@@ -352,13 +423,41 @@ def match_lots(
         result = LotMatchResult()
         accepted: dict[int, MatchedLot] = {}
 
+        from .lot_infill import infill_by_position
+
+        def _accept(value, pi, face, grow, scale, source):
+            accepted[value] = MatchedLot(
+                number=value,
+                page=pi,
+                ring=[(float(x), float(y)) for x, y in face.exterior.coords],
+                area_sqft=face.area * scale,
+                stated_sqft=stated_areas[value],
+                gap_used_pt=grow,
+                source=source,
+            )
+
+        def _agrees(face, value, scale):
+            got = face.area * scale
+            return abs(got - stated_areas[value]) / stated_areas[value] <= AREA_TOLERANCE
+
+        seen_refusals: set[tuple] = set()
+
         for grow in gap_ladder:
+            per_sheet: dict[int, tuple] = {}
             found: dict[int, tuple[int, object]] = {}
             for pi in sheets:
                 long_, runs, tokens = prepared[pi]
                 lines = [LineString(extend_ends(list(s), grow)) for s in long_]
                 lines += [LineString(extend_ends(r, grow)) for r in runs]
-                for value, face in _sole_occupancy(faces_from_lines(lines), tokens).items():
+                faces = faces_from_lines(lines)
+                # One occupancy pass, reused three ways: the largest qualifying
+                # face per lot (the primary answer, unchanged), every
+                # qualifying face (the fallback), and the faces with no number
+                # at all (the infill).
+                every = _sole_occupancy(faces, tokens, all_candidates=True)
+                sole = {v: max(c, key=lambda f: f.area) for v, c in every.items()}
+                per_sheet[pi] = (faces, tokens, sole, every)
+                for value, face in sole.items():
                     found[value] = (pi, face)
 
             if not result.scale_sqft_per_pt2:
@@ -373,16 +472,56 @@ def match_lots(
             for value, (pi, face) in found.items():
                 if value in accepted or value not in stated_areas:
                     continue
-                area = face.area * scale
-                if abs(area - stated_areas[value]) / stated_areas[value] <= AREA_TOLERANCE:
-                    accepted[value] = MatchedLot(
-                        number=value,
-                        page=pi,
-                        ring=[(float(x), float(y)) for x, y in face.exterior.coords],
-                        area_sqft=area,
-                        stated_sqft=stated_areas[value],
-                        gap_used_pt=grow,
+                if _agrees(face, value, scale):
+                    _accept(value, pi, face, grow, scale, "traced")
+
+            # FALLBACK — strictly additive. Sole occupancy answers with the
+            # LARGEST qualifying face, which is wrong for a lot whose largest
+            # candidate swallowed a neighbour. Consulting the smaller
+            # candidates recovers those, and because this only ever looks at
+            # lots the primary pass did not place, it cannot re-decide a lot
+            # that places today. That matters: a project has already been
+            # written from the current matches.
+            for pi in sheets:
+                _, _, _, every = per_sheet[pi]
+                for value, candidates in every.items():
+                    if value in accepted or value not in stated_areas:
+                        continue
+                    for face in candidates:
+                        if _agrees(face, value, scale):
+                            _accept(value, pi, face, grow, scale, "traced")
+                            break
+
+            # INFILL — name the faces the file left unnamed. Anchors are
+            # restricted to lots whose own area agrees with the schedule; an
+            # anchor whose face swallowed its neighbour would drag a whole run
+            # onto the wrong shapes. Verifying the anchor refuses rather than
+            # selects, so it does not make the identification circular.
+            outstanding = set(stated_areas) - set(accepted)
+            if outstanding:
+                for pi in sheets:
+                    faces, tokens, sole, _ = per_sheet[pi]
+                    anchors = {
+                        v: f for v, f in sole.items()
+                        if v in stated_areas and v in accepted and _agrees(f, v, scale)
+                    }
+                    if not anchors:
+                        continue
+                    outcome = infill_by_position(
+                        named=anchors,
+                        unnamed=unnamed_faces(faces, tokens),
+                        stated_areas=stated_areas,
+                        scale_sqft_per_pt2=scale,
+                        unassigned=set(stated_areas) - set(accepted),
                     )
+                    for value, face in outcome.assigned.items():
+                        if value not in accepted:
+                            _accept(value, pi, face, grow, scale, "positional")
+                    for lots, why in outcome.refusals:
+                        key = (tuple(lots), why)
+                        if key not in seen_refusals:
+                            seen_refusals.add(key)
+                            result.infill_refusals.append((list(lots), why))
 
         result.matched = [accepted[v] for v in sorted(accepted)]
         result.unresolved = sorted(set(stated_areas) - set(accepted))

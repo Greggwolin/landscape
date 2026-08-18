@@ -55,7 +55,7 @@ def _reading(*, areas, rings, sheets, scans, scale=50.0, round_scale=True):
     lots = [
         SimpleNamespace(
             number=n,
-            source="read" if n in {x for page in rings.values() for x in page} else "derived",
+            source="traced" if n in {x for page in rings.values() for x in page} else "unplaced",
             frontage_ft=1.0 if n in {x for page in rings.values() for x in page} else None,
         )
         for n in sorted(areas)
@@ -126,7 +126,7 @@ def test_counts_reconcile_to_the_schedule():
     payload = build_preview(reading, doc)
     assert payload["totals"] == {
         "scheduled": 4, "recovered": 2, "traced": 2, "rebuilt": 0,
-        "measured": 2, "no_outline": 2, "reconciles": True,
+        "positional": 0, "measured": 2, "no_outline": 2, "reconciles": True,
     }
     assert payload["unplaced"]["count"] == 2
     assert payload["unplaced"]["lot_numbers"] == [3, 4]
@@ -205,27 +205,51 @@ def test_excluded_pages_are_shown_with_their_reason():
     assert "cover sheet" in payload["excluded_sheets"][0]["reason"]
 
 
-def test_traced_and_rebuilt_are_distinguished_from_the_ring_not_the_source_field():
-    """`DerivedLot.source` says 'derived' for every lot that was not matched,
-    including ones that were never derived and have no outline at all. The
-    preview computes the honest three-way state from ring presence instead."""
+def test_the_preview_reports_the_source_the_reading_states():
+    """`DerivedLot.source` used to say "derived" for every unmatched lot,
+    including ones nothing derived, so the preview had to recompute the
+    distinction from ring presence. MK55 gave the field four honest values —
+    traced, rebuilt, positional, unplaced — so the preview reports what the
+    reading states instead of second-guessing it, and a lot with no outline is
+    counted as unplaced rather than as a failed derivation."""
     doc = _Doc([_page("SHEET NO. 1 OF 1")])
     lots = [
-        SimpleNamespace(number=1, source="read", frontage_ft=12.0),
-        SimpleNamespace(number=2, source="derived", frontage_ft=None),
-        SimpleNamespace(number=3, source="derived", frontage_ft=None),  # no ring
+        SimpleNamespace(number=1, source="traced", frontage_ft=12.0),
+        SimpleNamespace(number=2, source="positional", frontage_ft=None),
+        SimpleNamespace(number=3, source="rebuilt", frontage_ft=None),
+        SimpleNamespace(number=4, source="unplaced", frontage_ft=None),  # no ring
     ]
     reading = SimpleNamespace(
-        table=SimpleNamespace(areas={1: 5000, 2: 5000, 3: 5000}),
+        table=SimpleNamespace(areas={1: 5000, 2: 5000, 3: 5000, 4: 5000}),
         lots=lots, sheets=[0],
-        rings_by_sheet={0: {1: SQUARE, 2: SQUARE}},
+        rings_by_sheet={0: {1: SQUARE, 2: SQUARE, 3: SQUARE}},
         sheet_scans=[SimpleNamespace(page=0, is_lot_sheet=True, reason="lots")],
         scale_ft_per_inch=50.0, scale_is_round=True,
     )
     payload = build_preview(reading, doc)
     counts = payload["sheets"][0]["counts"]
-    assert (counts["traced"], counts["rebuilt"], counts["measured"]) == (1, 1, 1)
-    assert payload["totals"]["no_outline"] == 1  # lot 3, which was never derived
+    assert (counts["traced"], counts["positional"], counts["rebuilt"]) == (1, 1, 1)
+    assert counts["measured"] == 1
+    assert payload["totals"]["no_outline"] == 1          # lot 4
+    assert payload["unplaced"]["lot_numbers"] == [4]
+
+
+def test_assembly_is_declined_and_said_rather_than_guessed():
+    """Nothing in the drawing fixes how the sheets sit relative to each other,
+    and a guessed offset produces a plan that looks plausible and is wrong by a
+    street width. The window must say so instead of presenting three things as
+    one."""
+    doc = _Doc([_page("SHEET NO. 1 OF 2"), _page("SHEET NO. 2 OF 2")])
+    reading = _reading(
+        areas={1: 5000, 2: 5000}, rings={0: {1: SQUARE}, 1: {2: SQUARE}},
+        sheets=[0, 1],
+        scans=[SimpleNamespace(page=0, is_lot_sheet=True, reason="lots"),
+               SimpleNamespace(page=1, is_lot_sheet=True, reason="lots")],
+    )
+    payload = build_preview(reading, doc)
+    assert payload["assembly"]["established"] is False
+    assert "not been joined" in payload["assembly"]["reason"]
+    assert len(payload["sheets"]) == 2
 
 
 def test_already_draped_sheets_are_marked():

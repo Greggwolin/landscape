@@ -3177,3 +3177,27 @@
 .w-plan-preview-excluded summary { cursor: pointer; }
 .w-plan-preview-excluded ul { margin: 6px 0 4px; padding-left: 18px; }
 .w-plan-preview-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+
+/* ── Plan preview: the geometry, not the drawing (MK55) ─────────────────────
+   The window used to show the scanned sheet with lots shaded over it, so the
+   recovery could be checked by eye. That check has been made and passed, and
+   there is nothing to act on while looking again — so this draws the recovered
+   geometry itself, which is the artifact that gets draped. Colour separates
+   how each lot was established: traced is the file speaking, positional is us
+   working it out from its neighbours, and those are different claims. */
+.w-plan-preview-geometry { display: block; width: 100%; height: auto; background: var(--cui-body-bg); }
+.w-plan-lot { stroke-width: 1.1; }
+.w-plan-lot.is-traced     { fill: rgba(220, 38, 38, 0.20); stroke: rgba(190, 24, 24, 0.90); }
+.w-plan-lot.is-positional { fill: rgba(217, 119, 6, 0.22); stroke: rgba(180, 83, 9, 0.90); }
+.w-plan-lot.is-rebuilt    { fill: rgba(220, 38, 38, 0.07); stroke: rgba(190, 24, 24, 0.55); stroke-dasharray: 4 3; }
+.w-plan-preview-legend {
+  display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+  padding: 6px 14px; border-top: 1px solid var(--cui-border-color);
+  font-size: 12px; color: var(--cui-secondary-color);
+}
+.w-plan-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.w-plan-legend-item em { font-style: normal; opacity: 0.75; }
+.w-plan-swatch { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.w-plan-swatch.is-traced     { background: rgba(220, 38, 38, 0.20); border: 1px solid rgba(190, 24, 24, 0.90); }
+.w-plan-swatch.is-positional { background: rgba(217, 119, 6, 0.22); border: 1px solid rgba(180, 83, 9, 0.90); }
+.w-plan-swatch.is-rebuilt    { background: rgba(220, 38, 38, 0.07); border: 1px dashed rgba(190, 24, 24, 0.55); }

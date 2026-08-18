@@ -116,6 +116,10 @@ class PlanReading:
     #: Every page of the drawing with its lot-sheet verdict, so a page that was
     #: never examined can be shown as excluded rather than simply missing.
     sheet_scans: list["SheetScan"] = field(default_factory=list)
+    #: Runs the positional infill refused whole, each with a plain-English
+    #: reason. A refusal is the mechanism working, so it is carried out to the
+    #: window rather than logged and forgotten.
+    infill_refusals: list = field(default_factory=list)
 
     @property
     def lot_count(self) -> int:
@@ -123,7 +127,7 @@ class PlanReading:
 
     @property
     def outlined(self) -> int:
-        return sum(1 for lot in self.lots if lot.ring_3857 or lot.width_ft is not None)
+        return sum(1 for lot in self.lots if lot.source != "unplaced")
 
     @property
     def with_frontage(self) -> int:
@@ -305,6 +309,9 @@ def read_plan(
         pages = {m.number: m.page for m in match.matched}
         pages.update({n: o.page for n, o in derived.items()})
 
+        sources = {m.number: m.source for m in match.matched}
+        sources.update({n: "rebuilt" for n in derived})
+
         lots: list[DerivedLot] = []
         for number in sorted(table.areas):
             dims = measured.get(number)
@@ -320,21 +327,12 @@ def read_plan(
                     width_ft=dims.width_ft if dims else None,
                     depth_ft=dims.depth_ft if dims else None,
                     page=pages.get(number),
-                    # KNOWN WRONG (recorded MK51, 2026-08-18): this says
-                    # "derived" for every lot that was not matched — including
-                    # the ones that were never derived either and have no
-                    # outline at all. On the Red Valley plat that is 40 of 286
-                    # lots recorded as derived when nothing derived them, which
-                    # is a false statement sitting in a stored column.
-                    #
-                    # Not corrected here because `parcel_rollup` validates this
-                    # against VALID_SOURCES and writes it, so a third value is a
-                    # schema-visible change and belongs in its own prompt. The
-                    # preview window computes the honest three-way state from
-                    # ring presence instead — see
-                    # `plan_preview_views.build_preview`. Anything else reading
-                    # this column should do the same until it is fixed.
-                    source="read" if number in {m.number for m in match.matched} else "derived",
+# Four states, told apart by what actually happened rather
+                    # than by "was it matched". Until MK55 every unmatched lot
+                    # was recorded as "derived" including the 40 that nothing
+                    # derived and which have no outline at all — a false
+                    # statement in a stored column.
+                    source=sources.get(number, "unplaced"),
                 )
             )
 
@@ -348,6 +346,7 @@ def read_plan(
             # which is the single failure the preview window exists to catch.
             rings_by_sheet={page: dict(rings_by_sheet.get(page, {})) for page in lot_sheets},
             sheet_scans=scans,
+            infill_refusals=list(match.infill_refusals),
             scale_ft_per_inch=match.scale_ft_per_inch,
             scale_is_round=match.scale_is_round,
             label_disagreements=disagreements,

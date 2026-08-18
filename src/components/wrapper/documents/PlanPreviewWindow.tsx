@@ -11,18 +11,25 @@
  * up until lots are drawn on a map, where a missing sheet looks like a hole in
  * the subdivision and gets diagnosed as a mapping fault.
  *
- * So: one sheet at a time, the drawing with its recovered lots shaded light
- * red over it, and each sheet's own arithmetic stated in plain language. The
- * shading is translucent on purpose — the entire point is comparing it against
- * the drawing's own lot lines underneath, and an opaque fill would hide the
- * thing you came to check.
+ * It used to show the scanned sheet with the recovered lots shaded over it,
+ * so the recovery could be checked by eye. That check has been made and it
+ * passed, and looking at the drawing again buys nothing while there is no way
+ * to act on what you see. So this now shows the GEOMETRY — the artifact that
+ * will be draped — and not the drawing it came from. Colour separates how each
+ * lot was established, because "we traced this" and "we worked this one out
+ * from its neighbours" are different claims and only one of them is the file
+ * speaking.
+ *
+ * The sheets are NOT joined into one plan, deliberately. Nothing in the drawing
+ * fixes how they sit relative to one another, and a guessed offset produces a
+ * plan that looks entirely plausible and is wrong by a street width.
  *
  * Draping is manual work — trace, pin, verify, once per sheet — so the Drape
  * button lives here, next to the evidence of whether this sheet is worth the
  * effort. It starts the shipped workflow and does not reimplement any of it.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { setPendingPlanExtract } from '@/lib/gis/planExtractBridge';
@@ -31,7 +38,7 @@ const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8
 
 interface PreviewLot {
   number: number;
-  source: 'traced' | 'rebuilt';
+  source: 'traced' | 'rebuilt' | 'positional';
   measured: boolean;
   ring: [number, number][];
 }
@@ -47,7 +54,7 @@ interface PreviewSheet {
   page_height_pts: number;
   render_dpi: number;
   render_zoom: number;
-  counts: { recovered: number; traced: number; rebuilt: number; measured: number };
+  counts: { recovered: number; traced: number; rebuilt: number; positional: number; measured: number };
   already_draped: boolean;
   overlay_id: number | null;
   lots: PreviewLot[];
@@ -65,11 +72,20 @@ interface PreviewPayload {
   sheets: PreviewSheet[];
   excluded_sheets: { pdf_page: number; sheet_label: string; reason: string }[];
   totals: {
-    scheduled: number; recovered: number; traced: number;
-    rebuilt: number; measured: number; no_outline: number; reconciles: boolean;
+    scheduled: number; recovered: number; traced: number; rebuilt: number;
+    positional: number; measured: number; no_outline: number; reconciles: boolean;
   };
+  assembly: { established: boolean; reason: string };
+  refusals: { lots: number[]; reason: string }[];
   unplaced: { count: number; note: string; lot_numbers: number[] };
 }
+
+/** How a lot was established, said in words rather than in jargon. */
+const LOT_SOURCE_LABEL: Record<string, string> = {
+  traced: 'traced from the drawing',
+  rebuilt: 'rebuilt from stated dimensions',
+  positional: 'identified by position',
+};
 
 function ringToPoints(ring: [number, number][]): string {
   return ring.map(([x, y]) => `${x},${y}`).join(' ');
@@ -81,8 +97,8 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
   const [error, setError] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [images, setImages] = useState<Record<number, string>>({});
   const [imageError, setImageError] = useState<string | null>(null);
+  const [draping, setDraping] = useState(false);
   // The fetched PNG per sheet, kept so the Drape hand-off reuses the bytes the
   // window already downloaded rather than fetching the same sheet twice.
   const blobs = useRef<Record<number, Blob>>({});
@@ -112,30 +128,20 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
 
   const sheet: PreviewSheet | undefined = data?.sheets[index];
 
-  // Sheet images need the bearer token, and <img src> cannot carry one — so
-  // each sheet is fetched, held as a blob, and shown from an object URL. One
-  // sheet at a time, on demand: rendering all seven up front is what would
-  // make this expensive.
-  useEffect(() => {
-    if (!sheet || images[sheet.pdf_page]) return;
-    let live = true;
-    (async () => {
-      try {
-        const res = await fetch(`${DJANGO_API}${sheet.image_url}`, { headers: getAuthHeaders() });
-        if (!res.ok) throw new Error(String(res.status));
-        const blob = await res.blob();
-        if (!live) return;
-        blobs.current[sheet.pdf_page] = blob;
-        const url = URL.createObjectURL(blob);
-        objectUrls.current.push(url);
-        setImages((prev) => ({ ...prev, [sheet.pdf_page]: url }));
-        setImageError(null);
-      } catch {
-        if (live) setImageError('This sheet could not be rendered.');
-      }
-    })();
-    return () => { live = false; };
-  }, [sheet, images]);
+  // The sheet image is no longer displayed — this window shows the geometry,
+  // not the drawing. It is still fetched, but only when Drape is pressed,
+  // because the trace canvas needs the page as a picture. Fetching it here
+  // would download 1.5 MB per sheet that nothing renders.
+  const fetchSheetImage = useCallback(async (pdfPage: number): Promise<Blob | null> => {
+    if (blobs.current[pdfPage]) return blobs.current[pdfPage];
+    const target = data?.sheets.find((x) => x.pdf_page === pdfPage);
+    if (!target) return null;
+    const res = await fetch(`${DJANGO_API}${target.image_url}`, { headers: getAuthHeaders() });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    blobs.current[pdfPage] = blob;
+    return blob;
+  }, [data]);
 
   useEffect(() => () => { objectUrls.current.forEach(URL.revokeObjectURL); }, []);
 
@@ -152,8 +158,13 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
   /** Hand this sheet to the drape workflow that already exists. */
   const handleDrape = useCallback(async () => {
     if (!sheet || !data) return;
-    const blob = blobs.current[sheet.pdf_page];
-    if (!blob) return;
+    setDraping(true);
+    const blob = await fetchSheetImage(sheet.pdf_page);
+    setDraping(false);
+    if (!blob) {
+      setImageError('This sheet could not be rendered, so there is nothing to drape.');
+      return;
+    }
     // MapTab fetches the payload URL with no Authorization header, so it
     // cannot be handed this endpoint's URL — it would 401. A data URL of the
     // bytes already downloaded needs no auth and no second request.
@@ -173,13 +184,10 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
     onClose();
     router.push(`/w/projects/${data.project_id}/map`);
     window.dispatchEvent(new CustomEvent('landscaper:extract_plan_canvas'));
-  }, [sheet, data, docId, onClose, router]);
+  }, [sheet, data, docId, onClose, router, fetchSheetImage]);
 
   const totals = data?.totals;
-  const shading = useMemo(() => ({
-    traced: { fill: 'rgba(220, 38, 38, 0.22)', stroke: 'rgba(190, 24, 24, 0.85)' },
-    rebuilt: { fill: 'rgba(220, 38, 38, 0.10)', stroke: 'rgba(190, 24, 24, 0.55)' },
-  }), []);
+
 
   return (
     <div className="w-plan-preview-scrim" role="dialog" aria-modal="true" onClick={onClose}>
@@ -244,37 +252,46 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
             <div className="w-plan-preview-stage">
               {imageError && <p className="w-plan-preview-error">{imageError}</p>}
               <div className="w-plan-preview-canvas" style={{ width: `${zoom * 100}%` }}>
-                {images[sheet.pdf_page] ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={images[sheet.pdf_page]} alt={sheet.sheet_label} />
-                ) : (
-                  !imageError && <p className="w-plan-preview-loading">Rendering this sheet…</p>
-                )}
-                {/* The overlay's viewBox IS page-point space, so the polygons
-                    scale with the image no matter what zoom the sheet was
-                    rendered at. Multiplying by a hard-coded factor is how the
-                    shading ends up slightly off the lot lines and looks like a
-                    bad recovery. The render dpi is stated in the response for a
-                    client that does scale by hand. */}
+                {/* The geometry itself, on its own ground — this is the artifact
+                    that will be draped, not a picture of the sheet it came from.
+                    The viewBox IS page-point space, so nothing has to be scaled
+                    by hand and no render setting can shift a polygon. */}
                 <svg
-                  className="w-plan-preview-overlay"
+                  className="w-plan-preview-geometry"
                   viewBox={`0 0 ${sheet.page_width_pts} ${sheet.page_height_pts}`}
-                  preserveAspectRatio="none"
+                  role="img"
+                  aria-label={`Recovered lot geometry for ${sheet.sheet_label}`}
                 >
                   {sheet.lots.map((lot) => (
                     <polygon
                       key={lot.number}
                       points={ringToPoints(lot.ring)}
-                      fill={shading[lot.source].fill}
-                      stroke={shading[lot.source].stroke}
-                      strokeWidth={1.2}
+                      className={`w-plan-lot is-${lot.source}`}
                       vectorEffect="non-scaling-stroke"
                     >
-                      <title>{`Lot ${lot.number} — ${lot.source}${lot.measured ? ', measured' : ', not measured'}`}</title>
+                      <title>
+                        {`Lot ${lot.number} — ${LOT_SOURCE_LABEL[lot.source]}`}
+                        {lot.measured ? ', measured' : ', not measured'}
+                      </title>
                     </polygon>
                   ))}
                 </svg>
+                {sheet.lots.length === 0 && (
+                  <p className="w-plan-preview-loading">
+                    No geometry was recovered from this sheet.
+                  </p>
+                )}
               </div>
+            </div>
+
+            <div className="w-plan-preview-legend">
+              {(['traced', 'positional', 'rebuilt'] as const).map((k) => (
+                <span key={k} className="w-plan-legend-item">
+                  <i className={`w-plan-swatch is-${k}`} />
+                  {LOT_SOURCE_LABEL[k]}
+                  {sheet.counts[k] > 0 && <em> · {sheet.counts[k]}</em>}
+                </span>
+              ))}
             </div>
 
             <footer className="w-plan-preview-foot">
@@ -282,6 +299,7 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
                 <p className="w-plan-preview-sheet-sum">
                   <strong>{sheet.counts.recovered}</strong> lots recovered from this sheet
                   {' — '}{sheet.counts.traced} traced from the drawing,{' '}
+                  {sheet.counts.positional} identified by position,{' '}
                   {sheet.counts.rebuilt} rebuilt from stated dimensions,{' '}
                   {sheet.counts.measured} measured.
                 </p>
@@ -317,6 +335,24 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
                     other than the lots.
                   </p>
                 )}
+                {!data.assembly.established && (
+                  <p className="w-plan-preview-warn">{data.assembly.reason}</p>
+                )}
+                {data.refusals.length > 0 && (
+                  <details className="w-plan-preview-excluded">
+                    <summary>
+                      {data.refusals.reduce((n, r) => n + r.lots.length, 0)} lots were refused
+                      rather than guessed at
+                    </summary>
+                    <ul>
+                      {data.refusals.slice(0, 40).map((r) => (
+                        <li key={r.lots.join(',')}>
+                          <strong>{r.lots.join(', ')}</strong> — {r.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
                 {data.excluded_sheets.length > 0 && (
                   <details className="w-plan-preview-excluded">
                     <summary>
@@ -341,9 +377,9 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => void handleDrape()}
-                  disabled={!images[sheet.pdf_page]}
+                  disabled={draping}
                 >
-                  {sheet.already_draped ? 'Re-drape' : 'Drape'}
+                  {draping ? 'Preparing…' : sheet.already_draped ? 'Re-drape' : 'Drape'}
                 </button>
               </div>
             </footer>

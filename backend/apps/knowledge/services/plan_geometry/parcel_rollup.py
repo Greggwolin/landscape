@@ -81,14 +81,23 @@ SQFT_PER_ACRE = 43_560.0
 MIN_LOTS_PER_PARCEL = 5
 
 #: How an outline was obtained. Mirrors the CHECK constraint on the table.
-#: How a lot's geometry was established. NOTE (MK51, 2026-08-18): "derived" is
-#: currently over-reported — `plan_reader` labels every unmatched lot "derived",
-#: including lots that were never derived and have no outline at all (40 of 286
-#: on the Red Valley plat). A reader of this column cannot tell a rebuilt lot
-#: from an absent one. Adding a third value is a schema-visible change and
-#: belongs in its own prompt; until then derive the distinction from whether a
-#: ring exists, as `plan_preview_views.build_preview` does.
-VALID_SOURCES = ("read", "derived")
+#: How a lot's geometry was established. Four values, because there are four
+#: things that happen and the previous two could not tell them apart — every
+#: unmatched lot was recorded as "derived", including lots nothing derived and
+#: which have no outline at all. That was a false statement in a stored column
+#: (logged MK51, corrected here).
+#:
+#:   traced      its own number sat inside its own recovered outline
+#:   rebuilt     no outline closed, so it was reconstructed from the plat's
+#:               stated dimensions between two proven neighbours
+#:   positional  the outline was recovered but carried no usable number, and
+#:               was identified by walking the chain of shared edges between
+#:               two named neighbours (see `lot_infill`)
+#:   unplaced    counted in the schedule, no outline, on no sheet
+#:
+#: Kept to 16 characters: `gis_plan_lot.source` is varchar(16), so the spoken
+#: name "identified by position" is stored as "positional".
+VALID_SOURCES = ("traced", "rebuilt", "positional", "unplaced")
 
 
 # ─────────────────────────────────────────────────────── the input contract
@@ -114,7 +123,7 @@ class DerivedLot:
     depth_ft: Optional[float] = None
     #: Sheet the lot is drawn on. Used only to corroborate the grouping.
     page: Optional[int] = None
-    source: str = "read"
+    source: str = "traced"
 
     @property
     def parcel_number(self) -> int:

@@ -156,17 +156,17 @@ def build_preview(reading, doc, draped: Optional[dict[int, int]] = None) -> dict
         rect = page.rect
 
         lots = []
-        traced = rebuilt = measured = 0
+        counts = {"traced": 0, "rebuilt": 0, "positional": 0}
+        measured = 0
         for number in sorted(rings):
             lot = lots_by_number.get(number)
-            # Traced means the outline closed on its own; rebuilt means it was
-            # reconstructed from the plat's stated dimensions between two proven
-            # neighbours. Both are real geometry; only one was read.
-            source = "traced" if (lot and lot.source == "read") else "rebuilt"
-            if source == "traced":
-                traced += 1
-            else:
-                rebuilt += 1
+            # The reading now states this honestly, so it is read rather than
+            # re-derived here: traced (its own number sat in its own outline),
+            # rebuilt (reconstructed from stated dimensions), positional
+            # (recovered outline, unusable label, identified by walking the
+            # chain of neighbours).
+            source = (lot.source if lot and lot.source in counts else "traced")
+            counts[source] += 1
             has_frontage = bool(lot and lot.frontage_ft is not None)
             if has_frontage:
                 measured += 1
@@ -189,8 +189,9 @@ def build_preview(reading, doc, draped: Optional[dict[int, int]] = None) -> dict
             "render_zoom": round(PREVIEW_DPI / 72.0, 6),
             "counts": {
                 "recovered": len(lots),
-                "traced": traced,
-                "rebuilt": rebuilt,
+                "traced": counts["traced"],
+                "rebuilt": counts["rebuilt"],
+                "positional": counts["positional"],
                 "measured": measured,
             },
             "already_draped": numbering["pdf_page"] in draped,
@@ -231,10 +232,32 @@ def build_preview(reading, doc, draped: Optional[dict[int, int]] = None) -> dict
             "recovered": recovered_total,
             "traced": sum(s["counts"]["traced"] for s in sheets),
             "rebuilt": sum(s["counts"]["rebuilt"] for s in sheets),
+            "positional": sum(s["counts"]["positional"] for s in sheets),
             "measured": sum(s["counts"]["measured"] for s in sheets),
             "no_outline": len(no_outline),
             "reconciles": reconciles,
         },
+        # Assembly is NOT established, and saying so is the point. Sheets 4, 5
+        # and 6 share one scale and name each other across matchlines, which is
+        # what makes assembly conceivable — but no lot appears on two adjacent
+        # sheets, so there is no shared geometry to abut; the matchlines are
+        # text labels sitting in each sheet's own independent page coordinates;
+        # and no survey tie is common to all three. A guessed offset produces a
+        # plan that looks entirely plausible and is wrong by a street width, so
+        # these are shown as three separate pieces of geometry and never as one.
+        "assembly": {
+            "established": False,
+            "reason": (
+                "These sheets have not been joined into one plan. Nothing in the "
+                "drawing fixes how they sit relative to each other — no lot appears "
+                "on two sheets, and each sheet's coordinates are its own — so they "
+                "are shown separately rather than guessed into place."
+            ),
+        },
+        "refusals": [
+            {"lots": list(lots), "reason": reason}
+            for lots, reason in getattr(reading, "infill_refusals", []) or []
+        ],
         "unplaced": {
             "count": len(no_outline),
             "lot_numbers": no_outline[:200],
