@@ -537,6 +537,160 @@ def _summarize_failure(result: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Automated checks (BC5, LSCMD-BC-CHECKAUDIT-0819-BC5)
+# ---------------------------------------------------------------------------
+
+def gather_automated_checks() -> list[dict]:
+    """One entry per unattended automated check, plain English, so a broken
+    one reads as an alarm instead of staying invisible -- that silence was
+    the exact pattern BC5 was written to close. See
+    docs/audits/CHECK-INVENTORY-2026-08-19.md for the full audit this list
+    is built from.
+
+    Degrades entry-by-entry, not all-or-nothing: one unreachable source (gh
+    unauthenticated, a missing file) drops that one entry to 'unknown'
+    rather than blanking the whole section.
+
+    Returns rows: {'name': str, 'status': 'clean'|'stale'|'unknown', 'detail': str}
+    """
+    checks: list[dict] = []
+
+    # --- CI: the three required jobs on the most recent PR run --------------
+    try:
+        out = subprocess.run(
+            ['gh', 'run', 'list', '--repo', 'Greggwolin/landscape',
+             '--workflow', 'preview.yml', '--limit', '1',
+             '--json', 'databaseId,createdAt'],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+        )
+        runs = json.loads(out.stdout) if out.returncode == 0 else []
+    except Exception:
+        runs = None
+
+    wanted = {
+        'Build and Test': 'The build, lint, typecheck, and full frontend test suite',
+        'Backend Tests': 'The Django backend test suite',
+        'SQL Migration Recovery Guard': 'The check that a real migration file can never be silently gitignored',
+    }
+    if runs is None:
+        for plain in wanted.values():
+            checks.append({'name': plain, 'status': 'unknown', 'detail': 'could not reach GitHub to check'})
+    elif not runs:
+        for plain in wanted.values():
+            checks.append({'name': plain, 'status': 'unknown', 'detail': 'no pull-request run found yet'})
+    else:
+        run_id = runs[0]['databaseId']
+        try:
+            created = datetime.fromisoformat(runs[0]['createdAt'].replace('Z', '+00:00'))
+        except Exception:
+            created = None
+        try:
+            jout = subprocess.run(
+                ['gh', 'run', 'view', str(run_id), '--repo', 'Greggwolin/landscape', '--json', 'jobs'],
+                cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+            )
+            jobs = json.loads(jout.stdout).get('jobs', []) if jout.returncode == 0 else []
+        except Exception:
+            jobs = []
+        when = created.strftime('%B ').replace(' 0', ' ') + f"{created.day}" if created else 'recently'
+        for job_name, plain in wanted.items():
+            job = next((j for j in jobs if j.get('name') == job_name), None)
+            if job is None:
+                checks.append({'name': plain, 'status': 'unknown',
+                                'detail': 'not found in the most recent pull-request run'})
+                continue
+            concl = job.get('conclusion')
+            if concl == 'success':
+                checks.append({'name': plain, 'status': 'clean', 'detail': f'last ran clean {when}'})
+            elif concl in ('failure', 'cancelled', 'timed_out'):
+                checks.append({'name': plain, 'status': 'stale',
+                                'detail': f'failed on its most recent run ({when}) -- check the open pull request'})
+            else:
+                checks.append({'name': plain, 'status': 'unknown', 'detail': f'still running as of {when}'})
+
+    # --- Weekly disaster-recovery drill --------------------------------------
+    try:
+        out = subprocess.run(
+            ['gh', 'run', 'list', '--repo', 'Greggwolin/landscape',
+             '--workflow', 'disaster-drill.yml', '--limit', '10',
+             '--json', 'conclusion,createdAt,event'],
+            cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30,
+        )
+        runs = json.loads(out.stdout) if out.returncode == 0 else []
+        real_runs = [r for r in runs if r.get('event') in ('schedule', 'workflow_dispatch')]
+    except Exception:
+        real_runs = None
+
+    name = 'Weekly disaster-recovery drill (Neon backup/restore rehearsal)'
+    if real_runs is None:
+        checks.append({'name': name, 'status': 'unknown', 'detail': 'could not reach GitHub to check'})
+    elif not real_runs:
+        checks.append({
+            'name': name, 'status': 'stale',
+            'detail': ('has never completed a real scheduled or manual run -- a YAML bug silently broke '
+                        'every trigger until it was fixed 2026-08-19; the next Sunday run will be the first real test'),
+        })
+    else:
+        r = real_runs[0]
+        try:
+            created = datetime.fromisoformat(r['createdAt'].replace('Z', '+00:00'))
+            when = created.strftime('%B ').replace(' 0', ' ') + f"{created.day}"
+        except Exception:
+            when = 'recently'
+        if r.get('conclusion') == 'success':
+            checks.append({'name': name, 'status': 'clean', 'detail': f'last ran clean {when}'})
+        else:
+            checks.append({'name': name, 'status': 'stale', 'detail': f'failed on its most recent real run ({when})'})
+
+    # --- Database structure snapshot (manual tool, not on any schedule) -----
+    try:
+        snapshot_dir = REPO_ROOT / 'docs' / 'daily-context' / 'current'
+        files = sorted(snapshot_dir.glob('SCHEMA_EXPORT_*.md')) if snapshot_dir.exists() else []
+        if files:
+            stamp = files[-1].stem.replace('SCHEMA_EXPORT_', '')
+            checks.append({
+                'name': 'Database structure snapshot (schema drift detector)',
+                'status': 'stale',
+                'detail': (f'not on any schedule -- last generated by hand on {stamp}. The check itself now '
+                            'fails loudly on a real discrepancy; nothing currently triggers it automatically'),
+            })
+        else:
+            checks.append({'name': 'Database structure snapshot (schema drift detector)',
+                            'status': 'unknown', 'detail': 'no snapshot file found on disk'})
+    except Exception:
+        checks.append({'name': 'Database structure snapshot (schema drift detector)',
+                        'status': 'unknown', 'detail': 'could not read the snapshot directory'})
+
+    # --- Auto-commit safety net ----------------------------------------------
+    try:
+        last = _git('log', '--all', '--grep=^Auto-commit: Save work progress',
+                     '-1', '--format=%ad', '--date=format:%B %-d, %Y').strip()
+        if last:
+            checks.append({
+                'name': '15-minute auto-commit safety net',
+                'status': 'stale',
+                'detail': (f'has not run since {last} -- it was a background loop with no launchd job behind '
+                            'it, so it dies on every reboot or logout and never restarts itself'),
+            })
+        else:
+            checks.append({'name': '15-minute auto-commit safety net', 'status': 'unknown',
+                            'detail': 'no auto-commit history found'})
+    except Exception:
+        checks.append({'name': '15-minute auto-commit safety net', 'status': 'unknown',
+                        'detail': 'could not read git history'})
+
+    # --- Playwright specs (static finding -- confirmed 2026-08-19) ----------
+    checks.append({
+        'name': 'Playwright specs (contrast/accessibility + UI agent smoke scenarios, 6 files)',
+        'status': 'stale',
+        'detail': ('do not run automatically anywhere -- CI, git hooks, and every schedule were checked '
+                    '2026-08-19; they only run if someone invokes them by hand'),
+    })
+
+    return checks
+
+
+# ---------------------------------------------------------------------------
 # Feedback
 # ---------------------------------------------------------------------------
 
@@ -728,6 +882,15 @@ h2 {
 }
 .system-status .stale { color: #b45309; font-size: 14px; }
 .system-status .ok { color: #047857; font-size: 14px; }
+.automated-checks {
+  background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 8px 22px; margin-bottom: 12px;
+}
+.automated-checks ul { list-style: none; margin: 0; padding: 0; }
+.automated-checks li { padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+.automated-checks li:last-child { border-bottom: none; }
+.automated-checks li.ok { color: #047857; }
+.automated-checks li.stale { color: #b45309; }
 .item.pr-alarm { border-left: 4px solid #dc2626; background: #fef2f2; }
 .item.pr-normal { border-left: 3px solid #94a3b8; }
 .pr-alarm-tag {
@@ -1140,12 +1303,30 @@ def render_system_status(health: dict, today: date) -> str:
     return f'<div class="system-status"><div class="stale">{msg}</div></div>'
 
 
+def render_automated_checks(checks: list[dict]) -> str:
+    """§22.6.3 — plain English per line, never a bare job name or workflow
+    file. A check that hasn't run clean inside its expected window reads as
+    the alarm, matching render_stale_prs's green-and-idle convention.
+    """
+    if not checks:
+        return '<div class="empty">No automated checks could be read.</div>'
+    icon = {'clean': '✓', 'stale': '⚠', 'unknown': '?'}
+    css = {'clean': 'ok', 'stale': 'stale', 'unknown': 'stale'}
+    items = ''.join(
+        f'<li class="{css.get(c["status"], "stale")}">'
+        f'{icon.get(c["status"], "?")} <strong>{_esc(c["name"])}</strong> — {_esc(c["detail"])}'
+        f'</li>'
+        for c in checks
+    )
+    return f'<div class="automated-checks"><ul>{items}</ul></div>'
+
+
 def render_html(*, today: date, branch: str, open_feedback: list[dict],
                 resolved_recent: list[dict], wip_rows: list[dict],
                 sessions: list[dict], worktree_count: int,
                 uncommitted: dict, aged_uncommitted: dict,
                 stale_prs: list[dict], untracked_sql: list[str],
-                health: dict) -> str:
+                health: dict, automated_checks: list[dict]) -> str:
     in_progress_count = sum(1 for r in open_feedback if r['status'] == 'in_progress')
     summary = render_summary(
         today=today,
@@ -1185,6 +1366,8 @@ def render_html(*, today: date, branch: str, open_feedback: list[dict],
 {render_stale_prs(stale_prs)}
 <h2>System Status</h2>
 {render_system_status(health, today)}
+<h2>Automated Checks</h2>
+{render_automated_checks(automated_checks)}
 <div class="footer">
   Generated {datetime.now():%Y-%m-%d %H:%M:%S} ·
   Regenerate: <code>./backend/venv/bin/python scripts/brief/generate_daily_brief.py</code>
@@ -1217,6 +1400,7 @@ def main() -> int:
     branch = gather_branch_name()
     commits = gather_commits_24h()
     health = gather_health_status()
+    automated_checks = gather_automated_checks()
     uncommitted = gather_uncommitted_summary()
     aged_uncommitted = gather_aged_uncommitted()
     stale_prs = gather_stale_prs()
@@ -1242,6 +1426,7 @@ def main() -> int:
         stale_prs=stale_prs,
         untracked_sql=untracked_sql,
         health=health,
+        automated_checks=automated_checks,
     )
     dated, current = write_outputs(html, today)
     print(f"[brief] wrote {dated}", file=sys.stderr)
@@ -1250,7 +1435,8 @@ def main() -> int:
           f"resolved_recent={len(resolved_recent)} wip={len(wip_rows)} "
           f"sessions={len(sessions)} stale_prs={len(stale_prs)} "
           f"untracked_sql={len(untracked_sql)} "
-          f"health={health['status']}", file=sys.stderr)
+          f"health={health['status']} "
+          f"automated_checks={len(automated_checks)}", file=sys.stderr)
     return 0
 
 
