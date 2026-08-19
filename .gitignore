@@ -52,7 +52,6 @@ next-env.d.ts
 # Large files and local development files
 *.zip
 *.tar.gz
-*.sql
 /LocalFiles/
 
 # Office temp files
@@ -150,6 +149,35 @@ test-results/
 .next_stale*
 .next_stale_*
 landscape_rich_schema_*.json
+
+# Database dumps and exports -- BY PATTERN, NEVER BY EXTENSION (BC3,
+# LSCMD-BC-SQLRECOVER-0818-BC3). A blanket `*.sql` sat here for over a year and
+# silently kept 290 files off this Mac's git history -- 124 of them migrations,
+# some load-bearing (read by run_migration.py and src/lib/dms/migrate.ts). A
+# same-day attempt to fix it on 2026-05-01 (`017d1ccb`, LSCMD-GITIGNORE-CLEANUP-
+# 0501-DA44) was reverted the same day after the surfaced files turned out to be
+# exactly those load-bearing ones -- the fix was reverted instead of doing the
+# one-time triage the files actually needed. That triage is now done and recorded
+# in docs/audits/SQL-INVENTORY-2026-08-18.md; the next simplification of this
+# rule should read that file first, not re-add `*.sql`.
+# Nothing under migrations/ or backend/migrations/ may ever be matched here --
+# that is exactly where a blanket rule does the most damage.
+*.dump.sql
+*-dump.sql
+*_dump.sql
+*.backup.sql
+*-backup.sql
+*-backup-*.sql
+*_backup.sql
+db-export-*.sql
+*-export-*.sql
+
+# Structural guarantee, not a naming convention: no pattern above (or added later)
+# may ever swallow a real migration, regardless of what a migration happens to be
+# named. This is the actual fix -- the old rule failed because a broad pattern
+# quietly won over the files that mattered.
+!migrations/**
+!backend/migrations/**
 
 # Playwright MCP artifacts
 .playwright-mcp/
