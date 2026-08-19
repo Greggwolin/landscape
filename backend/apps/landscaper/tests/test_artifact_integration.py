@@ -3,35 +3,26 @@ End-to-end integration tests for the generative artifact system.
 
 These tests exercise the service layer (apps.artifacts.services) and the
 REST endpoints against a real Postgres connection — they do NOT mock the
-ORM. The test class self-skips if the test DB hasn't been bootstrapped
-with the `landscape` schema, since the project's `tbl_*` tables are
-managed=False (raw-SQL migrations).
-
-To enable these tests in CI, ensure the test DB has the landscape schema
-applied (the same `migrations/` directory the dev DB uses) before
-`manage.py test` runs.
-
-Manual one-shot setup against the existing test DB:
-
-    psql "$DATABASE_URL" -d test_land_v2 -c 'CREATE SCHEMA IF NOT EXISTS landscape'
-    DATABASE_URL="<test-db-url>" node scripts/run-migrations.mjs
+ORM. Each test class self-skips (via setUp, see below) if the test DB
+hasn't been bootstrapped with the `landscape` schema, since the project's
+`tbl_*` tables are managed=False (raw-SQL migrations).
 
 LAYER (ArtifactDedupParamsMergeTests): wiring — that create_artifact_record's
 dedup branch calls _merge_dedup_params with the stored row's params and persists
 the result. The pure-logic layer for that helper, which runs with no DB and no
 skip guard, is apps/artifacts/tests/test_dedup_params_merge.py.
 
-CAUTION: the skipUnless guard above calls _artifact_tables_present() at IMPORT
-time, so it inspects whatever DATABASE_URL points at — the dev database — not
-the test database pytest builds. On any environment whose dev DB lacks
-landscape.tbl_artifact, every test in this module silently skips. That includes
-CI, whose backend-tests job uses an empty throwaway Postgres. Filed as a
-follow-up; see the LSCMD-BA-DEDUPPARAMS-0814-BA1 PR.
+FIXED (BC5 check audit, 2026-08-19): the skip guard used to be a class-level
+`@unittest.skipUnless(_artifact_tables_present(), ...)` decorator, which is
+evaluated at IMPORT time -- during pytest collection, before conftest.py's
+lazy test-DB build has run. That meant every test in this module skipped on
+every CI run, unconditionally, regardless of whether the CI test DB actually
+had the artifact tables (conftest.py's managed=True flip + --run-syncdb does
+create them). The guard now runs inside each class's setUp(), which executes
+after the test DB is live, so it reflects reality instead of always skipping.
 """
 
 from __future__ import annotations
-
-import unittest
 
 from django.db import connection
 from django.test import TestCase
@@ -69,15 +60,12 @@ def _artifact_tables_present() -> bool:
         return False
 
 
-@unittest.skipUnless(
-    _artifact_tables_present(),
-    'landscape.tbl_artifact not present in test DB — '
-    'bootstrap with migrations/20260429_create_artifact_tables.up.sql to enable',
-)
 class ArtifactServiceIntegrationTests(TestCase):
     """Real DB exercise of the service layer."""
 
     def setUp(self):
+        if not _artifact_tables_present():
+            self.skipTest('landscape.tbl_artifact not present in test DB — bootstrap with migrations/20260429_create_artifact_tables.up.sql to enable')
         with connection.cursor() as c:
             c.execute('TRUNCATE landscape.tbl_artifact RESTART IDENTITY CASCADE')
 
@@ -241,10 +229,6 @@ class ArtifactServiceIntegrationTests(TestCase):
         self.assertEqual(result['dependent_artifacts'], [])
 
 
-@unittest.skipUnless(
-    _artifact_tables_present(),
-    'landscape.tbl_artifact not present in test DB',
-)
 class ArtifactDedupParamsMergeTests(TestCase):
     """A dedup refresh must refresh tool-owned params without destroying the
     user-owned state other code paths write into the same object.
@@ -263,6 +247,11 @@ class ArtifactDedupParamsMergeTests(TestCase):
     PROJECT_ID = 999_998
 
     def setUp(self):
+        if not _artifact_tables_present():
+            self.skipTest(
+                'landscape.tbl_artifact not present in test DB — '
+                'bootstrap with migrations/20260429_create_artifact_tables.up.sql to enable'
+            )
         with connection.cursor() as c:
             c.execute('TRUNCATE landscape.tbl_artifact RESTART IDENTITY CASCADE')
 
@@ -481,14 +470,12 @@ class ArtifactDedupParamsMergeTests(TestCase):
         self.assertEqual(_merge_dedup_params(stored={'a': 1}, fresh=None), {'a': 1})
 
 
-@unittest.skipUnless(
-    _artifact_tables_present(),
-    'landscape.tbl_artifact not present in test DB',
-)
 class ArtifactToolEndToEndTests(TestCase):
     """Real DB exercise of the Landscaper-side tool wrappers."""
 
     def setUp(self):
+        if not _artifact_tables_present():
+            self.skipTest('landscape.tbl_artifact not present in test DB — bootstrap with migrations/20260429_create_artifact_tables.up.sql to enable')
         with connection.cursor() as c:
             c.execute('TRUNCATE landscape.tbl_artifact RESTART IDENTITY CASCADE')
 
@@ -514,16 +501,24 @@ class ArtifactToolEndToEndTests(TestCase):
         self.assertEqual(len(h['versions']), 1)
 
 
-@unittest.skipUnless(
-    _artifact_tables_present(),
-    'landscape.tbl_artifact not present in test DB',
-)
 class ArtifactRestEndpointTests(TestCase):
     """Smoke tests for the five REST endpoints."""
 
     def setUp(self):
+        if not _artifact_tables_present():
+            self.skipTest('landscape.tbl_artifact not present in test DB — bootstrap with migrations/20260429_create_artifact_tables.up.sql to enable')
+        from django.contrib.auth import get_user_model
         from rest_framework.test import APIClient
+        # BC5 check audit (2026-08-19): this client was never authenticated,
+        # so all 5 endpoint tests below hit a real 401 from IsAuthenticated --
+        # the endpoints were correctly rejecting the request; the test setup
+        # was incomplete. force_authenticate matches the pattern already used
+        # elsewhere in this codebase (see apps/projects/tests_api.py).
+        user = get_user_model().objects.create_user(
+            username='bc5-artifact-rest-tests', email='bc5@test.local', password='n/a'
+        )
         self.client = APIClient()
+        self.client.force_authenticate(user=user)
         with connection.cursor() as c:
             c.execute('TRUNCATE landscape.tbl_artifact RESTART IDENTITY CASCADE')
 
