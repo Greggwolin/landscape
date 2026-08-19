@@ -801,17 +801,21 @@ Automatic extraction of lot/parcel geometry from uploaded project drawings (plat
 - `siteplan_raster.py` — raster contour extraction from site plan images
 - `lot_dimensions.py` — extracts lot width, depth, street-facing edge from geometry
 - `lot_match.py` — matches extracted lots to existing parcels in the project
+- `lot_infill.py` — recovers lots lost during plat extraction; fixes mislabeled lot IDs
 - `parcel_rollup.py` — aggregates individual lot outlines into parcel-level summaries
 - `calibration.py` — calibration for plan geometry measurement
 - `georeference.py` — georeferencing extracted geometry to real-world coordinates
+- `plan_reader.py` — reads plan content for preview rendering
 
 **Database:** `gis_plan_lot` table (migration `20260814_create_gis_plan_lot.up.sql`) — stores extracted lot outlines with geometry, dimensions, matched parcel references, and provenance.
 
-**Frontend:** `PlanStageCard.tsx` in `src/components/wrapper/documents/` — shows classified drawing type in the DMS detail panel with confirmation controls.
+**Frontend:** `PlanStageCard.tsx` in `src/components/wrapper/documents/` — shows classified drawing type in the DMS detail panel with confirmation controls. `PlanPreviewWindow.tsx` — interactive preview window for extracted plan geometry with confirm/reject flow.
+
+**Backend views:** `plan_preview_views.py` — Django views serving plan preview data and confirmation endpoints.
 
 **Management command:** `import_plan_lots` — CLI for importing plan lot data.
 
-**Status:** Code-complete, not yet integration-tested on a real uploaded plat. No Landscaper tools registered for this pipeline yet — extraction runs on upload via the classification pipeline.
+**Status:** Pipeline extended with lot infill recovery, preview window, and dimensions fix. Not yet integration-tested on a real uploaded plat. No Landscaper tools registered for this pipeline yet — extraction runs on upload via the classification pipeline.
 
 ### Valuation Engine Status
 
@@ -1087,7 +1091,8 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-08-14 (nightly sync) — Plan geometry extraction pipeline: entire new subsystem (`backend/apps/knowledge/services/plan_geometry/`, 10 modules, ~3,000+ lines) for auto-classifying uploaded drawings (plats, site plans), extracting lot geometry (vector from plats, raster from site plans), computing lot dimensions, and rolling up into parcel summaries. New `gis_plan_lot` table + `PlanStageCard` frontend component. Valuation fixes: fabrication guard preserves blocked replies; proforma cumulative total double-count fixed; DCF exit values floored to zero; authoritative assumptions hierarchy for income approach; canonical unit count. 8 new test files (~2,100 lines). Tool count unchanged at 285 registered / 282 advertised.*
+*Last audit: 2026-08-18 (nightly sync) — Plan geometry progress: lot infill recovery (`lot_infill.py` +260 lines), preview window (`plan_preview_views.py` +374, `PlanPreviewWindow.tsx` +355, `plan_reader.py` +108), lot dimensions point-deduction fix. Budget artifact view spec shipped (PR #241): `schedule_view_spec.py` +353, `ScheduleArtifact.tsx` +795, CSS +467 — declarative spec replaces LLM-composed table HTML for budget schedules. CI/nightly hardening: PR gating for stacked branches (CC15 #248), nightly committer off-main-line guard (CC7 #235). Daily brief: PRs-open-≥3-days section (+119 lines). Tool count unchanged at 285 registered / 282 advertised.*
+*Prior audit: 2026-08-14 (nightly sync) — Plan geometry extraction pipeline: entire new subsystem (`backend/apps/knowledge/services/plan_geometry/`, 10 modules, ~3,000+ lines) for auto-classifying uploaded drawings (plats, site plans), extracting lot geometry (vector from plats, raster from site plans), computing lot dimensions, and rolling up into parcel summaries. New `gis_plan_lot` table + `PlanStageCard` frontend component. Valuation fixes: fabrication guard preserves blocked replies; proforma cumulative total double-count fixed; DCF exit values floored to zero; authoritative assumptions hierarchy for income approach; canonical unit count. 8 new test files (~2,100 lines). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-07-31 — Editing spine extended to cash-flow + edit integrity guards: CC3 (#236) cash-flow assumptions editable cells (editing spine slice 4 — `cashflow_artifact_builder.py` expanded to ~500 lines, full write path + pytest); CC11 (#237) stale-cell guard — refuses an edit whose cell pointer no longer matches the current artifact state (prevents silent data corruption on concurrent edits); CC13 (#238) row-moved guard — the click names the ROW not the slot, detects row reordering between render and commit. WIP branch `feat/budget-artifact-slice1`: EB1 view-specification architecture for budget schedule rendering (`schedule_view_spec.py` 321 lines + `ScheduleArtifact.tsx` 676 lines — declarative spec replaces LLM-composed table HTML). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-07-28 — Artifact editing spine + thread destination persistence: CB6 (#224) single budget cell writable e2e with optimistic locking; CB8 (#227) batch commit — stage several edits, land as one set; TA1 (#226) thread destination persistence (new `landscaper_thread_last_destination` table + Django CRUD + frontend hook); CB3–CB5 (#221–#223) relay sweep + fabrication guard widened to income-property + land-sales vocabulary; CB7 (#225) planning-activity log fix; TA5 (2 commits) artifact routing for schedule tools; #228 LayerPanel hydration fix. Landed since (2026-07-29/30): CB10 UOM picklist editing (#232), CB9 sales-schedule editable cells (#229), CB12–CB14 sales recalc fixes (#231/#233/#234), TA5 artifact host-route fix (#230). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-07-27 — Nightly sync: +`review_budget_variance` tool (CB2 §3, PR #220); clarification Phase 3b Apply+review+modal-target (#219); SS18 drape false-success fix — persist actions now server-side (#218); FB-304 commit-msg hook recurrence guard. Tool count 284→285 registered, 281→282 advertised.*
