@@ -178,8 +178,12 @@ jobs:
         # Every Jest unit test (jest.config.ts testPathIgnorePatterns excludes
         # the Playwright specs that also live under tests/, so a bare `jest`
         # run here can't pick them up and throw). The Playwright contrast e2e
-        # (test:contrast / the full `npm test`) needs the deployed preview, so
-        # it runs in the post-deploy api-tests job, not here.
+        # (test:contrast) needs a deployed preview and does NOT currently run
+        # anywhere in CI -- the "api-tests" job that was meant to run it post-
+        # deploy was removed (see the NOTE lower in this file) and never
+        # replaced. BC5 check audit (2026-08-19): confirmed no Playwright spec
+        # runs automatically anywhere (CI, git hooks, or a scheduled job) --
+        # see docs/audits/CHECK-INVENTORY-2026-08-19.md.
         run: npm run test:unit
 
       - name: Upload coverage
