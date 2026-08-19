@@ -249,3 +249,8 @@ docs/UX/health-reports/
 
 # Screenshot captures — local-only chat/artifact UI shots, regenerable (LSCMD-CW-WTSAVE-0613-GV)
 reference/images/screenshots/capture-*/
+
+# BC5 Phase 2 proof -- deliberate: this line would silently re-swallow real migration
+# files, the exact regression the SQL Migration Recovery Guard exists to catch.
+# Will be reverted in the same session.
+backend/migrations/*.sql
