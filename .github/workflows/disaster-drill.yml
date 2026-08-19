@@ -113,7 +113,7 @@ jobs:
           );
           UPDATE landscape.tbl_project SET project_name = 'CORRUPTED' WHERE project_id = 1;
           COMMIT;
-EOF
+          EOF
 
           echo "✅ Corruption simulated"
 

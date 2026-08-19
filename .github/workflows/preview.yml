@@ -175,15 +175,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://user:pass@localhost:5432/land_v2' }}
 
       - name: Run unit tests
-        # Jest unit tests only. The Playwright contrast e2e (test:contrast / the
-        # full `npm test`) needs the deployed preview, so it runs in the
-        # post-deploy api-tests job, not here.
-        #
-        # test:unit rather than test:tokens: the latter names one hard-coded
-        # spec file, so any jest test added since silently never ran here. It
-        # takes an explicit path list rather than a bare `jest` because a bare
-        # run also collects the Playwright specs, which throw inside Jest. Add
-        # new unit-test directories to the test:unit script as they appear.
+        # Every Jest unit test (jest.config.ts testPathIgnorePatterns excludes
+        # the Playwright specs that also live under tests/, so a bare `jest`
+        # run here can't pick them up and throw). The Playwright contrast e2e
+        # (test:contrast / the full `npm test`) needs the deployed preview, so
+        # it runs in the post-deploy api-tests job, not here.
         run: npm run test:unit
 
       - name: Upload coverage

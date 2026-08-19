@@ -63,10 +63,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://user:pass@localhost:5432/land_v2' }}
 
       - name: Run unit tests
-        # Hermetic Jest unit tests (theme tokens). The Playwright contrast e2e
-        # (`test:contrast`) needs a live deployed URL, so — as in preview.yml —
-        # it is NOT run in this hermetic job.
-        run: npm run test:tokens
+        # Every hermetic Jest unit test (see jest.config.ts testPathIgnorePatterns
+        # for what's excluded -- Playwright specs only). The Playwright contrast
+        # e2e (`test:contrast`) needs a live deployed URL, so -- as in preview.yml
+        # -- it is NOT run in this hermetic job.
+        run: npm run test:unit
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
