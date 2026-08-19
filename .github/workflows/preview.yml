@@ -42,6 +42,18 @@ jobs:
   # is the layer-1 guard against that recurring: fails fast if any .sql file
   # exists under migrations/ or backend/migrations/ on disk that git doesn't
   # know about. No database access, no dependency on any other job.
+  #
+  # BC5 check audit (2026-08-19): the original "untracked files on disk" check
+  # below can never independently fail as a CI step -- actions/checkout only
+  # ever materializes tracked files, so `find` and `git ls-files` are always
+  # identical immediately after checkout with no intervening generation step.
+  # It's kept (harmless, real defense-in-depth for any future pipeline reorder
+  # that adds a step before this one), but the canary check below it is what
+  # actually re-tests the regression class this guard exists for: whether a
+  # .gitignore rule would silently swallow a real migration file dropped here.
+  # Verified locally: `git add --dry-run` on a canary file exits 0 when
+  # trackable, 1 when gitignored (git check-ignore has a known false-negative
+  # on standalone negation rules -- see reference_landscape_commit_hooks.md).
   sql-migration-guard:
     name: SQL Migration Recovery Guard
     runs-on: ubuntu-latest
@@ -59,6 +71,20 @@ jobs:
             echo "$untracked"
             exit 1
           fi
+
+      - name: Fail if a real migration file would be silently gitignored
+        run: |
+          fail=0
+          for dir in migrations backend/migrations; do
+            probe="$dir/.bc5-guard-canary-$$.sql"
+            touch "$probe"
+            if ! git add --dry-run "$probe" >/dev/null 2>&1; then
+              echo "::error::$dir is currently gitignored -- a real .sql migration file placed here would silently never be tracked."
+              fail=1
+            fi
+            rm -f "$probe"
+          done
+          exit $fail
           echo "No untracked migration files."
 
 
