@@ -1,5 +1,17 @@
 # SQL Rebuild Acceptance Test — 2026-08-18
 
+> **⚠️ CORRECTED 2026-08-19 — see `docs/audits/SCHEMA-RECOVERABILITY-2026-08-19.md`.**
+> The 30/365 tables and 2/41 views figure below measures the **SQL patch layer applied alone**,
+> against an empty database — not whether the schema is recoverable. It does not include Django's
+> own migrations, which this document's own text (below) correctly identifies as the baseline the
+> SQL layer assumes but does not itself apply. Session `LSCMD-BC-REBUILDPROOF-0819-BC6` applied
+> that Django baseline first, then this same SQL layer on top, and reconstructed 77 objects
+> instead of 32. It also answers the question this document could only bound between 0 and 297:
+> **176 real, live, code-referenced tables and views have no file anywhere — Django or SQL — in
+> the whole repository.** Read the 2026-08-19 document for the number that matters; the text
+> below is left exactly as originally written, for the record of what was tested and found on
+> 2026-08-18.
+
 Session: `LSCMD-BC-SQLRECOVER-0818-BC3`, Step 6. This is the test that matters — everything
 else in this recovery is bookkeeping until a fresh clone proves (or fails to prove) the schema
 can be rebuilt from what is now in git.
