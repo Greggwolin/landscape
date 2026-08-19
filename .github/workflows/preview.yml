@@ -77,9 +77,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install PostgreSQL client
+        timeout-minutes: 3
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client || (sleep 5 && sudo apt-get update && sudo apt-get install -y postgresql-client)
 
       - name: Resolve DATABASE_URL
         uses: ./.github/actions/resolve-neon-db-url
