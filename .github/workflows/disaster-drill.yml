@@ -37,9 +37,10 @@ jobs:
           neonctl --version
 
       - name: Install PostgreSQL client
+        timeout-minutes: 3
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client || (sleep 5 && sudo apt-get update && sudo apt-get install -y postgresql-client)
 
       # ======================================================================
       # STEP 1: Create test branch from production
@@ -113,7 +114,7 @@ jobs:
           );
           UPDATE landscape.tbl_project SET project_name = 'CORRUPTED' WHERE project_id = 1;
           COMMIT;
-EOF
+          EOF
 
           echo "✅ Corruption simulated"
 

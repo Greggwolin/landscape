@@ -27,6 +27,17 @@ const config: Config = {
     '**/?(*.)+(spec|test).[jt]s?(x)'
   ],
 
+  // Playwright specs live under tests/ too (jest's testMatch above can't tell
+  // a .spec.ts apart from a Playwright one by name) -- exclude them here so a
+  // bare `jest` run collects every real unit-test file without needing a
+  // manually-maintained path list that silently drops new suites.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/tests/e2e/',
+    '<rootDir>/tests/ui_agent_framework/',
+    '<rootDir>/tests/contrast\\.probe\\.spec\\.ts$'
+  ],
+
   // Module paths
   modulePaths: ['<rootDir>'],
   moduleNameMapper: {
