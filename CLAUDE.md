@@ -365,7 +365,7 @@ lu_product               -- Level 3: Product (e.g., 50' Lot)
 - Naming: `NNN_description.sql` (e.g., `017_add_land_use_labels.sql`)
 - Always include rollback section
 - Test on Peoria Meadows project before committing
-- `*.sql` is gitignored globally; new migrations need `git add -f` (a `!migrations/*.sql` unignore was tried and reverted in `LSCMD-GITIGNORE-CLEANUP-0501-DA44` — it surfaced ~60 inert historical SQL files with real code/doc references)
+- `migrations/` and `backend/migrations/` are never gitignored (structural rule, not a convention to remember — see `.gitignore`'s comment above the SQL dump/export patterns). No `git add -f` needed. This replaces a blanket `*.sql` ignore that silently kept 290 files, 124 of them migrations, out of git for over a year. A 2026-05-01 attempt to fix it (`LSCMD-GITIGNORE-CLEANUP-0501-DA44`) was reverted the same day, `017d1ccb` — **correcting the record here**: the revert's own commit message says the ~60 surfaced files were *referenced from production scripts* (`run_migration.py`, `src/lib/dms/migrate.ts`) and active feature docs, i.e. load-bearing, not inert; the response at the time was to re-hide them instead of tracking them. `LSCMD-BC-SQLRECOVER-0818-BC3` did that triage — see `docs/audits/SQL-INVENTORY-2026-08-18.md`.
 
 ---
 
