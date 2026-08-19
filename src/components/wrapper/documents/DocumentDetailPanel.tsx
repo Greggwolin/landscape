@@ -7,6 +7,7 @@ import ProfileForm from '@/components/dms/profile/ProfileForm';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { FilePreviewer } from '@/components/preview/FilePreviewer';
+import { PlanStageCard, type PlanProfile } from './PlanStageCard';
 export interface DocumentDetailDoc {
   doc_id: string;
   doc_name?: string;
@@ -165,6 +166,11 @@ export function DocumentDetailPanel({
     onProfileSaved?.();
   };
 
+  // Intake writes its reading of the drawing here; may arrive on the doc or
+  // via the detail fetch, same as the rest of the profile.
+  const planProfile = ((doc.profile_json ?? fetchedProfile ?? {}) as Record<string, unknown>)
+    .plan as PlanProfile | undefined;
+
   const openLabel = externalOpenHint(mimeType, name);
 
   const handleOpenExternally = () => {
@@ -262,6 +268,25 @@ export function DocumentDetailPanel({
         <DetailRow label="Created">{formatDate(doc.created_at)}</DetailRow>
         <DetailRow label="Modified">{formatDate(doc.updated_at, true)}</DetailRow>
         {parties && <DetailRow label="Parties">{parties}</DetailRow>}
+
+        {/* A drawing states what it is; intake reads that and stores it here.
+            The card is the only place it surfaces, and the only place the
+            confirmation can happen. Renders nothing for a non-plan. */}
+        {planProfile?.is_plan && (
+          <PlanStageCard
+            // Keyed by document: the card holds the picked stage and the
+            // confirmed flag in its own state, seeded from props. This panel is
+            // reused rather than remounted when a different document is
+            // selected, so without the key a drawing you just confirmed would
+            // leave the next drawing reading as confirmed — an unconfirmed
+            // sheet showing Survey-accurate is the exact thing this card exists
+            // to prevent.
+            key={doc.doc_id}
+            docId={doc.doc_id}
+            plan={planProfile}
+            onConfirmed={onProfileSaved}
+          />
+        )}
 
         <div className="w-doc-detail-divider" />
 

@@ -103,8 +103,16 @@ function SortableLayerRow({
         >
           {layer.label}
         </span>
-        {layer.count !== undefined && layer.count > 0 && (
-          <span className="layer-item-count">({layer.count})</span>
+        {/* Zero is not nothing to say — it is the layer telling you this data
+            has never been added to the project. Hiding the count at zero makes
+            "none yet" look identical to "not a counted layer" (Gregg, 2026-08-14). */}
+        {layer.count !== undefined && (
+          <span
+            className={`layer-item-count${layer.count === 0 ? ' is-empty' : ''}`}
+            title={layer.count === 0 ? 'None added to this project yet' : undefined}
+          >
+            ({layer.count})
+          </span>
         )}
       </label>
     </div>
@@ -127,6 +135,7 @@ export function LayerPanel({
   onEditAnnotation,
   onRemoveAnnotation,
   onReorderLayer,
+  renderLayerExtra,
 }: LayerPanelProps) {
   // "Overlays" is its own legend section (saved overlays carry per-plan
   // actions the generic layer rows don't). Local expand state — there's no
@@ -187,7 +196,13 @@ export function LayerPanel({
 
   return (
     <div className="layer-panel">
-      <div className="layer-panel-header">Layers</div>
+      {/* No panel-level header (2026-08-17). It said "Location" while the
+          first GROUP also said "Location", so the layers read as nested one
+          level deeper than they are — Gregg: "the main Location header should
+          be collapseable and the layers below do NOT need to be in a second
+          grouping". The groups themselves are the masters now: Location,
+          Market, Annotations, each collapsible by its own chevron, each with
+          its layers directly beneath it. */}
 
       <div className="layer-panel-content">
         {layers.groups.map((group) => {
@@ -215,7 +230,12 @@ export function LayerPanel({
                 pinned Annotations group. */}
             {group.expanded && (
               <div className="layer-group-items">
-                {dragEnabled && !isAnnotations ? (
+                {/* Annotations rows are reorderable too (Gregg, 2026-08-17).
+                    They were excluded because the group also hosts the named
+                    drawn shapes below, which are pinned — but that is a reason
+                    to pin THOSE, not to deny the three category toggles the
+                    handle every other layer row has. */}
+                {dragEnabled ? (
                   <DndContext
                     // Stable, per-group id so @dnd-kit's generated
                     // `aria-describedby` (DndDescribedBy-N) is deterministic
@@ -233,27 +253,31 @@ export function LayerPanel({
                       strategy={verticalListSortingStrategy}
                     >
                       {group.layers.map((layer) => (
-                        <SortableLayerRow
-                          key={layer.id}
-                          group={group}
-                          layer={layer}
-                          dragEnabled
-                          onToggleLayer={onToggleLayer}
-                          onZoomToLayer={onZoomToLayer}
-                        />
+                        <React.Fragment key={layer.id}>
+                          <SortableLayerRow
+                            group={group}
+                            layer={layer}
+                            dragEnabled
+                            onToggleLayer={onToggleLayer}
+                            onZoomToLayer={onZoomToLayer}
+                          />
+                          {renderLayerExtra?.(layer.id)}
+                        </React.Fragment>
                       ))}
                     </SortableContext>
                   </DndContext>
                 ) : (
                   group.layers.map((layer) => (
-                    <SortableLayerRow
-                      key={layer.id}
-                      group={group}
-                      layer={layer}
-                      dragEnabled={false}
-                      onToggleLayer={onToggleLayer}
-                      onZoomToLayer={onZoomToLayer}
-                    />
+                    <React.Fragment key={layer.id}>
+                      <SortableLayerRow
+                        group={group}
+                        layer={layer}
+                        dragEnabled={false}
+                        onToggleLayer={onToggleLayer}
+                        onZoomToLayer={onZoomToLayer}
+                      />
+                      {renderLayerExtra?.(layer.id)}
+                    </React.Fragment>
                   ))
                 )}
 

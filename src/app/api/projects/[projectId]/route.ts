@@ -42,12 +42,22 @@ export async function PATCH(req: NextRequest, context: Params) {
         mergedMetadata = { ...mergedMetadata, ...updates.gis_metadata }
       }
 
+      // MK24 §1: only a HAND-PLACED point is a user override. This used to
+      // stamp location_override_source: 'user' on any coordinate write, so an
+      // automatic move (parcel centroid, geocode) would mark itself as a
+      // deliberate user correction and then be protected as one. Callers now
+      // declare where the point came from; a write with no location_source is
+      // treated as a hand edit, which is what every pre-MK24 caller was.
       if (updates.location_lat !== undefined || updates.location_lon !== undefined) {
-        mergedMetadata = {
-          ...mergedMetadata,
-          location_override: true,
-          location_override_at: new Date().toISOString(),
-          location_override_source: 'user',
+        const isManual =
+          updates.location_source === undefined || updates.location_source === 'manual'
+        if (isManual) {
+          mergedMetadata = {
+            ...mergedMetadata,
+            location_override: true,
+            location_override_at: new Date().toISOString(),
+            location_override_source: 'user',
+          }
         }
       }
 
@@ -131,6 +141,7 @@ export async function PATCH(req: NextRequest, context: Params) {
       'value_add_enabled',
       'location_lat',
       'location_lon',
+      'location_source',  // MK24 §1: manual | parcel | geocoded | typed
       'project_type_code',
       'project_type',
       'template_id',
@@ -230,6 +241,7 @@ export async function GET(_req: NextRequest, context: Params) {
         p.year_built,
         p.location_lat,
         p.location_lon,
+        p.location_source,
         p.start_date,
         p.analysis_start_date,
         p.analysis_end_date,

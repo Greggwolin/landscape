@@ -8,11 +8,56 @@ import { ExcelAuditArtifact } from './ExcelAuditArtifact';
 import { ArtifactWorkspacePanel } from './ArtifactWorkspacePanel';
 import { WrapperHeader } from './WrapperHeader';
 import { ProjectDocumentsBody } from './ProjectDocumentsBody';
+import { PanelMapView } from './PanelMapView';
 import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
 const MIN_ARTIFACTS_WIDTH = 320;
 const MAX_ARTIFACTS_WIDTH = 1600;
+
+// MK24 §5/§6 — widths as a share of the viewport rather than fixed pixels.
+// The map wants the screen; the artifacts rail wants to sit beside the chat.
+const ARTIFACTS_VIEWPORT_SHARE = 0.25;
+// 70% — Gregg's number, restored 2026-08-17.
+//
+// MK24 set this to 70%, MK28 reduced it to 60% on the reasoning that the chat
+// shares the row and needed protecting. That was wrong: he had used 70% and
+// wanted it back ("it was 70% before you started tweaking"). The squeeze he
+// actually reported came from the destination push and the 1600px clamp
+// below, not from the share — both fixed separately. Don't lower this again
+// without him asking.
+const MAP_VIEWPORT_SHARE = 0.7;
+
+/** A viewport share in pixels.
+ *
+ * The upper bound is the LARGER of the legacy pixel cap and the requested
+ * share. MAX_ARTIFACTS_WIDTH (1600) was chosen for artifact takeover, and on a
+ * wide display it silently ate the map's share: 60% of a 3200px screen is
+ * 1920, clamped down to 1600, which lands back at ~50% — exactly the "it only
+ * opens at 50%" Gregg reported after MK28 set it to 60%. A share is a
+ * deliberate instruction about proportion; a constant tuned for a different
+ * purpose should not quietly overrule it. The lower bound still applies, so a
+ * narrow window cannot produce an unusable sliver.
+ */
+function widthForShare(share: number): number {
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
+  const wanted = Math.round(vw * share);
+  const upper = Math.max(MAX_ARTIFACTS_WIDTH, wanted);
+  return Math.min(Math.max(wanted, MIN_ARTIFACTS_WIDTH), upper);
+}
+
+// ── Seam for per-artifact width rules ───────────────────────────────────────
+// Gregg: "we will need to create rules for the panel widths as we finalize the
+// design of the standard artifacts." A table with twelve columns and a two-line
+// summary should not get the same width — but which gets what has not been
+// decided, so nothing is guessed here.
+//
+// This is where that decision lands. Return a viewport share for an artifact
+// that needs more than the 25% default; return null to take the default. The
+// user's drag always wins over whatever this returns (see hasUserDragged).
+function preferredShareForArtifact(_artifactId: number | null): number | null {
+  return null;
+}
 
 // Left sidebar collapses to this width during artifact takeover. Mirrors
 // COLLAPSED_WIDTH in src/app/w/layout.tsx — when activeArtifactId becomes
@@ -49,7 +94,19 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
   } = useWrapperUI();
 
   // Draggable width (LEFT-edge handle, dragging left widens the panel)
+  // MK24 §6 — 25% of the viewport, not a fixed 420px.
+  //
+  // The first render must NOT measure the window. This started as a lazy
+  // initialiser branching on `typeof window`, which is the textbook cause of a
+  // hydration mismatch: the server has no window and renders the constant, the
+  // browser measures and renders a share of the viewport, React finds two
+  // different widths for the same element and gives up reconciling that
+  // subtree. So both sides start from the constant and the viewport share is
+  // applied just after mount, one frame later.
   const [panelWidth, setPanelWidth] = useState(DEFAULT_ARTIFACTS_WIDTH);
+  // Once he has dragged the panel, the drag is authoritative — no automatic
+  // sizing (including the per-artifact seam above) may override it.
+  const hasUserDragged = useRef(false);
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
@@ -63,21 +120,71 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
   const inTakeoverMode = useRef(false);
   const takeoverMode = activeArtifactId != null;
 
+  // The opening width, applied one frame after mount — see the note on the
+  // panelWidth state above for why it cannot be measured during the first
+  // render. Runs once: this is the size the panel opens at, not a responsive
+  // rule, and re-running it on viewport changes would yank a panel the user
+  // had deliberately sized.
   useEffect(() => {
-    if (takeoverMode && !inTakeoverMode.current) {
+    if (hasUserDragged.current || inTakeoverMode.current) return;
+    setPanelWidth(widthForShare(ARTIFACTS_VIEWPORT_SHARE));
+     
+  }, []);
+
+  useEffect(() => {
+    // MK24 §5 — the map is a takeover too, just a wider one (70% rather than
+    // the artifact's half-of-remaining). Same snapshot-and-restore machinery:
+    // entering remembers the width the user had, leaving puts it back, so a
+    // deliberately dragged panel survives a trip to the map and back.
+    const mapMode = projectRightPanelView === 'map' && showViewToggle;
+    const wantsTakeover = takeoverMode || mapMode;
+
+    if (wantsTakeover && !inTakeoverMode.current) {
       preTakeoverWidth.current = panelWidth;
       inTakeoverMode.current = true;
-      const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
-      const available = Math.max(vw - SIDEBAR_COLLAPSED_WIDTH, MIN_ARTIFACTS_WIDTH * 2);
-      const half = Math.round(available / 2);
-      setPanelWidth(Math.min(Math.max(half, MIN_ARTIFACTS_WIDTH), MAX_ARTIFACTS_WIDTH));
-    } else if (!takeoverMode && inTakeoverMode.current) {
-      setPanelWidth(preTakeoverWidth.current ?? DEFAULT_ARTIFACTS_WIDTH);
+      if (mapMode) {
+        setPanelWidth(widthForShare(MAP_VIEWPORT_SHARE));
+      } else {
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
+        const available = Math.max(vw - SIDEBAR_COLLAPSED_WIDTH, MIN_ARTIFACTS_WIDTH * 2);
+        const half = Math.round(available / 2);
+        setPanelWidth(Math.min(Math.max(half, MIN_ARTIFACTS_WIDTH), MAX_ARTIFACTS_WIDTH));
+      }
+    } else if (wantsTakeover && inTakeoverMode.current) {
+      // Already in takeover but the KIND changed (artifact ⇄ map) — resize
+      // without touching the remembered pre-takeover width.
+      setPanelWidth(
+        mapMode
+          ? widthForShare(MAP_VIEWPORT_SHARE)
+          : Math.min(
+              Math.max(
+                Math.round(
+                  Math.max(
+                    (typeof window !== 'undefined' ? window.innerWidth : 1600) -
+                      SIDEBAR_COLLAPSED_WIDTH,
+                    MIN_ARTIFACTS_WIDTH * 2
+                  ) / 2
+                ),
+                MIN_ARTIFACTS_WIDTH
+              ),
+              MAX_ARTIFACTS_WIDTH
+            )
+      );
+    } else if (!wantsTakeover && inTakeoverMode.current) {
+      setPanelWidth(preTakeoverWidth.current ?? widthForShare(ARTIFACTS_VIEWPORT_SHARE));
       preTakeoverWidth.current = null;
       inTakeoverMode.current = false;
+    } else if (!wantsTakeover && !hasUserDragged.current) {
+      // Artifacts view, not in takeover, and he has not sized the panel
+      // himself: 25% by default, or wider if this artifact asks for it. The
+      // per-artifact rule is the seam above — it returns null today, so this
+      // is the plain 25%.
+      const share =
+        preferredShareForArtifact(activeArtifactId) ?? ARTIFACTS_VIEWPORT_SHARE;
+      setPanelWidth(widthForShare(share));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [takeoverMode]);
+  }, [takeoverMode, projectRightPanelView, showViewToggle]);
 
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -97,6 +204,11 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
 
       const handleUp = () => {
         isResizing.current = false;
+        // MK24 §6 — from here on the drag is authoritative. Per-artifact width
+        // rules (preferredShareForArtifact) must not move a panel he has
+        // deliberately sized; the takeover snapshot/restore still applies,
+        // because that restores HIS width rather than imposing one.
+        hasUserDragged.current = true;
         document.removeEventListener('pointermove', handleMove);
         document.removeEventListener('pointerup', handleUp);
       };
@@ -177,6 +289,22 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
             >
               Documents
             </button>
+            {/* MK22 — Map as a third view. Only on the project surface:
+                PanelMapView calls useWrapperProject, which throws without a
+                WrapperProjectProvider, and the dashboard renders this panel
+                without one. showViewToggle is set on the project page only. */}
+            {showViewToggle && (
+              <>
+                <span className="prp-toggle-sep" aria-hidden>|</span>
+                <button
+                  type="button"
+                  className={`prp-toggle-btn${projectRightPanelView === 'map' ? ' is-active' : ''}`}
+                  onClick={() => setProjectRightPanelView('map')}
+                >
+                  Map
+                </button>
+              </>
+            )}
           </div>
         }
         trailing={
@@ -213,6 +341,12 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
         <div className="project-right-panel-body project-right-panel-body--documents">
           <ProjectDocumentsBody projectId={projectId} />
         </div>
+      ) : projectRightPanelView === 'map' && showViewToggle ? (
+        // MK22 — the live map, keeping the toggle above it. Guarded by
+        // showViewToggle for the same reason the button is; if the view
+        // somehow persists onto the dashboard, this falls through to the
+        // artifacts branch rather than throwing on a missing project context.
+        <PanelMapView />
       ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} takeoverMode />
       ) : activeLocationBrief ? (

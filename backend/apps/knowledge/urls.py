@@ -14,6 +14,8 @@ from .views import (
     source_registry_views,
     knowledge_library_views,
     workbench_views,
+    plan_apply_views,
+    plan_preview_views,
 )
 
 urlpatterns = [
@@ -78,6 +80,18 @@ urlpatterns = [
     path('documents/<int:doc_id>/queue/', status_views.queue_document, name='knowledge-doc-queue'),
     path('documents/<int:doc_id>/reprocess/', status_views.reprocess_document, name='knowledge-doc-reprocess'),
     path('documents/<int:doc_id>/process/', status_views.process_document_now, name='knowledge-doc-process'),
+    # MK34 — read a confirmed drawing into its project. The first thing in
+    # the plan-geometry arc that writes to a project; the gates live in
+    # plan_geometry.apply_plan, not here.
+    path('documents/<int:doc_id>/apply-plan/', plan_apply_views.apply_plan_to_project, name='knowledge-doc-apply-plan'),
+
+    # Show the proposed geometry before anything is placed. Read-only: these
+    # two write nothing, and the drape workflow is what turns a sheet into an
+    # overlay. Registered here because a view is not a route until it is.
+    path('documents/<int:doc_id>/plan-preview/',
+         plan_preview_views.plan_preview, name='knowledge-doc-plan-preview'),
+    path('documents/<int:doc_id>/plan-preview/sheets/<int:pdf_page>/image/',
+         plan_preview_views.plan_preview_sheet_image, name='knowledge-doc-plan-preview-sheet'),
     path('queue/status/', status_views.get_queue_status, name='knowledge-queue-status'),
 
     # Canonical chat endpoints

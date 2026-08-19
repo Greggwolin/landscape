@@ -136,6 +136,13 @@ export interface MapCanvasProps {
   projectBoundary?: GeoJSON.Feature | null;
   taxParcels?: GeoJSON.FeatureCollection | null;
   selectedTaxParcelIds?: string[];
+  /** parcel_id values of the project's OWN parcel(s), matched through
+   *  sameApn so 502-07-001-0 finds 502070010 (MK22). */
+  subjectTaxParcelIds?: string[];
+  /** MK24 §1 — the subject marker was dragged and DROPPED here. Fires once,
+   *  on dragend, not on every drag frame; the caller persists it as a
+   *  hand-placed point. Omit to leave the marker fixed, as it was. */
+  onProjectLocationMoved?: (lng: number, lat: number) => void;
   parcelOutlineEnabled?: boolean;
   saleComps?: GeoJSON.FeatureCollection | null;
   rentComps?: GeoJSON.FeatureCollection | null;
@@ -203,6 +210,10 @@ export interface LayerPanelProps {
   onToggleLayer: (groupId: LayerGroupId, layerId: string) => void;
   onToggleGroup: (groupId: LayerGroupId) => void;
   onZoomToLayer: (groupId: LayerGroupId, layerId: string) => void;
+  /** MK28 §2 — extra content rendered directly beneath a given layer row,
+   *  e.g. the Comparable Unit Sales filters. Return null for layers that have
+   *  none; the panel renders nothing rather than an empty container. */
+  renderLayerExtra?: (layerId: string) => React.ReactNode;
   /** Saved site plans surfaced in the legend (optional — omit to hide section). */
   sitePlans?: SitePlanLegendItem[];
   onToggleSitePlan?: (overlayId: number) => void;

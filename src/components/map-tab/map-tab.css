@@ -10,8 +10,15 @@
 
 .map-tab {
   display: flex;
-  /* Fill remaining viewport height below tab bar */
-  height: calc(100vh - var(--cui-header-height, 56px) - 120px);
+  /* FILL the container rather than guessing at the viewport.
+     This was `height: calc(100vh - 56px - 120px)` — an estimate of the classic
+     tab's chrome. In the /w/ panel the chrome is different (panel header +
+     Artifacts|Documents|Map toggle), so the guess came up short and left a
+     band of dead space beneath the map (Gregg, 2026-08-17). flex:1 inside the
+     panel's flex column fills exactly; height:100% covers a non-flex parent;
+     min-height keeps it usable if neither resolves to anything. */
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 500px;
   background: var(--cui-body-bg, #121218);
   border-radius: 8px;
@@ -23,7 +30,9 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 .map-tab-sidebar {
-  width: 240px;
+  /* Width is set inline and drag-adjustable (see MapTab). The values here are
+     only the fallback for any surface that renders the rail without it. */
+  width: 264px;
   min-width: 240px;
   background: var(--cui-card-bg, #1a1a24);
   border-right: 1px solid var(--cui-border-color, #2d2d3a);
@@ -31,6 +40,21 @@
   flex-direction: column;
   overflow: hidden;
   min-height: 0; /* Allow flex shrinking */
+}
+
+/* Drag handle between the rail and the map. 4px of hit area, invisible until
+   hovered — the col-resize cursor is what announces it, the same way the
+   artifacts panel's handle works. */
+.map-tab-sidebar-handle {
+  flex: 0 0 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.15s;
+}
+
+.map-tab-sidebar-handle:hover,
+.map-tab-sidebar-handle:active {
+  background: var(--cui-primary, #5c6bc0);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -60,9 +84,18 @@
   padding: 8px 0;
 }
 
-/* Layer Group */
+/* Layer Group — each one is a SECTION, matching the County Parcels /
+   Draw-Measure treatment further down the rail: a rule above it, its own
+   header row with a chevron, contents beneath (Gregg, 2026-08-17). */
 .layer-group {
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  border-top: 1px solid var(--cui-border-color, #2d2d3a);
+  padding: 4px 0 6px;
+}
+
+/* No rule above the first section — it would double the panel's own edge. */
+.layer-group:first-child {
+  border-top: none;
 }
 
 .layer-group-header {
@@ -70,12 +103,12 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 16px;
+  padding: 6px 10px;
   background: none;
   border: none;
   color: var(--cui-body-color, #e5e5e5);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: background-color 0.15s;
   text-align: left;
@@ -103,11 +136,15 @@
 
 /* Layer Items */
 .layer-group-items {
-  padding-left: 24px;
+  /* Was 24px. The chevron already signals the nesting; a second indent this
+     deep just cost label width and wrapped every two-word layer name. */
+  padding-left: 6px;
 }
 
 .layer-item {
-  padding: 4px 16px 4px 8px;
+  /* Was 4px 16px 4px 8px — the 16px right gutter bought nothing and the rows
+     are the widest thing in the rail. */
+  padding: 3px 6px 3px 4px;
 }
 
 /* Draggable data-layer rows: grip handle sits left of the existing controls. */
@@ -257,6 +294,135 @@
 .layer-item-count {
   color: var(--cui-secondary-color, #9ca3af);
   font-size: 11px;
+}
+
+/* Controls that belong to a specific layer, rendered directly beneath its row
+   (MK28 §2 — the Comparable Unit Sales filters). Indented to the layer's label
+   so it reads as part of that row rather than a new section, and kept tight so
+   three inputs don't push the rest of the tree off screen. */
+.layer-item-extra {
+  /* Indent to the LAYER LABEL, not the row edge, so the controls read as
+     belonging to Comparable Unit Sales rather than to the group. 64px is the
+     row's own offset, summed from its parts: 4px item padding + 16px drag
+     handle + 4px flex gap + 40px of checkbox, colour swatch and their gaps.
+     Keep this in step if those change. */
+  padding: 2px 6px 8px 64px;
+}
+
+.layer-item-extra .form-control-sm {
+  font-size: 11px;
+  padding: 2px 6px;
+  height: 24px;
+}
+
+.layer-item-extra label {
+  font-size: 10px;
+  margin-bottom: 1px !important;
+}
+
+/* The three sale filters, three-across in the narrow rail (Gregg, 2026-08-17).
+   Equal columns so the row always fits whatever the rail width is, and both
+   the label and the value are centred over their own column — left-aligned
+   numbers of different widths read as ragged in a grid this tight. */
+.sfcomps-filters-compact {
+  display: grid;
+  /* Each column is only as wide as its own label — "Radius (mi)" is wider than
+     "Days" and there is no reason for their boxes to match. 1fr stretched all
+     three across the full rail, which put the fields under the drag handles
+     rather than under the layer they belong to (Gregg, 2026-08-17). */
+  /* Explicit widths rather than max-content: a number input contributes its
+     own intrinsic width (~170px) to intrinsic sizing, so max-content would
+     size the columns to the INPUTS and stretch the row again.
+     All three equal now that the radius box shows "3 mi" instead of carrying
+     "(mi)" in its label — 46px fits "Build Yr", the longest of the three
+     labels, at 10px. */
+  grid-template-columns: repeat(3, 46px);
+  justify-content: start;
+  gap: 5px;
+}
+
+.sfcomps-filters-compact > div {
+  min-width: 0;
+}
+
+.sfcomps-filters-compact label {
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sfcomps-filters-compact input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  /* Spinners eat most of the width at this size and the value is centred
+     around them, so drop them and let the number have the column. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.sfcomps-filters-compact input::-webkit-outer-spin-button,
+.sfcomps-filters-compact input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Sale-price legend, ON THE MAP (Gregg, 2026-08-17) — it explains the pins, so
+   it belongs where the pins are rather than in the rail. Bottom-left: clear of
+   the display controls top-left, the MapLibre nav top-right, and the scale bar
+   and attribution bottom-right. Same card treatment as the display controls so
+   the two read as one family. */
+.map-tab-legend {
+  position: absolute;
+  bottom: 12px;
+  left: 10px;
+  z-index: 5;
+  padding: 7px 9px;
+  background: var(--cui-card-bg, rgba(26, 26, 36, 0.92));
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none; /* never steal a click meant for the map */
+}
+
+.map-tab-legend-title {
+  font-size: 10px;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 4px;
+}
+
+.map-tab-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--cui-body-color, #e5e5e5);
+  white-space: nowrap;
+}
+
+.map-tab-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.map-tab-legend-range {
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--cui-secondary-color, #9ca3af);
+  font-size: 10px;
+}
+
+/* A count of zero (MK24 §3). Deliberately quieter than a real count, not
+   louder: "(0)" is telling you this data has not been added yet, which is a
+   prompt to go and add it — not an error. Muted and italic reads as an absence;
+   anything warning-coloured would read as something being wrong. */
+.layer-item-count.is-empty {
+  color: var(--cui-secondary-color, #9ca3af);
+  opacity: 0.55;
+  font-style: italic;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

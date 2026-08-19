@@ -345,6 +345,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     projectBoundary,
     taxParcels,
     selectedTaxParcelIds,
+    subjectTaxParcelIds,
+    onProjectLocationMoved,
     parcelOutlineEnabled,
     saleComps,
     rentComps,
@@ -819,13 +821,19 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     const selectedFillId = 'tax-parcels-selected-fill';
     const selectedHighlightId = 'tax-parcels-selected-highlight';
     const selectedLineId = 'tax-parcels-selected-line';
+    const subjectFillId = 'tax-parcels-subject-fill';
+    const subjectLineId = 'tax-parcels-subject-line';
 
-    // Clean up previous
+    // Clean up previous. Every layer added below must be removed here — this
+    // effect re-runs on every parcel/selection change, and a layer left behind
+    // makes addLayer throw on the next pass (MK22 added the two subject ones).
     safeRemoveLayer(map.current, fillId);
     safeRemoveLayer(map.current, lineId);
     safeRemoveLayer(map.current, selectedFillId);
     safeRemoveLayer(map.current, selectedHighlightId);
     safeRemoveLayer(map.current, selectedLineId);
+    safeRemoveLayer(map.current, subjectFillId);
+    safeRemoveLayer(map.current, subjectLineId);
     safeRemoveSource(map.current, srcId);
 
     // Check layer visibility
@@ -869,6 +877,40 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         'line-opacity': 1,
       },
     });
+
+    // MK22 — the project's OWN parcel, drawn before the selection layers so a
+    // deliberate click still reads on top of it. Gregg's ask was that the
+    // project's parcel be distinguishable among the county's; until now the
+    // tax-parcel layers only ever distinguished what the user had clicked.
+    // The ids are matched in MapTab through sameApn (502-07-001-0 vs
+    // 502070010), so this filter is a plain membership test on parcel_id.
+    const subjectIds = (subjectTaxParcelIds ?? []).filter(Boolean);
+    if (subjectIds.length > 0) {
+      map.current.addLayer({
+        id: subjectFillId,
+        type: 'fill',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'fill-color': LAYER_COLORS.siteBoundary,
+          'fill-opacity': 0.22,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', subjectIds]],
+      });
+
+      map.current.addLayer({
+        id: subjectLineId,
+        type: 'line',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': LAYER_COLORS.siteBoundary,
+          'line-width': 2.4,
+          'line-opacity': 1,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', subjectIds]],
+      });
+    }
 
     const selectedIds = (selectedTaxParcelIds ?? []).filter(Boolean);
     if (selectedIds.length > 0) {
@@ -993,7 +1035,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     };
 
      
-  }, [mapLoaded, styleRevision, taxParcels, layers, selectedTaxParcelIds, activeTool]);
+  }, [mapLoaded, styleRevision, taxParcels, layers, selectedTaxParcelIds, subjectTaxParcelIds, activeTool]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // LA County Parcel Overlays (subject + comps)
@@ -1635,10 +1677,33 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       ])
     );
 
-    subjectMarkerRef.current = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
+    // MK24 §1 — the point is a working estimate, so it can be corrected by
+    // hand. Draggable only when the caller supplies a handler to persist it;
+    // without one the marker stays fixed exactly as before.
+    const canMove = typeof onProjectLocationMoved === 'function';
+    if (canMove) markerEl.style.cursor = 'grab';
+
+    subjectMarkerRef.current = new maplibregl.Marker({
+      element: markerEl,
+      anchor: 'center',
+      draggable: canMove,
+    })
       .setLngLat([center[0], center[1]])
       .setPopup(subjectPopup)
       .addTo(map.current);
+
+    if (canMove) {
+      // Persist on DROP only. dragend fires once; 'drag' fires every frame and
+      // would write on each one.
+      subjectMarkerRef.current.on('dragstart', () => {
+        markerEl.style.cursor = 'grabbing';
+      });
+      subjectMarkerRef.current.on('dragend', () => {
+        markerEl.style.cursor = 'grab';
+        const dropped = subjectMarkerRef.current?.getLngLat();
+        if (dropped) onProjectLocationMoved?.(dropped.lng, dropped.lat);
+      });
+    }
 
     markerEl.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -1651,7 +1716,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       subjectMarkerRef.current?.remove();
       subjectMarkerRef.current = null;
     };
-  }, [mapLoaded, styleRevision, center]);
+  }, [mapLoaded, styleRevision, center, onProjectLocationMoved]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Parcel-association (P2 / Gesture B): draggable subject pin.

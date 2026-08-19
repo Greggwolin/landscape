@@ -53,7 +53,9 @@ import {
   writeStoredLayerOrder,
 } from '@/lib/maps/layerOrder';
 import { DEFAULT_TERRAIN_CONFIG } from '@/lib/maps/terrain';
-import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './constants';
+import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM,
+  RECENT_SALES_PRICE_TIERS, MAP_SIDEBAR_DEFAULT_WIDTH, MAP_SIDEBAR_MIN_WIDTH,
+  MAP_SIDEBAR_MAX_WIDTH } from './constants';
 import {
   useDemographics,
   DEMOGRAPHIC_FIELDS,
@@ -77,9 +79,14 @@ import {
   nudgeCorners,
   type DrapeCommand,
 } from '@/lib/gis/drapeCommandBridge';
-import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
+import { COUNTY_PARCEL_SERVICES, sameApn, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
+import {
+  SfCompsFilterControls,
+  SF_COMPS_DEFAULT_FILTERS,
+  type SfCompsFilters,
+} from '@/components/analysis/SfCompsFilterControls';
 import { useMarketCompetitors, type MarketCompetitiveProject } from '@/hooks/useMarketData';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
@@ -314,6 +321,57 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const [activeTool, setActiveTool] = useState<DrawTool>(null);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups(isDevelopmentProject));
+
+  // The project arrives asynchronously, so isDevelopmentProject is false on the
+  // first render and may flip once it lands. useState's initialiser runs ONCE,
+  // which froze the tree at that first guess: a land development kept the
+  // income-property rows (rental comparables instead of home resales, no Plan
+  // Parcels) for the life of the mount. Rebuild when the answer changes.
+  // ── Left panel width ──────────────────────────────────────────────────────
+  // Was a fixed 240px in CSS. Default is now 264 (10% wider) and the user can
+  // drag it: the rail carries layer names, counts, filters and a legend, and
+  // how much room those need depends on the project and the display.
+  //
+  // Same pointer pattern as the artifacts panel's own handle — pointermove on
+  // the document so the drag survives leaving the 4px strip, released on
+  // pointerup. Clamped so it can be neither unusably narrow nor wide enough to
+  // squeeze the map out.
+  const [sidebarWidth, setSidebarWidth] = useState(MAP_SIDEBAR_DEFAULT_WIDTH);
+  const sidebarResizing = useRef(false);
+  const sidebarStartX = useRef(0);
+  const sidebarStartWidth = useRef(0);
+
+  const handleSidebarResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      sidebarResizing.current = true;
+      sidebarStartX.current = e.clientX;
+      sidebarStartWidth.current = sidebarWidth;
+
+      const onMove = (ev: PointerEvent) => {
+        if (!sidebarResizing.current) return;
+        const next = sidebarStartWidth.current + (ev.clientX - sidebarStartX.current);
+        setSidebarWidth(
+          Math.min(Math.max(next, MAP_SIDEBAR_MIN_WIDTH), MAP_SIDEBAR_MAX_WIDTH)
+        );
+      };
+      const onUp = () => {
+        sidebarResizing.current = false;
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      };
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    },
+    [sidebarWidth]
+  );
+
+  const builtForDevelopment = useRef(isDevelopmentProject);
+  useEffect(() => {
+    if (builtForDevelopment.current === isDevelopmentProject) return;
+    builtForDevelopment.current = isDevelopmentProject;
+    setLayers(getDefaultLayerGroups(isDevelopmentProject));
+  }, [isDevelopmentProject]);
   // Terrain: hillshade relief on by default (subtle, from the free DEM); the
   // dramatic 3D tilt is opt-in. Both survive basemap switches (see MapCanvas).
   const [hillshadeEnabled, setHillshadeEnabled] = useState(true);
@@ -399,6 +457,14 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     const layer = group?.layers.find((entry) => entry.id === 'tax-parcels');
     return Boolean(layer?.visible);
   }, [layers]);
+  // Maricopa-only ON PURPOSE, and it must stay that way (checked MK22).
+  // This does NOT gate the parcel boundary — that comes from the queried
+  // `taxParcels` features and draws for every county. What it gates is a
+  // RASTER tile layer proxied from the Maricopa County Assessor's own
+  // ParcelOutline service (/api/gis/parcel-outline-tile, host-whitelisted to
+  // gis.mcassessor.maricopa.gov). Those tiles depict Maricopa County ground
+  // only; switching them on for Pinal would request Maricopa imagery over
+  // Pinal and draw either nothing or the wrong lines.
   const parcelOutlineEnabled = resolvedCounty === 'maricopa' && taxParcelsLayerVisible;
   const isLosAngelesCounty = useMemo(() => {
     const value = typeof projectCounty === 'string' ? projectCounty.toLowerCase() : '';
@@ -837,10 +903,53 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   // Match the Property > Market screen's default search window (3 mi / 180 days)
   // so the map's Recent Sales count agrees with the Market screen's comp count.
-  const { data: sfCompsData } = useSfComps(projectId, {
-    radiusMiles: 3,
-    soldWithinDays: 180,
-  });
+  // MK28 §2 — Comparable Unit Sales is filterable here, as it already is on
+  // the classic Market tab. This map hardcoded {3, 180} and took no filter
+  // input at all: the capability was never wired to this surface, not lost
+  // from it. Same controls (SfCompsFilterControls) and same defaults as the
+  // tile, so the two cannot drift in convention; the state is per-surface —
+  // see that component's note on why it is not lifted into a context.
+  const [sfFilters, setSfFilters] = useState<SfCompsFilters>(SF_COMPS_DEFAULT_FILTERS);
+  const { data: sfCompsData } = useSfComps(projectId, sfFilters);
+
+  // The filters sit under the Comparable Unit Sales row itself rather than in
+  // a separate panel, so the count above them moves as they change — that
+  // adjacency is the whole point. `recent-sales` is the land-dev id for that
+  // row; the income-property equivalent (rent-comps) has no comparable filter
+  // API yet, so it gets no controls rather than dead ones.
+  const renderLayerExtra = useCallback(
+    (layerId: string) =>
+      layerId === 'recent-sales' ? (
+        <div className="layer-item-extra">
+          <SfCompsFilterControls
+            filters={sfFilters}
+            onFiltersChange={setSfFilters}
+            compact
+          />
+        </div>
+      ) : null,
+    [sfFilters]
+  );
+
+  // The legend belongs ON the map, not in the rail (Gregg, 2026-08-17) — it
+  // explains what you are looking at, so it should sit where you are looking.
+  // Thresholds are the live 25th/75th percentiles of the filtered set, so they
+  // move with the filters; naming the colours alone would say nothing about
+  // what a red pin costs.
+  const recentSalesLegend = useMemo(() => {
+    if (!recentSalesLayerVisible || !sfCompsData?.comps?.length) return null;
+    const p25 = sfCompsData.stats?.p25Price ?? null;
+    const p75 = sfCompsData.stats?.p75Price ?? null;
+    const money = (v: number) => `$${Math.round(v).toLocaleString()}`;
+    return [
+      { ...RECENT_SALES_PRICE_TIERS.low, range: p25 != null ? `up to ${money(p25)}` : '' },
+      {
+        ...RECENT_SALES_PRICE_TIERS.mid,
+        range: p25 != null && p75 != null ? `${money(p25)} – ${money(p75)}` : '',
+      },
+      { ...RECENT_SALES_PRICE_TIERS.high, range: p75 != null ? `${money(p75)} and up` : '' },
+    ];
+  }, [recentSalesLayerVisible, sfCompsData]);
 
   const recentSales = useMemo<FeatureCollection | null>(() => {
     if (!recentSalesLayerVisible || !sfCompsData?.comps?.length) return null;
@@ -851,10 +960,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     const features = sfCompsData.comps
       .filter((comp) => Number.isFinite(comp.lat) && Number.isFinite(comp.lng))
       .map((comp, i) => {
-        // Color by price tier: green = below 25th %ile, yellow = 25-75th, red = above 75th
-        let tierColor = '#eab308'; // yellow (mid)
-        if (comp.salePrice <= p25) tierColor = '#22c55e'; // green (low)
-        else if (comp.salePrice >= p75) tierColor = '#ef4444'; // red (high)
+        // Colour by where this price sits among the comps CURRENTLY shown —
+        // lower quarter / middle half / upper quarter. Shared with the legend
+        // (RECENT_SALES_PRICE_TIERS) so the two cannot describe different
+        // colours.
+        let tierColor: string = RECENT_SALES_PRICE_TIERS.mid.color;
+        if (comp.salePrice <= p25) tierColor = RECENT_SALES_PRICE_TIERS.low.color;
+        else if (comp.salePrice >= p75) tierColor = RECENT_SALES_PRICE_TIERS.high.color;
 
         const priceFmt = comp.salePrice ? `$${comp.salePrice.toLocaleString()}` : '';
         const psfFmt = comp.pricePerSqft ? `$${Math.round(comp.pricePerSqft)}/sf` : '';
@@ -1267,21 +1379,16 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
               }
               if (layer.id === 'tax-parcels') return { ...layer, count: taxParcels?.features?.length ?? 0 };
               if (layer.id === 'site-boundary') return { ...layer, count: hasProjectLocation ? 1 : 0 };
+              // MK28 §2 — demo rings moved into Location. Rings are drawn from
+              // the project centre rather than fetched as features, so the
+              // count is "is there a centre to draw them around".
+              if (layer.id === 'demo-rings') return { ...layer, count: hasProjectLocation ? 1 : 0 };
               return layer;
             }),
           };
         }
-        if (group.id === 'comparables') {
-          return {
-            ...group,
-            layers: group.layers.map((layer) => {
-              if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
-              if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
-              if (layer.id === 'land-sales') return { ...layer, count: 0 };
-              return layer;
-            }),
-          };
-        }
+        // MK28 §2 — the 'comparables' group is gone; its layers now live in
+        // Market under their new labels, so every count is assigned here.
         if (group.id === 'market') {
           const sfCount = sfCompsData?.comps?.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)).length ?? 0;
           const compCount = competitorData?.filter((c) => {
@@ -1292,7 +1399,18 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           return {
             ...group,
             layers: group.layers.map((layer) => {
+              // Comparable Sales — whichever id this project type uses.
+              if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
+              // MK24 §3 — this 0 is HARDCODED, not a measured empty. Nothing
+              // in MapTab fetches land sales, so the layer has no source to
+              // count. Wire it to a real query when land sales get one.
+              if (layer.id === 'land-sales') return { ...layer, count: 0 };
+              // Comparable Unit Sales — SFR resales (land) or rentals (income).
               if (layer.id === 'recent-sales') return { ...layer, count: sfCount };
+              if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
+              // Placeholder — nothing fetches permits (MK28 §2). Reports 0 so
+              // it lists as a named, visibly empty row rather than blank.
+              if (layer.id === 'building-permits') return { ...layer, count: 0 };
               if (layer.id === 'competitive-projects') return { ...layer, count: compCount };
               return layer;
             }),
@@ -2036,6 +2154,136 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     const resolved = typeof candidate === 'string' ? candidate.trim() : '';
     return resolved || profileApn;
   }, [project, profileApn]);
+
+  // MK22 — which of the county's parcels is THIS project's. Counties publish
+  // the number in their own spelling: we store 502-07-001-0, the City of
+  // Maricopa publishes 502070010. Compared as typed they never match, and the
+  // parcel simply never highlighted — indistinguishable from the county having
+  // no record of it. sameApn normalises both sides before comparing.
+  const subjectTaxParcelIds = useMemo(() => {
+    if (!subjectApn || !taxParcels?.features?.length) return [] as string[];
+    const ids: string[] = [];
+    for (const feature of taxParcels.features) {
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      // parcel_id is set on every feature by the Django normaliser; the raw
+      // service field is also present and differs per county.
+      const candidates = [props.parcel_id, props.APN, props.AIN, props.parcel_number];
+      if (candidates.some((c) => typeof c === 'string' && sameApn(c, subjectApn))) {
+        const id = typeof props.parcel_id === 'string' ? props.parcel_id : String(feature.id ?? '');
+        if (id) ids.push(id);
+      }
+    }
+    return ids;
+  }, [subjectApn, taxParcels]);
+
+  // ── MK24 §1: the project location point ──────────────────────────────────
+  //
+  // The point is a working estimate that improves as the deal is understood:
+  // a general point for the site, then the centre of the attached parcels,
+  // then wherever a person drops it. Each step persists.
+  //
+  // Precedence, strongest first (Gregg, 2026-08-17):
+  //     manual > parcel > geocoded > typed   (NULL = legacy, weakest)
+  //
+  // A stronger source is never overwritten automatically, so a correction
+  // survives a later parcel attach instead of vanishing silently.
+  const LOCATION_SOURCE_RANK: Record<string, number> = useMemo(
+    () => ({ manual: 4, parcel: 3, geocoded: 2, typed: 1 }),
+    []
+  );
+
+  const currentLocationSource = useMemo(() => {
+    const raw = (project as Record<string, unknown>).location_source;
+    return typeof raw === 'string' && raw ? raw : null;
+  }, [project]);
+
+  const persistProjectLocation = useCallback(
+    async (lng: number, lat: number, source: 'manual' | 'parcel') => {
+      // Never let a weaker source overwrite a stronger one. A hand-placed
+      // point outranks everything, so an automatic parcel move stops here.
+      const incoming = LOCATION_SOURCE_RANK[source] ?? 0;
+      const existing = currentLocationSource
+        ? LOCATION_SOURCE_RANK[currentLocationSource] ?? 0
+        : 0;
+      if (source !== 'manual' && incoming <= existing) return;
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({
+            location_lat: lat,
+            location_lon: lng,
+            location_source: source,
+          }),
+        });
+        if (!res.ok) throw new Error(`PATCH failed (${res.status})`);
+        // Re-read so anything keyed off the project centre (demographics
+        // rings, competitor radius, sf-comps) picks the new point up rather
+        // than leaving a stale ring behind.
+        onProjectUpdated?.();
+      } catch (error) {
+        console.warn('Failed to persist project location:', error);
+      }
+    },
+    [projectId, currentLocationSource, LOCATION_SOURCE_RANK, onProjectUpdated]
+  );
+
+  // Dropped by hand — the most authoritative source there is.
+  const handleProjectLocationMoved = useCallback(
+    (lng: number, lat: number) => {
+      void persistProjectLocation(lng, lat, 'manual');
+    },
+    [persistProjectLocation]
+  );
+
+  // Parcels attached → move the point to their combined centre. ALL of the
+  // project's parcels, not just the primary APN: apn_secondary exists and a
+  // project may hold several, so the centre of one parcel is the wrong point
+  // for a multi-parcel site. Blocked by persistProjectLocation when the point
+  // was placed by hand.
+  const parcelCentroidKey = useMemo(
+    () => subjectTaxParcelIds.join('|'),
+    [subjectTaxParcelIds]
+  );
+
+  useEffect(() => {
+    if (!subjectTaxParcelIds.length || !taxParcels?.features?.length) return;
+    if (currentLocationSource === 'manual') return;
+
+    const own = taxParcels.features.filter((f) => {
+      const id = (f.properties as Record<string, unknown> | null)?.parcel_id;
+      return typeof id === 'string' && subjectTaxParcelIds.includes(id);
+    });
+    if (!own.length) return;
+
+    // Area-weighted centre would be better on wildly unequal parcels; the mean
+    // of the vertex centroids is what the attach flow already implies and is
+    // adequate for placing a marker.
+    let sumLng = 0;
+    let sumLat = 0;
+    let count = 0;
+    for (const feature of own) {
+      try {
+        const c = turf.centroid(feature as turf.AllGeoJSON);
+        const coords = c?.geometry?.coordinates;
+        if (!Array.isArray(coords) || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) {
+          continue;
+        }
+        sumLng += coords[0];
+        sumLat += coords[1];
+        count += 1;
+      } catch {
+        // An unusable outline just doesn't vote.
+      }
+    }
+    if (!count) return;
+
+    void persistProjectLocation(sumLng / count, sumLat / count, 'parcel');
+    // parcelCentroidKey collapses the id array to a stable string so this
+    // fires when the SET of attached parcels changes, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcelCentroidKey, currentLocationSource]);
 
   useEffect(() => {
     if (!subjectApn || !isDevelopmentProject || mapLocationOverride) return;
@@ -3209,10 +3457,20 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         if (!isDevelopmentProject) {
           filteredLayers = filteredLayers.filter((layer) => layer.id !== 'plan-parcels');
         }
-        filteredLayers = filteredLayers.filter((layer) => {
-          if (layer.id === 'tax-parcels') return true;
-          return layer.count === undefined || layer.count > 0;
-        });
+        // A ZERO COUNT IS KEPT, not filtered away.
+        //
+        // This used to drop every layer whose count was 0 (tax-parcels alone
+        // was exempted), and then drop any group left empty. That silently
+        // defeated the whole point of showing "(0)": MK24 made the panel
+        // render a zero count with a muted style, and this deleted those rows
+        // before the panel ever saw them. The visible symptom was the entire
+        // Market group missing on Red Valley — Comparable Sales, Comparable
+        // Unit Sales and Building Permits are all legitimately 0 there, so all
+        // three were removed and the group went with them (reported with a
+        // screenshot, 2026-08-17). Plan Parcels disappeared the same way.
+        //
+        // "None yet" and "not a thing this project tracks" must not look
+        // identical, and a named empty row is the only way to tell them apart.
         return {
           ...group,
           layers: filteredLayers,
@@ -3229,12 +3487,16 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   return (
     <div className="map-tab">
       {/* ─── Sidebar: Layers + Draw Tools ─── */}
-      <div className="map-tab-sidebar">
+      <div
+        className="map-tab-sidebar"
+        style={{ width: sidebarWidth, minWidth: sidebarWidth }}
+      >
         <LayerPanel
           layers={panelLayerState}
           onToggleLayer={handleToggleLayer}
           onToggleGroup={handleToggleGroup}
           onZoomToLayer={handleZoomToLayer}
+          renderLayerExtra={renderLayerExtra}
           sitePlans={sitePlansForLegend}
           onToggleSitePlan={handleToggleSitePlanVisibility}
           onEditSitePlan={handleEditSitePlan}
@@ -3670,6 +3932,17 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       </div>
 
       {/* ─── Map Content Area ─── */}
+      {/* Drag to resize the rail. Sits between the two so it never overlaps
+          either; the cursor is the only affordance, as with the artifacts
+          panel handle. */}
+      <div
+        className="map-tab-sidebar-handle"
+        onPointerDown={handleSidebarResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize layer panel"
+      />
+
       <div className="map-tab-content">
         <MapCanvas
           ref={mapCanvasRef}
@@ -3684,6 +3957,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           projectBoundary={projectBoundary}
           taxParcels={taxParcels}
           selectedTaxParcelIds={selectedTaxParcelIds}
+          subjectTaxParcelIds={subjectTaxParcelIds}
+          onProjectLocationMoved={handleProjectLocationMoved}
           parcelOutlineEnabled={parcelOutlineEnabled}
           saleComps={saleComps}
           rentComps={rentComps}
@@ -3770,6 +4045,24 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
             </div>
           )}
         </div>
+
+        {/* Sale-price legend, on the map itself so it sits where the pins are.
+            Only while the layer is drawn and there is something to explain. */}
+        {recentSalesLegend && (
+          <div className="map-tab-legend">
+            <div className="map-tab-legend-title">Sale price vs. these comps</div>
+            {recentSalesLegend.map((band) => (
+              <div key={band.label} className="map-tab-legend-row">
+                <span
+                  className="map-tab-legend-swatch"
+                  style={{ backgroundColor: band.color }}
+                />
+                <span className="map-tab-legend-label">{band.label}</span>
+                {band.range && <span className="map-tab-legend-range">{band.range}</span>}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* FB-323: in-map competitor detail drawer */}
         <CompetitorDetailPanel

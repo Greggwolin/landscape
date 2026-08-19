@@ -75,6 +75,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     activeMapArtifact,
     activeExcelAudit,
     activeArtifactId,
+    projectRightPanelView,
     setActiveLocationBrief,
     setActiveMapArtifact,
     setActiveExcelAudit,
@@ -127,7 +128,21 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const hasActiveArtifact = activeArtifactId != null;
+    // MK24 §5 — selecting Map collapses the left sidebar for the same reason
+    // an artifact takeover does: the content wants the screen. It restores the
+    // sidebar to whatever he had on the way out, via the snapshot refs already
+    // here, so a sidebar he deliberately widened comes back that width. The
+    // sidebar can still be reopened by hand while the map is showing — that
+    // path already exists for artifact takeover and is untouched.
+    // MK28 §1 — only when the PANEL is actually on screen. projectRightPanelView
+    // is global state, so MK24 keyed the sidebar collapse on it alone and the
+    // takeover also fired on /w/projects/{id}/map, where ProjectArtifactsPanel
+    // is not rendered at all (the route supplies its own map through <main>).
+    // That is the half-width Gregg saw after reopening the panel: a takeover
+    // running for a panel that was not there.
+    const isProjectRootRoute = /^\/w\/projects\/\d+\/?$/.test(pathname);
+    const inMapView = projectRightPanelView === 'map' && isProjectRootRoute;
+    const hasActiveArtifact = activeArtifactId != null || inMapView;
 
     if (hasActiveArtifact && !inTakeoverMode.current) {
       // Entering takeover. Snapshot current panel + sidebar state.
@@ -165,7 +180,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       inTakeoverMode.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeArtifactId]);
+  }, [activeArtifactId, projectRightPanelView, pathname]);
 
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.
@@ -341,6 +356,24 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
       if (page === 'projects') {
         router.push('/w/projects');
+      } else if (page === 'map') {
+        // THE NAV MAP IS NOT A PROJECT'S MAP (Gregg, 2026-08-17).
+        //
+        // It used to fall through to the project-scoped branch below, which
+        // resolves `projectId ?? lastProjectId` — so once you had opened a
+        // project, this icon dragged you back to that project's map from
+        // anywhere, including the dashboard where it is the only place the
+        // icon appears. Opening the nav map on the dashboard landed you in
+        // Red Valley.
+        //
+        // It is meant to be a clean map: any location, parcel selection for
+        // projects that do not exist yet. That surface does not exist yet —
+        // MapTab is project-bound throughout (every fetch and every write is
+        // scoped to one) — so until it is built this goes to the project
+        // picker, which at least states that a project is being chosen rather
+        // than silently assuming one.
+        if (projectId) router.push(`/w/projects/${projectId}/map`);
+        else router.push('/w/projects?goto=map');
       } else if (projectScoped.includes(page)) {
         // FB-308: a project-scoped page (Reports, Map) needs a project. With one
         // active, go straight there; with none, send the user to the project
