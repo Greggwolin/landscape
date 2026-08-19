@@ -299,6 +299,25 @@ def gather_aged_uncommitted(stale_after_days: int = 2,
     }
 
 
+def gather_untracked_sql() -> list[str]:
+    """Untracked .sql files anywhere in the repo (BC3, LSCMD-BC-SQLRECOVER-0818-BC3).
+    This is the recurrence check for the exact failure this session fixed -- a
+    blanket *.sql ignore kept 290 files off git for over a year. The CI guard
+    (SQL Migration Recovery Guard) catches this per-PR for migrations/ and
+    backend/migrations/ specifically; this catches it repo-wide, on a daily
+    cadence, for every path -- the two are complementary, not redundant.
+    """
+    out = _git('status', '--porcelain', '--', '*.sql')
+    paths = []
+    for line in out.splitlines():
+        if line.startswith('??'):
+            path = line[3:].strip()
+            if path.startswith('"') and path.endswith('"'):
+                path = path[1:-1]
+            paths.append(path)
+    return sorted(paths)
+
+
 def gather_stale_prs(min_age_days: int = 3) -> list[dict]:
     """Open PRs sitting ≥ min_age_days (BC1). A green, unreviewable PR has no
     other alarm — §4.10 gates merges on Gregg looking at it, but nothing ever
@@ -1025,6 +1044,27 @@ def render_aged_uncommitted(audit: dict) -> str:
     return ''.join(parts)
 
 
+def render_untracked_sql(paths: list[str]) -> str:
+    """§22.6.3 -- plain English, no bare path dump. This whole section exists
+    because 290 files sat untracked for over a year with nothing saying so;
+    even one hit here is styled as an alarm, not a status line.
+    """
+    if not paths:
+        return '<div class="empty">No untracked database files. The migrations/ guard and this check are both clean.</div>'
+    n = len(paths)
+    file_word = 'file' if n == 1 else 'files'
+    verb = 'exists' if n == 1 else 'exist'
+    rows_html = ''.join(f'<div class="meta-row"><code>{_esc(p)}</code></div>' for p in paths[:20])
+    more = f'<div class="meta-row">...and {n - 20} more</div>' if n > 20 else ''
+    return (
+        f'<div class="item pr-alarm"><div class="body">'
+        f'<div class="what">{n} database {file_word} {verb} on this machine but were never saved to git -- '
+        f'exactly the failure a branch-cleanup pass spent a session recovering from in August 2026.</div>'
+        f'<div class="meta">{rows_html}{more}</div>'
+        f'</div></div>'
+    )
+
+
 def render_stale_prs(rows: list[dict]) -> str:
     """§22.6.3 — every entry is a sentence, never a bare number or hash.
     Green-and-idle reads as the alarm (BC1's whole reason for existing);
@@ -1104,7 +1144,7 @@ def render_html(*, today: date, branch: str, open_feedback: list[dict],
                 resolved_recent: list[dict], wip_rows: list[dict],
                 sessions: list[dict], worktree_count: int,
                 uncommitted: dict, aged_uncommitted: dict,
-                stale_prs: list[dict],
+                stale_prs: list[dict], untracked_sql: list[str],
                 health: dict) -> str:
     in_progress_count = sum(1 for r in open_feedback if r['status'] == 'in_progress')
     summary = render_summary(
@@ -1139,6 +1179,8 @@ def render_html(*, today: date, branch: str, open_feedback: list[dict],
 {render_uncommitted(uncommitted)}
 <h2>Uncommitted ≥ 2 days (aged)</h2>
 {render_aged_uncommitted(aged_uncommitted)}
+<h2>Untracked Database Files</h2>
+{render_untracked_sql(untracked_sql)}
 <h2>PRs open ≥ 3 days ({len(stale_prs)})</h2>
 {render_stale_prs(stale_prs)}
 <h2>System Status</h2>
@@ -1178,6 +1220,7 @@ def main() -> int:
     uncommitted = gather_uncommitted_summary()
     aged_uncommitted = gather_aged_uncommitted()
     stale_prs = gather_stale_prs()
+    untracked_sql = gather_untracked_sql()
     wip_rows = gather_wip_branches()
     sessions = gather_sessions_3day(today)
     worktree_count = count_worktrees()
@@ -1197,6 +1240,7 @@ def main() -> int:
         uncommitted=uncommitted,
         aged_uncommitted=aged_uncommitted,
         stale_prs=stale_prs,
+        untracked_sql=untracked_sql,
         health=health,
     )
     dated, current = write_outputs(html, today)
@@ -1205,6 +1249,7 @@ def main() -> int:
           f"{sum(1 for r in open_feedback if r['status']=='in_progress')} "
           f"resolved_recent={len(resolved_recent)} wip={len(wip_rows)} "
           f"sessions={len(sessions)} stale_prs={len(stale_prs)} "
+          f"untracked_sql={len(untracked_sql)} "
           f"health={health['status']}", file=sys.stderr)
     return 0
 

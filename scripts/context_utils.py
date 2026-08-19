@@ -42,17 +42,22 @@ def read_env_file(path: Path) -> dict[str, str]:
 
 
 def get_database_url(repo_root: Path) -> str | None:
-    env_db = os.environ.get("DATABASE_URL")
+    # BC3 (LSCMD-BC-SQLRECOVER-0818-BC3): the nightly structure export was silently
+    # under-capturing the schema (178/365 tables, 0/41 views) because this function
+    # never checked .env.local -- the file that actually holds the current, correct
+    # connection string -- and only recognized the literal key DATABASE_URL, while
+    # root .env uses NEON_DB_URL. Both gaps are closed below; order matches how the
+    # rest of the app resolves its own DB connection (.env.local first).
+    env_db = os.environ.get("DATABASE_URL") or os.environ.get("NEON_DB_URL")
     if env_db:
         return env_db
 
-    backend_env = read_env_file(repo_root / "backend" / ".env")
-    if backend_env.get("DATABASE_URL"):
-        return backend_env["DATABASE_URL"]
-
-    root_env = read_env_file(repo_root / ".env")
-    if root_env.get("DATABASE_URL"):
-        return root_env["DATABASE_URL"]
+    for rel_path in (Path(".env.local"), Path("backend") / ".env", Path(".env")):
+        env = read_env_file(repo_root / rel_path)
+        if env.get("DATABASE_URL"):
+            return env["DATABASE_URL"]
+        if env.get("NEON_DB_URL"):
+            return env["NEON_DB_URL"]
 
     return None
 

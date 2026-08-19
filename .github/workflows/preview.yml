@@ -35,6 +35,34 @@ env:
 
 jobs:
   # ==========================================================================
+  # JOB 0: SQL Migration Recovery Guard (BC3, LSCMD-BC-SQLRECOVER-0818-BC3)
+  # ==========================================================================
+  # A blanket `*.sql` gitignore rule kept 290 files off this Mac's git history
+  # for over a year -- 124 of them under migrations/, some load-bearing. This
+  # is the layer-1 guard against that recurring: fails fast if any .sql file
+  # exists under migrations/ or backend/migrations/ on disk that git doesn't
+  # know about. No database access, no dependency on any other job.
+  sql-migration-guard:
+    name: SQL Migration Recovery Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fail on untracked migration files
+        run: |
+          untracked=$(comm -23 \
+            <(find migrations backend/migrations -name '*.sql' 2>/dev/null | sort) \
+            <(git ls-files migrations backend/migrations -- '*.sql' | sort))
+          if [ -n "$untracked" ]; then
+            echo "::error::Untracked .sql file(s) found under migrations/ or backend/migrations/ -- these must be committed, not gitignored:"
+            echo "$untracked"
+            exit 1
+          fi
+          echo "No untracked migration files."
+
+
+  # ==========================================================================
   # JOB 1: Create Neon Branch
   # ==========================================================================
   create-database:

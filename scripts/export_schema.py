@@ -109,6 +109,35 @@ def query_db_extras(repo_root: Path) -> tuple[dict[str, int], dict[tuple[str, st
         conn.close()
 
 
+def query_live_object_counts(repo_root: Path) -> tuple[int, int, str | None]:
+    """Independent ground truth for the fail-loud check (BC3): count relkind='r'
+    (tables) and relkind='v' (views) directly against pg_class/pg_namespace. Does
+    not reuse any of the rich-exporter or row_estimates machinery above, so a bug
+    in either of those can't also hide from this check.
+    """
+    try:
+        conn = db_connect(repo_root)
+    except Exception as exc:
+        return -1, -1, str(exc)
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.relkind, count(*)
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'landscape' AND c.relkind IN ('r', 'v')
+                GROUP BY c.relkind
+                """
+            )
+            counts = {relkind: n for relkind, n in cursor.fetchall()}
+        return counts.get("r", 0), counts.get("v", 0), None
+    except Exception as exc:
+        return -1, -1, str(exc)
+    finally:
+        conn.close()
+
+
 def format_column_type(column: dict[str, Any]) -> str:
     data_type = str(column.get("data_type") or "unknown")
     char_len = column.get("character_maximum_length")
@@ -204,7 +233,9 @@ def main() -> int:
 
         if args.json_out:
             write_json(Path(args.json_out).resolve(), snapshot)
-        return 0
+        # BC3: an unavailable-DB run is a failure, not a quiet success -- exit
+        # non-zero so a caller checking the exit code (not just the file text) sees it.
+        return 1
 
     row_estimates, udt_by_column, enum_labels, extras_error = query_db_extras(repo_root)
 
@@ -212,15 +243,21 @@ def main() -> int:
     indexes = rich_schema_data.get("indexes", [])
     constraints = rich_schema_data.get("constraints", [])
     foreign_keys = rich_schema_data.get("foreign_keys", [])
+    views = rich_schema_data.get("views", [])
+    view_names = {str(v.get("view_name")) for v in views}
 
-    # The rich exporter includes column metadata objects that may cover views.
-    # Restrict this report to real base tables when row_estimate metadata is available.
-    base_table_names = set(row_estimates.keys())
-    if base_table_names:
-        tables = [table for table in tables if str(table.get("table_name")) in base_table_names]
-        indexes = [idx for idx in indexes if str(idx.get("table_name")) in base_table_names]
-        constraints = [c for c in constraints if str(c.get("table_name")) in base_table_names]
-        foreign_keys = [fk for fk in foreign_keys if str(fk.get("table_name")) in base_table_names]
+    # BC3 (LSCMD-BC-SQLRECOVER-0818-BC3): this used to intersect against
+    # row_estimates.keys() (a separate pg_class stats query) as a POSITIVE filter --
+    # any table missing a stats row, for any reason, was silently dropped, and every
+    # view was dropped with no way to report them (they were never re-added anywhere
+    # below -- this file had no Views section at all). Views are now identified
+    # directly from the rich exporter's own pg_views query (view_names, above) and
+    # only THOSE are excluded from the table lists; nothing else is filtered out.
+    if view_names:
+        tables = [table for table in tables if str(table.get("table_name")) not in view_names]
+        indexes = [idx for idx in indexes if str(idx.get("table_name")) not in view_names]
+        constraints = [c for c in constraints if str(c.get("table_name")) not in view_names]
+        foreign_keys = [fk for fk in foreign_keys if str(fk.get("table_name")) not in view_names]
 
     indexes_by_table: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for idx in indexes:
@@ -248,10 +285,21 @@ def main() -> int:
     markdown_lines.append(f"- **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S %Z')}")
     markdown_lines.append(f"- **Schema:** landscape")
     markdown_lines.append(f"- **Table Count:** {len(tables)}")
+    markdown_lines.append(f"- **View Count:** {len(views)}")
     markdown_lines.append(f"- **Index Count:** {len(indexes)}")
     markdown_lines.append(f"- **Foreign Key Count:** {len(foreign_keys)}")
     if extras_error:
         markdown_lines.append(f"- **Row Estimates/Enums:** PARTIAL ({extras_error})")
+
+    markdown_lines.append("\n## Views")
+    if views:
+        for view in sorted(views, key=lambda v: str(v.get("view_name"))):
+            markdown_lines.append(f"\n### {view.get('view_name')}")
+            markdown_lines.append("```sql")
+            markdown_lines.append(str(view.get("view_definition") or "").strip())
+            markdown_lines.append("```")
+    else:
+        markdown_lines.append("none captured")
 
     markdown_lines.append("\n## Tables by Domain Prefix")
     for group in GROUP_ORDER:
@@ -345,6 +393,25 @@ def main() -> int:
             )
             table_signatures[table_name] = signature
 
+    # BC3 (LSCMD-BC-SQLRECOVER-0818-BC3) -- fail loudly instead of writing a
+    # silently partial file. A discrepancy here means something upstream (a stats
+    # query, a filter, a schema/permissions boundary) is still dropping objects;
+    # that must show up as a loud header and a non-zero exit, not a quiet number.
+    live_table_count, live_view_count, count_error = query_live_object_counts(repo_root)
+    exit_code = 0
+    if count_error:
+        markdown_lines.insert(1, f"\n## CAPTURE STATUS: COULD NOT VERIFY\n- **Error:** {count_error}\n")
+        exit_code = 1
+    elif live_table_count != len(tables) or live_view_count != len(views):
+        markdown_lines.insert(
+            1,
+            "\n## CAPTURE STATUS: DISCREPANCY DETECTED\n"
+            f"- **Captured:** {len(tables)} tables, {len(views)} views\n"
+            f"- **Live database:** {live_table_count} tables, {live_view_count} views\n"
+            "- **This export is INCOMPLETE. Do not treat the counts below as authoritative.**\n",
+        )
+        exit_code = 1
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(markdown_lines) + "\n", encoding="utf-8")
 
@@ -359,7 +426,7 @@ def main() -> int:
     if args.json_out:
         write_json(Path(args.json_out).resolve(), snapshot)
 
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":
