@@ -3178,14 +3178,17 @@
 .w-plan-preview-excluded ul { margin: 6px 0 4px; padding-left: 18px; }
 .w-plan-preview-actions { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 
-/* ── Plan preview: the geometry, not the drawing (MK55) ─────────────────────
-   The window used to show the scanned sheet with lots shaded over it, so the
-   recovery could be checked by eye. That check has been made and passed, and
-   there is nothing to act on while looking again — so this draws the recovered
-   geometry itself, which is the artifact that gets draped. Colour separates
-   how each lot was established: traced is the file speaking, positional is us
-   working it out from its neighbours, and those are different claims. */
+/* ── Plan preview: geometry drawn over the sheet it came from ───────────────
+   Colour separates how each lot was established: traced is the file speaking,
+   positional is us working it out from its neighbours, and those are different
+   claims. The outlines sit ON the plat — an earlier revision floated them on a
+   plain field, which reduces the check to a count. Over the drawing, a lot in
+   the wrong place is visible at a glance. When the sheet cannot be rendered
+   the geometry still draws, on its own background. */
 .w-plan-preview-geometry { display: block; width: 100%; height: auto; background: var(--cui-body-bg); }
+.w-plan-preview-canvas.has-image .w-plan-preview-geometry {
+  position: absolute; inset: 0; width: 100%; height: 100%; background: transparent;
+}
 .w-plan-lot { stroke-width: 1.1; }
 .w-plan-lot.is-traced     { fill: rgba(220, 38, 38, 0.20); stroke: rgba(190, 24, 24, 0.90); }
 .w-plan-lot.is-positional { fill: rgba(217, 119, 6, 0.22); stroke: rgba(180, 83, 9, 0.90); }

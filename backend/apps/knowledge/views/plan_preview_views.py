@@ -216,6 +216,29 @@ def build_preview(reading, doc, draped: Optional[dict[int, int]] = None) -> dict
     outlined_numbers = {n for page in reading.rings_by_sheet.values() for n in page}
     no_outline = sorted(set(reading.table.areas) - outlined_numbers)
     reconciles = recovered_total + len(no_outline) == scheduled
+
+    # Refusals are a log of ATTEMPTS, not a statement of outcome, and reporting
+    # the log's length is wrong twice over. On this plat it summed to 60 when
+    # 51 distinct lots had ever been declined — the naming pass tries a lot from
+    # more than one pair of anchors and appends it once per failed try — and of
+    # those 51, 23 were recovered afterwards by another pass. A lot the reader
+    # went on to establish is not a refusal, and listing it as one invites the
+    # reader of the window to hunt for 60 missing lots when 38 are missing.
+    #
+    # So: report what is still outstanding, keep the attempt count behind it,
+    # and name separately the lots that were never attempted at all — those are
+    # the ones no pass has an opinion about, and they were previously invisible.
+    refusal_attempts = [
+        {"lots": list(lots), "reason": reason}
+        for lots, reason in getattr(reading, "infill_refusals", []) or []
+    ]
+    refused_any = {n for group in refusal_attempts for n in group["lots"]}
+    outstanding = [
+        {**group, "lots": [n for n in group["lots"] if n not in outlined_numbers]}
+        for group in refusal_attempts
+    ]
+    outstanding = [group for group in outstanding if group["lots"]]
+    never_attempted = sorted(set(no_outline) - refused_any)
     return {
         "sheets": sheets,
         "excluded_sheets": excluded,
@@ -254,10 +277,19 @@ def build_preview(reading, doc, draped: Optional[dict[int, int]] = None) -> dict
                 "are shown separately rather than guessed into place."
             ),
         },
-        "refusals": [
-            {"lots": list(lots), "reason": reason}
-            for lots, reason in getattr(reading, "infill_refusals", []) or []
-        ],
+        "refusals": outstanding,
+        "refusal_summary": {
+            # Distinct lots declined by some pass and still without an outline.
+            "still_refused": len(refused_any - outlined_numbers),
+            # Declined once, established later — reported so the number moving
+            # between passes is visible rather than looking like a discrepancy.
+            "recovered_after_refusal": len(refused_any & outlined_numbers),
+            # In the schedule, no outline, and no pass ever declined them with
+            # a reason. Nothing has an opinion about these.
+            "never_attempted": len(never_attempted),
+            "never_attempted_lots": never_attempted[:200],
+            "attempts": sum(len(group["lots"]) for group in refusal_attempts),
+        },
         "unplaced": {
             "count": len(no_outline),
             "lot_numbers": no_outline[:200],

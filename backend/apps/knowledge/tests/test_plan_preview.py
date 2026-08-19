@@ -132,6 +132,49 @@ def test_counts_reconcile_to_the_schedule():
     assert payload["unplaced"]["lot_numbers"] == [3, 4]
 
 
+def test_refusals_report_the_outcome_not_the_number_of_attempts():
+    """A refusal list is a log of tries, and reporting its length lies twice.
+
+    Red Valley summed it to 60 against 286 scheduled and 38 without an outline:
+    the naming pass appends a lot once per failed try, so lots repeat, and 23 of
+    the lots in the log were established later by another pass. Sixty is larger
+    than the number of lots actually missing, which sends the reader of the
+    window hunting for lots that are not lost.
+
+    So the reported figure must reconcile to the lots with no outline: still
+    refused plus never reached equals unplaced, and nothing recovered appears.
+    """
+    doc = _Doc([_page("SHEET NO. 1 OF 1")])
+    reading = _reading(
+        areas={1: 5000, 2: 5000, 3: 5000, 4: 5000, 5: 5000},
+        rings={0: {1: SQUARE, 2: SQUARE}},  # 1 and 2 recovered; 3, 4, 5 are not
+        sheets=[0],
+        scans=[SimpleNamespace(page=0, is_lot_sheet=True, reason="lots")],
+    )
+    reading.infill_refusals = [
+        ([2], "declined by the naming pass — recovered later by another"),
+        ([3], "no unbroken chain runs to lot 3"),
+        ([3], "declined again on a second attempt from the other side"),
+        ([4], "no unbroken chain runs to lot 4"),
+        # lot 5 is never mentioned: nothing declined it, nothing found it
+    ]
+    payload = build_preview(reading, doc)
+    summary = payload["refusal_summary"]
+
+    assert summary["attempts"] == 4  # the raw log, kept but not headlined
+    assert summary["still_refused"] == 2  # lots 3 and 4, counted once each
+    assert summary["recovered_after_refusal"] == 1  # lot 2
+    assert summary["never_attempted"] == 1  # lot 5
+    assert summary["never_attempted_lots"] == [5]
+    assert (
+        summary["still_refused"] + summary["never_attempted"]
+        == payload["unplaced"]["count"]
+    )
+    listed = {n for group in payload["refusals"] for n in group["lots"]}
+    assert 2 not in listed, "a lot established later is not a refusal"
+    assert listed == {3, 4}
+
+
 def test_lots_with_no_outline_are_not_attributed_to_a_sheet():
     """The drawing never tied them to a page, so no sheet may claim them."""
     doc = _Doc([_page("SHEET NO. 1 OF 1")])

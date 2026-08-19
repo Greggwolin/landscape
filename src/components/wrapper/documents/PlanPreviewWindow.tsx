@@ -11,14 +11,15 @@
  * up until lots are drawn on a map, where a missing sheet looks like a hole in
  * the subdivision and gets diagnosed as a mapping fault.
  *
- * It used to show the scanned sheet with the recovered lots shaded over it,
- * so the recovery could be checked by eye. That check has been made and it
- * passed, and looking at the drawing again buys nothing while there is no way
- * to act on what you see. So this now shows the GEOMETRY — the artifact that
- * will be draped — and not the drawing it came from. Colour separates how each
- * lot was established, because "we traced this" and "we worked this one out
- * from its neighbours" are different claims and only one of them is the file
- * speaking.
+ * The sheet is drawn UNDERNEATH the recovered geometry, and that is the point
+ * of the window: outlines floating on a dark field can only be checked against
+ * a count, while outlines sitting on the plat they came from can be checked
+ * against the drawing — a lot in the wrong place, a run that stops early, a
+ * shape that is nothing like the block beneath it. An earlier revision dropped
+ * the image on the reasoning that the check had been made once; that is not
+ * what this window is for, and it goes back. Colour separates how each lot was
+ * established, because "we traced this" and "we worked this one out from its
+ * neighbours" are different claims and only one of them is the file speaking.
  *
  * The sheets are NOT joined into one plan, deliberately. Nothing in the drawing
  * fixes how they sit relative to one another, and a guessed offset produces a
@@ -77,6 +78,13 @@ interface PreviewPayload {
   };
   assembly: { established: boolean; reason: string };
   refusals: { lots: number[]; reason: string }[];
+  refusal_summary?: {
+    still_refused: number;
+    recovered_after_refusal: number;
+    never_attempted: number;
+    never_attempted_lots: number[];
+    attempts: number;
+  };
   unplaced: { count: number; note: string; lot_numbers: number[] };
 }
 
@@ -98,6 +106,7 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
   const [index, setIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [sheetImage, setSheetImage] = useState<string | null>(null);
   const [draping, setDraping] = useState(false);
   // The fetched PNG per sheet, kept so the Drape hand-off reuses the bytes the
   // window already downloaded rather than fetching the same sheet twice.
@@ -128,10 +137,10 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
 
   const sheet: PreviewSheet | undefined = data?.sheets[index];
 
-  // The sheet image is no longer displayed — this window shows the geometry,
-  // not the drawing. It is still fetched, but only when Drape is pressed,
-  // because the trace canvas needs the page as a picture. Fetching it here
-  // would download 1.5 MB per sheet that nothing renders.
+  // One sheet at a time, cached by page. The endpoint needs a bearer token so
+  // the URL cannot go straight into an <img src>; the bytes are fetched and
+  // handed over as an object URL. The same cache serves the Drape hand-off, so
+  // pressing Drape after looking at a sheet costs no second download.
   const fetchSheetImage = useCallback(async (pdfPage: number): Promise<Blob | null> => {
     if (blobs.current[pdfPage]) return blobs.current[pdfPage];
     const target = data?.sheets.find((x) => x.pdf_page === pdfPage);
@@ -144,6 +153,29 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
   }, [data]);
 
   useEffect(() => () => { objectUrls.current.forEach(URL.revokeObjectURL); }, []);
+
+  // Load the picture of whichever sheet is on screen. Failure is not fatal —
+  // the geometry still renders on its own, with a line saying the drawing
+  // could not be fetched, because a preview that shows nothing at all when the
+  // renderer hiccups is worse than one that shows the outlines unbacked.
+  useEffect(() => {
+    if (!sheet) return;
+    let live = true;
+    setSheetImage(null);
+    setImageError(null);
+    (async () => {
+      const blob = await fetchSheetImage(sheet.pdf_page);
+      if (!live) return;
+      if (!blob) {
+        setImageError('This sheet could not be rendered, so the outlines are shown on their own.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      objectUrls.current.push(url);
+      setSheetImage(url);
+    })();
+    return () => { live = false; };
+  }, [sheet, fetchSheetImage]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -251,11 +283,22 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
 
             <div className="w-plan-preview-stage">
               {imageError && <p className="w-plan-preview-error">{imageError}</p>}
-              <div className="w-plan-preview-canvas" style={{ width: `${zoom * 100}%` }}>
-                {/* The geometry itself, on its own ground — this is the artifact
-                    that will be draped, not a picture of the sheet it came from.
-                    The viewBox IS page-point space, so nothing has to be scaled
-                    by hand and no render setting can shift a polygon. */}
+              <div
+                className={`w-plan-preview-canvas${sheetImage ? ' has-image' : ''}`}
+                style={{ width: `${zoom * 100}%` }}
+              >
+                {/* The sheet itself, beneath. Both layers are the same page, so
+                    the image at its natural aspect and a viewBox in page points
+                    line up with nothing scaled by hand — which is exactly why
+                    the overlay can be trusted as a check: any misalignment on
+                    screen is a misalignment in the geometry, not in the render. */}
+                {sheetImage && (
+                  // Not next/image: the source is an object URL for bytes this
+                  // component fetched with a bearer token, which the optimizer
+                  // cannot fetch for itself.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sheetImage} alt={`${sheet.sheet_label} of the drawing`} />
+                )}
                 <svg
                   className="w-plan-preview-geometry"
                   viewBox={`0 0 ${sheet.page_width_pts} ${sheet.page_height_pts}`}
@@ -338,18 +381,56 @@ export function PlanPreviewWindow({ docId, onClose }: { docId: string; onClose: 
                 {!data.assembly.established && (
                   <p className="w-plan-preview-warn">{data.assembly.reason}</p>
                 )}
-                {data.refusals.length > 0 && (
+                {(data.refusals.length > 0 || (data.refusal_summary?.never_attempted ?? 0) > 0) && (
                   <details className="w-plan-preview-excluded">
+                    {/* The count here is the OUTCOME, not the number of times a
+                        pass declined something. Summing the attempt log said 60
+                        on this plat: the same lot is appended once per failed
+                        try, and 23 of the lots in it were established later by
+                        another pass. Neither is a missing lot, and a number
+                        larger than the 38 without an outline sends the reader
+                        looking for lots that are not lost. */}
                     <summary>
-                      {data.refusals.reduce((n, r) => n + r.lots.length, 0)} lots were refused
-                      rather than guessed at
+                      Of the {data.unplaced.count} with no outline,{' '}
+                      {data.refusal_summary?.still_refused
+                        ?? data.refusals.reduce((n, r) => n + r.lots.length, 0)}{' '}
+                      were refused rather than guessed at
+                      {(data.refusal_summary?.never_attempted ?? 0) > 0 && (
+                        <> and {data.refusal_summary?.never_attempted} were never reached</>
+                      )}
                     </summary>
+                    {(data.refusal_summary?.recovered_after_refusal ?? 0) > 0 && (
+                      <p>
+                        A further {data.refusal_summary?.recovered_after_refusal} were declined by
+                        one pass and established by a later one, so they are recovered and are not
+                        counted here.
+                      </p>
+                    )}
                     <ul>
-                      {data.refusals.slice(0, 40).map((r) => (
-                        <li key={r.lots.join(',')}>
+                      {/* Keyed by position, not by the lots named.
+                          The same lot can legitimately be refused twice for
+                          two different reasons — lot 435 is refused once by
+                          the naming pass and once by the outline pass — so a
+                          key built from the lot numbers collides, and React
+                          drops one of the two rows. Losing a refusal is worse
+                          than losing an ordinary row: this list is the record
+                          of what the reader declined to guess at, and a reason
+                          silently missing from it reads as a lot that was
+                          never in question. */}
+                      {data.refusals.slice(0, 40).map((r, i) => (
+                        <li key={`${i}-${r.lots.join(',')}`}>
                           <strong>{r.lots.join(', ')}</strong> — {r.reason}
                         </li>
                       ))}
+                      {(data.refusal_summary?.never_attempted_lots?.length ?? 0) > 0 && (
+                        <li>
+                          <strong>
+                            {data.refusal_summary?.never_attempted_lots.slice(0, 40).join(', ')}
+                          </strong>
+                          {' — never reached: no pass declined these with a reason, so nothing has '}
+                          an opinion about them yet.
+                        </li>
+                      )}
                     </ul>
                   </details>
                 )}
