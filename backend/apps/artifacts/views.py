@@ -691,6 +691,17 @@ def _walk_path(schema, path):
 # string, not decimal-coerced; see _write_budget_cell.
 _EDITABLE_BUDGET_CELL_COLUMNS = {
     'qty', 'rate', 'uom_code',
+    # Slice 2b. `notes` (the line's DESCRIPTION) becomes writable here for the
+    # first time -- it was deliberately read-only while only its counterpart
+    # was editable. Both halves of the cross-over are now live, which is why
+    # the mapping is asserted in both directions.
+    'notes', 'division_id', 'activity', 'category_id', 'vendor_name',
+    'timing_method', 'start_date', 'end_date', 'cf_start_flag',
+    'curve_profile', 'curve_steepness', 'growth_rate_set_id',
+    'escalation_method',
+    # The OVERRIDE half of escalation. Writing it clears growth_rate_set_id --
+    # see the branch in _write_budget_cell for why they can never coexist.
+    'escalation_rate',
     # Budget slice 2. These are the REAL COLUMN names, not the artifact's cell
     # keys — the artifact calls them start / duration / notes. The cell-key →
     # column mapping lives in exactly one place (budget_artifact_builder.
@@ -706,7 +717,49 @@ _EDITABLE_BUDGET_CELL_COLUMNS = {
 _BUDGET_PERIOD_COLUMNS = {'start_period', 'periods_to_complete'}
 
 # Free-text budget cells, written as strings rather than decimal-coerced.
-_BUDGET_TEXT_COLUMNS = {'internal_memo'}
+_BUDGET_TEXT_COLUMNS = {'internal_memo', 'notes', 'vendor_name'}
+
+# Constrained by a CHECK on the table, so an invalid value is refused by the
+# database. Validated here first to give a readable reason instead of a 500.
+_BUDGET_ENUM_COLUMNS = {
+    'curve_profile': ('standard', 'front_loaded', 'back_loaded'),
+    'escalation_method': ('to_start', 'through_duration'),
+    # No CHECK on timing_method; these are the values in use.
+    'timing_method': ('distributed', 'curve', 'end_loaded'),
+}
+
+# Foreign keys. Written as integers; an id that does not exist is refused by
+# the constraint and surfaces inline.
+_BUDGET_FK_COLUMNS = {'division_id', 'category_id'}
+
+_BUDGET_DATE_COLUMNS = {'start_date', 'end_date'}
+
+# Stage values that can ACTUALLY be saved.
+#
+# Four definitions of this vocabulary exist and no two agree (measured
+# 2026-08-19/20):
+#   * backend VALID_ACTIVITIES      -- has 'Improvements', no 'Development'
+#   * database chk_budget_lifecycle_stage -- has 'Development', no 'Improvements'
+#   * frontend LIFECYCLE_STAGES     -- five values, no 'Planning & Engineering'
+#   * the data itself               -- only 'Development' (153) and
+#                                      'Planning & Engineering' (153)
+#
+# The app and the database are mutually incompatible on two of six values:
+# writing 'Improvements' passes the allowlist and is then rejected by the CHECK;
+# writing 'Development' is refused by the allowlist even though every row that
+# has a stage uses it. Offering either would hand the user a choice that fails.
+#
+# So this slice offers only the INTERSECTION -- the values both accept -- and
+# leaves reconciling the vocabularies to a decision that is not this slice's to
+# make. Reported rather than papered over.
+WRITABLE_ACTIVITIES = frozenset({
+    'Acquisition', 'Planning & Engineering', 'Operations',
+    'Disposition', 'Financing',
+})
+_BUDGET_BOOL_COLUMNS = {'cf_start_flag'}
+
+# 0-100, per core_fin_fact_budget_curve_steepness_check.
+_BUDGET_PERCENT_COLUMNS = {'curve_steepness'}
 
 # What to call a period column in a message aimed at a person.
 _PERIOD_COLUMN_LABEL = {
@@ -759,6 +812,95 @@ def _resolve_cell_source_ref(schema, cell_path):
     return source_ref, None
 
 
+def _resolve_rate_set(project_id, set_id):
+    """Resolve a growth-rate set to the single scalar the engine reads.
+
+    Returns ``{'rate': Decimal, 'name': str}`` or an error envelope. Refuses a
+    graduated (multi-step) set: the engine applies ONE annual rate per line
+    (``_apply_inflation(amount, period, annual_rate)``), so flattening a stepped
+    schedule to its first step would misstate every later period while looking
+    like it worked.
+    """
+    from django.db import connection as _conn
+    with _conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT s.set_name, s.project_id, count(st.*) AS steps,
+                   min(st.rate) AS rate
+            FROM landscape.core_fin_growth_rate_sets s
+            LEFT JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = s.set_id
+            WHERE s.set_id = %s
+            GROUP BY s.set_name, s.project_id
+            """, [int(set_id)])
+        row = cursor.fetchone()
+    if not row:
+        return {'success': False, 'error': 'invalid_value',
+                'detail': f'rate set {set_id} does not exist.'}
+    name, owner, steps, rate = row[0], row[1], int(row[2] or 0), row[3]
+    if owner is not None and project_id is not None and int(owner) not in (0, int(project_id)):
+        return {'success': False, 'error': 'invalid_value',
+                'detail': f'rate set {name!r} belongs to another project.'}
+    if steps == 0 or rate is None:
+        return {'success': False, 'error': 'invalid_value',
+                'detail': f'rate set {name!r} has no rate defined yet.'}
+    if steps > 1:
+        return {
+            'success': False, 'error': 'graduated_set_unsupported',
+            'detail': (
+                f'{name!r} is a graduated schedule ({steps} steps). The cash-flow '
+                'engine applies one annual rate per line, so a stepped set cannot '
+                'be followed yet without misstating the later periods. Choose a '
+                'single-rate set, or type a rate directly to override.'),
+            'suggested_user_question': (
+                f'{name} steps over time, and a budget line can only follow a '
+                'single rate today — shall I use a flat rate instead?'),
+        }
+    # UNITS. core_fin_growth_rate_steps.rate is a FRACTION (0.03);
+    # core_fin_fact_budget.escalation_rate is a PERCENTAGE (3), which is what
+    # the engine divides by 100 ("escalation_rate in DB is stored as percentage
+    # (3 = 3%)" -- land_dev_cashflow_service._spread_cost). Measured, not
+    # assumed: every stored escalation_rate is 0/3/3.5/7.5 while every step
+    # rate is 0.03. Copying the fraction straight across would understate
+    # escalation by 100x, silently.
+    return {'rate': rate * 100, 'name': name}
+
+
+def _write_budget_columns(*, project_id, fact_id, user_id, values, label,
+                          meta=None):
+    """Write several budget columns as ONE update through the existing writer.
+
+    Used where a single cell owns more than one column -- escalation writes the
+    reference and its derived rate together, so the two can never be observed
+    disagreeing.
+    """
+    from apps.landscaper.tool_executor import handle_update_budget_item
+    payload = {'fact_id': fact_id, 'reason': f'Inline edit: {label}'}
+    payload.update(values)
+    # handle_update_budget_item drops None values (it filters `v is not None`),
+    # so clearing a column cannot go through it. Clear directly, still scoped to
+    # the allowlisted columns resolved above.
+    nulls = {k: v for k, v in values.items() if v is None}
+    setts = {k: v for k, v in values.items() if v is not None}
+    if setts:
+        result = handle_update_budget_item(
+            {**{'fact_id': fact_id, 'reason': f'Inline edit: {label}'}, **setts},
+            int(project_id), propose_only=False, user_id=user_id)
+        if not result.get('success'):
+            return {'success': False, 'error': 'db_error',
+                    'detail': result.get('error') or 'budget write failed'}
+    if nulls:
+        from django.db import connection as _conn
+        assignments = ', '.join(f'{k} = NULL' for k in nulls)
+        with _conn.cursor() as cursor:
+            cursor.execute(
+                f'UPDATE landscape.core_fin_fact_budget SET {assignments} '
+                'WHERE fact_id = %s', [int(fact_id)])
+    out = {'success': True, 'coerced_value': next(iter(values.values()), None)}
+    if meta:
+        out['meta'] = meta
+    return out
+
+
 def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
     """Write one budget INPUT cell (qty/rate/uom_code) via the existing writer.
 
@@ -805,6 +947,140 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
                 'detail': 'UOM cannot be empty — choose a unit of measure.',
             }
         value_to_write = code
+    elif column == 'activity':
+        # The writer's allowlist is the authority on what can be SAVED. 153 live
+        # rows carry 'Development', which is not on it; those are shown in the
+        # picklist as legacy so a user can SEE the stored value, but saving one
+        # is still refused rather than quietly promoting it to valid.
+        text = '' if raw_value is None else str(raw_value).strip()
+        if not text:
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': 'Stage cannot be empty — choose one.'}
+        if text not in WRITABLE_ACTIVITIES:
+            return {
+                'success': False, 'error': 'invalid_value',
+                'detail': (f'{text!r} cannot be saved as a stage. Stages both '
+                           f'the application and the database accept: '
+                           f'{", ".join(sorted(WRITABLE_ACTIVITIES))}.'),
+                'suggested_user_question': (
+                    f'{text} is not one of the current stages — which should '
+                    'this line use?'),
+            }
+        value_to_write = text
+    elif column == 'escalation_rate':
+        # Typing a rate is an explicit departure from the library, so it CLEARS
+        # the reference. Keeping both would let the label go on naming a set
+        # whose rate the line no longer uses -- two halves of one record
+        # agreeing with each other while being wrong about the world.
+        from .field_writers import _coerce_decimal
+        raw_text = '' if raw_value is None else str(raw_value).strip()
+        if not raw_text:
+            return _write_budget_columns(
+                project_id=project_id, fact_id=fact_id_int, user_id=user_id,
+                values={'escalation_rate': None, 'growth_rate_set_id': None},
+                label='escalation cleared')
+        try:
+            coerced = _coerce_decimal(raw_value)
+        except ValueError as exc:
+            return {'success': False, 'error': 'invalid_value', 'detail': str(exc)}
+        if coerced is None:
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': 'Escalation rate must be a number.'}
+        return _write_budget_columns(
+            project_id=project_id, fact_id=fact_id_int, user_id=user_id,
+            values={'escalation_rate': coerced, 'growth_rate_set_id': None},
+            label='escalation override',
+            meta={'escalation_ref': {'mode': 'override', 'set_id': None,
+                                     'set_name': None, 'rate': float(coerced)}})
+    elif column == 'growth_rate_set_id':
+        # THE ESCALATION REFERENCE.
+        #
+        # A line either FOLLOWS a named rate set or carries its own rate --
+        # never both. Following stores the reference AND refreshes the derived
+        # escalation_rate, because the cash-flow engine reads that scalar and
+        # nothing else (land_dev_cashflow_service._spread_cost and its
+        # TypeScript twin both read escalation_rate; neither has ever read
+        # growth_rate_set_id). Storing the reference alone would be a control
+        # that persists and changes no number.
+        #
+        # A graduated (multi-step) set cannot collapse to one scalar, so it is
+        # refused with a reason rather than silently flattened to its first
+        # step -- which would understate or overstate every later period.
+        raw_text = '' if raw_value is None else str(raw_value).strip()
+        if not raw_text:
+            # Clearing the reference leaves the line with no escalation at all;
+            # the project default then applies, which is the engine's fallback.
+            return _write_budget_columns(
+                project_id=project_id, fact_id=fact_id_int, user_id=user_id,
+                values={'growth_rate_set_id': None, 'escalation_rate': None},
+                label='escalation cleared')
+        try:
+            set_id = int(raw_text)
+        except (TypeError, ValueError):
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': f'escalation must reference a rate set; got {raw_text!r}.'}
+        resolved = _resolve_rate_set(project_id, set_id)
+        if resolved.get('error'):
+            return resolved
+        return _write_budget_columns(
+            project_id=project_id, fact_id=fact_id_int, user_id=user_id,
+            values={'growth_rate_set_id': set_id,
+                    'escalation_rate': resolved['rate']},
+            label=f"escalation follows {resolved['name']}",
+            meta={'escalation_ref': {'mode': 'followed', 'set_id': set_id,
+                                     'set_name': resolved['name'],
+                                     'rate': float(resolved['rate'])}})
+    elif column in _BUDGET_ENUM_COLUMNS:
+        allowed = _BUDGET_ENUM_COLUMNS[column]
+        text = '' if raw_value is None else str(raw_value).strip()
+        if not text:
+            value_to_write = None
+        elif text not in allowed:
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': (f'{column} must be one of {", ".join(allowed)}; '
+                               f'got {text!r}.')}
+        else:
+            value_to_write = text
+    elif column in _BUDGET_FK_COLUMNS:
+        text = '' if raw_value is None else str(raw_value).strip()
+        if not text:
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': f'{column} cannot be empty — choose a value.'}
+        try:
+            value_to_write = int(text)
+        except (TypeError, ValueError):
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': f'{column} must be an id; got {text!r}.'}
+    elif column in _BUDGET_DATE_COLUMNS:
+        text = '' if raw_value is None else str(raw_value).strip()
+        if not text:
+            value_to_write = None
+        else:
+            from datetime import date as _date
+            try:
+                value_to_write = _date.fromisoformat(text[:10])
+            except ValueError:
+                return {'success': False, 'error': 'invalid_value',
+                        'detail': f'{column} must be a date (YYYY-MM-DD); got {text!r}.'}
+    elif column in _BUDGET_BOOL_COLUMNS:
+        text = '' if raw_value is None else str(raw_value).strip().lower()
+        if text in ('1', 'true', 'yes', 'on'):
+            value_to_write = True
+        elif text in ('0', 'false', 'no', 'off', ''):
+            value_to_write = False
+        else:
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': f'{column} must be true or false; got {text!r}.'}
+    elif column in _BUDGET_PERCENT_COLUMNS:
+        from .field_writers import _coerce_decimal
+        try:
+            coerced = _coerce_decimal(raw_value)
+        except ValueError as exc:
+            return {'success': False, 'error': 'invalid_value', 'detail': str(exc)}
+        if coerced is None or not (0 <= coerced <= 100):
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': f'{column} must be between 0 and 100.'}
+        value_to_write = coerced
     elif column in _BUDGET_TEXT_COLUMNS:
         # Free text. An empty note is a legitimate value (clearing a note), so
         # unlike UOM it is not an error — it is written as NULL, which is what
