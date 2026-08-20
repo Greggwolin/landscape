@@ -105,3 +105,70 @@ export function budgetColumnOptions(
   }
   return null;
 }
+
+/* ─── Staleness (UB4 finding 1) ──────────────────────────────────────────── */
+
+/**
+ * Whether the STORED block schema can back every cell the view specification
+ * says this surface offers for editing.
+ *
+ * WHY THIS CHECK HAS TO EXIST
+ * ---------------------------
+ * The two payloads are written together, but only one of them is REWRITTEN.
+ * `_refresh_artifact_after_write` rebuilds the artifact after every commit, so
+ * a budget saved before a builder change keeps its old block schema until
+ * somebody happens to edit it. Slice 2 added refs for start / duration / notes;
+ * an artifact stored before that has refs for qty / rate / uom only.
+ *
+ * Rendered naively, that artifact shows Rate and UOM with the dashed
+ * editable underline and Start and Duration without it — and nothing on screen
+ * says why. The user cannot tell a field that is read-only by design from one
+ * that is broken, which is the worse outcome: half a table looking complete.
+ * (Observed exactly this way in QA: Rate and UOM editable, Start and Dur not,
+ * until an unrelated commit rebuilt the artifact and they silently came alive.)
+ *
+ * So: all of it, or none of it, with a reason.
+ */
+export interface BudgetEditability {
+  /** The stored schema backs every offered cell — safe to render editable. */
+  usable: boolean;
+  /** Offered cells with no ref behind them, e.g. ['duration','notes','start']. */
+  missing: string[];
+}
+
+/**
+ * What THIS BUILD offers for editing on a budget schedule.
+ *
+ * Deliberately a constant here rather than a read of the stored view
+ * specification's per-row `editable` list. That list is itself part of the
+ * artifact, written when the artifact was built — so on the very artifacts this
+ * check exists to catch, it is as out of date as the refs are. Trusting it
+ * makes a stale artifact look self-consistent: the old view spec offers only
+ * rate and UOM, the old block schema backs exactly those, and the mismatch that
+ * matters (against what the product now offers) goes unnoticed. That is the
+ * shape of the bug found in QA.
+ *
+ * Mirrors backend `budget_artifact_builder._EDITABLE_BUDGET_COLUMNS` and the
+ * per-row `editable` list emitted by `schedule_view_spec`. The two are asserted
+ * against each other in backend `test_budget_cell_mapping.py`; change them
+ * together.
+ */
+export const BUDGET_EDITABLE_CELLS = [
+  'uom', 'rate', 'start', 'duration', 'notes', 'qty',
+] as const;
+
+export function budgetEditability(
+  schema: BlockDocument | null | undefined,
+  rows: Array<{ id: string }> | null | undefined,
+): BudgetEditability {
+  if (!schema || !Array.isArray(rows) || rows.length === 0) {
+    return { usable: false, missing: [] };
+  }
+  const missing = new Set<string>();
+  for (const row of rows) {
+    for (const cellKey of BUDGET_EDITABLE_CELLS) {
+      if (!budgetCellTarget(schema, row.id, cellKey)) missing.add(cellKey);
+    }
+  }
+  return { usable: missing.size === 0, missing: [...missing].sort() };
+}

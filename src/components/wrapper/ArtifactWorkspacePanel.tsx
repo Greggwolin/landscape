@@ -201,14 +201,19 @@ export function ArtifactWorkspacePanel({
   const commitFieldEditsMutation = useArtifactCommitFieldEdits();
 
   // Transient impact banner (CB6) — one-line engine delta after a cell commit
-  // (e.g. "Cash-flow NPV +$12,400 → $3,420,000"). Auto-clears after a few
-  // seconds; the user can also dismiss it. Cleared when switching artifacts.
+  // (e.g. "Cash-flow NPV +$12,400 → $3,420,000").
+  //
+  // PERSISTS until the user dismisses it or the next commit replaces it (UB4
+  // finding 2). It used to clear itself after 7 seconds, which quietly undid
+  // the reason it exists: the line's job is to PROVE the write happened,
+  // especially for a timing edit whose effect is invisible on the row that was
+  // edited. A proof that disappears before it is read is the silent-commit
+  // problem wearing a different hat — and the multi-clause timing form
+  // ("… starts period 30 (was 7), ends 38" plus the NPV clause) is exactly the
+  // case that needs more than seven seconds.
+  //
+  // Still cleared when switching artifacts: it describes THAT artifact's write.
   const [impactBanner, setImpactBanner] = useState<string | null>(null);
-  useEffect(() => {
-    if (!impactBanner) return;
-    const t = setTimeout(() => setImpactBanner(null), 7000);
-    return () => clearTimeout(t);
-  }, [impactBanner]);
   useEffect(() => {
     setImpactBanner(null);
   }, [activeArtifactId]);
@@ -483,7 +488,7 @@ export function ArtifactWorkspacePanel({
           <div
             role="status"
             onClick={() => setImpactBanner(null)}
-            title="Dismiss"
+            title="Click to dismiss"
             style={{
               display: 'flex',
               alignItems: 'center',

@@ -7,7 +7,7 @@ import styles from './ScheduleArtifact.module.css';
 import { hierCellText, hierHeaderLabels } from './hierPath';
 import { withExtraColumns } from './columnOrder';
 import { buildLevelRows } from './levelRows';
-import { budgetCellTarget, budgetColumnOptions } from './budgetCellTarget';
+import { budgetCellTarget, budgetColumnOptions, budgetEditability } from './budgetCellTarget';
 import { useStagedEdits, stagedKey, type CommitEditsFn } from './useStagedEdits';
 
 /**
@@ -212,10 +212,22 @@ export function ScheduleArtifact({
     () => budgetColumnOptions(schema, 'uom'),
     [schema],
   );
-  /* Editing is possible only when there is somewhere to send it AND a schema
-   * to resolve refs from. Both absent in slice-1-era callers, which therefore
-   * keep the read-only behaviour they had. */
-  const canEdit = Boolean(onCommitFieldEdits && schema);
+  /* Editing is possible only when there is somewhere to send it, a schema to
+   * resolve refs from, AND that schema can back EVERY cell this surface offers.
+   *
+   * The last condition is the UB4 fix. The stored block schema is only rewritten
+   * when something commits, so a budget saved before slice 2 still carries refs
+   * for qty/rate/uom alone. Rendering that artifact cell-by-cell gave a table
+   * where Rate and UOM were editable and Start and Duration silently were not —
+   * indistinguishable, from the user's side, from a bug. All or none, with a
+   * reason shown. */
+  const editability = useMemo(
+    () => budgetEditability(schema, config.rows),
+    [schema, config.rows],
+  );
+  const canEdit = Boolean(onCommitFieldEdits && schema) && editability.usable;
+  const staleForEditing = Boolean(onCommitFieldEdits && schema)
+    && !editability.usable;
 
   /* Rows in scope. Scope addresses LEVELS, never names. */
   const visibleRows = useMemo(() => {
@@ -600,6 +612,20 @@ export function ScheduleArtifact({
 
   return (
     <div className={styles.root} style={{ position: 'relative' }}>
+      {/* A stored artifact that predates the current builder cannot back every
+        * editable cell. Say so once, plainly, instead of letting the user
+        * discover it one dead cell at a time. */}
+      {staleForEditing && (
+        <div className={styles.staleNotice} role="status">
+          This budget was saved before these fields became editable, so it is
+          read-only. Ask for the budget schedule again to refresh it
+          {editability.missing.length > 0
+            ? ` (missing: ${editability.missing.join(', ')})`
+            : ''}
+          .
+        </div>
+      )}
+
       {/* ── Commit bar (slice 2) ──
         * Appears only once something is staged. Nothing posts on a keystroke:
         * the whole set lands through ONE batch request, which is what makes a

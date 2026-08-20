@@ -88,6 +88,33 @@ class BudgetCellColumnMapping(SimpleTestCase):
             {'qty', 'rate', 'uom', 'start', 'duration', 'notes'},
         )
 
+    def test_the_view_spec_offers_exactly_what_the_builder_backs(self):
+        """The renderer decides editability from the refs; the view spec tells
+        the user what is on offer. If those two lists drift, the surface either
+        advertises cells it cannot write or hides ones it can — the second is
+        what shipped in slice 1 and what UB4 found in QA.
+
+        The FRONTEND carries the same list as BUDGET_EDITABLE_CELLS in
+        src/components/wrapper/budgetCellTarget.ts (it cannot read this one).
+        All three change together.
+        """
+        from apps.landscaper.tools.schedule_view_spec import build_budget_view_config
+        config = build_budget_view_config(
+            project_id=990201,
+            project_name='fixture',
+            records=[_record()],
+            total_budget=197000.0,
+            lot_count=None,
+            levels=[],
+        )
+        offered = set(config['rows'][0]['editable'])
+        self.assertEqual(offered, set(_EDITABLE_BUDGET_COLUMNS))
+        self.assertEqual(
+            offered,
+            {'uom', 'rate', 'start', 'duration', 'notes', 'qty'},
+            'frontend BUDGET_EDITABLE_CELLS must be updated to match',
+        )
+
     def test_every_ref_points_at_the_mapped_column(self):
         """The refs are generated FROM the mapping, so this proves the whole
         table at once rather than one entry at a time."""

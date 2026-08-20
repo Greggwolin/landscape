@@ -556,3 +556,16 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* A budget stored before these fields became editable. Stated once, at the top,
+ * rather than discovered one dead cell at a time. */
+.staleNotice {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--cui-body-color);
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-left: 3px solid var(--cui-warning);
+  border-radius: 4px;
+}

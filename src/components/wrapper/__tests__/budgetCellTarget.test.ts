@@ -1,5 +1,10 @@
 import type { BlockDocument } from '@/types/artifact';
-import { budgetCellTarget, budgetColumnOptions } from '../budgetCellTarget';
+import {
+  BUDGET_EDITABLE_CELLS,
+  budgetCellTarget,
+  budgetColumnOptions,
+  budgetEditability,
+} from '../budgetCellTarget';
 
 /**
  * The client half of the fail-closed rule.
@@ -138,5 +143,103 @@ describe('budgetColumnOptions', () => {
 
   it('returns null with no schema', () => {
     expect(budgetColumnOptions(null, 'uom')).toBeNull();
+  });
+});
+
+/* ─── UB4 finding 1 — stored artifact vs. what the surface offers ────────── */
+
+/**
+ * The bug this pins down was NOT in budgetCellTarget — that module was correct
+ * throughout. It was in the gap between the two payloads on one artifact
+ * record: `params_json.budget_view_config` said Start / Duration / Notes were
+ * editable while `current_state_json` (written by an older builder) carried refs
+ * for qty / rate / uom only. Rendered cell by cell, that produced a table where
+ * Rate and UOM were editable and Start and Duration silently were not.
+ *
+ * So these tests feed BOTH payloads, the way the renderer receives them, and
+ * assert the verdict the renderer acts on.
+ */
+
+/** The view specification's rows — only their ids matter to the verdict. */
+const viewRows = () => [{ id: 'b1' }, { id: 'b2' }];
+
+/** A block schema written by an older builder: refs for qty/rate/uom only, and
+ *  no start/duration/notes columns at all. Exactly what was on disk in QA. */
+const staleSchema = (): BlockDocument => {
+  const s = schema() as unknown as {
+    blocks: Array<{ type?: string; columns?: Array<{ key: string }>; rows?: Array<{
+      cells: Record<string, unknown>;
+      cell_source_refs?: Record<string, unknown>;
+    }> }>;
+  };
+  const table = s.blocks.find((b) => b.type === 'table')!;
+  table.columns = table.columns!.filter(
+    (c) => !['start', 'duration', 'notes'].includes(c.key),
+  );
+  for (const row of table.rows!) {
+    if (!row.cell_source_refs) continue;
+    row.cell_source_refs = Object.fromEntries(
+      Object.entries(row.cell_source_refs).filter(([k]) =>
+        ['qty', 'rate', 'uom'].includes(k)),
+    );
+  }
+  return s as unknown as BlockDocument;
+};
+
+describe('budgetEditability', () => {
+  it('accepts a schema that backs every offered cell', () => {
+    // b2 in the fixture carries no refs at all, so use a rows list that only
+    // claims what b1 offers -- the point here is the complete-schema case.
+    const v = budgetEditability(schema(), [{ id: 'b1' }]);
+    expect(v).toEqual({ usable: true, missing: [] });
+  });
+
+  it('REJECTS a pre-slice-2 schema, naming what is missing', () => {
+    // The regression. Before the fix this rendered half-editable with nothing
+    // on screen to say why.
+    const v = budgetEditability(staleSchema(), [{ id: 'b1' }]);
+    expect(v.usable).toBe(false);
+    expect(v.missing).toEqual(['duration', 'notes', 'start']);
+  });
+
+  it('is all-or-nothing: one unbacked cell disqualifies the surface', () => {
+    // Rate and UOM ARE backed on the stale schema. They must still not render
+    // editable, because a table that is editable in patches reads as broken.
+    const stale = staleSchema();
+    expect(budgetCellTarget(stale, 'b1', 'rate')).not.toBeNull();
+    expect(budgetCellTarget(stale, 'b1', 'uom')).not.toBeNull();
+    expect(budgetEditability(stale, [{ id: 'b1' }]).usable).toBe(false);
+  });
+
+  it('rejects when a row the view offers is absent from the stored schema', () => {
+    const v = budgetEditability(schema(), [{ id: 'b99' }]);
+    expect(v.usable).toBe(false);
+    expect(v.missing).toEqual([...BUDGET_EDITABLE_CELLS].sort());
+  });
+
+  it('does NOT trust the stored view spec, which can be stale too', () => {
+    // The artifact seen in QA had BOTH payloads old: the view spec claimed only
+    // rate + UOM were editable and the block schema backed exactly those. Judged
+    // against the stored claim it looks fine; judged against what this build
+    // offers it is stale, which is the answer that matters.
+    expect(budgetEditability(staleSchema(), [{ id: 'b1' }]).usable).toBe(false);
+  });
+
+  it('rejects an artifact with no stored schema at all', () => {
+    expect(budgetEditability(null, viewRows()).usable).toBe(false);
+    expect(budgetEditability(undefined, viewRows()).usable).toBe(false);
+  });
+
+  it('rejects when there are no rows to check', () => {
+    expect(budgetEditability(schema(), []).usable).toBe(false);
+    expect(budgetEditability(schema(), null).usable).toBe(false);
+  });
+
+  it('a row with no refs at all is missing everything, not nothing', () => {
+    // b2 carries no cell_source_refs. Silently passing it would let an artifact
+    // with one good row and one dead row render as fully editable.
+    const v = budgetEditability(schema(), [{ id: 'b2' }]);
+    expect(v.usable).toBe(false);
+    expect(v.missing).toEqual([...BUDGET_EDITABLE_CELLS].sort());
   });
 });
