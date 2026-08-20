@@ -64,9 +64,101 @@ class _DisableMigrations:
         return None
 
 
+# --- 3. Refuse to build the test database on a hosted/production server ------
+#
+# pytest-django creates its scratch database on whatever server DATABASE_URL
+# points at, naming it `test_<dbname>`. In this repo DATABASE_URL normally
+# points at the production Neon project, so simply running `pytest` in this
+# directory creates `test_land_v2` **on production** — which is exactly what
+# happened: `test_land_v2` and `test_test_land_v2` were both found sitting in
+# the live Neon project on 2026-08-20, the second one ten months old.
+#
+# CI is already hermetic (.github/workflows/preview.yml JOB 4 runs the suite
+# against a throwaway `postgres:16` service container), so this guard only
+# ever fires on a developer machine.
+
+_DISPOSABLE_HOSTS = frozenset({
+    '',            # unix socket / no host given
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    'postgres',    # docker-compose / GH Actions service container
+    'db',          # docker-compose convention
+    'host.docker.internal',
+})
+
+_ALLOW_REMOTE_SENTINEL = 'i-know-this-is-not-production'
+
+
+def _is_disposable_db_host(host):
+    """True when a test database on `host` can be created and dropped freely.
+
+    Pure function, no Django import — unit-testable on its own.
+    """
+    return (host or '').strip().lower() in _DISPOSABLE_HOSTS
+
+
+def _point_tests_at_a_disposable_database():
+    """Redirect the suite to TEST_DATABASE_URL if given, then hard-stop if the
+    resulting server is not disposable.
+
+    Runs inside ``pytest_configure``, before pytest-django opens any
+    connection, so nothing is created on the wrong server before we bail.
+    """
+    import pytest
+    from django.conf import settings
+
+    override = os.environ.get('TEST_DATABASE_URL', '').strip()
+    if override:
+        import dj_database_url
+        replacement = dj_database_url.parse(override)
+        # Keep the custom backend that sets search_path to the landscape schema.
+        replacement['ENGINE'] = settings.DATABASES['default'].get(
+            'ENGINE', 'db_backend'
+        )
+        settings.DATABASES['default'] = replacement
+
+    db = settings.DATABASES['default']
+    host = db.get('HOST') or ''
+
+    if _is_disposable_db_host(host):
+        return
+
+    if os.environ.get('ALLOW_TESTS_ON_REMOTE_DB') == _ALLOW_REMOTE_SENTINEL:
+        return
+
+    raise pytest.UsageError(
+        "\n"
+        "Refusing to run the test suite against a remote database server.\n"
+        "\n"
+        f"  DATABASE_URL currently points at : {host}/{db.get('NAME')}\n"
+        "\n"
+        "pytest-django would create a scratch database called\n"
+        f"  test_{db.get('NAME')}\n"
+        "on that server. If that server is the production Neon project, the\n"
+        "scratch database is created inside production and is left behind\n"
+        "whenever a run is interrupted.\n"
+        "\n"
+        "Point the suite at a throwaway Postgres instead, either by exporting\n"
+        "TEST_DATABASE_URL for this run:\n"
+        "\n"
+        "  TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/landscape pytest\n"
+        "\n"
+        "or by setting DATABASE_URL to a local server. CI already does this\n"
+        "(.github/workflows/preview.yml, JOB 4).\n"
+        "\n"
+        "If you genuinely mean to test against a remote server, set\n"
+        f"  ALLOW_TESTS_ON_REMOTE_DB={_ALLOW_REMOTE_SENTINEL}\n"
+    )
+
+
 def pytest_configure(config):
     from django.conf import settings
     from django.apps import apps as django_apps
+
+    # Must come first: everything below assumes we are allowed to build a
+    # test database on the configured server.
+    _point_tests_at_a_disposable_database()
 
     # Build tables from model state (skips the raw-SQL/unmanaged migration baggage).
     settings.MIGRATION_MODULES = _DisableMigrations()
