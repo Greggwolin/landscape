@@ -495,6 +495,10 @@ export function ArtifactWorkspacePanel({
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 600,
+              // The impact line is one string carrying several clauses, newline
+              // separated (schedule first, then what it did to the money). A
+              // flex row collapses those into one run of text.
+              whiteSpace: 'pre-line',
               color: 'var(--cui-success, #2e7d32)',
               background: 'var(--cui-success-bg-subtle, rgba(46,125,50,0.12))',
               border: '1px solid var(--cui-success-border-subtle, rgba(46,125,50,0.35))',
@@ -547,6 +551,17 @@ export function ArtifactWorkspacePanel({
             config={
               (active.params_json as { budget_view_config: ScheduleViewConfig })
                 .budget_view_config
+            }
+            // Slice 2 editing. The BLOCK SCHEMA comes along because that is
+            // where the per-cell source refs live and where the server resolves
+            // a write — the view specification carries no refs of its own. The
+            // commit callback is the SAME panel-level batch helper the generic
+            // renderer uses, so there is one write path and one impact banner,
+            // not a budget-specific copy of either.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
             }
             onClose={() => setActiveArtifactId(null)}
           />

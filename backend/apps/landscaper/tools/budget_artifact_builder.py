@@ -87,10 +87,37 @@ def _period_label(record: Dict[str, Any]) -> str:
 # rejected by the database. The artifact carries the allowed codes on the column
 # so the renderer can offer a dropdown instead of letting the user type into a
 # foreign key.
-_EDITABLE_BUDGET_COLUMNS = ('qty', 'rate', 'uom')
+_EDITABLE_BUDGET_COLUMNS = (
+    'qty', 'rate', 'uom',
+    # Budget slice 2. `start`/`duration` are the cash-flow SPREADING inputs
+    # (land_dev_cashflow_service._spread_cost and its TypeScript twin
+    # src/lib/financial-engine/cashflow/costs.ts read them), and a second
+    # trigger — trg_budget_calculate_end_period — derives end_period from the
+    # pair on every write. `notes` is the WHY of a line, distinct from the
+    # description that names it; see the mapping below, which is where that
+    # distinction is actually enforced.
+    'start', 'duration', 'notes',
+)
 
 # Artifact cell key → the real column it writes, where they differ.
-_BUDGET_CELL_TO_COLUMN = {'uom': 'uom_code'}
+#
+# ⚠️ THE ONE PLACE THIS MAPPING LIVES. Two entries CROSS OVER: the artifact's
+# `description` is the column `notes`, and the artifact's `notes` is the column
+# `internal_memo`. Getting this wrong does not fail loudly — it overwrites the
+# line's description with the user's note and looks like it worked. Any cell key
+# absent from _EDITABLE_BUDGET_COLUMNS gets no ref and therefore cannot be
+# written at all, so an unmapped key fails closed rather than falling through to
+# a same-named column. Asserted in test_budget_cell_column_mapping.
+_BUDGET_CELL_TO_COLUMN = {
+    'uom': 'uom_code',
+    'start': 'start_period',
+    'duration': 'periods_to_complete',
+    'notes': 'internal_memo',
+}
+
+# Cells captured as raw text rather than coerced to a number. Everything else in
+# _EDITABLE_BUDGET_COLUMNS is numeric.
+_TEXTUAL_BUDGET_CELLS = frozenset({'uom', 'notes'})
 
 
 def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any]:
@@ -113,8 +140,11 @@ def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any
             'row_id': fact_id,
             'column': column,
             'captured_at': captured_at,
-            # Numeric cells capture a number; the picklist captures its code.
-            'captured_value': raw if cell_key == 'uom' else _num(raw),
+            # Numeric cells capture a number; the picklist captures its
+            # code and the free-text note captures its string.
+            'captured_value': (
+                raw if cell_key in _TEXTUAL_BUDGET_CELLS else _num(raw)
+            ),
         }
     return refs
 
@@ -165,6 +195,17 @@ def build_budget_artifact_schema(
                 'rate': _num(r.get('rate')),
                 'amount': _num(r.get('amount')),
                 'period': _period_label(r),
+                # Budget slice 2. These three carry cell_source_refs, and
+                # schema_validation requires every ref to name a DECLARED
+                # column on the block — so they are real columns here, not
+                # refs hanging off a table that does not show them. That
+                # keeps the two budget surfaces consistent: the same fields
+                # are editable on the block renderer and on the view spec.
+                'start': r.get('start_period'),
+                'duration': r.get('periods_to_complete'),
+                # The user's NOTE (internal_memo), not the line's description
+                # (which is the `notes` column and renders as `description`).
+                'notes': r.get('internal_memo'),
             },
         })
 
@@ -192,6 +233,12 @@ def build_budget_artifact_schema(
                     {'key': 'rate', 'label': 'Rate', 'align': 'right'},
                     {'key': 'amount', 'label': 'Amount', 'align': 'right'},
                     {'key': 'period', 'label': 'Period', 'align': 'right'},
+                    # Slice 2 editable columns. `period` above stays as the
+                    # human-readable span; these are the two numbers behind it
+                    # plus the free-text note.
+                    {'key': 'start', 'label': 'Start', 'align': 'right'},
+                    {'key': 'duration', 'label': 'Dur', 'align': 'right'},
+                    {'key': 'notes', 'label': 'Notes', 'align': 'left'},
                 ],
                 'rows': rows,
             },

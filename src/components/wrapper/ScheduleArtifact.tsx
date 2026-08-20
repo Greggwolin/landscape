@@ -2,10 +2,13 @@
 
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
+import type { BlockDocument } from '@/types/artifact';
 import styles from './ScheduleArtifact.module.css';
 import { hierCellText, hierHeaderLabels } from './hierPath';
 import { withExtraColumns } from './columnOrder';
 import { buildLevelRows } from './levelRows';
+import { budgetCellTarget, budgetColumnOptions } from './budgetCellTarget';
+import { useStagedEdits, stagedKey, type CommitEditsFn } from './useStagedEdits';
 
 /**
  * ScheduleArtifact — one topic plus one view specification.
@@ -122,6 +125,19 @@ export interface ScheduleViewConfig {
 interface Props {
   config: ScheduleViewConfig;
   onClose?: () => void;
+  /**
+   * The artifact's BLOCK SCHEMA. Slice 2 needs it because that is where the
+   * per-cell `cell_source_refs` live, and the server resolves a write against
+   * the stored schema — not against this view specification. See
+   * budgetCellTarget for why the mapping goes through the shared `b{n}` row id.
+   * Absent (an older artifact, or a caller that has not wired it) → the table
+   * renders exactly as slice 1 did, read-only.
+   */
+  schema?: BlockDocument | null;
+  /** Clears staging when the panel switches artifacts. */
+  artifactId?: number;
+  /** Batch commit. Without it nothing is editable — staging has nowhere to go. */
+  onCommitFieldEdits?: CommitEditsFn;
 }
 
 /* ─── Formatting ───────────────────────────────────────────────────────── */
@@ -166,7 +182,13 @@ function formatTimestamp(iso: string): string {
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
-export function ScheduleArtifact({ config, onClose }: Props) {
+export function ScheduleArtifact({
+  config,
+  onClose,
+  schema,
+  artifactId,
+  onCommitFieldEdits,
+}: Props) {
   // The view specification, held as state. Chat composes it; these controls
   // tune what came back.
   // A level holds a SET of chosen members, not one. Selecting two villages
@@ -176,7 +198,24 @@ export function ScheduleArtifact({ config, onClose }: Props) {
   const [grouping, setGrouping] = useState<string>(config.default_grouping);
   const [extraColumns, setExtraColumns] = useState<string[]>([]);
   const [derivationRow, setDerivationRow] = useState<ScheduleRow | null>(null);
-  const [editHint, setEditHint] = useState<string | null>(null);
+
+  /* ── Editing (slice 2) ───────────────────────────────────────────────────
+   * The store is the SHARED one (useStagedEdits), not a second copy living in
+   * this file. `editingKey` is the single cell currently open for typing —
+   * local view state, deliberately not in the shared store, which holds only
+   * what has been staged.
+   */
+  const staging = useStagedEdits(onCommitFieldEdits, artifactId);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string>('');
+  const uomOptions = useMemo(
+    () => budgetColumnOptions(schema, 'uom'),
+    [schema],
+  );
+  /* Editing is possible only when there is somewhere to send it AND a schema
+   * to resolve refs from. Both absent in slice-1-era callers, which therefore
+   * keep the read-only behaviour they had. */
+  const canEdit = Boolean(onCommitFieldEdits && schema);
 
   /* Rows in scope. Scope addresses LEVELS, never names. */
   const visibleRows = useMemo(() => {
@@ -457,30 +496,96 @@ export function ScheduleArtifact({ config, onClose }: Props) {
       );
     }
 
-    const editable = (row.editable ?? []).includes(column.key);
     const text = numeric ? formatNumber(raw) : formatText(raw);
-    return (
-      <td key={column.key} className={align}>
-        {editable ? (
-          <span
-            className={styles.editable}
-            role="button"
-            tabIndex={0}
-            onClick={() => setEditHint(
-              'Editing this schedule arrives in the next slice — this view is read-only for now.',
-            )}
-            onKeyDown={(e) => { if (e.key === 'Enter') setEditHint(
-              'Editing this schedule arrives in the next slice — this view is read-only for now.',
-            ); }}
-          >
-            {text}
-          </span>
-        ) : (
+
+    /* What is editable is decided by the SERVER's per-cell refs, resolved
+     * through the block schema — not by a list in this file. `row.editable`
+     * from the view spec is only the slice-1 affordance hint; if the two ever
+     * disagree, the refs win, because the refs are what the write path will
+     * actually accept. */
+    const target = canEdit ? budgetCellTarget(schema, row.id, column.key) : null;
+    if (!target) {
+      return (
+        <td key={column.key} className={align}>
           <span className={raw === null || raw === undefined || raw === ''
             ? styles.emptyCell : undefined}
           >
             {text}
           </span>
+        </td>
+      );
+    }
+
+    const key = stagedKey(target.cellPath);
+    const entry = staging.staged[key];
+    const options = column.key === 'uom' ? uomOptions : null;
+
+    const commitDraft = (value: string) => {
+      staging.stageEdit(target.cellPath, value, raw, target.expectedRef);
+      setEditingKey(null);
+    };
+
+    if (editingKey === key) {
+      return (
+        <td key={column.key} className={align}>
+          {options ? (
+            <select
+              className={styles.cellInput}
+              autoFocus
+              value={draft}
+              onChange={(e) => commitDraft(e.target.value)}
+              onBlur={() => setEditingKey(null)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setEditingKey(null); }}
+            >
+              {options.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className={styles.cellInput}
+              autoFocus
+              value={draft}
+              inputMode={numeric ? 'numeric' : undefined}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => commitDraft(draft)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitDraft(draft);
+                if (e.key === 'Escape') setEditingKey(null);
+              }}
+            />
+          )}
+        </td>
+      );
+    }
+
+    /* Staged: show the typed value, and keep the PRIOR value visible beside it.
+     * The user staged several edits before committing; they must be able to see
+     * what each one is replacing without undoing it to look. */
+    const openEditor = () => {
+      setDraft(entry ? entry.value : String(raw ?? ''));
+      setEditingKey(key);
+    };
+
+    return (
+      <td key={column.key} className={align}>
+        <span
+          className={entry ? styles.stagedCell : styles.editable}
+          role="button"
+          tabIndex={0}
+          title={entry ? 'Staged — commit to save' : 'Double-click to edit'}
+          onDoubleClick={openEditor}
+          onKeyDown={(e) => { if (e.key === 'Enter') openEditor(); }}
+        >
+          {entry ? entry.value : text}
+        </span>
+        {entry && (
+          <span className={styles.priorValue} title="Value before this edit">
+            was {text}
+          </span>
+        )}
+        {entry?.error && (
+          <span className={styles.cellError}>{entry.error}</span>
         )}
       </td>
     );
@@ -495,6 +600,36 @@ export function ScheduleArtifact({ config, onClose }: Props) {
 
   return (
     <div className={styles.root} style={{ position: 'relative' }}>
+      {/* ── Commit bar (slice 2) ──
+        * Appears only once something is staged. Nothing posts on a keystroke:
+        * the whole set lands through ONE batch request, which is what makes a
+        * single impact line for the set meaningful. */}
+      {staging.stagedCount > 0 && (
+        <div className={styles.commitBar} role="region" aria-label="Staged changes">
+          <span className={styles.commitCount}>
+            {staging.stagedCount} change{staging.stagedCount === 1 ? '' : 's'} staged
+          </span>
+          <span className={styles.commitActions}>
+            <button
+              type="button"
+              className={styles.commitButton}
+              disabled={staging.committing}
+              onClick={() => { void staging.commitStaged(); }}
+            >
+              {staging.committing ? 'Saving…' : 'Commit'}
+            </button>
+            <button
+              type="button"
+              className={styles.discardButton}
+              disabled={staging.committing}
+              onClick={staging.discardStaged}
+            >
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className={styles.head}>
         <div className={styles.kicker}>
@@ -725,7 +860,6 @@ export function ScheduleArtifact({ config, onClose }: Props) {
       </div>
 
 
-      {editHint && <div className={styles.hint}>{editHint}</div>}
 
       {rung === 'summary' && summary.droppedZero > 0 && (
         <div className={styles.excluded}>
@@ -756,7 +890,67 @@ export function ScheduleArtifact({ config, onClose }: Props) {
             <dl className={styles.popList}>
               <dt>Quantity</dt>
               <dd>
-                {formatNumber(derivationRow.derivation?.quantity)}
+                {/* Quantity is edited HERE, not in the table: slice 1 rev 4
+                  * removed the quantity columns from the table and moved the
+                  * number into this popover, which is where it is actually
+                  * wanted. It stages into the same shared store as every table
+                  * cell and lands in the same batch. */}
+                {(() => {
+                  const target = canEdit
+                    ? budgetCellTarget(schema, derivationRow.id, 'qty')
+                    : null;
+                  const qty = derivationRow.derivation?.quantity ?? null;
+                  if (!target) return formatNumber(qty);
+                  const key = stagedKey(target.cellPath);
+                  const entry = staging.staged[key];
+                  if (editingKey === key) {
+                    return (
+                      <input
+                        className={styles.cellInput}
+                        autoFocus
+                        inputMode="numeric"
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={() => {
+                          staging.stageEdit(target.cellPath, draft, qty, target.expectedRef);
+                          setEditingKey(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            staging.stageEdit(target.cellPath, draft, qty, target.expectedRef);
+                            setEditingKey(null);
+                          }
+                          if (e.key === 'Escape') setEditingKey(null);
+                        }}
+                      />
+                    );
+                  }
+                  return (
+                    <>
+                      <span
+                        className={entry ? styles.stagedCell : styles.editable}
+                        role="button"
+                        tabIndex={0}
+                        title={entry ? 'Staged — commit to save' : 'Double-click to edit'}
+                        onDoubleClick={() => {
+                          setDraft(entry ? entry.value : String(qty ?? ''));
+                          setEditingKey(key);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setDraft(entry ? entry.value : String(qty ?? ''));
+                            setEditingKey(key);
+                          }
+                        }}
+                      >
+                        {entry ? entry.value : formatNumber(qty)}
+                      </span>
+                      {entry && (
+                        <span className={styles.priorValue}>was {formatNumber(qty)}</span>
+                      )}
+                    </>
+                  );
+                })()}
                 {derivationRow.derivation?.uom
                   ? ` ${String(derivationRow.derivation.uom).replace('$/', '')}` : ''}
               </dd>
@@ -782,7 +976,8 @@ export function ScheduleArtifact({ config, onClose }: Props) {
               </>
             )}
             <div className={styles.popFoot}>
-              The amount is quantity × rate. Change the rate or the unit of
+              The amount is quantity × rate, recomputed by the database — it is
+              never typed directly. Change the quantity, the rate or the unit of
               measure to move it.
             </div>
           </div>

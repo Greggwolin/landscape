@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback, useContext, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useContext, useRef } from 'react';
 import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
 import type {
   ArtifactRendererProps,
@@ -20,6 +20,7 @@ import type {
   TableRow,
   TextBlock,
 } from '@/types/artifact';
+import { useStagedEdits, stagedKey, type StagedEdit } from './useStagedEdits';
 import styles from './ArtifactRenderer.module.css';
 
 /**
@@ -39,16 +40,12 @@ import styles from './ArtifactRenderer.module.css';
  * through BlockList → Block → Section → Table. kv-pair edits are unaffected —
  * they still commit immediately via onCommitFieldEdit.
  */
-interface StagedEdit {
-  path: string[];
-  value: string;
-  /** CC13: the source_ref this cell was showing when the user typed. Sent with
-   *  the commit so the server can refuse if that position now resolves to a
-   *  different row (schedules reorder on write). */
-  expectedRef?: SourceRef;
-  /** Inline reason when this cell's commit failed (kept staged + dirty). */
-  error?: string;
-}
+// The staging STORE now lives in useStagedEdits, shared with ScheduleArtifact
+// (budget slice 2) so there is one implementation of the stage/commit rule
+// rather than two. The context below is this renderer's own concern: its
+// EditableCell sits under BlockList -> Block -> Section -> Table and cannot be
+// prop-drilled to. ScheduleArtifact renders its cells directly and needs no
+// context, which is why the context did not move with the store.
 interface StagingContextValue {
   /** Keyed by path.join('/'). */
   staged: Record<string, StagedEdit>;
@@ -63,7 +60,6 @@ interface StagingContextValue {
   active: boolean;
 }
 const StagingContext = React.createContext<StagingContextValue | null>(null);
-const stagedKey = (path: string[]) => path.join('/');
 
 export function ArtifactRenderer(props: ArtifactRendererProps) {
   const {
@@ -87,89 +83,16 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     headerExtras,
   } = props;
 
-  // ── CB8 staging state ──────────────────────────────────────────────────
-  const [staged, setStaged] = useState<Record<string, StagedEdit>>({});
-  const [committing, setCommitting] = useState(false);
+  // ── CB8 staging state (shared store — see useStagedEdits) ──────────────
+  const {
+    staged,
+    stageEdit,
+    discardStaged,
+    commitStaged,
+    stagedCount,
+    committing,
+  } = useStagedEdits(onCommitFieldEdits, artifactId);
 
-  // Clear staging when switching to a different artifact.
-  useEffect(() => {
-    setStaged({});
-  }, [artifactId]);
-
-  const stageEdit = useCallback(
-    (
-      path: string[],
-      newValue: string,
-      committed: string | number | null,
-      expectedRef?: SourceRef,
-    ) => {
-      const key = stagedKey(path);
-      const committedStr = committed == null ? '' : String(committed);
-      setStaged((prev) => {
-        const next = { ...prev };
-        if (newValue === committedStr) {
-          // Reverted to the committed value — drop it from staging.
-          delete next[key];
-        } else {
-          next[key] = { path, value: newValue, expectedRef };
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const discardStaged = useCallback(() => setStaged({}), []);
-
-  const commitStaged = useCallback(async () => {
-    if (!onCommitFieldEdits) return;
-    const entries = Object.values(staged);
-    if (!entries.length) return;
-    setCommitting(true);
-    try {
-      const edits = entries.map((e) => ({
-        cell_path: e.path,
-        new_value: e.value,
-        expected_ref: e.expectedRef,
-      }));
-      const resp = await onCommitFieldEdits(edits);
-      if (!resp?.success) {
-        // Batch-level rejection (e.g. duplicate_target) — keep everything
-        // staged and annotate each cell with the reason.
-        const msg = resp?.detail || resp?.error || 'Commit failed.';
-        setStaged((prev) => {
-          const next: Record<string, StagedEdit> = {};
-          for (const [k, v] of Object.entries(prev)) next[k] = { ...v, error: msg };
-          return next;
-        });
-        return;
-      }
-      // Per-edit results: clear the ones that landed, keep the failed ones
-      // staged + dirty with their reason. Never silently drop a typed edit.
-      const results = resp.results || [];
-      setStaged((prev) => {
-        const next: Record<string, StagedEdit> = {};
-        for (const [k, v] of Object.entries(prev)) {
-          const r = results.find(
-            (rr) => Array.isArray(rr.cell_path) && rr.cell_path.join('/') === k,
-          );
-          if (r && r.status === 'error') {
-            next[k] = {
-              ...v,
-              error: r.suggested_user_question || r.detail || r.error || 'Could not save.',
-            };
-          }
-          // applied (or unmatched) → cleared; the refetched artifact shows the
-          // canonical committed value.
-        }
-        return next;
-      });
-    } finally {
-      setCommitting(false);
-    }
-  }, [onCommitFieldEdits, staged]);
-
-  const stagedCount = Object.keys(staged).length;
   const stagingValue = useMemo<StagingContextValue>(
     () => ({ staged, stageEdit, active: stagedCount > 0 }),
     [staged, stageEdit, stagedCount],

@@ -465,3 +465,94 @@
   color: var(--cui-secondary-color);
   white-space: nowrap;
 }
+
+/* ─── Editing (slice 2) ─────────────────────────────────────────────────── */
+
+/* A staged cell reads as the user's typed value, not yet the record's value —
+ * so it is coloured as pending rather than as committed data. */
+.stagedCell {
+  border-bottom: 1px dashed var(--cui-warning);
+  color: var(--cui-warning);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* The value being replaced, kept on screen while the edit is staged. Several
+ * edits can be staged at once; the user must be able to see what each one
+ * displaces without undoing it to look. */
+.priorValue {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  white-space: nowrap;
+}
+
+/* Why one cell of the batch did not land. Kept beside the cell, which stays
+ * staged and dirty — a typed edit is never silently dropped. */
+.cellError {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--cui-danger);
+}
+
+.cellInput {
+  width: 100%;
+  min-width: 60px;
+  padding: 1px 4px;
+  font: inherit;
+  color: var(--cui-body-color);
+  background: var(--cui-body-bg);
+  border: 1px solid var(--cui-primary);
+  border-radius: 2px;
+}
+
+.commitBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+}
+
+.commitCount {
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.commitActions {
+  display: flex;
+  gap: 6px;
+}
+
+.commitButton,
+.discardButton {
+  padding: 3px 10px;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.commitButton {
+  color: var(--cui-white);
+  background: var(--cui-primary);
+  border: 1px solid var(--cui-primary);
+}
+
+.discardButton {
+  color: var(--cui-secondary-color);
+  background: transparent;
+  border: 1px solid var(--cui-border-color);
+}
+
+.commitButton:disabled,
+.discardButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

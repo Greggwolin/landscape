@@ -9,7 +9,7 @@ Pure-logic tests (SimpleTestCase, no DB) lock in the fail-closed guarantees:
   * the budget writer refuses any column outside {qty, rate} even if a ref
     were somehow present (belt-and-suspenders over the trigger-recomputed
     `amount`)
-  * the impact line is an engine delta, empty when nothing moved.
+  * the impact line is an engine delta (see test_budget_cell_mapping).
 
 The end-to-end DB write (rate → trigger-recomputed amount) is verified live
 against project 9 per §15.2; these tests guard the boundary logic.
@@ -21,7 +21,6 @@ from django.test import SimpleTestCase
 
 from apps.artifacts.views import (
     _EDITABLE_BUDGET_CELL_COLUMNS,
-    _format_npv_impact,
     _resolve_cell_source_ref,
     _walk_path,
     _write_budget_cell,
@@ -138,9 +137,55 @@ class WriteBudgetCellGuards(SimpleTestCase):
         self.assertFalse(res['success'])
         self.assertEqual(res['error'], 'column_not_writable')
 
-    def test_editable_columns_are_qty_rate_and_uom(self):
-        # CB10 adds uom_code (a picklist FK code) to the inline-editable set.
-        self.assertEqual(_EDITABLE_BUDGET_CELL_COLUMNS, {'qty', 'rate', 'uom_code'})
+    def test_editable_columns_are_the_slice_2_set(self):
+        # CB10 added uom_code (a picklist FK code); budget slice 2 adds the two
+        # period columns and the internal memo. These are the REAL column names
+        # — the artifact calls the last three start / duration / notes.
+        self.assertEqual(
+            _EDITABLE_BUDGET_CELL_COLUMNS,
+            {'qty', 'rate', 'uom_code',
+             'start_period', 'periods_to_complete', 'internal_memo'},
+        )
+
+    def test_amount_is_never_editable(self):
+        """The one column that must never join the set, however it grows.
+
+        trg_budget_calculate_amount recomputes amount = qty x rate on every
+        write, so exposing it would let a user type a number the database
+        immediately overwrites.
+        """
+        self.assertNotIn('amount', _EDITABLE_BUDGET_CELL_COLUMNS)
+
+    def test_description_column_is_never_editable(self):
+        """`notes` the COLUMN is the line's description, and stays read-only.
+
+        The artifact's `notes` cell maps to internal_memo, not to this column.
+        If this assertion ever fails, the cross-over mapping has collapsed and
+        a user's note is about to overwrite a line's description.
+        """
+        self.assertNotIn('notes', _EDITABLE_BUDGET_CELL_COLUMNS)
+
+    def test_period_must_be_a_whole_number(self):
+        res = _write_budget_cell(
+            project_id=9, fact_id=257, column='start_period', raw_value='3.5')
+        self.assertFalse(res['success'])
+        self.assertEqual(res['error'], 'invalid_value')
+
+    def test_period_below_one_rejected(self):
+        # Period 1 is the first period; 0 and negatives would mis-spread the
+        # cost across the cash flow rather than fail.
+        for bad in ('0', '-2'):
+            res = _write_budget_cell(
+                project_id=9, fact_id=257, column='periods_to_complete',
+                raw_value=bad)
+            self.assertFalse(res['success'], bad)
+            self.assertEqual(res['error'], 'invalid_value', bad)
+
+    def test_empty_period_rejected(self):
+        res = _write_budget_cell(
+            project_id=9, fact_id=257, column='start_period', raw_value='  ')
+        self.assertFalse(res['success'])
+        self.assertEqual(res['error'], 'invalid_value')
 
     def test_empty_uom_rejected(self):
         # A blank UOM selection is a client error and never reaches the DB.
@@ -168,19 +213,8 @@ class WriteBudgetCellGuards(SimpleTestCase):
         self.assertEqual(res['error'], 'invalid_value')
 
 
-class FormatNpvImpact(SimpleTestCase):
-    def test_upward_move(self):
-        line = _format_npv_impact(3_000_000, 3_012_400)
-        self.assertIn('+$12,400', line)
-        self.assertIn('$3,012,400', line)
-
-    def test_downward_move(self):
-        line = _format_npv_impact(3_012_400, 3_000_000)
-        self.assertTrue(line.startswith('Cash-flow NPV −$12,400'))
-
-    def test_no_move_is_empty(self):
-        self.assertEqual(_format_npv_impact(3_000_000, 3_000_000.4), '')
-
-    def test_missing_reading_is_empty(self):
-        self.assertEqual(_format_npv_impact(None, 3_000_000), '')
-        self.assertEqual(_format_npv_impact(3_000_000, None), '')
+# The old _format_npv_impact was removed with budget slice 2. It returned ''
+# when the delta was under $1, which meant a committed edit could report
+# nothing at all — indistinguishable from a write that never landed. Its
+# replacement is _format_npv_clause, covered in test_budget_cell_mapping.py,
+# which never returns '' and never claims a retimed cost left NPV unchanged.
