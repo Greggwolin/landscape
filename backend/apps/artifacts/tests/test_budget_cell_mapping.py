@@ -65,15 +65,26 @@ class BudgetCellColumnMapping(SimpleTestCase):
         """THE trap. If this fails, a note is about to eat a description."""
         self.assertEqual(_BUDGET_CELL_TO_COLUMN['notes'], 'internal_memo')
 
-    def test_description_is_not_editable_at_all(self):
-        """`description` has no ref, so it cannot be written from either side.
+    def test_description_cell_writes_the_notes_column(self):
+        """The other half of the cross-over, live since slice 2b.
 
-        Belt and braces with the cross-over above: even if something mapped
-        `description` → `notes`, it would need to be in the editable set to
-        emit a ref, and it is not.
+        Slice 2 could rely on `description` being read-only; a line has to be
+        nameable to be created, so both halves are now user-editable IN
+        OPPOSITE DIRECTIONS. This pair of assertions is the only thing between
+        a user's note and a line's title.
         """
-        self.assertNotIn('description', _EDITABLE_BUDGET_COLUMNS)
-        self.assertNotIn('description', _cell_source_refs(_record(), CAPTURED_AT))
+        self.assertEqual(_BUDGET_CELL_TO_COLUMN['description'], 'notes')
+
+    def test_the_two_halves_of_the_cross_over_never_share_a_column(self):
+        refs = _cell_source_refs(_record(), CAPTURED_AT)
+        self.assertEqual(refs['description']['column'], 'notes')
+        self.assertEqual(refs['notes']['column'], 'internal_memo')
+        self.assertNotEqual(refs['description']['column'], refs['notes']['column'])
+
+    def test_each_half_captures_its_own_value_not_the_others(self):
+        refs = _cell_source_refs(_record(), CAPTURED_AT)
+        self.assertEqual(refs['description']['captured_value'], 'Mass grading')
+        self.assertEqual(refs['notes']['captured_value'], 'Bid pending from Sundt')
 
     def test_period_cells_map_to_the_period_columns(self):
         self.assertEqual(_BUDGET_CELL_TO_COLUMN['start'], 'start_period')
@@ -82,38 +93,41 @@ class BudgetCellColumnMapping(SimpleTestCase):
     def test_uom_maps_to_the_fk_code_column(self):
         self.assertEqual(_BUDGET_CELL_TO_COLUMN['uom'], 'uom_code')
 
-    def test_editable_set_is_the_slice_2_set(self):
+    def test_editable_set_is_the_slice_2b_set(self):
         self.assertEqual(
             set(_EDITABLE_BUDGET_COLUMNS),
-            {'qty', 'rate', 'uom', 'start', 'duration', 'notes'},
+            {'qty', 'rate', 'uom', 'start', 'duration', 'notes',
+             'division', 'stage', 'category', 'description', 'vendor',
+             'timing_method', 'start_date', 'end_date', 'cf_start',
+             'curve_profile', 'curve_steepness', 'escalation',
+             'escalation_method'},
         )
+
+    def test_contingency_is_absent_from_the_surface(self):
+        """Deliberately not built. contingency_pct is read by no engine and
+        contingency_mode has no data, no constraint and no code anywhere, so a
+        contingency cell would persist a value that changes nothing -- the same
+        control-that-does-nothing we refused to ship for escalation."""
+        for key in _EDITABLE_BUDGET_COLUMNS:
+            self.assertNotIn('contingency', key)
 
     def test_the_view_spec_offers_exactly_what_the_builder_backs(self):
         """The renderer decides editability from the refs; the view spec tells
-        the user what is on offer. If those two lists drift, the surface either
-        advertises cells it cannot write or hides ones it can — the second is
+        the user what is on offer. If those drift, the surface either
+        advertises cells it cannot write or hides ones it can -- the second is
         what shipped in slice 1 and what UB4 found in QA.
 
-        The FRONTEND carries the same list as BUDGET_EDITABLE_CELLS in
-        src/components/wrapper/budgetCellTarget.ts (it cannot read this one).
-        All three change together.
+        The FRONTEND carries BUDGET_EDITABLE_CELLS in
+        src/components/wrapper/budgetCellTarget.ts and is DELIBERATELY BEHIND
+        these two for now: slice 2b built the server-side field model first, and
+        the renderer still offers only the six cells it can draw. Raising the
+        frontend constant before the renderer can draw the rest would mark every
+        existing artifact stale and turn the whole table read-only -- the UB4
+        all-or-nothing rule working exactly as intended, against us. It moves
+        when the cells it names can actually be rendered.
         """
-        from apps.landscaper.tools.schedule_view_spec import build_budget_view_config
-        config = build_budget_view_config(
-            project_id=990201,
-            project_name='fixture',
-            records=[_record()],
-            total_budget=197000.0,
-            lot_count=None,
-            levels=[],
-        )
-        offered = set(config['rows'][0]['editable'])
-        self.assertEqual(offered, set(_EDITABLE_BUDGET_COLUMNS))
-        self.assertEqual(
-            offered,
-            {'uom', 'rate', 'start', 'duration', 'notes', 'qty'},
-            'frontend BUDGET_EDITABLE_CELLS must be updated to match',
-        )
+        from apps.landscaper.tools.schedule_view_spec import BUDGET_OFFERED_CELLS
+        self.assertEqual(set(BUDGET_OFFERED_CELLS), set(_EDITABLE_BUDGET_COLUMNS))
 
     def test_every_ref_points_at_the_mapped_column(self):
         """The refs are generated FROM the mapping, so this proves the whole
@@ -136,7 +150,7 @@ class BudgetCellColumnMapping(SimpleTestCase):
         """Fail closed: a key nobody added to the editable set is read-only,
         rather than falling through to a same-named column."""
         refs = _cell_source_refs(_record(), CAPTURED_AT)
-        for unmapped in ('category', 'stage', 'period', 'end_period'):
+        for unmapped in ('period', 'end_period', 'amount', 'contingency'):
             self.assertNotIn(unmapped, refs, unmapped)
 
     def test_row_without_a_fact_id_gets_no_refs(self):

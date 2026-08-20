@@ -137,14 +137,16 @@ class WriteBudgetCellGuards(SimpleTestCase):
         self.assertFalse(res['success'])
         self.assertEqual(res['error'], 'column_not_writable')
 
-    def test_editable_columns_are_the_slice_2_set(self):
-        # CB10 added uom_code (a picklist FK code); budget slice 2 adds the two
-        # period columns and the internal memo. These are the REAL column names
-        # — the artifact calls the last three start / duration / notes.
+    def test_editable_columns_are_the_slice_2b_set(self):
+        # REAL column names. The artifact calls several of these something
+        # else -- start / duration / notes / description / stage / division.
         self.assertEqual(
             _EDITABLE_BUDGET_CELL_COLUMNS,
-            {'qty', 'rate', 'uom_code',
-             'start_period', 'periods_to_complete', 'internal_memo'},
+            {'qty', 'rate', 'uom_code', 'start_period', 'periods_to_complete',
+             'internal_memo', 'notes', 'division_id', 'activity', 'category_id',
+             'vendor_name', 'timing_method', 'start_date', 'end_date',
+             'cf_start_flag', 'curve_profile', 'curve_steepness',
+             'growth_rate_set_id', 'escalation_method', 'escalation_rate'},
         )
 
     def test_amount_is_never_editable(self):
@@ -156,14 +158,16 @@ class WriteBudgetCellGuards(SimpleTestCase):
         """
         self.assertNotIn('amount', _EDITABLE_BUDGET_CELL_COLUMNS)
 
-    def test_description_column_is_never_editable(self):
-        """`notes` the COLUMN is the line's description, and stays read-only.
+    def test_contingency_columns_are_never_writable(self):
+        """Not built in slice 2b: no engine reads contingency_pct and
+        contingency_mode is undefined everywhere. A cell writing either would
+        change nothing while looking like it worked."""
+        self.assertNotIn('contingency_pct', _EDITABLE_BUDGET_CELL_COLUMNS)
+        self.assertNotIn('contingency_mode', _EDITABLE_BUDGET_CELL_COLUMNS)
 
-        The artifact's `notes` cell maps to internal_memo, not to this column.
-        If this assertion ever fails, the cross-over mapping has collapsed and
-        a user's note is about to overwrite a line's description.
-        """
-        self.assertNotIn('notes', _EDITABLE_BUDGET_CELL_COLUMNS)
+    def test_end_period_is_never_writable(self):
+        """Derived by trg_budget_calculate_end_period from start + duration."""
+        self.assertNotIn('end_period', _EDITABLE_BUDGET_CELL_COLUMNS)
 
     def test_period_must_be_a_whole_number(self):
         res = _write_budget_cell(

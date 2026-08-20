@@ -97,6 +97,15 @@ _EDITABLE_BUDGET_COLUMNS = (
     # description that names it; see the mapping below, which is where that
     # distinction is actually enforced.
     'start', 'duration', 'notes',
+    # Budget slice 2b -- the rest of the line. `description` becoming editable
+    # is the moment the cross-over below stops being a reading hazard and
+    # becomes a WRITING one: both halves are now user-editable, in opposite
+    # directions, so the mapping is the only thing standing between a note and
+    # a description. Tested in both directions.
+    'division', 'stage', 'category', 'description',
+    'vendor', 'timing_method', 'start_date', 'end_date',
+    'cf_start', 'curve_profile', 'curve_steepness',
+    'escalation', 'escalation_method',
 )
 
 # Artifact cell key → the real column it writes, where they differ.
@@ -112,12 +121,31 @@ _BUDGET_CELL_TO_COLUMN = {
     'uom': 'uom_code',
     'start': 'start_period',
     'duration': 'periods_to_complete',
-    'notes': 'internal_memo',
+    # ⚠️ THE CROSS-OVER. Both of these are now editable, in opposite
+    # directions. Read them together or not at all:
+    'notes': 'internal_memo',       # the artifact's NOTE  -> internal_memo
+    'description': 'notes',         # the artifact's TITLE -> notes
+    # Slice 2b, plain renames:
+    'division': 'division_id',
+    'stage': 'activity',
+    'category': 'category_id',
+    'vendor': 'vendor_name',
+    'cf_start': 'cf_start_flag',
+    # The escalation cell writes the REFERENCE. Choosing a set also refreshes
+    # the derived escalation_rate the engine reads; typing a rate instead
+    # clears the reference. Both handled in _write_budget_cell.
+    'escalation': 'growth_rate_set_id',
 }
 
 # Cells captured as raw text rather than coerced to a number. Everything else in
 # _EDITABLE_BUDGET_COLUMNS is numeric.
-_TEXTUAL_BUDGET_CELLS = frozenset({'uom', 'notes'})
+_TEXTUAL_BUDGET_CELLS = frozenset({
+    'uom', 'notes', 'description', 'stage', 'vendor', 'timing_method',
+    'start_date', 'end_date', 'curve_profile', 'escalation_method',
+})
+
+# Captured as-is: booleans and the reference id, neither of which is a float.
+_RAW_BUDGET_CELLS = frozenset({'cf_start', 'escalation', 'division', 'category'})
 
 
 def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any]:
@@ -143,7 +171,8 @@ def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any
             # Numeric cells capture a number; the picklist captures its
             # code and the free-text note captures its string.
             'captured_value': (
-                raw if cell_key in _TEXTUAL_BUDGET_CELLS else _num(raw)
+                raw if cell_key in _TEXTUAL_BUDGET_CELLS
+                or cell_key in _RAW_BUDGET_CELLS else _num(raw)
             ),
         }
     return refs
@@ -203,6 +232,19 @@ def build_budget_artifact_schema(
                 # are editable on the block renderer and on the view spec.
                 'start': r.get('start_period'),
                 'duration': r.get('periods_to_complete'),
+                'division': r.get('division_id'),
+                'stage': r.get('activity'),
+                'vendor': r.get('vendor_name'),
+                'timing_method': r.get('timing_method'),
+                'start_date': (r.get('start_date').isoformat()[:10]
+                               if hasattr(r.get('start_date'), 'isoformat') else None),
+                'end_date': (r.get('end_date').isoformat()[:10]
+                             if hasattr(r.get('end_date'), 'isoformat') else None),
+                'cf_start': r.get('cf_start_flag'),
+                'curve_profile': r.get('curve_profile'),
+                'curve_steepness': _num(r.get('curve_steepness')),
+                'escalation': r.get('growth_rate_set_id'),
+                'escalation_method': r.get('escalation_method'),
                 # The user's NOTE (internal_memo), not the line's description
                 # (which is the `notes` column and renders as `description`).
                 'notes': r.get('internal_memo'),
@@ -239,6 +281,19 @@ def build_budget_artifact_schema(
                     {'key': 'start', 'label': 'Start', 'align': 'right'},
                     {'key': 'duration', 'label': 'Dur', 'align': 'right'},
                     {'key': 'notes', 'label': 'Notes', 'align': 'left'},
+                    # Slice 2b. Declared because schema_validation rejects a
+                    # cell_source_ref naming a column the block does not have.
+                    {'key': 'division', 'label': 'Division', 'align': 'left'},
+                    {'key': 'stage', 'label': 'Stage', 'align': 'left'},
+                    {'key': 'vendor', 'label': 'Vendor', 'align': 'left'},
+                    {'key': 'timing_method', 'label': 'Timing', 'align': 'left'},
+                    {'key': 'start_date', 'label': 'Start date', 'align': 'left'},
+                    {'key': 'end_date', 'label': 'End date', 'align': 'left'},
+                    {'key': 'cf_start', 'label': 'CF start', 'align': 'left'},
+                    {'key': 'curve_profile', 'label': 'Curve', 'align': 'left'},
+                    {'key': 'curve_steepness', 'label': 'Steep', 'align': 'right'},
+                    {'key': 'escalation', 'label': 'Escalation', 'align': 'left'},
+                    {'key': 'escalation_method', 'label': 'Esc. when', 'align': 'left'},
                 ],
                 'rows': rows,
             },
@@ -270,7 +325,12 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
                    -- Added for the view specification (budget slice 1). Purely
                    -- additive: the block-schema builder reads named keys, so
                    -- extra keys on each record cannot change what it emits.
-                   f.division_id, f.activity, f.internal_memo
+                   f.division_id, f.activity, f.internal_memo,
+                   -- Budget slice 2b. Additive: the block-schema builder reads
+                   -- named keys, so extra keys per record cannot change it.
+                   f.vendor_name, f.timing_method, f.cf_start_flag,
+                   f.curve_profile, f.curve_steepness,
+                   f.growth_rate_set_id, f.escalation_rate, f.escalation_method
             FROM landscape.core_fin_fact_budget f
             LEFT JOIN landscape.core_unit_cost_category c
                 ON f.category_id = c.category_id

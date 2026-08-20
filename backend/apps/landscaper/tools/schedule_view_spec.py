@@ -57,6 +57,27 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# What the budget surface OFFERS for editing, as a named contract rather than a
+# list buried in a row dict.
+#
+# It must equal budget_artifact_builder._EDITABLE_BUDGET_COLUMNS -- the builder
+# emits a cell_source_ref for exactly those keys, and the renderer refuses to
+# offer editing at all unless the stored refs cover everything offered here. The
+# frontend carries the same list as BUDGET_EDITABLE_CELLS in
+# src/components/wrapper/budgetCellTarget.ts (it cannot read either of these).
+# All three change together; the first two are asserted equal in
+# test_budget_cell_mapping.py.
+#
+# `amount` is absent and always will be -- the trigger owns it. Contingency is
+# absent because no engine reads it (slice 2b decision).
+BUDGET_OFFERED_CELLS = (
+    'uom', 'rate', 'start', 'duration', 'notes', 'qty',
+    'division', 'stage', 'category', 'description',
+    'vendor', 'timing_method', 'start_date', 'end_date',
+    'cf_start', 'curve_profile', 'curve_steepness',
+    'escalation', 'escalation_method',
+)
+
 # The four detail rungs. "napkin / standard / detail" from a year ago, brought
 # back as a property of the view rather than a mode the whole app sits in.
 RUNGS = ('summary', 'standard', 'detail', 'all')
@@ -75,6 +96,45 @@ def _num(value: Any) -> Optional[float]:
 
 
 _LEADING_WORDS = re.compile(r'^[A-Za-z][A-Za-z\s&/\-]*?\s*(?=[\d])')
+
+
+def _date_str(value: Any) -> Optional[str]:
+    """A date as an ISO day string, or None. Never a datetime repr."""
+    if value is None:
+        return None
+    return value.isoformat()[:10] if hasattr(value, 'isoformat') else str(value)[:10]
+
+
+def _escalation_ref(record: Dict[str, Any],
+                    sets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Which half of a line's escalation is authoritative.
+
+    EXACTLY ONE of the two, never both. A line either FOLLOWS a named rate set
+    -- ``growth_rate_set_id`` populated, ``escalation_rate`` a derived cache of
+    that set's current rate, kept only because the cash-flow engine reads a
+    scalar -- or it CARRIES ITS OWN rate, in which case the reference is
+    cleared. Clearing is what stops the two drifting into disagreeing: the label
+    can never go on naming a set whose rate the line no longer uses.
+
+    ``mode`` is 'followed' | 'override' | 'none'.
+    """
+    set_id = record.get('growth_rate_set_id')
+    rate = _num(record.get('escalation_rate'))
+    if set_id is not None:
+        match = next((x for x in sets if x['value'] == set_id), None)
+        return {
+            'mode': 'followed',
+            'set_id': set_id,
+            'set_name': (match or {}).get('label') or f'Rate set {set_id}',
+            # Shown as DERIVED, not as something the user typed.
+            'rate': rate if rate is not None else (match or {}).get('rate'),
+            'usable': bool((match or {}).get('usable', True)),
+        }
+    if rate is not None:
+        return {'mode': 'override', 'set_id': None, 'set_name': None,
+                'rate': rate, 'usable': True}
+    return {'mode': 'none', 'set_id': None, 'set_name': None,
+            'rate': None, 'usable': True}
 
 
 def _member_number(display_name: Optional[str], code: Optional[str],
@@ -224,6 +284,14 @@ def build_budget_view_config(
     ancestors = build_ancestor_index(levels)
     level_numbers = [lvl['level'] for lvl in levels]
 
+    # Every constrained cell's allowed values, read once. A cell whose list is
+    # missing renders read-only rather than as free text into a foreign key.
+    picklists = fetch_budget_picklists(project_id)
+    escalation_sets = picklists.get('escalation_sets') or []
+    # "Division" is not a real word either -- the deepest configured level's
+    # own label is. Falls back only when the project has no levels configured.
+    division_label = (levels[-1]['label'] if levels else 'Division')
+
     rows: List[Dict[str, Any]] = []
     for idx, record in enumerate(records, start=1):
         division_id = record.get('division_id')
@@ -232,6 +300,7 @@ def build_budget_view_config(
         rate = _num(record.get('rate'))
         amount = _num(record.get('amount'))
         uom = record.get('uom_code') or ''
+        escalation_ref = _escalation_ref(record, escalation_sets)
         rows.append({
             # Same id the block schema uses, so the editing spine can map a
             # rendered cell back to its source row when slice 2 lands.
@@ -251,7 +320,27 @@ def build_budget_view_config(
                 # Notes records WHY. Stored in the long-existing but never
                 # populated internal-memo column — see the builder's note.
                 'notes': record.get('internal_memo'),
+                # ── Budget slice 2b ──
+                'division': record.get('division_id'),
+                'vendor': record.get('vendor_name'),
+                'timing_method': record.get('timing_method'),
+                'start_date': _date_str(record.get('start_date')),
+                'end_date': _date_str(record.get('end_date')),
+                'cf_start': record.get('cf_start_flag'),
+                'curve_profile': record.get('curve_profile'),
+                'curve_steepness': _num(record.get('curve_steepness')),
+                # Escalation displays what the line POINTS AT when it follows a
+                # set, and the typed number only when it does not. Exactly one
+                # of the two is authoritative — see `escalation_ref` below.
+                'escalation': (
+                    escalation_ref['set_name'] if escalation_ref['mode'] == 'followed'
+                    else escalation_ref['rate']
+                ),
+                'escalation_method': record.get('escalation_method'),
             },
+            # Which of the two halves is authoritative on THIS line, so the
+            # renderer can show a followed rate as derived rather than typed.
+            'escalation_ref': escalation_ref,
             # Double-clicking an amount opens this instead of merely refusing.
             # The quantity columns were removed from the table entirely in
             # rev 4; the quantity lives here, where it is actually wanted.
@@ -275,7 +364,7 @@ def build_budget_view_config(
             # editing at all rather than rendering half a table as writable.
             # `qty` is offered in the derivation popover rather than as a
             # column, but it is offered, so it belongs here.
-            'editable': ['uom', 'rate', 'start', 'duration', 'notes', 'qty'],
+            'editable': list(BUDGET_OFFERED_CELLS),
         })
 
     # Columns. Fourteen do not fit a side panel, so which appear is decided by
@@ -283,15 +372,39 @@ def build_budget_view_config(
     # earns its place when it VARIES across the visible rows; anything constant
     # becomes part of the title instead).
     columns = [
-        {'key': 'category', 'label': 'Category', 'align': 'left', 'kind': 'picklist'},
-        {'key': 'stage', 'label': 'Stage', 'align': 'left', 'kind': 'picklist'},
+        {'key': 'category', 'label': 'Category', 'align': 'left',
+         'kind': 'picklist', 'options': picklists.get('category') or []},
+        # Stage options are VALID_ACTIVITIES -- the writer's allowlist -- plus
+        # any value the visible rows actually hold. 153 of 366 live lines carry
+        # 'Development', which the writer would reject; appending it as a
+        # legacy choice means opening such a line shows its real stage instead
+        # of a blank dropdown that silently rewrites it on the next save.
+        {'key': 'stage', 'label': 'Stage', 'align': 'left',
+         'kind': 'picklist', 'options': _stage_options(picklists, records)},
         {'key': 'description', 'label': 'Description', 'align': 'left', 'kind': 'text'},
-        {'key': 'uom', 'label': 'UOM', 'align': 'center', 'kind': 'picklist'},
+        {'key': 'uom', 'label': 'UOM', 'align': 'center',
+         'kind': 'picklist', 'options': picklists.get('uom') or []},
         {'key': 'rate', 'label': 'Rate', 'align': 'right', 'kind': 'number'},
         {'key': 'amount', 'label': 'Amount', 'align': 'right', 'kind': 'computed'},
         {'key': 'start', 'label': 'Start', 'align': 'center', 'kind': 'number'},
         {'key': 'duration', 'label': 'Dur', 'align': 'center', 'kind': 'number'},
         {'key': 'notes', 'label': 'Notes', 'align': 'left', 'kind': 'text'},
+        # ── Budget slice 2b ──
+        {'key': 'division', 'label': division_label, 'align': 'left',
+         'kind': 'picklist', 'options': picklists.get('division') or []},
+        {'key': 'vendor', 'label': 'Vendor', 'align': 'left', 'kind': 'text'},
+        {'key': 'timing_method', 'label': 'Timing', 'align': 'left',
+         'kind': 'picklist', 'options': picklists.get('timing_method') or []},
+        {'key': 'start_date', 'label': 'Start date', 'align': 'center', 'kind': 'date'},
+        {'key': 'end_date', 'label': 'End date', 'align': 'center', 'kind': 'date'},
+        {'key': 'cf_start', 'label': 'CF start', 'align': 'center', 'kind': 'boolean'},
+        {'key': 'curve_profile', 'label': 'Curve', 'align': 'left',
+         'kind': 'picklist', 'options': picklists.get('curve_profile') or []},
+        {'key': 'curve_steepness', 'label': 'Steep', 'align': 'right', 'kind': 'number'},
+        {'key': 'escalation', 'label': 'Escalation', 'align': 'left',
+         'kind': 'reference', 'options': picklists.get('escalation_sets') or []},
+        {'key': 'escalation_method', 'label': 'Esc. when', 'align': 'left',
+         'kind': 'picklist', 'options': picklists.get('escalation_method') or []},
     ]
 
     # The detail ladder. Same four rungs on every topic; only the column lists
@@ -358,3 +471,168 @@ def build_budget_view_config(
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'project_id': project_id,
     }
+
+
+# ─── Picklist sources (budget slice 2b) ──────────────────────────────────────
+#
+# Every constrained cell is fed from the table that constrains it. Free text
+# into a foreign key earns a database rejection and nothing else, so the
+# artifact carries the allowed values and the renderer offers them.
+#
+# These are READ here and ride on the view specification's columns, so the
+# renderer needs no second round-trip and cannot drift from what the writer
+# will accept.
+
+# core_fin_fact_budget CHECK constraints, read from the live schema
+# (core_fin_fact_budget_curve_profile_check / _escalation_method_check).
+# Hard-coding them here is safe only because they are CHECKs: the database
+# refuses anything else, so an out-of-date list fails loudly rather than
+# silently writing a bad value.
+_CURVE_PROFILES = ['standard', 'front_loaded', 'back_loaded']
+_ESCALATION_METHODS = ['to_start', 'through_duration']
+
+# timing_method has NO check constraint; these are the values actually in use
+# (distributed 21 / curve 17 / end_loaded 9, measured 2026-08-19).
+_TIMING_METHODS = ['distributed', 'curve', 'end_loaded']
+
+
+def _opt(value, label=None):
+    return {'value': value, 'label': label if label is not None else value}
+
+
+def fetch_budget_picklists(project_id: int) -> Dict[str, Any]:
+    """Every constrained cell's allowed values, for one project.
+
+    Returns ``{column_key: [{value, label}, ...]}`` plus ``escalation_sets``,
+    which carries more than a label because an escalation choice is a
+    REFERENCE and the renderer has to show what it points at.
+
+    Degrades per-list: one unreadable lookup costs that column its dropdown,
+    not the artifact its render.
+    """
+    from django.db import connection
+
+    out: Dict[str, Any] = {}
+
+    # Stage. Only the values the application AND the database both accept --
+    # they disagree on two of six (see WRITABLE_ACTIVITIES). A row whose stored
+    # stage is outside that intersection gets its own value appended as a
+    # legacy option by the caller, so opening a line shows what it really says
+    # instead of a blank dropdown that rewrites it on the next save.
+    try:
+        from apps.artifacts.views import WRITABLE_ACTIVITIES
+        out['stage'] = [_opt(a) for a in sorted(WRITABLE_ACTIVITIES)]
+    except Exception:  # noqa: BLE001
+        logger.exception('budget picklists: activities unavailable')
+
+    out['timing_method'] = [_opt(v, v.replace('_', ' ').title()) for v in _TIMING_METHODS]
+    out['curve_profile'] = [_opt(v, v.replace('_', ' ').title()) for v in _CURVE_PROFILES]
+    out['escalation_method'] = [
+        _opt('to_start', 'To start'),
+        _opt('through_duration', 'Through duration'),
+    ]
+
+    with connection.cursor() as cursor:
+        # Division — the project's OWN hierarchy. Labels come from the project
+        # config, never from a hard-coded "Area / Phase / Parcel".
+        try:
+            cursor.execute(
+                """
+                SELECT d.division_id, d.display_name, d.division_code, d.tier
+                FROM landscape.tbl_division d
+                WHERE d.project_id = %s
+                ORDER BY d.tier, d.division_code, d.division_id
+                """, [project_id])
+            out['division'] = [
+                _opt(r[0], (r[1] or r[2] or f'Division {r[0]}'))
+                for r in cursor.fetchall()
+            ]
+        except Exception:  # noqa: BLE001
+            logger.exception('budget picklists: divisions unavailable')
+
+        # Category. The modal narrows these by stage via the lifecycle junction;
+        # the artifact carries the whole list plus each category's stages so the
+        # renderer can narrow without another round-trip.
+        try:
+            cursor.execute(
+                """
+                SELECT c.category_id, c.category_name, c.parent_id,
+                       COALESCE(array_agg(s.activity) FILTER (
+                           WHERE s.activity IS NOT NULL), '{}')
+                FROM landscape.core_unit_cost_category c
+                LEFT JOIN landscape.core_category_lifecycle_stages s
+                       ON s.category_id = c.category_id
+                WHERE COALESCE(c.is_active, true)
+                GROUP BY c.category_id, c.category_name, c.parent_id
+                ORDER BY c.parent_id NULLS FIRST, c.category_name
+                """)
+            out['category'] = [
+                {'value': r[0], 'label': r[1], 'parent_id': r[2],
+                 'stages': list(r[3] or [])}
+                for r in cursor.fetchall()
+            ]
+        except Exception:  # noqa: BLE001
+            logger.exception('budget picklists: categories unavailable')
+
+        # UOM — FK-constrained, active codes only.
+        try:
+            cursor.execute(
+                "SELECT uom_code, name FROM landscape.core_fin_uom "
+                "WHERE is_active ORDER BY uom_code")
+            out['uom'] = [_opt(r[0], f'{r[0]} — {r[1]}') for r in cursor.fetchall()]
+        except Exception:  # noqa: BLE001
+            logger.exception('budget picklists: uom unavailable')
+
+        # Escalation — the project's named rate sets. A set with more than one
+        # STEP is a graduated schedule and cannot collapse to the single scalar
+        # the cash-flow engine reads, so it is offered but marked unusable and
+        # refused on write, with a reason, rather than silently flattened.
+        try:
+            cursor.execute(
+                """
+                SELECT s.set_id, s.set_name, s.card_type, s.is_default,
+                       count(st.*) AS steps,
+                       min(st.rate) FILTER (WHERE st.rate IS NOT NULL) AS rate
+                FROM landscape.core_fin_growth_rate_sets s
+                LEFT JOIN landscape.core_fin_growth_rate_steps st
+                       ON st.set_id = s.set_id
+                WHERE s.project_id = %s AND s.card_type = 'cost'
+                GROUP BY s.set_id, s.set_name, s.card_type, s.is_default
+                ORDER BY s.is_default DESC, s.set_name
+                """, [project_id])
+            out['escalation_sets'] = [
+                {'value': r[0], 'label': r[1], 'card_type': r[2],
+                 'is_default': bool(r[3]), 'steps': int(r[4] or 0),
+                 'rate': _num(r[5]),
+                 'usable': int(r[4] or 0) == 1}
+                for r in cursor.fetchall()
+            ]
+        except Exception:  # noqa: BLE001
+            logger.exception('budget picklists: escalation sets unavailable')
+
+    return out
+
+
+def _stage_options(picklists: Dict[str, Any],
+                   records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The writer's allowlist, plus whatever the rows actually hold.
+
+    Three lists disagree about this vocabulary today (measured 2026-08-19):
+    the backend's VALID_ACTIVITIES has six values including 'Planning &
+    Engineering'; the frontend's LIFECYCLE_STAGES has five and omits it; and
+    the live data uses only 'Development' (153 rows, absent from
+    VALID_ACTIVITIES) and 'Planning & Engineering' (153 rows). Offering the
+    allowlist alone would show 153 lines a dropdown that cannot represent their
+    own stored value.
+
+    So a stored value that is not on the allowlist is appended and labelled as
+    legacy. It is not silently promoted to valid — the writer still refuses it —
+    but the user can SEE what the line says.
+    """
+    allowed = list(picklists.get('stage') or [])
+    known = {o['value'] for o in allowed}
+    extra = sorted({
+        r.get('activity') for r in records
+        if r.get('activity') and r.get('activity') not in known
+    })
+    return allowed + [_opt(v, f'{v} (legacy)') for v in extra]
