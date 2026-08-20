@@ -234,18 +234,35 @@ npm run test:headless
 
 ### Backend (Django)
 
-Run the Django suite from `backend/`, always against local Postgres:
+Set this once in `backend/.env` and the suite just works:
 
 ```bash
-DATABASE_URL=postgresql://localhost/landscape pytest
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/landscape
 ```
 
-pytest builds its test database with `--create-db`, which drops and recreates it. Because
-`backend/.env` points `DATABASE_URL` at the real Neon database — correct for the dev server, which
-needs real data — a bare `pytest` would aim that drop-and-recreate at the database holding real
-project data. A guard in `backend/conftest.py` refuses to run against any host other than
-`localhost`/`127.0.0.1` and prints the command above. Set `LANDSCAPE_ALLOW_TEST_DB=1` only when the
-target really is an isolated, disposable database.
+then run `pytest` from `backend/`.
+
+**Why this exists.** pytest builds its test database with `--create-db`, which drops and recreates
+`test_<dbname>` on whatever server `DATABASE_URL` names. `backend/.env` points that at the real Neon
+database — correct for the dev server, which needs real data — so a bare `pytest` aimed a
+drop-and-recreate at the database holding real project data. This is not hypothetical:
+`test_land_v2` and `test_test_land_v2` were both found sitting in the live Neon project on
+2026-08-20, the second one ten months old.
+
+A guard in `backend/conftest.py` now refuses unless the target is disposable — `localhost`,
+`127.0.0.1`, `::1`, a local unix socket, or a container hostname (`postgres`, `db`,
+`host.docker.internal`). `TEST_DATABASE_URL`, when set, is used in preference to `DATABASE_URL` and
+is the host that gets checked.
+
+To override for a genuinely isolated, disposable database:
+
+```bash
+LANDSCAPE_ALLOW_TEST_DB=i-know-this-is-not-production pytest
+```
+
+It is a phrase rather than a flag on purpose. `=1` is what you reach for when you want the error to
+go away; a sentence about the target database is not something you type by accident. `1`, `true` and
+`yes` do not satisfy it.
 
 ### Reference projects in the database
 

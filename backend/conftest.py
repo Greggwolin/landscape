@@ -35,6 +35,24 @@ if ENGINE_PATH.exists():
 # Set Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
+# --- TEST_DATABASE_URL redirect ---------------------------------------------
+#
+# Point the suite at the disposable database BEFORE settings are loaded, by
+# rewriting DATABASE_URL in the environment. config.settings reads it through
+# python-decouple, which consults os.environ first, so settings.py then does
+# all of its own work on the safe URL -- including overriding ENGINE to the
+# custom `db_backend` that sets `search_path TO landscape, public`.
+#
+# It has to happen HERE, not in pytest_configure. Mutating settings.DATABASES
+# after django.setup() drops that ENGINE override unless it is carefully
+# merged back, and even merged it leaves connection wrappers already built
+# against the old host. Both were tried and measured: replacing the dict cost
+# 58 failures, merging it and dropping the cached connection cost 369 errors.
+# Rewriting one environment variable before anything reads it costs nothing.
+_test_db_url = os.environ.get('TEST_DATABASE_URL', '').strip()
+if _test_db_url:
+    os.environ['DATABASE_URL'] = _test_db_url
+
 # Setup Django
 django.setup()
 
@@ -87,22 +105,43 @@ ALLOWED_TEST_DB_HOSTS = frozenset({
     # An empty host means a local unix-domain socket. libpq cannot reach a
     # remote server without a host, so this can only ever be a local database.
     '',
+    # Container hostnames. A database reachable only by a compose service name
+    # or by host.docker.internal is by construction a local, disposable one —
+    # these resolve to nothing outside the container network. Omitting them
+    # made the guard fire on a perfectly safe docker setup, and a guard that
+    # cries wolf on the normal case is a guard people learn to switch off.
+    'postgres',
+    'db',
+    'host.docker.internal',
 })
+
+# Where the suite SHOULD build its scratch database, when DATABASE_URL points
+# somewhere it must not. Set this once in backend/.env and a bare `pytest`
+# simply works; without it every run needs the override retyped, which is the
+# workaround that only held because someone remembered every time.
+TEST_DB_URL_ENV_VAR = 'TEST_DATABASE_URL'
 
 TEST_DB_OPT_IN_ENV_VAR = 'LANDSCAPE_ALLOW_TEST_DB'
 
+# The opt-in is a PHRASE, not a flag.
+#
+# `=1` is the value a person reaches for when they want the error to go away,
+# and a guard that yields to `=1` gets defeated by habit rather than by
+# judgement. Typing "i-know-this-is-not-production" is a sentence about the
+# target database, and it is not something anyone types by accident.
+TEST_DB_OPT_IN_PHRASE = 'i-know-this-is-not-production'
+
 
 def opt_in_is_affirmative(value):
-    """True only for an affirmative opt-in value.
+    """True only for the exact opt-in phrase, trimmed and case-insensitive.
 
     NOTE the name: anything starting with ``test_`` would be collected as a
     test by pytest the moment this module is imported into one.
 
-    Deliberately strict: ``LANDSCAPE_ALLOW_TEST_DB=0`` must NOT disable the
-    guard. A bare truthiness check would accept "0" and "false", which is the
-    opposite of what someone typing them intends.
+    ``1`` / ``true`` / ``yes`` deliberately do NOT satisfy it — see
+    TEST_DB_OPT_IN_PHRASE.
     """
-    return str(value or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    return str(value or '').strip().lower() == TEST_DB_OPT_IN_PHRASE
 
 
 def db_target_is_allowed(host, opt_in=None):
@@ -117,10 +156,44 @@ def db_target_is_allowed(host, opt_in=None):
     return (host or '').strip().lower() in ALLOWED_TEST_DB_HOSTS
 
 
+def _apply_test_db_redirect():
+    """Re-point an already-configured settings object at TEST_DATABASE_URL.
+
+    The module-level rewrite above is enough when conftest is imported first,
+    but pytest-django reads DJANGO_SETTINGS_MODULE from pytest.ini and
+    configures Django BEFORE the rootdir conftest is imported, so by the time
+    this file runs settings.DATABASES is already built from the unsafe URL.
+
+    MERGE, never replace: settings.py overrides ENGINE to the custom
+    `db_backend`, which is what sets `search_path TO landscape, public` after
+    connecting (Neon's pooler rejects it as a startup option). Replacing the
+    dict wholesale drops that and 58 tests fail looking like missing tables.
+    Measured, not guessed.
+    """
+    url = os.environ.get(TEST_DB_URL_ENV_VAR, '').strip()
+    if not url:
+        return
+    from django.conf import settings
+    existing = settings.DATABASES.get('default', {})
+    if not existing:
+        return
+    import dj_database_url
+    parsed = dj_database_url.parse(
+        url,
+        conn_max_age=existing.get('CONN_MAX_AGE', 600),
+        conn_health_checks=existing.get('CONN_HEALTH_CHECKS', True),
+    )
+    merged = {**existing, **parsed}
+    merged['ENGINE'] = existing.get('ENGINE') or merged.get('ENGINE')
+    settings.DATABASES['default'] = merged
+
+
 def _refuse_unsafe_test_database():
     """Stop the run before --create-db can touch a non-test server."""
     import pytest
     from django.conf import settings
+
+    _apply_test_db_redirect()
 
     default = settings.DATABASES.get('default', {})
     host = default.get('HOST') or ''
@@ -142,13 +215,22 @@ def _refuse_unsafe_test_database():
         "itself. If that server holds real project data, this is destructive.\n"
         "Only localhost / 127.0.0.1 is allowed by default.\n"
         "\n"
-        "Run the suite against local Postgres instead:\n"
+        "This is not hypothetical: test_land_v2 and test_test_land_v2 were both\n"
+        "found sitting in the live Neon project on 2026-08-20, the second one\n"
+        "ten months old — leftovers of exactly this.\n"
+        "\n"
+        "Set {url_var} once in backend/.env and a bare `pytest` will just work:\n"
+        "\n"
+        "    {url_var}=postgresql://postgres:postgres@localhost:5432/landscape\n"
+        "\n"
+        "Or point this one run somewhere safe:\n"
         "\n"
         "    DATABASE_URL=postgresql://localhost/landscape pytest\n"
         "\n"
         "If the target really is an isolated, disposable database, set\n"
-        "{var}=1 to override this check.\n".format(
-            host=host, name=name, var=TEST_DB_OPT_IN_ENV_VAR
+        "{var}={phrase}\n".format(
+            host=host, name=name, var=TEST_DB_OPT_IN_ENV_VAR,
+            url_var=TEST_DB_URL_ENV_VAR, phrase=TEST_DB_OPT_IN_PHRASE,
         ),
         returncode=4,
     )
