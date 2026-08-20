@@ -64,7 +64,101 @@ class _DisableMigrations:
         return None
 
 
+# --- 3. Refuse to build a test database anywhere but a test host -------------
+#
+# `backend/.env` legitimately points DATABASE_URL at the real Neon database so
+# the Django dev server sees real data, and pytest.ini carries `--create-db`.
+# Together, a bare `pytest` would DROP and CREATE `test_land_v2` on that server,
+# and the connection_created hook above would issue CREATE SCHEMA on the
+# maintenance connection to `land_v2` itself — DDL against the database holding
+# real project data.
+#
+# Deny by default; allow an explicit, named opt-in. We deliberately do NOT
+# pattern-match "production" hostnames. That is fragile in both directions: it
+# would block a legitimate isolated Neon branch database, and it would silently
+# stop protecting anything the day the production endpoint is rotated. Requiring
+# a human to type the variable that means "I know what I am doing" is safer than
+# requiring this file to recognize every dangerous host in advance.
+
+ALLOWED_TEST_DB_HOSTS = frozenset({
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    # An empty host means a local unix-domain socket. libpq cannot reach a
+    # remote server without a host, so this can only ever be a local database.
+    '',
+})
+
+TEST_DB_OPT_IN_ENV_VAR = 'LANDSCAPE_ALLOW_TEST_DB'
+
+
+def opt_in_is_affirmative(value):
+    """True only for an affirmative opt-in value.
+
+    NOTE the name: anything starting with ``test_`` would be collected as a
+    test by pytest the moment this module is imported into one.
+
+    Deliberately strict: ``LANDSCAPE_ALLOW_TEST_DB=0`` must NOT disable the
+    guard. A bare truthiness check would accept "0" and "false", which is the
+    opposite of what someone typing them intends.
+    """
+    return str(value or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def db_target_is_allowed(host, opt_in=None):
+    """Whether pytest may build a test database on ``host``.
+
+    Pure and offline: takes an already-resolved host string, reads no settings
+    and opens no connection, so it can be unit-tested directly (see
+    ``backend/tests/test_db_guard.py``).
+    """
+    if opt_in_is_affirmative(opt_in):
+        return True
+    return (host or '').strip().lower() in ALLOWED_TEST_DB_HOSTS
+
+
+def _refuse_unsafe_test_database():
+    """Stop the run before --create-db can touch a non-test server."""
+    import pytest
+    from django.conf import settings
+
+    default = settings.DATABASES.get('default', {})
+    host = default.get('HOST') or ''
+    name = default.get('NAME') or '(unnamed)'
+
+    if db_target_is_allowed(host, os.environ.get(TEST_DB_OPT_IN_ENV_VAR)):
+        return
+
+    # Host and database name only — never the connection string, which carries
+    # credentials.
+    pytest.exit(
+        "\n"
+        "REFUSING TO RUN: the test database would be built on a non-test host.\n"
+        "\n"
+        "  DATABASE_URL resolves to host {host!r}, database {name!r}.\n"
+        "\n"
+        "pytest runs with --create-db, so continuing would DROP and CREATE a test\n"
+        "database on that server, and create the `landscape` schema on {name!r}\n"
+        "itself. If that server holds real project data, this is destructive.\n"
+        "Only localhost / 127.0.0.1 is allowed by default.\n"
+        "\n"
+        "Run the suite against local Postgres instead:\n"
+        "\n"
+        "    DATABASE_URL=postgresql://localhost/landscape pytest\n"
+        "\n"
+        "If the target really is an isolated, disposable database, set\n"
+        "{var}=1 to override this check.\n".format(
+            host=host, name=name, var=TEST_DB_OPT_IN_ENV_VAR
+        ),
+        returncode=4,
+    )
+
+
 def pytest_configure(config):
+    # Runs before settings are mutated, before collection, and long before
+    # --create-db can act. See section 3.
+    _refuse_unsafe_test_database()
+
     from django.conf import settings
     from django.apps import apps as django_apps
 

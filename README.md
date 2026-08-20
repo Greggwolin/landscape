@@ -232,6 +232,21 @@ npm run test:headless
 >
 > Until that runs (or the Playwright step is excluded from the default), `npm test` will fail at the contrast suite even though the underlying styling is fine. No `npm run test:api` script exists; ignore older docs that reference one.
 
+### Backend (Django)
+
+Run the Django suite from `backend/`, always against local Postgres:
+
+```bash
+DATABASE_URL=postgresql://localhost/landscape pytest
+```
+
+pytest builds its test database with `--create-db`, which drops and recreates it. Because
+`backend/.env` points `DATABASE_URL` at the real Neon database — correct for the dev server, which
+needs real data — a bare `pytest` would aim that drop-and-recreate at the database holding real
+project data. A guard in `backend/conftest.py` refuses to run against any host other than
+`localhost`/`127.0.0.1` and prints the command above. Set `LANDSCAPE_ALLOW_TEST_DB=1` only when the
+target really is an isolated, disposable database.
+
 ### Reference projects in the database
 
 - Project 7 — Peoria Lakes Phase 1 — Master-planned community with dependencies
