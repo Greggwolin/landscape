@@ -228,7 +228,13 @@ export function useArtifactUpdateState() {
         `${DJANGO_API_URL}/api/artifacts/${artifactId}/update_state/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // Every READ in this file sends getAuthHeaders(); these three WRITES
+          // did not, so an authenticated browser got 401 on every commit while
+          // the backend tests — which authenticate properly — stayed green.
+          // Found by hands-on QA during budget slice 2 (UB3); the defect
+          // predates it and affected update_state, commit_field_edit and
+          // commit_field_edits alike.
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(input),
         },
       );
@@ -323,7 +329,13 @@ export function useArtifactCommitFieldEdit() {
         `${DJANGO_API_URL}/api/artifacts/${artifactId}/commit_field_edit/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // Every READ in this file sends getAuthHeaders(); these three WRITES
+          // did not, so an authenticated browser got 401 on every commit while
+          // the backend tests — which authenticate properly — stayed green.
+          // Found by hands-on QA during budget slice 2 (UB3); the defect
+          // predates it and affected update_state, commit_field_edit and
+          // commit_field_edits alike.
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(input),
         },
       );
@@ -407,7 +419,13 @@ export function useArtifactCommitFieldEdits() {
         `${DJANGO_API_URL}/api/artifacts/${artifactId}/commit_field_edits/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // Every READ in this file sends getAuthHeaders(); these three WRITES
+          // did not, so an authenticated browser got 401 on every commit while
+          // the backend tests — which authenticate properly — stayed green.
+          // Found by hands-on QA during budget slice 2 (UB3); the defect
+          // predates it and affected update_state, commit_field_edit and
+          // commit_field_edits alike.
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(input),
         },
       );

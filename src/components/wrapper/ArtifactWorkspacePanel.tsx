@@ -201,14 +201,19 @@ export function ArtifactWorkspacePanel({
   const commitFieldEditsMutation = useArtifactCommitFieldEdits();
 
   // Transient impact banner (CB6) — one-line engine delta after a cell commit
-  // (e.g. "Cash-flow NPV +$12,400 → $3,420,000"). Auto-clears after a few
-  // seconds; the user can also dismiss it. Cleared when switching artifacts.
+  // (e.g. "Cash-flow NPV +$12,400 → $3,420,000").
+  //
+  // PERSISTS until the user dismisses it or the next commit replaces it (UB4
+  // finding 2). It used to clear itself after 7 seconds, which quietly undid
+  // the reason it exists: the line's job is to PROVE the write happened,
+  // especially for a timing edit whose effect is invisible on the row that was
+  // edited. A proof that disappears before it is read is the silent-commit
+  // problem wearing a different hat — and the multi-clause timing form
+  // ("… starts period 30 (was 7), ends 38" plus the NPV clause) is exactly the
+  // case that needs more than seven seconds.
+  //
+  // Still cleared when switching artifacts: it describes THAT artifact's write.
   const [impactBanner, setImpactBanner] = useState<string | null>(null);
-  useEffect(() => {
-    if (!impactBanner) return;
-    const t = setTimeout(() => setImpactBanner(null), 7000);
-    return () => clearTimeout(t);
-  }, [impactBanner]);
   useEffect(() => {
     setImpactBanner(null);
   }, [activeArtifactId]);
@@ -483,7 +488,7 @@ export function ArtifactWorkspacePanel({
           <div
             role="status"
             onClick={() => setImpactBanner(null)}
-            title="Dismiss"
+            title="Click to dismiss"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -495,6 +500,10 @@ export function ArtifactWorkspacePanel({
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 600,
+              // The impact line is one string carrying several clauses, newline
+              // separated (schedule first, then what it did to the money). A
+              // flex row collapses those into one run of text.
+              whiteSpace: 'pre-line',
               color: 'var(--cui-success, #2e7d32)',
               background: 'var(--cui-success-bg-subtle, rgba(46,125,50,0.12))',
               border: '1px solid var(--cui-success-border-subtle, rgba(46,125,50,0.35))',
@@ -547,6 +556,17 @@ export function ArtifactWorkspacePanel({
             config={
               (active.params_json as { budget_view_config: ScheduleViewConfig })
                 .budget_view_config
+            }
+            // Slice 2 editing. The BLOCK SCHEMA comes along because that is
+            // where the per-cell source refs live and where the server resolves
+            // a write — the view specification carries no refs of its own. The
+            // commit callback is the SAME panel-level batch helper the generic
+            // renderer uses, so there is one write path and one impact banner,
+            // not a budget-specific copy of either.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
             }
             onClose={() => setActiveArtifactId(null)}
           />

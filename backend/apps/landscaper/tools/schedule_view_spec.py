@@ -265,10 +265,17 @@ def build_budget_view_config(
                 # this is null rather than a plausible-looking tag.
                 'basis': None,
             },
-            # Slice 1 renders read-only. These are the cells the server already
-            # marks writable on the block schema; carried so the dashed-underline
-            # affordance matches what slice 2 will actually accept.
-            'editable': ['rate', 'uom'],
+            # The cells this surface OFFERS for editing. Slice 1 carried
+            # ['rate', 'uom'] because that was all the block schema had refs
+            # for; leaving it there through slice 2 made it a lie.
+            #
+            # It is now a CONTRACT, not a hint: the renderer compares this list
+            # against the per-cell refs on the stored block schema, and if the
+            # stored artifact cannot back every one of them it declines to offer
+            # editing at all rather than rendering half a table as writable.
+            # `qty` is offered in the derivation popover rather than as a
+            # column, but it is offered, so it belongs here.
+            'editable': ['uom', 'rate', 'start', 'duration', 'notes', 'qty'],
         })
 
     # Columns. Fourteen do not fit a side panel, so which appear is decided by

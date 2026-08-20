@@ -245,9 +245,25 @@ class ArtifactViewSet(viewsets.ViewSet):
         # walk) to learn the table. Best-effort; a failed read never blocks.
         pre_ref, _pre_err = _resolve_edit_target(artifact.current_state_json, spec)
         npv_before = None
+        npv_relevant = False
         if (_pre_err is None and pre_ref.get('table') in _NPV_IMPACTING_TABLES
                 and artifact.project_id is not None):
-            npv_before = _read_cashflow_npv(artifact.project_id)
+            npv_relevant = True
+            cf_before = _read_cashflow_state(artifact.project_id)
+            npv_before = cf_before['npv']
+
+        # Timing-before, read while it is still 'before': the end_period trigger
+        # rewrites the derived value on the write itself.
+        timing_target = set()
+        if (_pre_err is None and pre_ref.get('table') == 'core_fin_fact_budget'
+                and pre_ref.get('column') in _TIMING_BUDGET_COLUMNS):
+            timing_target = {int(pre_ref['row_id'])}
+        note_target = (
+            _pre_err is None
+            and pre_ref.get('table') == 'core_fin_fact_budget'
+            and pre_ref.get('column') in _NOTE_BUDGET_COLUMNS
+        )
+        timing_before = _read_budget_timing(timing_target)
 
         # Single write path — the SAME per-edit helper the batch endpoint uses.
         result = _apply_one_edit(artifact, spec, user_id)
@@ -265,13 +281,28 @@ class ArtifactViewSet(viewsets.ViewSet):
         if not refreshed.get('success'):
             return Response(refreshed, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Impact line: cash-flow NPV after vs before. Engine delta only —
-        # empty string when nothing moved, never a fabricated figure.
-        impact_line = ''
-        if npv_before is not None:
-            impact_line = _format_npv_impact(
-                npv_before, _read_cashflow_npv(artifact.project_id)
-            )
+        # Impact line. Engine delta only — never a fabricated figure — and
+        # never empty, so a committed write always reports itself.
+        note_labels = []
+        if note_target:
+            fid = int(pre_ref['row_id'])
+            note_labels = [
+                _read_budget_timing([fid]).get(fid, {}).get('label') or f'Line {fid}'
+            ]
+        cf_after = (_read_cashflow_state(artifact.project_id)
+                    if npv_before is not None
+                    else {'npv': None, 'horizon': None})
+        impact_line = _build_impact_line(
+            project_id=artifact.project_id,
+            npv_before=npv_before,
+            npv_after=cf_after['npv'],
+            timing_before=timing_before,
+            timing_after=_read_budget_timing(timing_target),
+            note_labels=note_labels,
+            npv_relevant=npv_relevant,
+            horizon=cf_after['horizon'] or (
+                cf_before['horizon'] if npv_relevant else None),
+        )
 
         return Response({
             'success': True,
@@ -374,10 +405,24 @@ class ArtifactViewSet(viewsets.ViewSet):
             sr is not None and sr['table'] in _NPV_IMPACTING_TABLES
             for _spec, sr, _err in resolved
         )
-        npv_before = (
-            _read_cashflow_npv(artifact.project_id)
-            if any_npv_impacting and artifact.project_id is not None else None
+        cf_before = (
+            _read_cashflow_state(artifact.project_id)
+            if any_npv_impacting and artifact.project_id is not None
+            else {'npv': None, 'horizon': None}
         )
+        npv_before = cf_before['npv']
+
+        # Timing-before, once, for the budget rows whose start/duration this
+        # batch touches. Must be read BEFORE any write — trg_budget_calculate_
+        # end_period rewrites end_period underneath us on the first UPDATE.
+        timing_targets = {
+            int(sr['row_id'])
+            for _spec, sr, err in resolved
+            if err is None and sr is not None
+            and sr['table'] == 'core_fin_fact_budget'
+            and sr['column'] in _TIMING_BUDGET_COLUMNS
+        }
+        timing_before = _read_budget_timing(timing_targets)
 
         # Pass 2 — apply each edit through its own writer.
         results = []
@@ -428,12 +473,43 @@ class ArtifactViewSet(viewsets.ViewSet):
                 )
             new_state = refreshed.get('new_state')
 
-        # ONE impact line for the whole set — engine delta, empty if nothing
-        # moved, never fabricated.
+        # ONE impact line for the whole set. Never fabricated — and, since
+        # slice 2, never empty either: a committed edit that reports nothing is
+        # indistinguishable from one that never landed. See _build_impact_line.
         impact_line = ''
-        if npv_before is not None and applied:
-            impact_line = _format_npv_impact(
-                npv_before, _read_cashflow_npv(artifact.project_id)
+        if applied:
+            landed = {
+                (r['target']['table'], str(r['target']['row_id']),
+                 r['target']['column'])
+                for r in results
+                if r.get('status') == 'applied' and r.get('target')
+            }
+            timing_landed = {
+                int(row_id) for table, row_id, column in landed
+                if table == 'core_fin_fact_budget'
+                and column in _TIMING_BUDGET_COLUMNS
+            }
+            note_landed = [
+                int(row_id) for table, row_id, column in landed
+                if table == 'core_fin_fact_budget'
+                and column in _NOTE_BUDGET_COLUMNS
+            ]
+            note_labels = [
+                (_read_budget_timing([f]).get(f, {}).get('label') or f'Line {f}')
+                for f in note_landed
+            ]
+            cf_after = (_read_cashflow_state(artifact.project_id)
+                        if npv_before is not None
+                        else {'npv': None, 'horizon': None})
+            impact_line = _build_impact_line(
+                project_id=artifact.project_id,
+                npv_before=npv_before,
+                npv_after=cf_after['npv'],
+                timing_before=timing_before,
+                timing_after=_read_budget_timing(timing_landed),
+                note_labels=note_labels,
+                npv_relevant=any_npv_impacting,
+                horizon=cf_after['horizon'] or cf_before['horizon'],
             )
 
         return Response({
@@ -613,7 +689,30 @@ def _walk_path(schema, path):
 # (e.g. amount, recomputed by trg_budget_calculate_amount) can never be written.
 # `uom_code` (CB10) is a picklist code, not a number — it is written as a
 # string, not decimal-coerced; see _write_budget_cell.
-_EDITABLE_BUDGET_CELL_COLUMNS = {'qty', 'rate', 'uom_code'}
+_EDITABLE_BUDGET_CELL_COLUMNS = {
+    'qty', 'rate', 'uom_code',
+    # Budget slice 2. These are the REAL COLUMN names, not the artifact's cell
+    # keys — the artifact calls them start / duration / notes. The cell-key →
+    # column mapping lives in exactly one place (budget_artifact_builder.
+    # _BUDGET_CELL_TO_COLUMN) and is what stops the artifact's `notes` landing
+    # on the column `notes`, which is the line's DESCRIPTION.
+    'start_period', 'periods_to_complete', 'internal_memo',
+}
+
+# Period columns: whole numbers with a floor, not free decimals. Validated here
+# with a readable message rather than left to a database constraint — the
+# column is a plain nullable integer, so 0 or -3 would otherwise be stored
+# happily and then silently mis-spread the cost across the cash flow.
+_BUDGET_PERIOD_COLUMNS = {'start_period', 'periods_to_complete'}
+
+# Free-text budget cells, written as strings rather than decimal-coerced.
+_BUDGET_TEXT_COLUMNS = {'internal_memo'}
+
+# What to call a period column in a message aimed at a person.
+_PERIOD_COLUMN_LABEL = {
+    'start_period': 'Start period',
+    'periods_to_complete': 'Duration',
+}
 
 
 def _resolve_cell_source_ref(schema, cell_path):
@@ -706,6 +805,52 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
                 'detail': 'UOM cannot be empty — choose a unit of measure.',
             }
         value_to_write = code
+    elif column in _BUDGET_TEXT_COLUMNS:
+        # Free text. An empty note is a legitimate value (clearing a note), so
+        # unlike UOM it is not an error — it is written as NULL, which is what
+        # "no note" means on a nullable text column. Not decimal-coerced, and
+        # never conflated with the description column; see the mapping comment
+        # on _EDITABLE_BUDGET_CELL_COLUMNS.
+        text = '' if raw_value is None else str(raw_value).strip()
+        value_to_write = text or None
+    elif column in _BUDGET_PERIOD_COLUMNS:
+        # Whole periods only. The cash-flow spreaders read these directly
+        # (land_dev_cashflow_service._spread_cost and its TypeScript twin), and
+        # trg_budget_calculate_end_period derives end_period from the pair, so a
+        # fractional or non-positive value would corrupt the schedule silently
+        # rather than fail. Refuse inline with a readable reason instead.
+        raw_text = '' if raw_value is None else str(raw_value).strip()
+        if not raw_text:
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': (
+                    f'{_PERIOD_COLUMN_LABEL[column]} cannot be empty — '
+                    'enter a whole number of periods.'
+                ),
+            }
+        try:
+            period_value = int(raw_text.replace(',', ''))
+        except (TypeError, ValueError):
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': (
+                    f'{_PERIOD_COLUMN_LABEL[column]} must be a whole number; '
+                    f'got {raw_text!r}.'
+                ),
+            }
+        if period_value < 1:
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': (
+                    f'{_PERIOD_COLUMN_LABEL[column]} must be 1 or greater; '
+                    f'got {period_value}. Period 1 is the first period of the '
+                    'schedule, and a line must run for at least one period.'
+                ),
+            }
+        value_to_write = period_value
     else:
         # Coerce loose numeric input ("1,250" / "$500" / "300") to a Decimal.
         from .field_writers import _coerce_decimal
@@ -1405,39 +1550,345 @@ _NPV_IMPACTING_TABLES = {
 }
 
 
+def _read_cashflow_state(project_id):
+    """Cash-flow headline + horizon, from THE canonical engine. Never raises.
+
+    Goes through ``_fetch_cashflow_schedule`` → ``cashflow_routing.
+    fetch_cashflow_schedule(include_financing=False)``, which is the same call
+    the cash-flow artifact builder makes. That is deliberate and load-bearing:
+    the number in the impact line and the number on the cash-flow screen come
+    from one engine, so they cannot disagree. NPV is NEVER computed here — this
+    repo already carries six IRR implementations and that is the mistake not to
+    repeat.
+
+    ``horizon`` is the analysis length in periods, used only to explain an
+    exact-zero delta (a cost pushed past the end of the analysis is truncated
+    either way). Returns ``{'npv': float|None, 'horizon': int|None}``.
+    """
+    try:
+        from apps.landscaper.tool_executor import _fetch_cashflow_schedule
+        envelope = _fetch_cashflow_schedule(int(project_id)) or {}
+        summary = envelope.get('summary') or {}
+        npv = summary.get('npv')
+        total_periods = envelope.get('totalPeriods')
+        if total_periods is None:
+            periods = envelope.get('periods')
+            total_periods = len(periods) if isinstance(periods, list) else None
+        return {
+            'npv': float(npv) if npv is not None else None,
+            'horizon': int(total_periods) if total_periods else None,
+        }
+    except Exception:
+        import logging as _logging
+        _logging.getLogger(__name__).debug(
+            'commit_field_edit: cash-flow read failed (non-blocking)', exc_info=True
+        )
+        return {'npv': None, 'horizon': None}
+
+
 def _read_cashflow_npv(project_id):
     """Best-effort cash-flow NPV headline for the impact line (CB6).
 
     Returns a float or ``None``; never raises. A missing / un-modeled schedule
     simply yields no impact line rather than blocking the write.
     """
+    return _read_cashflow_state(project_id)['npv']
+
+
+# ─── Impact line (budget slice 2) ────────────────────────────────────────────
+#
+# WHY THIS IS NOT JUST AN NPV DELTA ANY MORE
+# ------------------------------------------
+# start_period / periods_to_complete are TIMING inputs: they change WHEN money
+# is spent, not how much. A duration edit can reshape the whole schedule and
+# move NPV by less than a dollar, and the old formatter returned '' for that —
+# so a committed write reported nothing at all. That is the silent-write class
+# this project has paid for before: the user cannot tell a successful write from
+# a no-op. The impact line's job is to PROVE the write happened; the NPV delta
+# was only ever a proxy for that.
+#
+# So: every committed edit produces at least one clause. Never ''.
+
+# Sentinel: 'nobody passed a rate, go and read it'. Distinct from None,
+# which is the real answer 'this project has no discount rate'.
+_UNSET = object()
+
+_TIMING_BUDGET_COLUMNS = {'start_period', 'periods_to_complete'}
+_NOTE_BUDGET_COLUMNS = {'internal_memo'}
+
+
+def _project_discount_rate(project_id):
+    """The project's OWN stored discount rate, or None when it has none.
+
+    Deliberately re-reads tbl_dcf_analysis rather than trusting the engine's
+    figure: LandDevCashFlowService._get_dcf_assumptions falls back to 0.10 when
+    the project has no rate (see its `discount_rate = float(row[1]) if row[1]
+    else 0.10`). An NPV computed from an invented rate must not be reported to
+    the user as if it were theirs, so the impact line says the rate is missing
+    instead of showing that number.
+
+    A stored ZERO is returned as 0.0, NOT as None. The two mean different
+    things and produce different sentences: absent means "we cannot value
+    this", zero means "this project does not discount, so timing genuinely does
+    not change present value". Collapsing them would turn a real answer into a
+    missing one.
+    """
+    if project_id is None:
+        return None
+    from django.db import connection as _conn
     try:
-        from apps.landscaper.tool_executor import _fetch_cashflow_schedule
-        envelope = _fetch_cashflow_schedule(int(project_id))
-        summary = (envelope or {}).get('summary') or {}
-        npv = summary.get('npv')
-        return float(npv) if npv is not None else None
-    except Exception:
+        with _conn.cursor() as cursor:
+            cursor.execute(
+                'SELECT discount_rate FROM landscape.tbl_dcf_analysis '
+                'WHERE project_id = %s LIMIT 1',
+                [int(project_id)],
+            )
+            row = cursor.fetchone()
+    except Exception:  # noqa: BLE001
         import logging as _logging
         _logging.getLogger(__name__).debug(
-            'commit_field_edit: NPV read failed (non-blocking)', exc_info=True
+            'impact line: discount-rate read failed (non-blocking)', exc_info=True
         )
+        return None
+    if not row or row[0] is None:
+        return None
+    try:
+        return float(row[0])
+    except (TypeError, ValueError):
         return None
 
 
-def _format_npv_impact(before, after):
-    """One-line NPV delta for the impact banner.
+def _read_budget_timing(fact_ids):
+    """Timing snapshot for the given budget rows: {fact_id: {...}}.
 
-    Empty string when nothing moved (< $1) or either reading is unavailable.
-    Engine delta only — never a fabricated figure.
+    Reads start_period, periods_to_complete, the TRIGGER-DERIVED end_period, and
+    the line's description (the `notes` column — see the mapping note). Returns
+    {} on any failure; the impact line degrades to its NPV clause rather than
+    taking a successful write down with it.
     """
+    ids = [int(f) for f in fact_ids]
+    if not ids:
+        return {}
+    from django.db import connection as _conn
+    try:
+        with _conn.cursor() as cursor:
+            cursor.execute(
+                'SELECT fact_id, start_period, periods_to_complete, end_period, '
+                'notes, amount FROM landscape.core_fin_fact_budget '
+                'WHERE fact_id = ANY(%s)',
+                [ids],
+            )
+            rows = cursor.fetchall()
+    except Exception:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).debug(
+            'impact line: timing read failed (non-blocking)', exc_info=True
+        )
+        return {}
+    return {
+        r[0]: {
+            'start_period': r[1],
+            'periods_to_complete': r[2],
+            'end_period': r[3],
+            'label': (r[4] or '').strip() or f'Line {r[0]}',
+            'amount': float(r[5]) if r[5] is not None else None,
+        }
+        for r in rows
+    }
+
+
+def _format_timing_clause(label, before, after):
+    """One clause naming what the user changed AND what the trigger derived.
+
+    trg_budget_calculate_end_period rewrites end_period from
+    (start_period, periods_to_complete) on every write. The user changed one
+    number and the database changed a second one, so both belong in the same
+    sentence — the "was" on what they edited, the resulting value on what was
+    derived. Returns '' when nothing about this row's timing actually moved.
+    """
+    parts = []
+    old_start, new_start = before.get('start_period'), after.get('start_period')
+    old_dur, new_dur = (before.get('periods_to_complete'),
+                        after.get('periods_to_complete'))
+    if new_start != old_start and new_start is not None:
+        parts.append(f'starts period {new_start} (was {_or_dash(old_start)})')
+    elif new_start is not None:
+        parts.append(f'starts period {new_start}')
+    if new_dur != old_dur and new_dur is not None:
+        plural = '' if new_dur == 1 else 's'
+        parts.append(f'runs {new_dur} period{plural} (was {_or_dash(old_dur)})')
+    if new_start == old_start and new_dur == old_dur:
+        return ''
+    end = after.get('end_period')
+    if end is not None:
+        parts.append(f'ends {end}')
+    return f"{label} {', '.join(parts)}" if parts else ''
+
+
+def _or_dash(value):
+    return '—' if value is None else value
+
+
+def _money(value):
+    """Whole dollars, parenthesised when negative.
+
+    A land-development NPV is routinely negative early in the schedule, and
+    naive interpolation renders that as ``$-412,002`` — the minus sign lands
+    inside the amount, on the wrong side of the symbol. The tabular standard
+    this product already uses puts negatives in parentheses.
+    """
+    if value is None:
+        return '—'
+    body = f'${abs(value):,.0f}'
+    return f'({body})' if value < 0 else body
+
+
+# Why an exact-zero NPV delta happened. Each is a real, nameable condition;
+# anything else is a propagation defect, not a result. See _diagnose_zero_npv.
+_ZERO_NPV_ZERO_RATE = (
+    "the project's discount rate is zero, so moving a cost does not change its "
+    'present value'
+)
+_ZERO_NPV_NO_AMOUNT = 'the line has no amount to move'
+_ZERO_NPV_NO_CHANGE = 'the schedule did not actually change'
+_ZERO_NPV_OUTSIDE_HORIZON = (
+    'the line falls outside the analysis horizon, so it is truncated either way'
+)
+
+
+def _diagnose_zero_npv(*, discount_rate, timing_before, timing_after, horizon):
+    """Name the reason a timing edit moved NPV by EXACTLY zero, or return None.
+
+    For a discounted cash flow this is not a normal outcome. Money is valued by
+    WHEN it occurs, so for any non-zero rate and any non-zero amount, moving a
+    cost must move its present value. An exact zero therefore means one of a
+    small set of specific conditions holds — or the edit never reached the
+    engine, which is a bug.
+
+    Returning None means "none of the known causes applies", and the caller
+    reports a suspected propagation defect rather than a quiet success.
+    Swallowing that would be exactly the silent-write failure this whole line
+    exists to prevent.
+    """
+    if discount_rate == 0:
+        return _ZERO_NPV_ZERO_RATE
+
+    moved = [
+        fid for fid, after in timing_after.items()
+        if (fid in timing_before
+            and (after.get('start_period') != timing_before[fid].get('start_period')
+                 or after.get('periods_to_complete')
+                 != timing_before[fid].get('periods_to_complete')))
+    ]
+    if not moved:
+        return _ZERO_NPV_NO_CHANGE
+
+    if all(not (timing_after[fid].get('amount') or 0) for fid in moved):
+        return _ZERO_NPV_NO_AMOUNT
+
+    if horizon:
+        def outside(snapshot):
+            start = snapshot.get('start_period')
+            return start is not None and start > horizon
+        if all(outside(timing_after[fid]) and outside(timing_before[fid])
+               for fid in moved):
+            return _ZERO_NPV_OUTSIDE_HORIZON
+
+    return None
+
+
+def _format_npv_clause(before, after, *, discount_rate, zero_cause=None,
+                       timing_edit=False):
+    """The NPV half of the impact line. Never empty, and never claims stasis.
+
+    Three cases, per the UB3 corrected condition 3:
+
+    3a — the delta is displayable: show it.
+    3b — the delta is non-zero but rounds away in whole dollars: say that it
+         MOVED and that the move is under a dollar. Never "unchanged": a cash
+         flow values money by when it occurs, so a timing edit on a real amount
+         at a real discount rate always moves NPV. "Unchanged" and "smaller than
+         the precision we print" are different claims and only one is true —
+         and the false one teaches the user that retiming is free.
+    3c — the delta computes as exactly zero: a condition to EXPLAIN, never a
+         bare result. ``zero_cause`` names it; None means none of the known
+         causes applies, which points at the timing input not reaching the
+         engine.
+
+    The headline stays in whole dollars. Widening its precision to chase a
+    sub-dollar move would change how every NPV in the product reads in order to
+    win an edge case.
+    """
+    if discount_rate is None:
+        return ('Cash-flow NPV not computed — this project has no discount '
+                'rate set.')
     if before is None or after is None:
-        return ''
+        return 'Cash-flow NPV unavailable — the cash flow could not be modelled.'
     delta = after - before
+    if delta == 0:
+        if zero_cause:
+            return f'Cash-flow NPV unmoved — {zero_cause}.'
+        if timing_edit:
+            return ('Cash-flow NPV did not move, which a retimed cost should '
+                    'not do — the timing change may not have reached the cash '
+                    'flow. This looks like a defect; please report it.')
+        return f'Cash-flow NPV {_money(after)} (no change from this edit)'
     if abs(delta) < 1:
-        return ''
-    sign = '+' if delta >= 0 else '−'  # minus sign
-    return f'Cash-flow NPV {sign}${abs(delta):,.0f} → ${after:,.0f}'
+        sign = 'up' if delta > 0 else 'down'
+        return f'Cash-flow NPV moved {sign} by less than $1 → {_money(after)}'
+    sign = '+' if delta > 0 else '−'  # minus sign
+    return f'Cash-flow NPV {sign}${abs(delta):,.0f} → {_money(after)}'
+
+
+def _build_impact_line(*, project_id, npv_before, npv_after, timing_before,
+                       timing_after, note_labels, npv_relevant, horizon=None,
+                       discount_rate=_UNSET):
+    """Assemble the impact banner. ALWAYS non-empty for a committed edit.
+
+    Clause order: what moved on the schedule first (concrete, per line), then
+    what it did to the money. A notes edit moves neither, so it gets a plain
+    confirmation of what was saved — condition 7 of the UB3 answers: a committed
+    edit that reports nothing is the failure this line exists to prevent.
+    """
+    clauses = []
+    for fact_id, after in timing_after.items():
+        before = timing_before.get(fact_id)
+        if not before:
+            continue
+        clause = _format_timing_clause(after.get('label') or f'Line {fact_id}',
+                                       before, after)
+        if clause:
+            clauses.append(clause)
+    for label in note_labels:
+        clauses.append(f'Note saved on {label}')
+    if npv_relevant:
+        rate = (_project_discount_rate(project_id)
+                if discount_rate is _UNSET else discount_rate)
+        timing_edit = bool(timing_after)
+        zero_cause = None
+        # Only a RETIMED cost is guaranteed to move present value, so only a
+        # timing edit's zero needs explaining. Diagnosing a rate or UOM edit
+        # here produced 'the schedule did not actually change' — true, but
+        # about a schedule the user never touched.
+        if (timing_edit and npv_before is not None and npv_after is not None
+                and npv_after - npv_before == 0):
+            zero_cause = _diagnose_zero_npv(
+                discount_rate=rate,
+                timing_before=timing_before,
+                timing_after=timing_after,
+                horizon=horizon,
+            )
+        clauses.append(_format_npv_clause(
+            npv_before, npv_after,
+            discount_rate=rate,
+            zero_cause=zero_cause,
+            timing_edit=timing_edit,
+        ))
+    if not clauses:
+        # Reached only when a write landed on something with no schedule, no
+        # note and no cash-flow relevance. Still says something.
+        clauses.append('Saved')
+    return '\n'.join(clauses)
 
 
 def _refresh_artifact_after_write(*, artifact, user_id):
