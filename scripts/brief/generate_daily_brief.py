@@ -6,10 +6,13 @@ Produces a single self-contained HTML brief to the OneDrive workspace folder
 matching daily-brief/MOCKUP-redesign.html. Sections in order:
   1. Header + summary callout
   2. Work In Progress (labeled branches only — see .claude/branch-labels.json)
-  3. Open Feedback (from tbl_feedback where source='help_panel' and
-     status in (open, in_progress); in_progress rows get the orange border
-     treatment plus a "Being worked on" tag)
-  4. Resolved Recently (closed_at or addressed_at within last 7 days)
+  3. Open Feedback (from tbl_feedback where source in ('help_panel','manual')
+     and status in (open, in_progress); in_progress rows get the orange border
+     treatment plus a "Being worked on" tag. 'manual' = deliberately logged
+     items — engineering debt, audit findings — included since 2026-08-21;
+     'backfill' stays excluded)
+  4. Resolved Recently (closed_at or addressed_at within last 7 days, same
+     sources as section 3)
   5. Today's Sessions (rolling 3-day; read from .claude/sessions.json)
   6. Parallel Sessions (one-line summary of .claude/worktrees/)
   7. Uncommitted Right Now (plain-English translation of git status)
@@ -695,7 +698,18 @@ def gather_automated_checks() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def gather_open_feedback(conn) -> list[dict]:
-    """Open + in-progress, real captures only (source='help_panel').
+    """Open + in-progress, real captures only (source in help_panel, manual).
+
+    ``manual`` rows are items logged deliberately rather than captured from the
+    Help panel — engineering debt, findings from an audit, things Gregg asked to
+    have recorded so he would not have to remember them.
+
+    They were EXCLUDED from this section until 2026-08-21, which defeated the
+    point of the section: four manual rows (FB-305, 307, 328, 329) had been open
+    since May and June without ever appearing in a brief. Found while logging six
+    more. ``backfill`` stays excluded — those are 256 historical rows seeded from
+    old help messages, and they are all closed.
+
     LEFT JOIN LATERAL pulls the LLM's prior answer for backfilled rows
     (source_help_message_id IS NOT NULL) so the brief can render it inline.
     Rows without a help_message link return previous_answer = NULL.
@@ -719,7 +733,7 @@ def gather_open_feedback(conn) -> list[dict]:
              ORDER BY m_assistant.created_at ASC
              LIMIT 1
           ) prev ON true
-         WHERE f.source = 'help_panel'
+         WHERE f.source IN ('help_panel', 'manual')
            AND f.status IN ('open', 'in_progress')
          ORDER BY f.status = 'in_progress' DESC, f.created_at DESC, f.id DESC
     """
@@ -729,14 +743,19 @@ def gather_open_feedback(conn) -> list[dict]:
 
 
 def gather_resolved_recently(conn) -> list[dict]:
-    """Closed/addressed within last 7 days, real captures only."""
+    """Closed/addressed within last 7 days, real captures only.
+
+    Sources kept in step with gather_open_feedback: an item that appears in the
+    open section must be able to appear here when it is resolved, or it drops
+    out of the brief silently and looks abandoned rather than done.
+    """
     sql = """
         SELECT
             id, created_at, page_context, message_text, status, source,
             addressed_at, closed_at,
             resolved_by_commit_sha, resolved_by_commit_url, resolution_notes
           FROM landscape.tbl_feedback
-         WHERE source = 'help_panel'
+         WHERE source IN ('help_panel', 'manual')
            AND status IN ('addressed', 'closed', 'wontfix', 'duplicate')
            AND COALESCE(closed_at, addressed_at) >= NOW() - INTERVAL %s
          ORDER BY COALESCE(closed_at, addressed_at) DESC, id DESC
