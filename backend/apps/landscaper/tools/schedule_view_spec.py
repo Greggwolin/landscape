@@ -435,6 +435,8 @@ def build_budget_view_config(
         {'key': 'stage', 'label': 'Stage', 'available': has_stage,
          'reason': None if has_stage
                    else 'No stage recorded on these lines'},
+        {'key': 'category', 'label': 'Category', 'available': True,
+         'reason': None},
         {'key': 'notes', 'label': 'Notes', 'available': True,
          'reason': None if has_notes
                    else 'No notes recorded yet — the column is empty until one is written'},

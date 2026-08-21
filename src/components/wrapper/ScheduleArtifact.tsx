@@ -240,12 +240,29 @@ export function ScheduleArtifact({
    * hidden — an empty junction table should not empty the dropdown. */
   const categoriesForStage = React.useCallback(
     (column: ScheduleColumn, stage: unknown) => {
-      const all = column.options ?? [];
+      const all = (column.options ?? []).map(
+        (o) => ({ value: String(o.value), label: o.label }),
+      );
       const s = stage == null ? '' : String(stage);
-      if (!s) return all.map((o) => ({ value: String(o.value), label: o.label }));
-      return all
+      if (!s) return all;
+      const narrowed = (column.options ?? [])
         .filter((o) => !o.stages?.length || o.stages.includes(s))
         .map((o) => ({ value: String(o.value), label: o.label }));
+
+      /* NEVER STRAND A ROW.
+       *
+       * Narrowing is a convenience, not a constraint — the database does not
+       * require a category to be linked to a stage. Measured on project 9: rows
+       * carry the legacy stage 'Development', which almost nothing in
+       * core_category_lifecycle_stages links to, so narrowing 289 categories by
+       * it left FOUR, and they were operating-expense categories with no
+       * bearing on a land-development line. A dropdown that is technically
+       * populated and practically useless reads exactly like one that is
+       * broken — which is how it was reported.
+       *
+       * So a narrowing that would leave the user with almost nothing yields to
+       * the full list. Better a longer list than a wrong one. */
+      return narrowed.length >= 5 ? narrowed : all;
     },
     [],
   );
@@ -418,6 +435,12 @@ export function ScheduleArtifact({
         // An explicitly requested column always shows. The constant-drop rule
         // below is an automatic tidy-up, not a veto over what was asked for —
         // asking for Stage and getting nothing is indistinguishable from broken.
+        /* A column you have grouped BY is repeated down every row inside its
+         * own group — the heading already says it. Hiding it is not a tidy-up
+         * like the constant-drop rule below; it is removing a literal
+         * duplication of the group heading. Applies to any groupable column,
+         * not just category, so grouping by stage hides stage too. */
+        if (grouping !== 'none' && key === grouping) return false;
         if (extraColumns.includes(key)) return true;
         // The `all` rung is the one you BUILD a line on, and a line needs a
         // category and a stage to exist. Dropping them because every existing
@@ -437,7 +460,7 @@ export function ScheduleArtifact({
     return cols;
      
   }, [config.columns, config.rung_columns, rung, extraColumns, visibleRows,
-      showHier, hierHeader]);
+      showHier, hierHeader, grouping]);
 
   /* Line rows, grouped into sections with subtotals. */
   const sections = useMemo(() => {
@@ -718,36 +741,6 @@ export function ScheduleArtifact({
         </div>
       )}
 
-      {/* ── Commit bar (slice 2) ──
-        * Appears only once something is staged. Nothing posts on a keystroke:
-        * the whole set lands through ONE batch request, which is what makes a
-        * single impact line for the set meaningful. */}
-      {staging.stagedCount > 0 && (
-        <div className={styles.commitBar} role="region" aria-label="Staged changes">
-          <span className={styles.commitCount}>
-            {staging.stagedCount} change{staging.stagedCount === 1 ? '' : 's'} staged
-          </span>
-          <span className={styles.commitActions}>
-            <button
-              type="button"
-              className={styles.commitButton}
-              disabled={staging.committing}
-              onClick={() => { void staging.commitStaged(); }}
-            >
-              {staging.committing ? 'Saving…' : 'Commit'}
-            </button>
-            <button
-              type="button"
-              className={styles.discardButton}
-              disabled={staging.committing}
-              onClick={staging.discardStaged}
-            >
-              Discard
-            </button>
-          </span>
-        </div>
-      )}
-
       {/* ── Header ── */}
       <div className={styles.head}>
         <div className={styles.kicker}>
@@ -868,6 +861,40 @@ export function ScheduleArtifact({
             </button>
           ))}
       </div>
+
+      {/* ── Commit bar (slice 2) ──
+        * Sits directly under the badge row and above the table it acts on,
+        * where the eye already is — it used to float above the header, away
+        * from the rows being changed.
+        * Appears only once something is staged. Nothing posts on a keystroke:
+        * the whole set lands through ONE batch request, which is what makes a
+        * single impact line for the set meaningful. */}
+      {staging.stagedCount > 0 && (
+        <div className={styles.commitBar} role="region" aria-label="Staged changes">
+          <span className={styles.commitCount}>
+            {staging.stagedCount} change{staging.stagedCount === 1 ? '' : 's'} staged
+          </span>
+          <span className={styles.commitActions}>
+            <button
+              type="button"
+              className={styles.commitButton}
+              disabled={staging.committing}
+              onClick={() => { void staging.commitStaged(); }}
+            >
+              {staging.committing ? 'Saving…' : 'Commit'}
+            </button>
+            <button
+              type="button"
+              className={styles.discardButton}
+              disabled={staging.committing}
+              onClick={staging.discardStaged}
+            >
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
+
 
       {/* ── The schedule ── */}
       <div className={styles.scroll}>

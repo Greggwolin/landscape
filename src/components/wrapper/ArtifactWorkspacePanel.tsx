@@ -193,6 +193,28 @@ export function ArtifactWorkspacePanel({
   const activeQuery = useArtifact(activeArtifactId);
   const active = activeQuery.data ?? null;
 
+  /* Follow a superseded artifact to the one that replaced it.
+   *
+   * Dedup keeps ONE canonical artifact per (project, dedup_key): re-running a
+   * tool archives the previous artifact and writes a new one. Nothing stopped
+   * the archived copy being opened again — a chat thread still points at the
+   * artifact IT created — so following an older thread rendered a snapshot
+   * several builder versions behind.
+   *
+   * That is not cosmetic. An archived budget artifact carries the refs it had
+   * when it was written, so the all-or-nothing editability rule correctly makes
+   * the whole table read-only, and a read-only table has no dropdowns to open.
+   * The symptom reads as "the picklists don't populate" — which is how it was
+   * reported, and why the cause was not where the symptom pointed.
+   *
+   * Only ever forward, and only to a live artifact the server named. */
+  useEffect(() => {
+    const successor = active?.superseded_by_artifact_id;
+    if (active?.is_archived && successor && successor !== activeArtifactId) {
+      setActiveArtifactId(successor);
+    }
+  }, [active, activeArtifactId, setActiveArtifactId]);
+
   // Mutations.
   const patchMutation = useArtifactPatch();
   const restoreMutation = useArtifactRestore();
