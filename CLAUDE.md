@@ -309,7 +309,23 @@ npm run db:bootstrap:containers       # Bootstrap container data
 npm run test              # Theme tokens + contrast tests
 npm run test:ui           # Playwright UI mode
 npm run test:headless     # Playwright headless
+npm run test:unit         # Jest unit suite
+
+# Backend — the DATABASE_URL is REQUIRED, not optional
+DATABASE_URL=postgresql://localhost/landscape pytest    # from backend/
 ```
+
+**The backend suite refuses to run against a non-local database.** pytest builds
+`test_<dbname>` with `--create-db` on whatever server `DATABASE_URL` names, and
+`backend/.env` names the production Neon project. `test_land_v2` and
+`test_test_land_v2` were both found sitting in that live project on 2026-08-20,
+the second one ten months old. `backend/conftest.py` now refuses unless the host
+is disposable (`localhost`, `127.0.0.1`, `::1`, a unix socket, or `postgres` /
+`db` / `host.docker.internal`). Override with
+`LANDSCAPE_ALLOW_TEST_DB=i-know-this-is-not-production` — a phrase, not a flag,
+so it cannot be satisfied by habit. **Do not use `TEST_DATABASE_URL`**: it is
+read only when conftest is imported before Django settings are configured, which
+is not what happens under pytest.
 
 ### Seeding
 
@@ -662,6 +678,32 @@ Persistent, versioned visual outputs that render in the right panel of the chat-
 **Phase 4 — Firing rules + cascades + chat cards + real update path.** System-prompt firing rules govern when Landscaper auto-creates an artifact vs. asking. Dependency hooks let one artifact trigger refresh of dependent artifacts. Chat cards render compact previews inline in the chat thread that link to the full artifact in the right panel. Update path is real (not append-only) — artifacts can mutate in place with version history retained.
 
 **Phase 4.5 — Firing discipline + new tool + flat rendering.** Tightened firing rules to reduce false-positive auto-creation. New tool `get_operating_statement` (P&L pulled and rendered as an artifact). "Flat" rendering mode for tabular artifacts that don't need a custom visual.
+
+**Budget schedule editing (Aug 2026).** Budget cells are editable in place on the
+schedule artifact — rate, UOM, start, duration and notes in the table, quantity
+in the derivation popover. Amount is never editable on any surface: a database
+trigger recomputes it as `qty × rate`, and it carries no `cell_source_ref`, so
+both the resolver and the writer refuse it.
+
+Two things to know before extending this:
+
+- **The artifact's cell keys are not the database's column names, and two cross
+  over.** The artifact's `description` is the column `notes`; the artifact's
+  `notes` is `internal_memo`. The mapping lives in exactly one place
+  (`budget_artifact_builder._BUDGET_CELL_TO_COLUMN`) and an unmapped key gets no
+  ref, so it fails closed rather than falling through to a same-named column.
+- **An artifact whose stored state predates the current builder declines editing
+  entirely** rather than rendering half the table as writable. The stored block
+  schema is only rewritten when something commits, so an older budget carries
+  refs for fewer cells; showing some cells editable and others not is
+  indistinguishable, from the user's side, from a bug.
+
+**Artifact writes now send auth headers.** Every READ in `src/hooks/useArtifact.ts`
+sent `getAuthHeaders()`; the three WRITES (`update_state`, `commit_field_edit`,
+`commit_field_edits`) did not, so an authenticated browser received 401 on every
+commit while the backend suite stayed green. The editing spine had never
+committed from a browser before this was fixed (Aug 2026). Green CI is not
+evidence that an artifact works.
 
 **Phase 5 (Apr 30, 2026) — Operating-statement guard + tabular formatting standard (Item #1 from F4 handoff).** Hard programmatic enforcement of operating-statement rendering spec, plus a universal tabular formatting standard that applies to every tabular artifact going forward.
 

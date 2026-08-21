@@ -35,22 +35,29 @@ if ENGINE_PATH.exists():
 # Set Django settings module
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
-# --- TEST_DATABASE_URL redirect ---------------------------------------------
+# --- TEST_DATABASE_URL --------------------------------------------------------
 #
-# Point the suite at the disposable database BEFORE settings are loaded, by
-# rewriting DATABASE_URL in the environment. config.settings reads it through
-# python-decouple, which consults os.environ first, so settings.py then does
-# all of its own work on the safe URL -- including overriding ENGINE to the
-# custom `db_backend` that sets `search_path TO landscape, public`.
+# Honoured only when this module is imported BEFORE Django settings are
+# configured. Under pytest that is usually NOT the case: pytest-django reads
+# DJANGO_SETTINGS_MODULE from pytest.ini and configures Django during
+# pytest_load_initial_conftests, before the rootdir conftest is imported. So
+# treat this as a convenience for direct imports, never as the safety
+# mechanism -- the guard below is the safety mechanism.
 #
-# It has to happen HERE, not in pytest_configure. Mutating settings.DATABASES
-# after django.setup() drops that ENGINE override unless it is carefully
-# merged back, and even merged it leaves connection wrappers already built
-# against the old host. Both were tried and measured: replacing the dict cost
-# 58 failures, merging it and dropping the cached connection cost 369 errors.
-# Rewriting one environment variable before anything reads it costs nothing.
+# DO NOT reinstate a settings-level version of this. It was tried and it was
+# worse than useless: mutating settings.DATABASES from pytest_configure changes
+# the dict the guard reads while the real connection has already been resolved
+# from the original config. The suite reported HOST='localhost', satisfied this
+# very guard, and connected to 169.254.254.254 anyway -- creating `test_land_v2`
+# ON NEON, which is the exact stray database this guard exists to prevent.
+# Verified with a probe test on 2026-08-21.
+#
+# To point the suite somewhere safe, set DATABASE_URL for the run. That works
+# because settings.py reads it before anything connects:
+#
+#     DATABASE_URL=postgresql://localhost/landscape pytest
 _test_db_url = os.environ.get('TEST_DATABASE_URL', '').strip()
-if _test_db_url:
+if _test_db_url and 'config.settings' not in sys.modules:
     os.environ['DATABASE_URL'] = _test_db_url
 
 # Setup Django
@@ -156,44 +163,10 @@ def db_target_is_allowed(host, opt_in=None):
     return (host or '').strip().lower() in ALLOWED_TEST_DB_HOSTS
 
 
-def _apply_test_db_redirect():
-    """Re-point an already-configured settings object at TEST_DATABASE_URL.
-
-    The module-level rewrite above is enough when conftest is imported first,
-    but pytest-django reads DJANGO_SETTINGS_MODULE from pytest.ini and
-    configures Django BEFORE the rootdir conftest is imported, so by the time
-    this file runs settings.DATABASES is already built from the unsafe URL.
-
-    MERGE, never replace: settings.py overrides ENGINE to the custom
-    `db_backend`, which is what sets `search_path TO landscape, public` after
-    connecting (Neon's pooler rejects it as a startup option). Replacing the
-    dict wholesale drops that and 58 tests fail looking like missing tables.
-    Measured, not guessed.
-    """
-    url = os.environ.get(TEST_DB_URL_ENV_VAR, '').strip()
-    if not url:
-        return
-    from django.conf import settings
-    existing = settings.DATABASES.get('default', {})
-    if not existing:
-        return
-    import dj_database_url
-    parsed = dj_database_url.parse(
-        url,
-        conn_max_age=existing.get('CONN_MAX_AGE', 600),
-        conn_health_checks=existing.get('CONN_HEALTH_CHECKS', True),
-    )
-    merged = {**existing, **parsed}
-    merged['ENGINE'] = existing.get('ENGINE') or merged.get('ENGINE')
-    settings.DATABASES['default'] = merged
-
-
 def _refuse_unsafe_test_database():
     """Stop the run before --create-db can touch a non-test server."""
     import pytest
     from django.conf import settings
-
-    _apply_test_db_redirect()
 
     default = settings.DATABASES.get('default', {})
     host = default.get('HOST') or ''
@@ -219,18 +192,14 @@ def _refuse_unsafe_test_database():
         "found sitting in the live Neon project on 2026-08-20, the second one\n"
         "ten months old — leftovers of exactly this.\n"
         "\n"
-        "Set {url_var} once in backend/.env and a bare `pytest` will just work:\n"
-        "\n"
-        "    {url_var}=postgresql://postgres:postgres@localhost:5432/landscape\n"
-        "\n"
-        "Or point this one run somewhere safe:\n"
+        "Point the run at a local database:\n"
         "\n"
         "    DATABASE_URL=postgresql://localhost/landscape pytest\n"
         "\n"
         "If the target really is an isolated, disposable database, set\n"
         "{var}={phrase}\n".format(
             host=host, name=name, var=TEST_DB_OPT_IN_ENV_VAR,
-            url_var=TEST_DB_URL_ENV_VAR, phrase=TEST_DB_OPT_IN_PHRASE,
+            phrase=TEST_DB_OPT_IN_PHRASE,
         ),
         returncode=4,
     )

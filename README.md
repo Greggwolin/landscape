@@ -234,25 +234,21 @@ npm run test:headless
 
 ### Backend (Django)
 
-Set this once in `backend/.env` and the suite just works:
+Run the Django suite from `backend/`, pointed at local Postgres:
 
 ```bash
-TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/landscape
+DATABASE_URL=postgresql://localhost/landscape pytest
 ```
 
-then run `pytest` from `backend/`.
+**Why this is required.** pytest builds its test database with `--create-db`, which drops and
+recreates `test_<dbname>` on whatever server `DATABASE_URL` names. `backend/.env` points that at the
+real Neon database — correct for the dev server, which needs real data — so a bare `pytest` aimed a
+drop-and-recreate at the production project. This is not hypothetical: `test_land_v2` and
+`test_test_land_v2` were both found sitting in the live Neon project on 2026-08-20, the second one
+ten months old.
 
-**Why this exists.** pytest builds its test database with `--create-db`, which drops and recreates
-`test_<dbname>` on whatever server `DATABASE_URL` names. `backend/.env` points that at the real Neon
-database — correct for the dev server, which needs real data — so a bare `pytest` aimed a
-drop-and-recreate at the database holding real project data. This is not hypothetical:
-`test_land_v2` and `test_test_land_v2` were both found sitting in the live Neon project on
-2026-08-20, the second one ten months old.
-
-A guard in `backend/conftest.py` now refuses unless the target is disposable — `localhost`,
-`127.0.0.1`, `::1`, a local unix socket, or a container hostname (`postgres`, `db`,
-`host.docker.internal`). `TEST_DATABASE_URL`, when set, is used in preference to `DATABASE_URL` and
-is the host that gets checked.
+A guard in `backend/conftest.py` refuses unless the target is disposable — `localhost`, `127.0.0.1`,
+`::1`, a local unix socket, or a container hostname (`postgres`, `db`, `host.docker.internal`).
 
 To override for a genuinely isolated, disposable database:
 
@@ -263,6 +259,12 @@ LANDSCAPE_ALLOW_TEST_DB=i-know-this-is-not-production pytest
 It is a phrase rather than a flag on purpose. `=1` is what you reach for when you want the error to
 go away; a sentence about the target database is not something you type by accident. `1`, `true` and
 `yes` do not satisfy it.
+
+> **Do not use `TEST_DATABASE_URL`.** The variable exists and is read, but only when `conftest.py`
+> is imported before Django settings are configured — which is *not* what happens under pytest,
+> because pytest-django configures Django first. Relying on it is actively unsafe: an earlier
+> attempt to honour it by rewriting `settings.DATABASES` made the guard *report* `localhost` while
+> the suite connected to Neon and rebuilt `test_land_v2` there. Use `DATABASE_URL`.
 
 ### Reference projects in the database
 
