@@ -153,6 +153,26 @@ class BudgetCellColumnMapping(SimpleTestCase):
         for unmapped in ('period', 'end_period', 'amount', 'contingency'):
             self.assertNotIn(unmapped, refs, unmapped)
 
+    def test_date_captures_are_json_serialisable(self):
+        """The schema is PERSISTED as JSON.
+
+        A psycopg2 date lands in a ref's captured_value unserialisable, and the
+        failure mode is nasty: the row write itself succeeds, then saving the
+        rebuilt artifact raises `Object of type date is not JSON serializable`,
+        so the database is updated while the client gets a 500 and shows the
+        edit as still pending. Found in a browser, not by a test — this is the
+        test.
+        """
+        import json
+        from datetime import date
+        record = _record()
+        record['start_date'] = date(2027, 3, 1)
+        record['end_date'] = date(2027, 6, 1)
+        refs = _cell_source_refs(record, CAPTURED_AT)
+        json.dumps(refs)  # must not raise
+        self.assertEqual(refs['start_date']['captured_value'], '2027-03-01')
+        self.assertEqual(refs['end_date']['captured_value'], '2027-06-01')
+
     def test_row_without_a_fact_id_gets_no_refs(self):
         record = _record()
         record['fact_id'] = None

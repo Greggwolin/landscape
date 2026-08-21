@@ -54,6 +54,17 @@ const schema = (): BlockDocument => ({
         { key: 'start', label: 'Start' },
         { key: 'duration', label: 'Dur' },
         { key: 'notes', label: 'Notes' },
+        { key: 'description', label: 'Description' },
+        { key: 'division', label: 'Division' },
+        { key: 'stage', label: 'Stage' },
+        { key: 'category', label: 'Category' },
+        { key: 'vendor', label: 'Vendor' },
+        { key: 'timing_method', label: 'Timing' },
+        { key: 'start_date', label: 'Start date' },
+        { key: 'end_date', label: 'End date' },
+        { key: 'cf_start', label: 'CF start' },
+        { key: 'curve_profile', label: 'Curve' },
+        { key: 'curve_steepness', label: 'Steep' },
       ],
       rows: [
         {
@@ -66,6 +77,19 @@ const schema = (): BlockDocument => ({
             start: ref('start_period', 4),
             duration: ref('periods_to_complete', 3),
             notes: ref('internal_memo', 'Bid pending'),
+            // Slice 2b-2. Note `description` maps to the column `notes` while
+            // `notes` maps to `internal_memo` — the cross-over, in one fixture.
+            description: ref('notes', 'Grading'),
+            division: ref('division_id', 629),
+            stage: ref('activity', 'Planning & Engineering'),
+            category: ref('category_id', 31),
+            vendor: ref('vendor_name', 'Sundt'),
+            timing_method: ref('timing_method', 'curve'),
+            start_date: ref('start_date', '2027-03-01'),
+            end_date: ref('end_date', '2027-06-01'),
+            cf_start: ref('cf_start_flag', false),
+            curve_profile: ref('curve_profile', 'standard'),
+            curve_steepness: ref('curve_steepness', 40),
           },
           cells: { category: 'Grading', qty: 788, rate: 250, amount: 197000 },
         },
@@ -110,8 +134,19 @@ describe('budgetCellTarget', () => {
   });
 
   it('refuses a cell whose column has no ref', () => {
-    expect(budgetCellTarget(schema(), 'b1', 'category')).toBeNull();
-    expect(budgetCellTarget(schema(), 'b1', 'description')).toBeNull();
+    // `escalation` is backed on the SERVER but this build does not offer it,
+    // and the fixture mirrors that: no ref, so no editing.
+    expect(budgetCellTarget(schema(), 'b1', 'escalation')).toBeNull();
+    expect(budgetCellTarget(schema(), 'b1', 'period')).toBeNull();
+  });
+
+  it('description resolves to the notes column, not to itself', () => {
+    // The cross-over, from the client side. If this ever returns
+    // internal_memo, a line title is about to be written into a user's note.
+    const target = budgetCellTarget(schema(), 'b1', 'description');
+    expect(target?.expectedRef.column).toBe('notes');
+    expect(budgetCellTarget(schema(), 'b1', 'notes')?.expectedRef.column)
+      .toBe('internal_memo');
   });
 
   it('refuses every cell on a row with no refs at all', () => {
@@ -199,7 +234,11 @@ describe('budgetEditability', () => {
     // on screen to say why.
     const v = budgetEditability(staleSchema(), [{ id: 'b1' }]);
     expect(v.usable).toBe(false);
-    expect(v.missing).toEqual(['duration', 'notes', 'start']);
+    // A pre-slice-2 schema backs qty/rate/uom and nothing else, so everything
+    // this build added since is missing.
+    expect(v.missing).toEqual(
+      [...BUDGET_EDITABLE_CELLS].filter((c) => !['qty', 'rate', 'uom'].includes(c)).sort(),
+    );
   });
 
   it('is all-or-nothing: one unbacked cell disqualifies the surface', () => {
