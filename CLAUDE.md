@@ -309,7 +309,23 @@ npm run db:bootstrap:containers       # Bootstrap container data
 npm run test              # Theme tokens + contrast tests
 npm run test:ui           # Playwright UI mode
 npm run test:headless     # Playwright headless
+npm run test:unit         # Jest unit suite
+
+# Backend — the DATABASE_URL is REQUIRED, not optional
+DATABASE_URL=postgresql://localhost/landscape pytest    # from backend/
 ```
+
+**The backend suite refuses to run against a non-local database.** pytest builds
+`test_<dbname>` with `--create-db` on whatever server `DATABASE_URL` names, and
+`backend/.env` names the production Neon project. `test_land_v2` and
+`test_test_land_v2` were both found sitting in that live project on 2026-08-20,
+the second one ten months old. `backend/conftest.py` now refuses unless the host
+is disposable (`localhost`, `127.0.0.1`, `::1`, a unix socket, or `postgres` /
+`db` / `host.docker.internal`). Override with
+`LANDSCAPE_ALLOW_TEST_DB=i-know-this-is-not-production` — a phrase, not a flag,
+so it cannot be satisfied by habit. **Do not use `TEST_DATABASE_URL`**: it is
+read only when conftest is imported before Django settings are configured, which
+is not what happens under pytest.
 
 ### Seeding
 
@@ -662,6 +678,32 @@ Persistent, versioned visual outputs that render in the right panel of the chat-
 **Phase 4 — Firing rules + cascades + chat cards + real update path.** System-prompt firing rules govern when Landscaper auto-creates an artifact vs. asking. Dependency hooks let one artifact trigger refresh of dependent artifacts. Chat cards render compact previews inline in the chat thread that link to the full artifact in the right panel. Update path is real (not append-only) — artifacts can mutate in place with version history retained.
 
 **Phase 4.5 — Firing discipline + new tool + flat rendering.** Tightened firing rules to reduce false-positive auto-creation. New tool `get_operating_statement` (P&L pulled and rendered as an artifact). "Flat" rendering mode for tabular artifacts that don't need a custom visual.
+
+**Budget schedule editing (Aug 2026).** Budget cells are editable in place on the
+schedule artifact — rate, UOM, start, duration and notes in the table, quantity
+in the derivation popover. Amount is never editable on any surface: a database
+trigger recomputes it as `qty × rate`, and it carries no `cell_source_ref`, so
+both the resolver and the writer refuse it.
+
+Two things to know before extending this:
+
+- **The artifact's cell keys are not the database's column names, and two cross
+  over.** The artifact's `description` is the column `notes`; the artifact's
+  `notes` is `internal_memo`. The mapping lives in exactly one place
+  (`budget_artifact_builder._BUDGET_CELL_TO_COLUMN`) and an unmapped key gets no
+  ref, so it fails closed rather than falling through to a same-named column.
+- **An artifact whose stored state predates the current builder declines editing
+  entirely** rather than rendering half the table as writable. The stored block
+  schema is only rewritten when something commits, so an older budget carries
+  refs for fewer cells; showing some cells editable and others not is
+  indistinguishable, from the user's side, from a bug.
+
+**Artifact writes now send auth headers.** Every READ in `src/hooks/useArtifact.ts`
+sent `getAuthHeaders()`; the three WRITES (`update_state`, `commit_field_edit`,
+`commit_field_edits`) did not, so an authenticated browser received 401 on every
+commit while the backend suite stayed green. The editing spine had never
+committed from a browser before this was fixed (Aug 2026). Green CI is not
+evidence that an artifact works.
 
 **Phase 5 (Apr 30, 2026) — Operating-statement guard + tabular formatting standard (Item #1 from F4 handoff).** Hard programmatic enforcement of operating-statement rendering spec, plus a universal tabular formatting standard that applies to every tabular artifact going forward.
 
@@ -1107,7 +1149,8 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-08-18 (nightly sync) — Plan geometry progress: lot infill recovery (`lot_infill.py` +260 lines), preview window (`plan_preview_views.py` +374, `PlanPreviewWindow.tsx` +355, `plan_reader.py` +108), lot dimensions point-deduction fix. Budget artifact view spec shipped (PR #241): `schedule_view_spec.py` +353, `ScheduleArtifact.tsx` +795, CSS +467 — declarative spec replaces LLM-composed table HTML for budget schedules. CI/nightly hardening: PR gating for stacked branches (CC15 #248), nightly committer off-main-line guard (CC7 #235). Daily brief: PRs-open-≥3-days section (+119 lines). Tool count unchanged at 285 registered / 282 advertised.*
+*Last audit: 2026-08-19 (nightly sync) — SQL file recovery shipped (PR #251): 290 database files recovered from blanket `*.sql` gitignore, rule rewritten to exempt `migrations/` and `backend/migrations/` permanently. BC5 Phase 2 CI proof: deliberate break/revert cycles for lint, typecheck, backend tests, and gitignore — each gate verified to catch its target failure and pass on revert. CI hardening: disaster-drill YAML fix, every real jest suite wired into CI, SQL guard structural gap + stale comment cleaned, artifact-integration skip guard. Daily brief: new "Automated Checks" section. Audit docs: full check inventory (`docs/audits/CHECK-INVENTORY-2026-08-19.md`), schema recoverability proof (176 tables with no file anywhere), Django baseline. Plan geometry GP14 merged (PR #247). Tool count unchanged at 285 registered / 282 advertised.*
+*Prior audit: 2026-08-18 (nightly sync) — Plan geometry progress: lot infill recovery (`lot_infill.py` +260 lines), preview window (`plan_preview_views.py` +374, `PlanPreviewWindow.tsx` +355, `plan_reader.py` +108), lot dimensions point-deduction fix. Budget artifact view spec shipped (PR #241): `schedule_view_spec.py` +353, `ScheduleArtifact.tsx` +795, CSS +467 — declarative spec replaces LLM-composed table HTML for budget schedules. CI/nightly hardening: PR gating for stacked branches (CC15 #248), nightly committer off-main-line guard (CC7 #235). Daily brief: PRs-open-≥3-days section (+119 lines). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-08-14 (nightly sync) — Plan geometry extraction pipeline: entire new subsystem (`backend/apps/knowledge/services/plan_geometry/`, 10 modules, ~3,000+ lines) for auto-classifying uploaded drawings (plats, site plans), extracting lot geometry (vector from plats, raster from site plans), computing lot dimensions, and rolling up into parcel summaries. New `gis_plan_lot` table + `PlanStageCard` frontend component. Valuation fixes: fabrication guard preserves blocked replies; proforma cumulative total double-count fixed; DCF exit values floored to zero; authoritative assumptions hierarchy for income approach; canonical unit count. 8 new test files (~2,100 lines). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-07-31 — Editing spine extended to cash-flow + edit integrity guards: CC3 (#236) cash-flow assumptions editable cells (editing spine slice 4 — `cashflow_artifact_builder.py` expanded to ~500 lines, full write path + pytest); CC11 (#237) stale-cell guard — refuses an edit whose cell pointer no longer matches the current artifact state (prevents silent data corruption on concurrent edits); CC13 (#238) row-moved guard — the click names the ROW not the slot, detects row reordering between render and commit. WIP branch `feat/budget-artifact-slice1`: EB1 view-specification architecture for budget schedule rendering (`schedule_view_spec.py` 321 lines + `ScheduleArtifact.tsx` 676 lines — declarative spec replaces LLM-composed table HTML). Tool count unchanged at 285 registered / 282 advertised.*
 *Prior audit: 2026-07-28 — Artifact editing spine + thread destination persistence: CB6 (#224) single budget cell writable e2e with optimistic locking; CB8 (#227) batch commit — stage several edits, land as one set; TA1 (#226) thread destination persistence (new `landscaper_thread_last_destination` table + Django CRUD + frontend hook); CB3–CB5 (#221–#223) relay sweep + fabrication guard widened to income-property + land-sales vocabulary; CB7 (#225) planning-activity log fix; TA5 (2 commits) artifact routing for schedule tools; #228 LayerPanel hydration fix. Landed since (2026-07-29/30): CB10 UOM picklist editing (#232), CB9 sales-schedule editable cells (#229), CB12–CB14 sales recalc fixes (#231/#233/#234), TA5 artifact host-route fix (#230). Tool count unchanged at 285 registered / 282 advertised.*
