@@ -155,6 +155,16 @@ export interface BudgetEditability {
  */
 export const BUDGET_EDITABLE_CELLS = [
   'uom', 'rate', 'start', 'duration', 'notes', 'qty',
+  // Slice 2b-2: the rest of the line, now that the renderer can draw them.
+  'division', 'stage', 'category', 'description', 'vendor',
+  'timing_method', 'start_date', 'end_date', 'cf_start',
+  'curve_profile', 'curve_steepness',
+  // `escalation` and `escalation_method` are DELIBERATELY absent. The server
+  // backs them with refs, so including them would pass the staleness check —
+  // but the per-line escalation control is being replaced by a single
+  // budget-level rate, and offering a gesture that is about to be withdrawn
+  // teaches the wrong thing. This list is what THIS BUILD offers, and it does
+  // not offer those.
 ] as const;
 
 export function budgetEditability(

@@ -569,3 +569,11 @@
   border-left: 3px solid var(--cui-warning);
   border-radius: 4px;
 }
+
+/* A staged checkbox has no text to colour, so the control itself carries the
+ * pending state. */
+.stagedCheckbox {
+  accent-color: var(--cui-warning);
+  outline: 1px solid var(--cui-warning);
+  outline-offset: 1px;
+}

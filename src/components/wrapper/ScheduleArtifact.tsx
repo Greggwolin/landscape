@@ -68,6 +68,10 @@ export interface ScheduleColumn {
   label: string;
   align?: 'left' | 'right' | 'center';
   kind?: string;
+  /** Allowed values for a constrained cell, read from the table that
+   *  constrains it. Free text into a foreign key earns a database rejection
+   *  and nothing else, so the artifact carries the choices. */
+  options?: Array<{ value: string | number; label: string; parent_id?: number | null; stages?: string[] }>;
 }
 
 export interface ScheduleOptionalColumn {
@@ -88,7 +92,9 @@ export interface ScheduleDerivation {
 export interface ScheduleRow {
   id: string;
   scope: Record<string, number>;
-  cells: Record<string, string | number | null>;
+  /** `boolean` is real, not defensive: cf_start is a flag on the budget line
+   *  and the view specification sends it as one. */
+  cells: Record<string, string | number | boolean | null>;
   derivation?: ScheduleDerivation;
   editable?: string[];
 }
@@ -180,6 +186,11 @@ function formatTimestamp(iso: string): string {
   });
 }
 
+/** Reading order of the detail ladder. A rung the specification does not define
+ *  is not offered; a rung it defines that is missing here is a bug in this
+ *  constant, which is why it lives next to the component that renders it. */
+const RUNG_ORDER = ['summary', 'standard', 'detail', 'all'] as const;
+
 /* ─── Component ────────────────────────────────────────────────────────── */
 
 export function ScheduleArtifact({
@@ -208,9 +219,52 @@ export function ScheduleArtifact({
   const staging = useStagedEdits(onCommitFieldEdits, artifactId);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [draft, setDraft] = useState<string>('');
-  const uomOptions = useMemo(
-    () => budgetColumnOptions(schema, 'uom'),
+  /* Options for a constrained cell.
+   *
+   * The view specification carries them per column (slice 2b), read from the
+   * table that constrains the value. The block schema is the fallback for
+   * artifacts built before that — UOM has ridden there since CB10. Column
+   * first, because it is the fresher of the two. */
+  const optionsFor = React.useCallback(
+    (column: ScheduleColumn): Array<{ value: string; label: string }> | null => {
+      if (column.options?.length) {
+        return column.options.map((o) => ({ value: String(o.value), label: o.label }));
+      }
+      return budgetColumnOptions(schema, column.key);
+    },
     [schema],
+  );
+
+  /* Categories narrow by the row's stage, the way the original form does.
+   * A category with no stages recorded is offered everywhere rather than
+   * hidden — an empty junction table should not empty the dropdown. */
+  const categoriesForStage = React.useCallback(
+    (column: ScheduleColumn, stage: unknown) => {
+      const all = (column.options ?? []).map(
+        (o) => ({ value: String(o.value), label: o.label }),
+      );
+      const s = stage == null ? '' : String(stage);
+      if (!s) return all;
+      const narrowed = (column.options ?? [])
+        .filter((o) => !o.stages?.length || o.stages.includes(s))
+        .map((o) => ({ value: String(o.value), label: o.label }));
+
+      /* NEVER STRAND A ROW.
+       *
+       * Narrowing is a convenience, not a constraint — the database does not
+       * require a category to be linked to a stage. Measured on project 9: rows
+       * carry the legacy stage 'Development', which almost nothing in
+       * core_category_lifecycle_stages links to, so narrowing 289 categories by
+       * it left FOUR, and they were operating-expense categories with no
+       * bearing on a land-development line. A dropdown that is technically
+       * populated and practically useless reads exactly like one that is
+       * broken — which is how it was reported.
+       *
+       * So a narrowing that would leave the user with almost nothing yields to
+       * the full list. Better a longer list than a wrong one. */
+      return narrowed.length >= 5 ? narrowed : all;
+    },
+    [],
   );
   /* Editing is possible only when there is somewhere to send it, a schema to
    * resolve refs from, AND that schema can back EVERY cell this surface offers.
@@ -381,7 +435,18 @@ export function ScheduleArtifact({
         // An explicitly requested column always shows. The constant-drop rule
         // below is an automatic tidy-up, not a veto over what was asked for —
         // asking for Stage and getting nothing is indistinguishable from broken.
+        /* A column you have grouped BY is repeated down every row inside its
+         * own group — the heading already says it. Hiding it is not a tidy-up
+         * like the constant-drop rule below; it is removing a literal
+         * duplication of the group heading. Applies to any groupable column,
+         * not just category, so grouping by stage hides stage too. */
+        if (grouping !== 'none' && key === grouping) return false;
         if (extraColumns.includes(key)) return true;
+        // The `all` rung is the one you BUILD a line on, and a line needs a
+        // category and a stage to exist. Dropping them because every existing
+        // row happens to share one leaves no way to set them on a new row —
+        // the tidy-up defeating the rung's whole purpose.
+        if (rung === 'all') return true;
         if ((key === 'category' || key === 'stage') && visibleRows.length > 1) {
           return distinct(key) > 1;
         }
@@ -395,7 +460,7 @@ export function ScheduleArtifact({
     return cols;
      
   }, [config.columns, config.rung_columns, rung, extraColumns, visibleRows,
-      showHier, hierHeader]);
+      showHier, hierHeader, grouping]);
 
   /* Line rows, grouped into sections with subtotals. */
   const sections = useMemo(() => {
@@ -530,12 +595,45 @@ export function ScheduleArtifact({
 
     const key = stagedKey(target.cellPath);
     const entry = staging.staged[key];
-    const options = column.key === 'uom' ? uomOptions : null;
+
+    /* Which editor this cell gets. Driven by the column's KIND, which the view
+     * specification sets from the shape of the underlying column — a picklist
+     * because the database constrains it, a date because it is a date. The
+     * renderer never decides this from the column name. */
+    const options = column.key === 'category'
+      ? categoriesForStage(column, row.cells.stage)
+      : optionsFor(column);
+    const isBoolean = column.kind === 'boolean';
+    const isDate = column.kind === 'date';
 
     const commitDraft = (value: string) => {
       staging.stageEdit(target.cellPath, value, raw, target.expectedRef);
       setEditingKey(null);
     };
+
+    /* A checkbox has no "open for editing" state — one click IS the edit. */
+    if (isBoolean) {
+      const current = entry ? entry.value === 'true' : Boolean(raw);
+      return (
+        <td key={column.key} className={align}>
+          <input
+            type="checkbox"
+            checked={current}
+            title={entry ? 'Staged — commit to save' : undefined}
+            className={entry ? styles.stagedCheckbox : undefined}
+            onChange={(e) => staging.stageEdit(
+              target.cellPath, String(e.target.checked),
+              raw === true ? 'true' : 'false', target.expectedRef,
+            )}
+          />
+          {entry && (
+            <span className={styles.priorValue}>
+              was {raw ? 'yes' : 'no'}
+            </span>
+          )}
+        </td>
+      );
+    }
 
     if (editingKey === key) {
       return (
@@ -549,6 +647,9 @@ export function ScheduleArtifact({
               onBlur={() => setEditingKey(null)}
               onKeyDown={(e) => { if (e.key === 'Escape') setEditingKey(null); }}
             >
+              {/* A cell can be empty today; without this the dropdown would
+                * silently show the first option as though it were the value. */}
+              <option value="">—</option>
               {options.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
@@ -557,8 +658,9 @@ export function ScheduleArtifact({
             <input
               className={styles.cellInput}
               autoFocus
+              type={isDate ? 'date' : 'text'}
               value={draft}
-              inputMode={numeric ? 'numeric' : undefined}
+              inputMode={numeric && !isDate ? 'numeric' : undefined}
               onChange={(e) => setDraft(e.target.value)}
               onBlur={() => commitDraft(draft)}
               onKeyDown={(e) => {
@@ -579,6 +681,19 @@ export function ScheduleArtifact({
       setEditingKey(key);
     };
 
+    /* A picklist cell stores an id and must SHOW a name. Rendering the raw
+     * value would put `629` where the user wrote "Area 3". Falls back to the
+     * raw value when the options list cannot explain it — an id with no
+     * matching option is worth seeing, not hiding. */
+    const labelFor = (value: unknown) => {
+      if (!options) return null;
+      const hit = options.find((o) => o.value === String(value ?? ''));
+      return hit ? hit.label : null;
+    };
+    const displayText = options
+      ? (labelFor(entry ? entry.value : raw) ?? (entry ? entry.value : text))
+      : (entry ? entry.value : text);
+
     return (
       <td key={column.key} className={align}>
         <span
@@ -589,11 +704,11 @@ export function ScheduleArtifact({
           onDoubleClick={openEditor}
           onKeyDown={(e) => { if (e.key === 'Enter') openEditor(); }}
         >
-          {entry ? entry.value : text}
+          {displayText}
         </span>
         {entry && (
           <span className={styles.priorValue} title="Value before this edit">
-            was {text}
+            was {options ? (labelFor(raw) ?? text) : text}
           </span>
         )}
         {entry?.error && (
@@ -623,36 +738,6 @@ export function ScheduleArtifact({
             ? ` (missing: ${editability.missing.join(', ')})`
             : ''}
           .
-        </div>
-      )}
-
-      {/* ── Commit bar (slice 2) ──
-        * Appears only once something is staged. Nothing posts on a keystroke:
-        * the whole set lands through ONE batch request, which is what makes a
-        * single impact line for the set meaningful. */}
-      {staging.stagedCount > 0 && (
-        <div className={styles.commitBar} role="region" aria-label="Staged changes">
-          <span className={styles.commitCount}>
-            {staging.stagedCount} change{staging.stagedCount === 1 ? '' : 's'} staged
-          </span>
-          <span className={styles.commitActions}>
-            <button
-              type="button"
-              className={styles.commitButton}
-              disabled={staging.committing}
-              onClick={() => { void staging.commitStaged(); }}
-            >
-              {staging.committing ? 'Saving…' : 'Commit'}
-            </button>
-            <button
-              type="button"
-              className={styles.discardButton}
-              disabled={staging.committing}
-              onClick={staging.discardStaged}
-            >
-              Discard
-            </button>
-          </span>
         </div>
       )}
 
@@ -746,7 +831,12 @@ export function ScheduleArtifact({
       {/* ── Detail rung and grouping ── */}
       <div className={styles.bar}>
         <span className={styles.barLabel}>Detail</span>
-        {['summary', 'standard', 'detail'].map((value) => (
+        {/* Driven by the SPECIFICATION, not a list in this file. The server has
+          * defined four rungs since slice 1 while this array offered three, so
+          * `all` — the rung you use to build a budget rather than read one —
+          * was unreachable. Same class of drift as slice 1's stale `editable`
+          * list: two places describing one thing, one of them wrong. */}
+        {RUNG_ORDER.filter((value) => config.rung_columns[value]).map((value) => (
           <button
             type="button"
             key={value}
@@ -771,6 +861,40 @@ export function ScheduleArtifact({
             </button>
           ))}
       </div>
+
+      {/* ── Commit bar (slice 2) ──
+        * Sits directly under the badge row and above the table it acts on,
+        * where the eye already is — it used to float above the header, away
+        * from the rows being changed.
+        * Appears only once something is staged. Nothing posts on a keystroke:
+        * the whole set lands through ONE batch request, which is what makes a
+        * single impact line for the set meaningful. */}
+      {staging.stagedCount > 0 && (
+        <div className={styles.commitBar} role="region" aria-label="Staged changes">
+          <span className={styles.commitCount}>
+            {staging.stagedCount} change{staging.stagedCount === 1 ? '' : 's'} staged
+          </span>
+          <span className={styles.commitActions}>
+            <button
+              type="button"
+              className={styles.commitButton}
+              disabled={staging.committing}
+              onClick={() => { void staging.commitStaged(); }}
+            >
+              {staging.committing ? 'Saving…' : 'Commit'}
+            </button>
+            <button
+              type="button"
+              className={styles.discardButton}
+              disabled={staging.committing}
+              onClick={staging.discardStaged}
+            >
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
+
 
       {/* ── The schedule ── */}
       <div className={styles.scroll}>

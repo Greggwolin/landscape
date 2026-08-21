@@ -32,6 +32,11 @@ const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localho
 
 export interface ArtifactSummary {
   artifact_id: number;
+  /** When this artifact is archived, the live one that replaced it (same
+   *  project + dedup_key), else null. Dedup archives the previous artifact on
+   *  every tool re-run, but nothing stops the archived copy being opened
+   *  again — a chat thread still points at the artifact IT created. */
+  superseded_by_artifact_id?: number | null;
   project_id: number | null;
   thread_id: string | null;
   tool_name: string;

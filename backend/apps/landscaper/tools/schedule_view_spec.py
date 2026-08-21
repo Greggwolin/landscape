@@ -413,8 +413,16 @@ def build_budget_view_config(
         'summary': ['group', 'amount', 'pct'],
         'standard': ['category', 'description', 'uom', 'rate', 'amount'],
         'detail': ['description', 'uom', 'rate', 'amount', 'start', 'duration'],
-        'all': ['category', 'stage', 'description', 'uom', 'rate', 'amount',
-                'start', 'duration', 'notes'],
+        # Slice 2b-2. `all` is the rung you use to BUILD a budget rather than
+        # read one, so it carries the fields a line needs to exist -- division,
+        # stage, category, description, uom, rate -- plus the timing and
+        # scheduling refinements. Escalation stays out: the per-line control is
+        # being replaced by a single budget-level rate, and putting it on screen
+        # now would teach a gesture that is about to be withdrawn.
+        'all': ['division', 'category', 'stage', 'description', 'uom', 'rate',
+                'amount', 'start', 'duration', 'start_date', 'end_date',
+                'timing_method', 'curve_profile', 'curve_steepness',
+                'cf_start', 'vendor', 'notes'],
     }
 
     # Optional columns ride behind removable chips above the table — the answer
@@ -427,6 +435,8 @@ def build_budget_view_config(
         {'key': 'stage', 'label': 'Stage', 'available': has_stage,
          'reason': None if has_stage
                    else 'No stage recorded on these lines'},
+        {'key': 'category', 'label': 'Category', 'available': True,
+         'reason': None},
         {'key': 'notes', 'label': 'Notes', 'available': True,
          'reason': None if has_notes
                    else 'No notes recorded yet — the column is empty until one is written'},
@@ -435,6 +445,22 @@ def build_budget_view_config(
                    'The inflated view comes from the cash flow, not from here.'},
         {'key': 'evidence', 'label': 'Evidence', 'available': False,
          'reason': 'No evidence source is recorded on any budget line yet'},
+        # Slice 2b-2 -- reachable from any rung without moving to `all`.
+        {'key': 'division', 'label': division_label, 'available': True,
+         'reason': None},
+        {'key': 'vendor', 'label': 'Vendor', 'available': True, 'reason': None},
+        {'key': 'timing_method', 'label': 'Timing', 'available': True,
+         'reason': None},
+        {'key': 'start_date', 'label': 'Start date', 'available': True,
+         'reason': None},
+        {'key': 'end_date', 'label': 'End date', 'available': True,
+         'reason': None},
+        {'key': 'cf_start', 'label': 'CF start', 'available': True,
+         'reason': None},
+        {'key': 'curve_profile', 'label': 'Curve', 'available': True,
+         'reason': None},
+        {'key': 'curve_steepness', 'label': 'Steep', 'available': True,
+         'reason': None},
     ]
 
     return {

@@ -148,6 +148,15 @@ _TEXTUAL_BUDGET_CELLS = frozenset({
 _RAW_BUDGET_CELLS = frozenset({'cf_start', 'escalation', 'division', 'category'})
 
 
+def _capture(cell_key: str, raw: Any) -> Any:
+    """The value a ref records, in a form that survives JSON persistence."""
+    if hasattr(raw, 'isoformat'):
+        return raw.isoformat()[:10]
+    if cell_key in _TEXTUAL_BUDGET_CELLS or cell_key in _RAW_BUDGET_CELLS:
+        return raw
+    return _num(raw)
+
+
 def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any]:
     """Per-cell pointers at the real source row, for the editable cells only.
 
@@ -170,10 +179,15 @@ def _cell_source_refs(record: Dict[str, Any], captured_at: str) -> Dict[str, Any
             'captured_at': captured_at,
             # Numeric cells capture a number; the picklist captures its
             # code and the free-text note captures its string.
-            'captured_value': (
-                raw if cell_key in _TEXTUAL_BUDGET_CELLS
-                or cell_key in _RAW_BUDGET_CELLS else _num(raw)
-            ),
+            #
+            # Dates are coerced to ISO strings. The schema is PERSISTED AS
+            # JSON, and a psycopg2 date lands in it unserialisable: the write
+            # itself succeeds and then saving the rebuilt artifact raises
+            # `Object of type date is not JSON serializable`, so the row is
+            # updated while the client gets a 500 and shows the edit as still
+            # pending. Only reachable once a line actually has a date, which is
+            # why it survived the slice-2b field model unnoticed.
+            'captured_value': _capture(cell_key, raw),
         }
     return refs
 

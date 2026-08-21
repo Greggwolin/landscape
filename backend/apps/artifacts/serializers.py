@@ -27,9 +27,40 @@ class ArtifactListSerializer(serializers.ModelSerializer):
 class ArtifactDetailSerializer(serializers.ModelSerializer):
     """Full artifact rep including the block document and source pointers."""
 
+    superseded_by_artifact_id = serializers.SerializerMethodField()
+
+    def get_superseded_by_artifact_id(self, obj):
+        """The live artifact that replaced this one, when this one is archived.
+
+        Dedup keeps ONE canonical artifact per (project, dedup_key): re-running
+        a tool archives the previous one and writes a new one. Nothing stops the
+        archived copy being opened again afterwards — a chat thread still points
+        at the artifact IT created, so following that thread renders a snapshot
+        that may be several builder versions behind.
+
+        That is not cosmetic. An archived budget artifact carries the refs it had
+        when it was written, so the all-or-nothing editability rule correctly
+        makes the whole table read-only, and a read-only table has no dropdowns
+        to open. The symptom reads as "the picklists don't populate".
+
+        Returning the successor lets the client follow it instead of rendering a
+        superseded snapshot as though it were current.
+        """
+        if not obj.is_archived or not obj.dedup_key:
+            return None
+        live = (Artifact.objects
+                .filter(project_id=obj.project_id, dedup_key=obj.dedup_key,
+                        is_archived=False)
+                .order_by('-artifact_id')
+                .values_list('artifact_id', flat=True)
+                .first())
+        return live
+
     class Meta:
         model = Artifact
         fields = [
+            'superseded_by_artifact_id',
+            'is_archived',
             'artifact_id',
             'project_id',
             'thread_id',
@@ -43,7 +74,6 @@ class ArtifactDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'last_edited_at',
             'created_by_user_id',
-            'is_archived',
         ]
         read_only_fields = [
             'artifact_id',
