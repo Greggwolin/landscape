@@ -420,7 +420,18 @@ def lot_number_tokens(page, lo: int, hi: int, min_height_pt: float = 13.0):
 #: PyMuPDF frequently returns "TRACTA" as a single word — the two-word form
 #: only survives when the gap is wide enough to break the run. Both happen on
 #: the same plat, so both are read.
-_TRACT_MERGED = re.compile(r"^TRACT[\s.]*([A-Z])$")
+_OCR_LETTER_FIX = str.maketrans({"8": "B", "1": "I", "0": "O"})
+
+
+def _normalize_tract_label(raw: str) -> str:
+    """Fix OCR digit-letter confusions in tract labels."""
+    raw = raw.strip().upper()
+    if raw and raw[0].isdigit():
+        raw = raw[0].translate(_OCR_LETTER_FIX) + raw[1:]
+    return raw
+
+
+_TRACT_MERGED = re.compile(r"^TRACT[\s.]*([A-Z0-9](?:-\d{1,2})?)$")
 
 #: Words that start with TRACT but are not a label. "TRACTS" would otherwise
 #: read as tract "S".
@@ -468,11 +479,11 @@ def tract_tokens(page, min_height_pt: float = 10.0, labels=None):
         merged = _TRACT_MERGED.fullmatch(text)
         if merged:
             # One word already carrying its own letter — no partner to find.
-            label = merged.group(1)
+            label = _normalize_tract_label(merged.group(1))
             if _wanted(label):
                 out.append((label, Point((w[0] + w[2]) / 2, (w[1] + w[3]) / 2)))
             continue
-        if re.fullmatch(r"[A-Z]", text):
+        if re.fullmatch(r"[A-Z](?:-\d{1,2})?", text):
             letter_words.append(w)
 
     used_letters = set()
@@ -494,7 +505,7 @@ def tract_tokens(page, min_height_pt: float = 10.0, labels=None):
                 best = (dx, i, lw)
         if best is not None:
             _, li, lw = best
-            label = lw[4].strip().upper()
+            label = _normalize_tract_label(lw[4].strip())
             if not _wanted(label):
                 continue
             used_letters.add(li)
@@ -941,10 +952,19 @@ def match_lots(
                     }
                     if not anchors:
                         continue
-                    # Filter out faces that are identified tracts
+                    # Filter out faces that are identified tracts AND
+                    # filter to lot-sized faces only. Sub-lot slivers from
+                    # easement and setback lines outnumber real lots 10:1
+                    # and make the walk graph intractable. Filtering to
+                    # faces whose area falls in the lot-size range cuts
+                    # the unnamed pool from ~900 to ~60 and lets infill
+                    # find unique chains.
+                    min_lot_pt2 = min(stated_areas.values()) / scale * 0.50
+                    max_lot_pt2 = max(stated_areas.values()) / scale * 1.50
                     unnamed = [
                         f for f in unnamed_faces(faces, tokens)
                         if id(f) not in tract_faces
+                        and min_lot_pt2 <= f.area <= max_lot_pt2
                     ]
                     outcome = infill_by_position(
                         named=anchors,

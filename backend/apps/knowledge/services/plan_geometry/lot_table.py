@@ -190,14 +190,34 @@ def compare_to_drawn_labels(table: LotAreaTable, drawn: Iterable[int]) -> dict[s
 
 #: Tract identifier in the table: a single uppercase letter, possibly preceded
 #: by "TRACT" or "TR" or "TR.".
-_TRACT_LABEL = re.compile(r"^(?:TRACT\s*|TR\.?\s*)?([A-Z])$", re.IGNORECASE)
+# Known OCR confusions in tract labels: B↔8, I↔1, O↔0. The text layer on
+# the Red Valley plat renders B as 8 and I as 1 consistently across all
+# occurrences. This is safe because real lot numbers are pure integers and
+# tract labels always carry a letter prefix — "TRACT 8-1" in context can
+# only mean "TRACT B-1".
+_OCR_LETTER_FIX = str.maketrans({"8": "B", "1": "I", "0": "O"})
+
+
+def _normalize_tract_label(raw: str) -> str:
+    """Fix OCR digit↔letter confusions in the letter part of a tract label."""
+    raw = raw.strip().upper()
+    if not raw:
+        return raw
+    # If the first character is a digit that should be a letter, translate it
+    if raw[0].isdigit():
+        raw = raw[0].translate(_OCR_LETTER_FIX) + raw[1:]
+    return raw
+
+
+# Matches: bare letter (A), compound (A-1), or OCR-mangled (8-1, 1-3)
+_TRACT_LABEL = re.compile(r"^(?:TRACT\s*|TR\.?\s*)?([A-Z0-9](?:-\d{1,2})?)$", re.IGNORECASE)
 
 
 @dataclass
 class TractAreaTable:
     """The plat's own statement of its drainage/utility tracts."""
 
-    #: tract label ("A", "B", ...) → square feet
+    #: tract label ("A-1", "B-2", ...) → square feet
     areas: dict[str, int] = field(default_factory=dict)
     rejected: list[tuple[str, str, str]] = field(default_factory=list)
     sheets: list[int] = field(default_factory=list)
@@ -226,7 +246,7 @@ def read_tract_area_table(doc, header: str = "TRACT AREA TABLE") -> TractAreaTab
     """
     table = TractAreaTable()
     # Try multiple header variations
-    headers = [header, "TRACT AREA SUMMARY", "TRACT AREA", "TRACT TABLE"]
+    headers = [header, "TRACT USE TABLE", "TRACT AREA SUMMARY", "TRACT AREA", "TRACT TABLE", "TRACT USE"]
     for page_index in range(len(doc)):
         page = doc[page_index]
         page_text = page.get_text().upper()
@@ -241,13 +261,13 @@ def read_tract_area_table(doc, header: str = "TRACT AREA TABLE") -> TractAreaTab
             m = _TRACT_LABEL.fullmatch(text)
             if not m:
                 continue
-            label = m.group(1).upper()
+            label = _normalize_tract_label(m.group(1))
             mid = (candidate[1] + candidate[3]) / 2
             height = candidate[3] - candidate[1]
 
             def same_row(w, left_of):
                 return (abs((w[1] + w[3]) / 2 - mid) < height * 0.6
-                        and 0 < w[0] - left_of < height * 8)
+                        and 0 < w[0] - left_of < height * 30)
 
             near_sqft = [w for w in sqft if same_row(w, candidate[2])]
             if not near_sqft:
