@@ -1788,7 +1788,12 @@ LANDSCAPER_TOOLS = [
             "'show me the line-item budget', 'the development budget', 'open the "
             "budget', 'budget detail'. The artifact is built server-side and "
             "returned already-created — do NOT call create_artifact and do NOT "
-            "compose the table yourself; just announce it in one sentence. Use "
+            "compose the table yourself; just announce it in one sentence. "
+            "ALWAYS call this when the user asks to see the budget, INCLUDING "
+            "when a budget artifact is already open in the right panel. The "
+            "artifact is a stored snapshot, not a live view, and calling this "
+            "is what refreshes it — answering 'it is already open' without "
+            "calling leaves the user looking at old data and is a defect. Use "
             "get_budget_rollup for a text category summary, get_budget_items for "
             "raw rows."
         ),

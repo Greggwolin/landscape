@@ -10,10 +10,20 @@ import { WrapperHeader } from './WrapperHeader';
 import { ProjectDocumentsBody } from './ProjectDocumentsBody';
 import { PanelMapView } from './PanelMapView';
 import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
+import {
+  ArtifactWidthRequestProvider,
+  useArtifactWidthRequest,
+} from './artifactWidthRequest';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
 const MIN_ARTIFACTS_WIDTH = 320;
 const MAX_ARTIFACTS_WIDTH = 1600;
+
+/* The chat's floor. The panel may grow over everything else on the row, but not
+ * over this — a chat narrower than this stops being usable, and the artifact
+ * panel taking the whole window is a different feature (takeover), reached
+ * deliberately rather than by opening a wide table. */
+const MIN_CHAT_WIDTH = 380;
 
 // MK24 §5/§6 — widths as a share of the viewport rather than fixed pixels.
 // The map wants the screen; the artifacts rail wants to sit beside the chat.
@@ -52,9 +62,20 @@ function widthForShare(share: number): number {
 // summary should not get the same width — but which gets what has not been
 // decided, so nothing is guessed here.
 //
-// This is where that decision lands. Return a viewport share for an artifact
-// that needs more than the 25% default; return null to take the default. The
-// user's drag always wins over whatever this returns (see hasUserDragged).
+// ⚠️ THAT DECISION LANDED 2026-08-22 AND IT DID NOT LAND HERE. Gregg: "the user
+// needs access to all columns. if the artifacts panel needs to expand in width
+// to accommodate, thats fine." The rule turned out not to be per-artifact at
+// all — it is per COLUMN SET, and the column set changes with the detail rung,
+// the chips the user has toggled, and the constant-drop rule, none of which
+// move the artifact id. A share computed from an id would be stale the moment a
+// chip was clicked. So the rule lives in ./artifactWidthRequest, where the
+// artifact reports the width its current columns need and this panel grows to
+// meet it (see requestedWidth below).
+//
+// This seam stays for the case it was actually written for: an artifact whose
+// natural width is a proportion of the screen rather than a sum of columns — a
+// map, a drawing, an image. Return a viewport share for such an artifact;
+// return null to take the default. The user's drag still wins over both.
 function preferredShareForArtifact(_artifactId: number | null): number | null {
   return null;
 }
@@ -81,7 +102,17 @@ interface ProjectArtifactsPanelProps {
   showViewToggle?: boolean;
 }
 
-export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassigned, showViewToggle }: ProjectArtifactsPanelProps) {
+export function ProjectArtifactsPanel(props: ProjectArtifactsPanelProps) {
+  // The provider has to sit ABOVE the panel body, because the body renders the
+  // artifact that makes the request and this panel has to read it back.
+  return (
+    <ArtifactWidthRequestProvider>
+      <ProjectArtifactsPanelInner {...props} />
+    </ArtifactWidthRequestProvider>
+  );
+}
+
+function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassigned, showViewToggle }: ProjectArtifactsPanelProps) {
   const {
     artifactsOpen,
     toggleArtifacts,
@@ -106,10 +137,51 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
   const [panelWidth, setPanelWidth] = useState(DEFAULT_ARTIFACTS_WIDTH);
   // Once he has dragged the panel, the drag is authoritative — no automatic
   // sizing (including the per-artifact seam above) may override it.
+  //
+  // Kept as BOTH a ref and state on purpose: the effects below read it
+  // synchronously while they run, and the render needs it to decide whether a
+  // width request may grow the panel. A ref alone would not re-render; state
+  // alone would be a frame late for the effects.
   const hasUserDragged = useRef(false);
+  const [userSized, setUserSized] = useState(false);
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+
+  /* ── Growing to fit the content ──────────────────────────────────────────
+   * The mounted artifact reports the width its current columns need. The panel
+   * grows to meet it, and stops at whatever leaves the chat usable. Nothing
+   * here ever SHRINKS the panel — a request smaller than the current width is
+   * simply not a constraint, so closing columns does not yank the panel in
+   * while the user is reading it. */
+  const { requestedWidth } = useArtifactWidthRequest();
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
+
+  // Measured after mount, never during render — see the panelWidth note above
+  // for why the first render must not touch `window`.
+  useEffect(() => {
+    const measure = () => setViewportWidth(window.innerWidth);
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  // The widest the panel may go: everything on the row except the collapsed
+  // sidebar and the chat's floor. Null until the viewport has been measured,
+  // which keeps the first render identical on both sides of hydration.
+  const maxContentWidth =
+    viewportWidth == null
+      ? null
+      : Math.max(
+          viewportWidth - SIDEBAR_COLLAPSED_WIDTH - MIN_CHAT_WIDTH,
+          MIN_ARTIFACTS_WIDTH
+        );
+
+  // What actually gets rendered. A width he dragged for himself is final.
+  const effectiveWidth =
+    userSized || requestedWidth == null || maxContentWidth == null
+      ? panelWidth
+      : Math.max(panelWidth, Math.min(requestedWidth, maxContentWidth));
 
   // Takeover mode — when activeArtifactId becomes truthy, expand the panel
   // to share the remaining viewport with the chat (50/50 after the
@@ -191,14 +263,22 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
       e.preventDefault();
       isResizing.current = true;
       startX.current = e.clientX;
-      startWidth.current = panelWidth;
+      // Start from what is on screen, not from the stored width. If the content
+      // grew the panel past `panelWidth`, dragging from the stored value would
+      // jump the edge away from the cursor on the first pixel of movement.
+      startWidth.current = effectiveWidth;
+
+      // The drag may go as wide as the content may — otherwise a table that
+      // widened itself past the legacy 1600 cap could not then be dragged, and
+      // the handle would appear broken exactly where it matters most.
+      const dragCeiling = Math.max(MAX_ARTIFACTS_WIDTH, maxContentWidth ?? 0);
 
       const handleMove = (ev: PointerEvent) => {
         if (!isResizing.current) return;
         const delta = startX.current - ev.clientX;
         const newWidth = startWidth.current + delta;
         setPanelWidth(
-          Math.min(Math.max(newWidth, MIN_ARTIFACTS_WIDTH), MAX_ARTIFACTS_WIDTH)
+          Math.min(Math.max(newWidth, MIN_ARTIFACTS_WIDTH), dragCeiling)
         );
       };
 
@@ -207,8 +287,10 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
         // MK24 §6 — from here on the drag is authoritative. Per-artifact width
         // rules (preferredShareForArtifact) must not move a panel he has
         // deliberately sized; the takeover snapshot/restore still applies,
-        // because that restores HIS width rather than imposing one.
+        // because that restores HIS width rather than imposing one. A content
+        // width request is subject to the same rule — see effectiveWidth.
         hasUserDragged.current = true;
+        setUserSized(true);
         document.removeEventListener('pointermove', handleMove);
         document.removeEventListener('pointerup', handleUp);
       };
@@ -216,7 +298,7 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
       document.addEventListener('pointermove', handleMove);
       document.addEventListener('pointerup', handleUp);
     },
-    [panelWidth]
+    [effectiveWidth, maxContentWidth]
   );
 
   /* ── Collapsed strip ── */
@@ -265,7 +347,7 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
           background: 'transparent',
         }}
       />
-      <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
+      <div className="artifacts-panel" style={{ width: effectiveWidth, flexShrink: 0 }}>
       {/* Header — Artifacts | Documents view toggle. Sits at the top of
           the rail full-bleed (no gutter). Active label is white, inactive
           is muted. Clicking either swaps the panel body without navigating

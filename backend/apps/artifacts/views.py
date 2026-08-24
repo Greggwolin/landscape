@@ -54,6 +54,121 @@ from .services import (
 )
 
 
+def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
+    """Rebuild a deterministic artifact whose stored view specification is old.
+
+    THE PROBLEM THIS SOLVES. A schedule artifact stores the specification it was
+    built with — the columns, the option lists, the knobs. That is what makes it
+    a durable snapshot rather than a live query, and it is correct. What was
+    missing is any way for an EXISTING artifact to pick up a change to how the
+    specification is built. There wasn't one, and re-asking made it worse rather
+    than better: the model sees the artifact is already open and answers
+    "already open in the right panel" without calling the tool, so the stored
+    spec is never replaced.
+
+    Measured on 2026-08-24: three separate re-asks against a live budget
+    artifact left ``last_edited_at`` unchanged. Meanwhile the columns added on
+    2026-08-21 were invisible to the person who asked for them, which is how a
+    correct change comes to look like a broken feature.
+
+    THE RULE. Opening the artifact is enough. On read, compare the version
+    stamped into the stored specification against the builder's current one; if
+    the stored one is behind, re-run the builder before serving. The builder
+    routes through the ordinary dedup path, so tool-owned keys refresh and
+    user-owned state — a saved view, an answered clarification — survives
+    exactly as it does on any other refresh.
+
+    WHY ON READ AND NOT SOMEWHERE TIDIER. A read that writes is not free, so it
+    is worth saying why the alternatives are worse. A migration would fix
+    today's artifacts and none of tomorrow's. A background sweep would fix them
+    eventually, which is indistinguishable from "sometimes". A flag returned to
+    the client would put the retry in the one place that has already proved it
+    can silently not happen. Rebuilding here costs one extra query the first
+    time each artifact is opened after a version bump, and nothing at all
+    afterwards.
+
+    FAILS OPEN, ALWAYS. A rebuild that raises returns the artifact untouched.
+    A stale view renders; a missing one does not, and the stale one is a
+    strictly better failure.
+    """
+    tool_name = artifact.tool_name or ''
+    entry = _VIEW_SPEC_BUILDERS.get(tool_name)
+    if entry is None or artifact.project_id is None or artifact.is_archived:
+        return artifact
+
+    params_key, current_version, rebuild = entry
+    stored = (artifact.params_json or {}).get(params_key) or {}
+    if not isinstance(stored, dict):
+        return artifact
+    # A spec with no version predates the stamp and is by definition behind.
+    if stored.get('spec_version', 0) >= current_version():
+        return artifact
+
+    try:
+        rebuild(artifact)
+    except Exception:  # noqa: BLE001
+        import logging as _logging
+        _logging.getLogger(__name__).exception(
+            'artifact %s: view-spec rebuild failed, serving the stored spec',
+            artifact.artifact_id,
+        )
+        return artifact
+
+    return Artifact.objects.filter(pk=artifact.pk).first() or artifact
+
+
+def _rebuild_budget_view_spec(artifact: Artifact) -> None:
+    """Re-run the budget builder for this artifact's project.
+
+    Deliberately the SAME entry point the tool uses, not a private shortcut:
+    the rebuild has to produce a byte-identical artifact to a fresh
+    "show me the budget", or opening the panel and asking for it would diverge.
+    Dedup routes it onto this very row.
+    """
+    from apps.landscaper.tools.budget_artifact_builder import (
+        create_budget_artifact,
+        fetch_budget_schedule_data,
+    )
+    data = fetch_budget_schedule_data(int(artifact.project_id))
+    if not data.get('records'):
+        # No lines left to render. Leave the artifact exactly as it is rather
+        # than replacing a readable snapshot with an empty one.
+        return
+    create_budget_artifact(
+        project_id=int(artifact.project_id),
+        project_name=data['project_name'],
+        records=data['records'],
+        total_budget=data['total_budget'],
+        category_count=data['category_count'],
+        lot_count=data['lot_count'],
+        uom_options=data.get('uom_options'),
+        user_id=artifact.created_by_user_id,
+        thread_id=artifact.thread_id,
+    )
+
+
+def _budget_view_spec_version() -> int:
+    from apps.landscaper.tools.schedule_view_spec import (
+        BUDGET_VIEW_SPEC_VERSION,
+    )
+    return BUDGET_VIEW_SPEC_VERSION
+
+
+# tool_name → (params key holding the spec, current-version fn, rebuild fn).
+#
+# One line per deterministic schedule. Budget is the only one carrying a
+# versioned view specification today; sales, cash flow, capitalization and rent
+# roll join here as each grows one, and until then they are correctly absent —
+# an entry with no version to compare would rebuild on every single read.
+_VIEW_SPEC_BUILDERS = {
+    'get_budget_schedule': (
+        'budget_view_config',
+        _budget_view_spec_version,
+        _rebuild_budget_view_spec,
+    ),
+}
+
+
 class ArtifactViewSet(viewsets.ViewSet):
     """ViewSet for artifact list/retrieve/patch + version + restore actions."""
 
@@ -98,6 +213,7 @@ class ArtifactViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         artifact = get_object_or_404(Artifact, pk=pk)
+        artifact = _rebuild_if_view_spec_stale(artifact)
         serializer = ArtifactDetailSerializer(artifact)
         return Response(serializer.data)
 

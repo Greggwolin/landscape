@@ -71,7 +71,7 @@ export interface UseStagedEditsResult {
   stageEdit: (
     path: string[],
     newValue: string,
-    committed: string | number | null,
+    committed: string | number | boolean | null,
     expectedRef?: SourceRef,
   ) => void;
   discardStaged: () => void;
@@ -104,7 +104,7 @@ export function useStagedEdits(
     (
       path: string[],
       newValue: string,
-      committed: string | number | null,
+      committed: string | number | boolean | null,
       expectedRef?: SourceRef,
     ) => {
       const key = stagedKey(path);
