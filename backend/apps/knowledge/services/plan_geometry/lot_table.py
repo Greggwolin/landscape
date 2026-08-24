@@ -375,25 +375,131 @@ def derive_missing_lots(
 
     for run in runs:
         low, high = run[0] - 1, run[-1] + 1
-        if low not in by_number or high not in by_number:
-            refused.append((run, "no proven lot on both sides"))
+        has_low = low in by_number
+        has_high = high in by_number
+        if not has_low and not has_high:
+            refused.append((run, "no proven lot on either side"))
             continue
+
+        # ── EDGE LOTS: one anchor only ──────────────────────────
+        # Place each lot adjacent to the one proved neighbour, using
+        # stated_area / anchor_depth as the width.
+        if not has_low or not has_high:
+            anchor_lot = by_number[low] if has_low else by_number[high]
+            anchor = _clean(anchor_lot.ring)
+            # Determine orientation from anchor shape: wider than tall = horizontal
+            a_w = anchor[1] - anchor[0]
+            a_h = anchor[3] - anchor[2]
+            is_horiz = a_w < a_h  # lot width < depth → lots run horizontally
+            if is_horiz:
+                depth_pt = a_h
+                edge = anchor[1] if has_low else anchor[0]
+            else:
+                depth_pt = a_w
+                edge = anchor[3] if has_low else anchor[2]
+            depth_ft = depth_pt * ft_per_pt
+
+            cursor = edge
+            ordered = list(run) if has_low else list(reversed(run))
+            for n in ordered:
+                w_ft = stated_areas[n] / depth_ft
+                w_pt = w_ft / ft_per_pt
+                if has_low:
+                    x1, x2 = cursor, cursor + w_pt
+                else:
+                    x1, x2 = cursor - w_pt, cursor
+                if is_horiz:
+                    ring = [(x1, anchor[2]), (x2, anchor[2]),
+                            (x2, anchor[3]), (x1, anchor[3])]
+                else:
+                    ring = [(anchor[0], x1), (anchor[1], x1),
+                            (anchor[1], x2), (anchor[0], x2)]
+                derived[n] = DerivedOutline(
+                    number=n, page=anchor_lot.page, ring=ring,
+                    area_sqft=stated_areas[n],
+                    stated_sqft=stated_areas[n],
+                    width_ft=w_ft,
+                )
+                cursor = x2 if has_low else x1
+            continue
+
         a_lot, b_lot = by_number[low], by_number[high]
         if a_lot.page != b_lot.page:
             refused.append((run, "the neighbours are on different sheets"))
             continue
         a, b = _clean(a_lot.ring), _clean(b_lot.ring)
-        if abs(a[2] - b[2]) > 4 or abs(a[3] - b[3]) > 4:
-            refused.append((run, "the neighbours are not in the same row"))
+        # Lots on a curved street share one edge tightly but the opposite
+        # edge is staggered by the arc — typically 10-12 pt on this plat.
+        # Require at least one side aligned within 4 pt and the other
+        # within 15 pt (~10 ft at 1in=50ft, <10% of a 120 ft lot depth).
+        _TIGHT, _LOOSE = 4, 15
+        h_top, h_bot = abs(a[2] - b[2]), abs(a[3] - b[3])
+        horizontal = (min(h_top, h_bot) <= _TIGHT and max(h_top, h_bot) <= _LOOSE)
+        v_left, v_right = abs(a[0] - b[0]), abs(a[1] - b[1])
+        vertical = (min(v_left, v_right) <= _TIGHT and max(v_left, v_right) <= _LOOSE)
+        if not horizontal and not vertical:
+            # Corner turn — fall back to the low-numbered anchor alone,
+            # same logic as edge lots. The numbering walks the block
+            # boundary, so the low anchor is the last lot before the turn.
+            anchor_lot = a_lot
+            anchor = a
+            a_w = anchor[1] - anchor[0]
+            a_h = anchor[3] - anchor[2]
+            is_horiz = a_w < a_h
+            if is_horiz:
+                depth_pt = a_h
+                edge = anchor[1]
+            else:
+                depth_pt = a_w
+                edge = anchor[3]
+            depth_ft_edge = depth_pt * ft_per_pt
+            cursor = edge
+            for n in run:
+                w_ft = stated_areas[n] / depth_ft_edge
+                w_pt = w_ft / ft_per_pt
+                x1, x2 = cursor, cursor + w_pt
+                if is_horiz:
+                    ring = [(x1, anchor[2]), (x2, anchor[2]),
+                            (x2, anchor[3]), (x1, anchor[3])]
+                else:
+                    ring = [(anchor[0], x1), (anchor[1], x1),
+                            (anchor[1], x2), (anchor[0], x2)]
+                derived[n] = DerivedOutline(
+                    number=n, page=anchor_lot.page, ring=ring,
+                    area_sqft=stated_areas[n],
+                    stated_sqft=stated_areas[n],
+                    width_ft=w_ft,
+                )
+                cursor = x2
             continue
 
-        if a[0] < b[0]:
-            left, right = a[1] - grow_pt, b[0] + grow_pt
+        if horizontal:
+            # ── horizontal row: gap runs left-right ──────────────
+            if a[0] < b[0]:
+                left, right = a[1] - grow_pt, b[0] + grow_pt
+            else:
+                left, right = b[1] - grow_pt, a[0] + grow_pt
+            # Use the AVERAGE of the two anchors' depths rather than
+            # their overlap. On a curved street, lots stagger by ~10 pt
+            # at one edge while sharing the other; the overlap clips the
+            # depth and inflates the width needed, refusing a 42 ft lot
+            # into a 42 ft gap as "3 ft short."
+            a_depth = a[3] - a[2]
+            b_depth = b[3] - b[2]
+            avg_depth_pt = (a_depth + b_depth) / 2
+            ytop = min(a[2], b[2]) + grow_pt
+            ybot = ytop + avg_depth_pt
+            gap_ft = (right - left) * ft_per_pt
+            depth_ft = avg_depth_pt * ft_per_pt
         else:
-            left, right = b[1] - grow_pt, a[0] + grow_pt
-        ytop, ybot = max(a[2], b[2]) + grow_pt, min(a[3], b[3]) - grow_pt
-        gap_ft = (right - left) * ft_per_pt
-        depth_ft = (ybot - ytop) * ft_per_pt
+            # ── vertical column: gap runs top-bottom ─────────────
+            if a[2] < b[2]:
+                top, bot = a[3] - grow_pt, b[2] + grow_pt
+            else:
+                top, bot = b[3] - grow_pt, a[2] + grow_pt
+            xleft, xright = max(a[0], b[0]) + grow_pt, min(a[1], b[1]) - grow_pt
+            gap_ft = (bot - top) * ft_per_pt
+            depth_ft = (xright - xleft) * ft_per_pt
 
         if gap_ft < min_lot_ft * 0.97:
             refused.append((run, f"the gap is {gap_ft:.1f} ft, narrower than the plat's "
@@ -401,18 +507,33 @@ def derive_missing_lots(
             continue
 
         needed = {n: stated_areas[n] / depth_ft for n in run}
-        tolerance = max(closure_tolerance_ft, 0.01 * gap_ft)
+        # 3% of the gap accounts for line thickness (~1pt = 0.7ft) and
+        # the depth averaging across staggered anchors. At 42ft this is
+        # ~1.3ft; at 180ft ~5.4ft — still well below a missing tract.
+        tolerance = max(closure_tolerance_ft, 0.03 * gap_ft)
         placed: Optional[dict[int, tuple[float, float]]] = None
 
-        callouts = _callouts_across(doc[a_lot.page], left, right, ytop, ybot,
-                                    gap_ft, tolerance)
+        if horizontal:
+            left_edge, right_edge = left, right
+            callouts = _callouts_across(doc[a_lot.page], left, right, ytop, ybot,
+                                        gap_ft, tolerance)
+        else:
+            left_edge, right_edge = top, bot
+            # Vertical gaps: skip callout reading for now — the callout
+            # reader is tuned for horizontal rows. Closure check still
+            # applies.
+            callouts = None
+
         if callouts:
             # the drawing itself says what occupies the gap, and in what order
             wanted = [needed[n] for n in run]
-            index, x, trial = 0, left, {}
+            index, x, trial = 0, left_edge, {}
             for _, value in callouts:
                 x2 = x + value / ft_per_pt
-                if (index < len(wanted) and abs(value - wanted[index]) <= 0.75
+                # 5% of the needed width accounts for the depth estimate
+                # shifting when anchors stagger on curved streets.
+                match_tol = max(0.75, 0.05 * wanted[index]) if index < len(wanted) else 0.75
+                if (index < len(wanted) and abs(value - wanted[index]) <= match_tol
                         and value >= min_lot_ft * 0.97):
                     trial[run[index]] = (x, x2)
                     index += 1
@@ -421,27 +542,64 @@ def derive_missing_lots(
                 placed = trial
 
         if placed is None:
-            if abs(gap_ft - sum(needed.values())) > closure_tolerance_ft:
+            total_needed = sum(needed.values())
+            excess = gap_ft - total_needed
+            if abs(excess) <= tolerance:
+                # Lots fill the gap exactly — place left to right.
+                placed, x = {}, left_edge
+                for n in run:
+                    x2 = x + needed[n] / ft_per_pt
+                    placed[n] = (x, x2)
+                    x = x2
+            elif 15 <= excess <= 80:
+                # The excess is a plausible drainage tract width. Place
+                # the lots at the LEFT end (lower-numbered anchor side)
+                # and leave the tract at the right. Plat lot numbering
+                # runs left-to-right within a block, with tracts at
+                # block boundaries.
+                placed, x = {}, left_edge
+                for n in run:
+                    x2 = x + needed[n] / ft_per_pt
+                    placed[n] = (x, x2)
+                    x = x2
+                logger.info(
+                    "lots %s: placed with %.0f ft tract at right of gap",
+                    run, excess,
+                )
+            elif excess > 80:
+                # Very large excess — multiple tracts or features in the
+                # gap. Place the lots against the low-numbered anchor
+                # (same as edge-lot logic) since we can't determine the
+                # tract layout.
+                placed, x = {}, left_edge
+                for n in run:
+                    x2 = x + needed[n] / ft_per_pt
+                    placed[n] = (x, x2)
+                    x = x2
+                logger.info(
+                    "lots %s: placed against low anchor, %.0f ft of tracts/features in gap",
+                    run, excess,
+                )
+            else:
                 refused.append((run, f"the gap is {gap_ft:.1f} ft but the lots need "
-                                     f"{sum(needed.values()):.1f} ft — something else "
+                                     f"{total_needed:.1f} ft — something else "
                                      f"occupies it"))
                 continue
-            placed, x = {}, left
-            for n in run:
-                x2 = x + needed[n] / ft_per_pt
-                placed[n] = (x, x2)
-                x = x2
 
         for n, (x, x2) in placed.items():
             width_ft = (x2 - x) * ft_per_pt
             if width_ft < min_lot_ft * 0.97:
                 refused.append(([n], "would be narrower than the plat's smallest lot"))
                 continue
+            if horizontal:
+                ring = [(x, ytop), (x2, ytop), (x2, ybot), (x, ybot)]
+            else:
+                ring = [(xleft, x), (xright, x), (xright, x2), (xleft, x2)]
             derived[n] = DerivedOutline(
                 number=n,
                 page=a_lot.page,
-                ring=[(x, ytop), (x2, ytop), (x2, ybot), (x, ybot)],
-                area_sqft=(x2 - x) * (ybot - ytop) * ft_per_pt * ft_per_pt,
+                ring=ring,
+                area_sqft=(x2 - x) * depth_ft * ft_per_pt,
                 stated_sqft=stated_areas[n],
                 width_ft=width_ft,
             )

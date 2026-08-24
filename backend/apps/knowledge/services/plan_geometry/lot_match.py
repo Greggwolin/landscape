@@ -93,6 +93,14 @@ GAP_LADDER_PT = (0.5, 1.0, 1.5, 2.5, 4.0)
 #: A recovered area must agree with the stated area to within this.
 AREA_TOLERANCE = 0.01
 
+#: Wider tolerance for UNDERSIZED sole-occupant faces. Plats draw building
+#: setback lines inside each lot, creating narrow strips that polygonize
+#: separates from the lot interior. The lot's sole-occupant face is the
+#: interior, which is smaller than the full lot by the area of the strips —
+#: typically 5–10%. An 8% tolerance recovers these without accepting faces
+#: that have swallowed a neighbour (those are oversized, not undersized).
+_SETBACK_TOLERANCE = 0.08
+
 #: Faces smaller than this are slivers between easement lines.
 MIN_FACE_PT2 = 200.0
 
@@ -866,6 +874,32 @@ def match_lots(
                         if _agrees(face, value, scale):
                             _accept(value, pi, face, grow, scale, "traced")
                             break
+
+            # SETBACK TOLERANCE — strictly additive. Plats draw building
+            # setbacks and easements inside each lot, and polygonize breaks
+            # those into separate faces. The lot's sole-occupant face is
+            # smaller than the full lot by the area of those strips — typically
+            # 5–10%, enough to fail the 1% gate. Rather than merging adjacent
+            # faces (which steals area from the derive step's gap calculation),
+            # accept the face as-is with a wider tolerance. Safety comes from
+            # SOLE OCCUPANCY (the face holds exactly one label) plus the
+            # DIRECTION constraint (only undersized — an oversized face has
+            # swallowed a neighbour, which is a different problem).
+            if scale:
+                for pi in sheets:
+                    _, _, _, every, _, _ = per_sheet[pi]
+                    for value, candidates in every.items():
+                        if value in accepted or value not in stated_areas:
+                            continue
+                        for face in candidates:
+                            computed = face.area * scale
+                            stated = stated_areas[value]
+                            if computed >= stated * (1 - AREA_TOLERANCE):
+                                continue  # already tried above, skip
+                            shortfall = (stated - computed) / stated
+                            if shortfall <= _SETBACK_TOLERANCE:
+                                _accept(value, pi, face, grow, scale, "traced")
+                                break
 
             # TRACT MATCHING — associate tract labels with their faces. Tracts
             # are area-verified with a wider tolerance than lots (3% vs 1%)
