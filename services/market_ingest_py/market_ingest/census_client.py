@@ -17,6 +17,7 @@ from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .db import GeoRecord, SeriesMeta
+from .config import redact_params
 from .normalize import NormalizedObservation, parse_decimal
 
 
@@ -209,13 +210,13 @@ class CensusClient:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
     def _request(self, query: CensusQuery) -> List[List[str]]:
-        logger.debug("Census request url={} params={}", query.url, query.params)
+        logger.debug("Census request url={} params={}", query.url, redact_params(query.params))
         response = self.session.get(query.url, params=query.params, timeout=30)
         if response.status_code == 204:
             return []
         # 404 means data not available for this geography/time period - treat as empty
         if response.status_code == 404:
-            logger.debug("Census API returned 404 (data not available) for query: {}", query.params)
+            logger.debug("Census API returned 404 (data not available) for query: {}", redact_params(query.params))
             return []
         if response.status_code >= 400:
             raise CensusError(f"Census API error {response.status_code}: {response.text}")
@@ -349,13 +350,13 @@ class BlockGroupDemographicsClient:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=15))
     def _request(self, url: str, params: Dict[str, str]) -> List[List[str]]:
         """Make a Census API request with retry logic."""
-        logger.debug("Census BG request url={} params={}", url, params)
+        logger.debug("Census BG request url={} params={}", url, redact_params(params))
         response = self.session.get(url, params=params, timeout=60)
 
         if response.status_code == 204:
             return []
         if response.status_code == 404:
-            logger.debug("Census API returned 404 for params: {}", params)
+            logger.debug("Census API returned 404 for params: {}", redact_params(params))
             return []
         if response.status_code >= 400:
             raise CensusError(f"Census API error {response.status_code}: {response.text}")

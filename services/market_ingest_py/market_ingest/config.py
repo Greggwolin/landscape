@@ -10,6 +10,23 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field, PostgresDsn, ValidationError, model_validator
 
+# Query-parameter names that carry a provider credential. The clients log their
+# request parameters at DEBUG, and this package is now run from GitHub Actions,
+# whose logs are retained and readable -- an unredacted key printed once is a key
+# that has to be rotated. Redact at the logging site, not at the call site.
+SECRET_PARAM_KEYS = {"key", "api_key", "apikey", "registrationkey", "token"}
+
+
+def redact_params(params):
+    """Return a copy of a params/payload mapping with credentials masked."""
+    if not isinstance(params, dict):
+        return params
+    return {
+        k: ("***redacted***" if str(k).lower() in SECRET_PARAM_KEYS else v)
+        for k, v in params.items()
+    }
+
+
 DEFAULT_BUNDLES: Dict[str, List[str]] = {
     "macro_v1": [
         "CPIAUCSL",

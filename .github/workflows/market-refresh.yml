@@ -1,0 +1,149 @@
+# GitHub Actions: Monthly Market Data Refresh
+# Version: v1.0 (2026-08-24) -- LSCMD-SD-MARKETREFRESH-0821-SD17
+#
+# Re-fetches the market series the platform already tracks, so /market and the
+# CPI baseline stop going stale. Before this existed there was no automation at
+# all: the working path was a person running the CLI by hand, and the newest
+# observation in public.market_data was 2026-04-01.
+#
+# WHY HERE AND NOT VERCEL OR RAILWAY
+#   Railway builds from backend/ only, so services/market_ingest_py never ships
+#   there, and the Railway service is gunicorn with no worker and no cron.
+#   A Vercel function is the wrong host for a multi-provider fetch that runs for
+#   minutes. GitHub Actions checks out the whole repository, has no request
+#   timeout, and already runs disaster-drill.yml on a schedule -- it is the only
+#   scheduler in this platform that can actually do this.
+#
+# CADENCE
+#   Monthly on the 16th at 09:00 UTC. The economic series publish monthly (CPI for
+#   month M lands around the middle of M+1), so the 16th is after that month's
+#   release rather than racing it. The census series publish once a year in
+#   December and are picked up by whichever run follows.
+#
+#   Deliberately one day after the CPI sync cron (vercel.json, "0 12 15 * *") --
+#   that job now refuses to write when its source is stale, so it needs this one
+#   to have run recently. See src/app/api/cron/sync-cpi-to-settings/route.ts.
+
+name: Monthly Market Refresh
+
+on:
+  schedule:
+    - cron: '0 9 16 * *'   # 16th of each month, 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      geo_id:
+        description: 'Restrict to one geo_id (smoke test). Blank = the full tracked set.'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Fetch and normalise but write nothing'
+        type: boolean
+        required: false
+        default: false
+
+# Never let two refreshes overlap -- they would race on the same upsert keys.
+concurrency:
+  group: market-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh tracked market series
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      NEON_DB_URL: ${{ secrets.NEON_DB_URL }}
+      DATABASE_URL: ${{ secrets.NEON_DB_URL }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r services/market_ingest_py/requirements.txt 2>/dev/null \
+            || pip install loguru tenacity python-dateutil pydantic psycopg2-binary requests
+
+      - name: Fail fast if any credential is missing
+        run: |
+          missing=""
+          for k in NEON_DB_URL FRED_API_KEY CENSUS_API_KEY BLS_API_KEY; do
+            [ -z "${!k}" ] && missing="$missing $k"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
+          echo "All four provider credentials present."
+
+      - name: Show the refresh set
+        working-directory: backend
+        run: python manage.py refresh_market_data --list
+
+      - name: Record row count before
+        id: before
+        run: |
+          COUNT=$(python -c "
+          import os, psycopg2
+          c = psycopg2.connect(os.environ['NEON_DB_URL'])
+          cur = c.cursor()
+          cur.execute('SELECT count(*), max(date) FROM public.market_data')
+          r = cur.fetchone(); print(f'{r[0]}|{r[1]}')
+          ")
+          echo "rows=${COUNT%%|*}" >> "$GITHUB_OUTPUT"
+          echo "newest=${COUNT##*|}" >> "$GITHUB_OUTPUT"
+          echo "Before: ${COUNT%%|*} rows, newest ${COUNT##*|}"
+
+      - name: Refresh
+        working-directory: backend
+        run: |
+          ARGS=""
+          [ -n "${{ inputs.geo_id }}" ] && ARGS="$ARGS --geo-id ${{ inputs.geo_id }}"
+          [ "${{ inputs.dry_run }}" = "true" ] && ARGS="$ARGS --dry-run"
+          python manage.py refresh_market_data $ARGS
+
+      - name: Report what changed
+        if: always()
+        run: |
+          python - <<'PY'
+          import os, psycopg2
+          c = psycopg2.connect(os.environ['NEON_DB_URL'])
+          cur = c.cursor()
+          cur.execute('SELECT count(*), max(date) FROM public.market_data')
+          rows, newest = cur.fetchone()
+          before = int('${{ steps.before.outputs.rows }}' or 0)
+          cur.execute("""
+              SELECT job_id, status, COALESCE(stats->>'rows_written','?')
+              FROM public.market_fetch_job ORDER BY job_id DESC LIMIT 1
+          """)
+          job = cur.fetchone()
+          cur.execute("""
+              SELECT latest_observation_date, (CURRENT_DATE - latest_observation_date)
+              FROM landscape.v_current_cpi_inflation WHERE series_code = 'CPIAUCSL'
+          """)
+          cpi = cur.fetchone()
+
+          out = [
+              f'Rows: {before} -> {rows} ({rows - before:+d})',
+              f'Newest observation: {newest}',
+              f'Last fetch job: #{job[0]} {job[1]}, {job[2]} rows written' if job else 'No fetch job row',
+          ]
+          if cpi:
+              state = 'sync will DECLINE (stale)' if cpi[1] > 95 else 'sync may write'
+              out.append(f'CPIAUCSL newest {cpi[0]} ({cpi[1]} days old) -- CPI {state}')
+          summary = '\n'.join(f'- {line}' for line in out)
+          print(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as fh:
+              fh.write('## Market refresh\n' + summary + '\n')
+          PY
