@@ -61,6 +61,11 @@ jobs:
     env:
       NEON_DB_URL: ${{ secrets.NEON_DB_URL }}
       DATABASE_URL: ${{ secrets.NEON_DB_URL }}
+      # Django refuses to import settings without this. Nothing in this job signs
+      # or encrypts anything -- it opens a database connection and talks to four
+      # HTTP APIs -- so a fixed placeholder is correct here, matching the
+      # convention preview.yml already uses for its backend test job.
+      SECRET_KEY: ci-market-refresh-not-used-for-signing
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
       BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
