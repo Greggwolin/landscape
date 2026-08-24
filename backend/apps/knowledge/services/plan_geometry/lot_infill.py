@@ -189,28 +189,14 @@ def infill_by_position(
     unnamed_ids = set(range(len(anchors), len(faces)))
     adjacency = build_adjacency(faces)
 
-    for left, right in zip(anchors, anchors[1:]):
-        between = [n for n in schedule if left < n < right]
-        if not between:
-            continue
-        if left // 100 != right // 100:
-            # Plats number in hundred blocks by parcel, so 180 and 201 are not
-            # consecutive lots — they are the last of one parcel and the first
-            # of another, often on a different part of the drawing entirely.
-            # Not a run, and reporting it as a broken chain would be noise
-            # standing in for a refusal that never applied.
-            continue
-        if any(n not in unassigned for n in between):
-            # Something in this gap was placed elsewhere, so these two anchors
-            # are not consecutive lots and the shapes between them are not a
-            # single run.
-            continue
+    def _try_run(left, right, between):
+        """Attempt to walk one run between two anchors. Returns True if placed."""
+        if any(n not in unassigned or n in assigned for n in between):
+            return False
         if len(between) > MAX_RUN:
             refusals.append((between, f"{len(between)} lots in one gap — too long a run to walk"))
-            continue
+            return False
 
-        # A shape handed to an earlier run is spent; offering it to a second
-        # run would let one face be two lots.
         walks = _walks(
             adjacency,
             start=anchor_index[left],
@@ -224,19 +210,16 @@ def infill_by_position(
                 f"no unbroken chain of exactly {len(between)} unnamed shapes runs "
                 f"from lot {left} to lot {right}",
             ))
-            continue
+            return False
         if len(walks) > 1:
             refusals.append((
                 between,
                 f"{len(walks)} different ways to walk from lot {left} to lot {right} "
                 f"through {len(between)} unnamed shapes — which shape is which is not decided",
             ))
-            continue
+            return False
 
         walk = walks[0]
-        # Area is a veto only. It cannot confirm the assignment — every
-        # candidate agrees when eleven lots state the same 5040 sq ft — but a
-        # disagreement is proof the walk landed on the wrong shapes.
         disagreeing = []
         for number, node in zip(between, walk):
             got = faces[node].area * scale_sqft_per_pt2
@@ -250,11 +233,76 @@ def infill_by_position(
                 + ", ".join(f"lot {n} would be {g:,} sq ft against {s:,} stated"
                             for n, g, s in disagreeing),
             ))
-            continue
+            return False
 
         for number, node in zip(between, walk):
             assigned[number] = faces[node]
             used_nodes.add(node)
         logger.info("named by position: %s between lots %d and %d", between, left, right)
+        return True
+
+    # PASS 1 — same hundred block (the safe, original rule)
+    for left, right in zip(anchors, anchors[1:]):
+        between = [n for n in schedule if left < n < right]
+        if not between:
+            continue
+        if left // 100 != right // 100:
+            continue
+        _try_run(left, right, between)
+
+    # PASS 2 — cross hundred-block boundary.
+    #
+    # A plat numbers lots sequentially around a block perimeter: ...180, 181,
+    # 182, 183 then 201, 202... The gap from 183 to 201 is typically 17
+    # numbers (184-200) with zero actual lots in between — the hundred-block
+    # boundary is a NAMING convention, not a physical gap.
+    #
+    # But some plats have lots right at the boundary where the last lot of one
+    # block (e.g. 183) abuts the first of the next (201), with only a drainage
+    # tract between them. The original rule refused all cross-boundary pairs,
+    # which meant any unnamed lots at a block boundary were unrecoverable.
+    #
+    # The safety here is the same as everywhere: the walk must be unique, the
+    # count must be exact, and every area must agree with the schedule. The
+    # hundred-block check was a heuristic for "these anchors are probably far
+    # apart"; the adjacency graph is the real answer. Two anchors that are NOT
+    # adjacent through unnamed faces fail the walk test and refuse, whether or
+    # not they share a hundred block.
+    #
+    # Additional guard: only attempt cross-boundary when the two anchors are
+    # adjacent (graph distance ≤ MAX_RUN + 1), AND the between-list is short
+    # (≤ 3 lots), AND every number in between is still unassigned.
+    for left, right in zip(anchors, anchors[1:]):
+        if left // 100 == right // 100:
+            continue  # already handled in pass 1
+        between = [n for n in schedule if left < n < right]
+        if not between or len(between) > 3:
+            continue  # only short cross-boundary runs
+        # Check that the anchors are actually nearby on this sheet (not on
+        # opposite sides of the drawing)
+        li, ri = anchor_index[left], anchor_index[right]
+        if not _reachable(adjacency, li, ri, unnamed_ids - used_nodes, max_depth=len(between) + 1):
+            continue
+        _try_run(left, right, between)
 
     return InfillResult(assigned, refusals)
+
+
+def _reachable(adjacency, start: int, end: int, allowed: set[int], max_depth: int) -> bool:
+    """BFS check: can we reach `end` from `start` through `allowed` nodes
+    within `max_depth` steps?"""
+    visited = {start}
+    frontier = {start}
+    for _ in range(max_depth):
+        next_frontier = set()
+        for node in frontier:
+            for nb in adjacency.get(node, ()):
+                if nb == end:
+                    return True
+                if nb in allowed and nb not in visited:
+                    visited.add(nb)
+                    next_frontier.add(nb)
+        frontier = next_frontier
+        if not frontier:
+            break
+    return False

@@ -29,6 +29,7 @@ from apps.knowledge.services.plan_geometry.parcel_rollup import (
     MIN_LOTS_PER_PARCEL,
     PARCEL_ROLLUP_COLUMNS,
     DerivedLot,
+    DerivedTract,
     Grouping,
     _wkt_polygon,
     group_into_parcels,
@@ -418,3 +419,106 @@ def test_wkt_leaves_an_already_closed_ring_alone():
 def test_wkt_refuses_a_degenerate_ring():
     with pytest.raises(ValueError, match="at least three points"):
         _wkt_polygon([(0.0, 0.0), (1.0, 1.0)])
+
+
+# ─────────────────────────────────────────────────────────────────── tracts
+
+
+def _tracts(placed: bool = True) -> list[DerivedTract]:
+    return [
+        DerivedTract(
+            label=label,
+            area_sqft=area,
+            ring_3857=_square(500.0 + i * 20, 500.0) if placed else None,
+            page=4,
+        )
+        for i, (label, area) in enumerate((("A", 24_000.0), ("B", 61_500.0)))
+    ]
+
+
+def test_a_tract_is_written_with_no_parcel_and_its_own_lot_type():
+    """A drainage tract sits between parcels, so its parcel_id is null.
+
+    It is stored on the same vintage and supersede rule as a lot, but it is
+    not one: the discriminator column says so, and nothing rolls its area into
+    a parcel (PF1).
+    """
+    cursor = _FakeCursor()
+    grouping = group_into_parcels(_red_valley_lots())
+
+    result = write_rollup(
+        cursor,
+        project_id=7,
+        grouping=grouping,
+        source_doc="plat.pdf",
+        stage=3,
+        tracts=_tracts(),
+    )
+
+    assert result.tracts_written == 2
+    inserts = [
+        params for sql, params in cursor.executed
+        if "INSERT INTO landscape.gis_plan_lot" in sql
+    ]
+    tract_rows = [p for p in inserts if p[2] in ("A", "B")]
+    assert len(tract_rows) == 2
+    for row in tract_rows:
+        assert row[1] is None            # parcel_id
+        assert row[6] == "tract"         # source
+        assert row[-1] == "tract"        # lot_type
+    # Every lot row still says it is a lot.
+    assert all(p[-1] == "lot" for p in inserts if p[2] not in ("A", "B"))
+
+
+def test_a_tract_area_is_rolled_into_no_parcel():
+    """The parcels must be identical whether or not tracts came with them."""
+    without = group_into_parcels(_red_valley_lots())
+    acres_without = [p.acres for p in without.parcels]
+
+    cursor = _FakeCursor()
+    result = write_rollup(
+        cursor,
+        project_id=7,
+        grouping=group_into_parcels(_red_valley_lots()),
+        source_doc="plat.pdf",
+        stage=3,
+        tracts=_tracts(),
+    )
+
+    parcel_updates = [
+        params for sql, params in cursor.executed
+        if "INSERT INTO landscape.tbl_parcel" in sql
+    ]
+    assert len(parcel_updates) == len(acres_without)
+    assert result.parcels_written == len(acres_without)
+
+
+def test_a_tract_with_no_outline_is_not_written():
+    """Same rule as a lot: counted, but there is no geometry to store."""
+    cursor = _FakeCursor()
+    result = write_rollup(
+        cursor,
+        project_id=7,
+        grouping=group_into_parcels(_red_valley_lots()),
+        source_doc="plat.pdf",
+        stage=3,
+        tracts=_tracts(placed=False),
+    )
+    assert result.tracts_written == 0
+    assert not [
+        p for _, p in cursor.executed if len(p) > 2 and p[2] in ("A", "B")
+    ]
+
+
+def test_a_tract_with_an_invalid_source_is_refused():
+    cursor = _FakeCursor()
+    with pytest.raises(ValueError, match="lot source must be one of"):
+        write_rollup(
+            cursor,
+            project_id=7,
+            grouping=group_into_parcels(_red_valley_lots()),
+            source_doc="plat.pdf",
+            stage=3,
+            tracts=[DerivedTract(label="A", area_sqft=1.0,
+                                 ring_3857=_square(0, 0), source="invented")],
+        )

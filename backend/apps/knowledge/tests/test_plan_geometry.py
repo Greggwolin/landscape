@@ -602,12 +602,17 @@ def test_match_lots_closes_hairline_gaps_and_verifies_every_area(plat_pdf):
     by_number = {m.number: m for m in result.matched}
     first_rung = lot_match.GAP_LADDER_PT[0]
 
-    # The three lots left open needed more than the first rung to close.
-    for number in GAPPED_LOTS:
-        assert by_number[number].gap_used_pt > first_rung
-
-    # Everything already closed came in on the first rung.
-    for number in set(range(1, 13)) - set(GAPPED_LOTS):
+    # Every lot now closes on the first rung, the deliberately-gapped three
+    # included. `snap_endpoints` connects near-miss endpoints directly instead
+    # of pushing each line further along its own direction, and it closes on
+    # the first pass the gaps that blind extension had to escalate to reach
+    # (PF1). Before that, GAPPED_LOTS came in above the first rung.
+    #
+    # The escalation ladder is not what makes this safe and never was: the
+    # acceptance test is the stated area, asserted above at a median error
+    # under 0.1% across all twelve lots. A snap that distorted geometry would
+    # fail that gate and its lot would be dropped, not kept.
+    for number in range(1, 13):
         assert by_number[number].gap_used_pt == first_rung
 
 

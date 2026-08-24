@@ -64,7 +64,9 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "LotAreaTable",
+    "TractAreaTable",
     "read_lot_area_table",
+    "read_tract_area_table",
     "compare_to_drawn_labels",
     "DerivedOutline",
     "derive_missing_lots",
@@ -181,6 +183,93 @@ def compare_to_drawn_labels(table: LotAreaTable, drawn: Iterable[int]) -> dict[s
         "drawn_but_not_tabulated": sorted(drawn - set(table.areas)),
         "tabulated_but_not_drawn": sorted(set(table.areas) - drawn),
     }
+
+
+# ─────────────────────────────────────────── tract area table
+
+
+#: Tract identifier in the table: a single uppercase letter, possibly preceded
+#: by "TRACT" or "TR" or "TR.".
+_TRACT_LABEL = re.compile(r"^(?:TRACT\s*|TR\.?\s*)?([A-Z])$", re.IGNORECASE)
+
+
+@dataclass
+class TractAreaTable:
+    """The plat's own statement of its drainage/utility tracts."""
+
+    #: tract label ("A", "B", ...) → square feet
+    areas: dict[str, int] = field(default_factory=dict)
+    rejected: list[tuple[str, str, str]] = field(default_factory=list)
+    sheets: list[int] = field(default_factory=list)
+
+    def __len__(self) -> int:
+        return len(self.areas)
+
+    @property
+    def total_acres(self) -> float:
+        return sum(self.areas.values()) / SQFT_PER_ACRE
+
+    def summary(self) -> str:
+        labels = ", ".join(sorted(self.areas))
+        return (
+            f"{len(self.areas)} tracts ({labels}), {self.total_acres:.2f} acres; "
+            f"{len(self.rejected)} rows failed their own arithmetic"
+        )
+
+
+def read_tract_area_table(doc, header: str = "TRACT AREA TABLE") -> TractAreaTable:
+    """Read every sheet carrying a tract area table.
+
+    Tract area tables have the same columnar layout as lot area tables but the
+    first column is a letter (A, B, C...) or "TRACT A" instead of a number.
+    The table header is typically "TRACT AREA TABLE" or "TRACT AREA SUMMARY".
+    """
+    table = TractAreaTable()
+    # Try multiple header variations
+    headers = [header, "TRACT AREA SUMMARY", "TRACT AREA", "TRACT TABLE"]
+    for page_index in range(len(doc)):
+        page = doc[page_index]
+        page_text = page.get_text().upper()
+        if not any(h in page_text for h in headers):
+            continue
+        words = page.get_text("words")
+        sqft = [w for w in words if _SQFT.fullmatch(w[4])]
+        acres = [w for w in words if _ACRES.fullmatch(w[4])]
+        found_here = 0
+        for candidate in words:
+            text = candidate[4].strip()
+            m = _TRACT_LABEL.fullmatch(text)
+            if not m:
+                continue
+            label = m.group(1).upper()
+            mid = (candidate[1] + candidate[3]) / 2
+            height = candidate[3] - candidate[1]
+
+            def same_row(w, left_of):
+                return (abs((w[1] + w[3]) / 2 - mid) < height * 0.6
+                        and 0 < w[0] - left_of < height * 8)
+
+            near_sqft = [w for w in sqft if same_row(w, candidate[2])]
+            if not near_sqft:
+                continue
+            s = min(near_sqft, key=lambda w: w[0])
+            near_acres = [w for w in acres if same_row(w, s[2])]
+            if not near_acres:
+                continue
+            a = min(near_acres, key=lambda w: w[0])
+
+            square_feet = int(re.sub(r"[.,]", "", s[4]))
+            stated_acres = float(a[4])
+            if abs(square_feet / SQFT_PER_ACRE - stated_acres) <= _ARITHMETIC_TOLERANCE_ACRES:
+                table.areas[label] = square_feet
+                found_here += 1
+            else:
+                table.rejected.append((label, s[4], a[4]))
+        if found_here:
+            table.sheets.append(page_index)
+    if table.areas:
+        logger.info("tract area table: %s", table.summary())
+    return table
 
 
 # ─────────────────────────────────────────── building the lots that never closed
