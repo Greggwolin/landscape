@@ -104,7 +104,7 @@ _EDITABLE_BUDGET_COLUMNS = (
     # a description. Tested in both directions.
     'division', 'stage', 'category', 'description',
     'vendor', 'timing_method', 'start_date', 'end_date',
-    'cf_start', 'curve_profile', 'curve_steepness',
+    'curve_profile', 'curve_steepness',
     'escalation', 'escalation_method',
 )
 
@@ -130,7 +130,6 @@ _BUDGET_CELL_TO_COLUMN = {
     'stage': 'activity',
     'category': 'category_id',
     'vendor': 'vendor_name',
-    'cf_start': 'cf_start_flag',
     # The escalation cell writes the REFERENCE. Choosing a set also refreshes
     # the derived escalation_rate the engine reads; typing a rate instead
     # clears the reference. Both handled in _write_budget_cell.
@@ -145,7 +144,7 @@ _TEXTUAL_BUDGET_CELLS = frozenset({
 })
 
 # Captured as-is: booleans and the reference id, neither of which is a float.
-_RAW_BUDGET_CELLS = frozenset({'cf_start', 'escalation', 'division', 'category'})
+_RAW_BUDGET_CELLS = frozenset({'escalation', 'division', 'category'})
 
 
 def _capture(cell_key: str, raw: Any) -> Any:
@@ -254,7 +253,6 @@ def build_budget_artifact_schema(
                                if hasattr(r.get('start_date'), 'isoformat') else None),
                 'end_date': (r.get('end_date').isoformat()[:10]
                              if hasattr(r.get('end_date'), 'isoformat') else None),
-                'cf_start': r.get('cf_start_flag'),
                 'curve_profile': r.get('curve_profile'),
                 'curve_steepness': _num(r.get('curve_steepness')),
                 'escalation': r.get('growth_rate_set_id'),
@@ -303,7 +301,6 @@ def build_budget_artifact_schema(
                     {'key': 'timing_method', 'label': 'Timing', 'align': 'left'},
                     {'key': 'start_date', 'label': 'Start date', 'align': 'left'},
                     {'key': 'end_date', 'label': 'End date', 'align': 'left'},
-                    {'key': 'cf_start', 'label': 'CF start', 'align': 'left'},
                     {'key': 'curve_profile', 'label': 'Curve', 'align': 'left'},
                     {'key': 'curve_steepness', 'label': 'Steep', 'align': 'right'},
                     {'key': 'escalation', 'label': 'Escalation', 'align': 'left'},
@@ -380,14 +377,21 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
         # dropdown — typing into a foreign key only earns a database rejection.
         # Read here (not in the tool) so the after-write refresh rebuilds the
         # identical schema, options included.
+        # The label is the code and nothing else — the renderer shows an
+        # option's label in the CELL as well as in the dropdown, so a
+        # description here puts a sentence in every row of a two-character
+        # column. Kept identical to the same list in
+        # schedule_view_spec.build_budget_view_config; if one grows a
+        # description the other must too, or the after-write refresh will
+        # silently relabel the column.
         cursor.execute(
             """
-            SELECT uom_code, name FROM landscape.core_fin_uom
+            SELECT uom_code FROM landscape.core_fin_uom
             WHERE is_active ORDER BY uom_code
             """
         )
         uom_options = [
-            {'value': row[0], 'label': f'{row[0]} — {row[1]}' if row[1] else row[0]}
+            {'value': row[0], 'label': row[0]}
             for row in cursor.fetchall()
         ]
 

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import type { BlockDocument } from '@/types/artifact';
 import styles from './ScheduleArtifact.module.css';
+import { useArtifactWidthRequest, widthForColumns } from './artifactWidthRequest';
 import { hierCellText, hierHeaderLabels } from './hierPath';
 import { withExtraColumns } from './columnOrder';
 import { buildLevelRows } from './levelRows';
@@ -208,6 +209,20 @@ export function ScheduleArtifact({
   const [rung, setRung] = useState<string>(config.default_rung);
   const [grouping, setGrouping] = useState<string>(config.default_grouping);
   const [extraColumns, setExtraColumns] = useState<string[]>([]);
+  /* Columns the user has switched OFF.
+   *
+   * A chip used to be add-only. On the `all` rung every column is already in
+   * the rung's own list, so clicking Parcel, Vendor or Timing there did
+   * nothing at all — the chip lit up and the column never moved. Gregg,
+   * 2026-08-24: "the parcel, vendor, timing buttons dont toggle the columns.
+   * they are always visible."
+   *
+   * Kept as a SEPARATE list rather than toggling membership of extraColumns,
+   * because the two are not opposites: extraColumns means "show this even
+   * though the rung does not", and this means "hide this even though the rung
+   * does". Changing rung leaves both intact, which is what makes a chip feel
+   * like a switch rather than something that resets under you. */
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [derivationRow, setDerivationRow] = useState<ScheduleRow | null>(null);
 
   /* ── Editing (slice 2) ───────────────────────────────────────────────────
@@ -441,7 +456,22 @@ export function ScheduleArtifact({
          * duplication of the group heading. Applies to any groupable column,
          * not just category, so grouping by stage hides stage too. */
         if (grouping !== 'none' && key === grouping) return false;
+        /* Switched off by its chip. Ahead of every other rule including the
+         * `all` rung below: an explicit "no" from the user outranks a default,
+         * and only columns that HAVE a chip can land here, so the fields a line
+         * needs to exist cannot be hidden this way. */
+        if (hiddenColumns.includes(key)) return false;
         if (extraColumns.includes(key)) return true;
+        /* Curve profile and steepness only mean anything on a line whose
+         * timing method is a curve. Gregg, 2026-08-24: "the curve and steep
+         * columns should only be visible / available if Curve is elected in
+         * the timing col." Live on 17 of 366 lines, so on almost every view
+         * these were two permanently empty columns taking width from the
+         * columns that do carry something. Asking for them by chip still
+         * shows them — the rule above returns first. */
+        if (key === 'curve_profile' || key === 'curve_steepness') {
+          return visibleRows.some((r) => r.cells.timing_method === 'curve');
+        }
         // The `all` rung is the one you BUILD a line on, and a line needs a
         // category and a stage to exist. Dropping them because every existing
         // row happens to share one leaves no way to set them on a new row —
@@ -458,9 +488,28 @@ export function ScheduleArtifact({
       cols.unshift({ key: HIER_KEY, label: hierHeader, align: 'left', kind: 'text' });
     }
     return cols;
-     
+
   }, [config.columns, config.rung_columns, rung, extraColumns, visibleRows,
-      showHier, hierHeader, grouping]);
+      showHier, hierHeader, grouping, hiddenColumns]);
+
+  /* Ask the panel for the room these columns need.
+   *
+   * Gregg, 2026-08-22: "the user needs access to all columns. if the artifacts
+   * panel needs to expand in width to accommodate, thats fine." The panel
+   * cannot work this out for itself — the column set changes with the rung, the
+   * chips and the constant-drop rule above, none of which the panel can see.
+   *
+   * The request is withdrawn on unmount so a narrow artifact opened next does
+   * not inherit a wide table's claim on the panel. Whether the request is
+   * honoured is the panel's business: it will not shrink itself, will not
+   * override a width the user dragged, and will not squeeze the chat below its
+   * floor. See ./artifactWidthRequest. */
+  const { requestWidth } = useArtifactWidthRequest();
+  const desiredWidth = useMemo(() => widthForColumns(activeColumns), [activeColumns]);
+  useEffect(() => {
+    requestWidth(desiredWidth);
+    return () => requestWidth(null);
+  }, [desiredWidth, requestWidth]);
 
   /* Line rows, grouped into sections with subtotals. */
   const sections = useMemo(() => {
@@ -544,10 +593,22 @@ export function ScheduleArtifact({
     });
   };
 
+  /* A chip is a switch, and what it does depends on where the column stands
+   * RIGHT NOW rather than on which list it happens to sit in.
+   *
+   * Visible → hide it. Hidden → show it. That reads as one gesture to the
+   * person clicking, and it is the behaviour that was missing: on the `all`
+   * rung a column is already in the rung's list, so the old add-only version
+   * had nothing to add and silently did nothing. */
   const toggleColumn = (key: string) => {
-    setExtraColumns((prev) => prev.includes(key)
-      ? prev.filter((k) => k !== key)
-      : [...prev, key]);
+    const isVisible = activeColumns.some((c) => c.key === key);
+    if (isVisible) {
+      setExtraColumns((prev) => prev.filter((k) => k !== key));
+      setHiddenColumns((prev) => prev.includes(key) ? prev : [...prev, key]);
+    } else {
+      setHiddenColumns((prev) => prev.filter((k) => k !== key));
+      setExtraColumns((prev) => prev.includes(key) ? prev : [...prev, key]);
+    }
   };
 
   const renderCell = (row: ScheduleRow, column: ScheduleColumn) => {
@@ -811,7 +872,13 @@ export function ScheduleArtifact({
         <div className={styles.bar}>
           <span className={styles.barLabel}>Columns</span>
           {config.optional_columns.map((column) => {
-            const on = extraColumns.includes(column.key);
+            /* Lit when the column is ON SCREEN, not when it is in the "added"
+             * list. Those came apart the moment a chip could also remove: on
+             * the `all` rung every column is visible without ever having been
+             * added, so the old test left every chip dark while its column sat
+             * in plain sight. A switch that shows the opposite of the thing it
+             * controls is worse than no switch. */
+            const on = activeColumns.some((c) => c.key === column.key);
             return (
               <button
                 type="button"

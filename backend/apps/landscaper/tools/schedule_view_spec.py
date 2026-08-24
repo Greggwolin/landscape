@@ -74,13 +74,152 @@ BUDGET_OFFERED_CELLS = (
     'uom', 'rate', 'start', 'duration', 'notes', 'qty',
     'division', 'stage', 'category', 'description',
     'vendor', 'timing_method', 'start_date', 'end_date',
-    'cf_start', 'curve_profile', 'curve_steepness',
+    'curve_profile', 'curve_steepness',
     'escalation', 'escalation_method',
 )
 
 # The four detail rungs. "napkin / standard / detail" from a year ago, brought
 # back as a property of the view rather than a mode the whole app sits in.
 RUNGS = ('summary', 'standard', 'detail', 'all')
+
+# ── The view specification's own version ────────────────────────────────────
+#
+# A budget artifact STORES the specification it was built with. That is
+# deliberate — it is what makes an artifact a durable snapshot rather than a
+# live query — but it has a consequence nobody had accounted for: change how the
+# schedule is built and the change is invisible on every artifact that already
+# exists, forever, because nothing rebuilds them.
+#
+# That is not hypothetical. It happened twice in one day on 2026-08-24. Gregg
+# reported "I don't see 17 field choices" — his artifact carried the column set
+# from before slice 2b-2. Hours later a unit-of-measure label fix could not be
+# demonstrated in a browser for exactly the same reason. Re-asking does not help:
+# the model sees the artifact is already open and skips the tool, so the one
+# gesture a person would reach for is the one that does nothing.
+#
+# BUMP THIS whenever build_budget_view_config changes shape in a way a person
+# would see — a column added or removed, an option list relabelled, a rung
+# altered, a knob added. The artifact read path (backend/apps/artifacts/views.py,
+# _rebuild_if_view_spec_stale) compares this number against the stored one and
+# rebuilds the artifact before serving it, so opening the budget is enough. Do
+# not bump it for a change that only affects VALUES — those already refresh.
+#
+#   1 — slice 1: the view specification itself (2026-07-31)
+#   2 — slice 2b-2: nineteen columns, thirteen chips, the `all` rung (2026-08-21)
+#   3 — unit-of-measure labels are the bare code, not "LF — Linear Feet"
+#       (2026-08-24, Gregg: "just the short name")
+#   4 — start and end dates derive from the period integers when they were
+#       never typed (2026-08-24, Gregg: "if the start and end periods are
+#       entered, then the start and end dates should be autocalculated")
+#   5 — "CF start" removed from the schedule (2026-08-24, Gregg chose 4a). The
+#       column comment says "Marks cash flow beginning". NOTHING READS IT — not
+#       the cash-flow service, not the calculations app, not the financial
+#       engine — and it is false on all 366 budget lines. It rendered as a
+#       checkbox on every row of the widest view, taking width from columns that
+#       carry something. The database column stays; only the schedule stops
+#       offering it. Restoring it means re-adding the column, the rung entry,
+#       the chip and the cell together, and giving it something that reads it.
+BUDGET_VIEW_SPEC_VERSION = 5
+
+
+def _period_zero(project_id: int):
+    """The calendar month that budget period 1 lands in, or None.
+
+    Periods on a budget line are MONTHS counted from the project's analysis
+    start — the same anchor the land-development cash flow uses
+    (land_dev_cashflow_service._get_project_config).
+
+    RETURNS None WHEN THE PROJECT HAS NO ANALYSIS START DATE, and that is the
+    whole point of this function existing separately. The cash-flow service
+    defaults a missing anchor to 1 January 2025 so it can still produce a
+    schedule. Doing that HERE would print a specific calendar date next to a
+    line item, on screen, that nobody chose — a fabricated date is worse than an
+    empty cell, and Peoria has an anchor while Lynn Villa does not.
+    """
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'SELECT analysis_start_date FROM landscape.tbl_project '
+                'WHERE project_id = %s', [project_id])
+            row = cursor.fetchone()
+        return row[0] if row and row[0] else None
+    except Exception:  # noqa: BLE001
+        logger.exception('budget view: analysis start date unavailable')
+        return None
+
+
+def _add_months(anchor, months: int):
+    """Anchor plus N whole months, clamped to the end of a short month."""
+    import calendar
+    total = anchor.month - 1 + months
+    year = anchor.year + total // 12
+    month = total % 12 + 1
+    day = min(anchor.day, calendar.monthrange(year, month)[1])
+    return anchor.replace(year=year, month=month, day=day)
+
+
+def _derived_dates(record: Dict[str, Any], period_zero):
+    """(start_date, end_date, which of them were derived).
+
+    Gregg, 2026-08-24: "if the start and end periods are entered, then the start
+    and end dates should be autocalculated." 324 of 366 live budget lines carry
+    a start period and a duration; only 36 carry dates. The date columns were
+    therefore empty on nearly every row while the information to fill them sat
+    two columns to the left.
+
+    THREE RULES, IN ORDER.
+
+    1. A TYPED DATE ALWAYS WINS. If someone entered a date it is the answer, and
+       nothing here recomputes it. Derivation fills a hole; it does not overrule
+       a person.
+    2. NO ANCHOR, NO DATE. Without the project's analysis start date there is no
+       way to know what month period 1 is, so the cell stays empty. It is not
+       filled with a guess and it is not filled with today.
+    3. THE DERIVED VALUE IS MARKED. The row carries which cells were computed,
+       so the renderer can show them as derived rather than typed — the same
+       treatment a followed escalation rate already gets. A computed value
+       presented as an entered one is the silent-inference failure this codebase
+       has a standing rule against.
+
+    Period 1 is the anchor month itself, so period N starts N-1 months later.
+    The end date is the last day of the final period's month: a line running
+    periods 3 to 5 finishes at the end of period 5, not at its start.
+    """
+    import calendar
+    typed_start = _date_str(record.get('start_date'))
+    typed_end = _date_str(record.get('end_date'))
+    derived: List[str] = []
+    if period_zero is None:
+        return typed_start, typed_end, derived
+
+    start_period = record.get('start_period')
+    end_period = record.get('end_period')
+    if end_period is None and start_period is not None:
+        duration = record.get('periods_to_complete')
+        if duration is not None:
+            try:
+                end_period = int(start_period) + int(duration) - 1
+            except (TypeError, ValueError):
+                end_period = None
+
+    start_out, end_out = typed_start, typed_end
+    if not typed_start and start_period is not None:
+        try:
+            start_out = _add_months(
+                period_zero, int(start_period) - 1).isoformat()
+            derived.append('start_date')
+        except (TypeError, ValueError):
+            pass
+    if not typed_end and end_period is not None:
+        try:
+            last = _add_months(period_zero, int(end_period) - 1)
+            end_out = last.replace(
+                day=calendar.monthrange(last.year, last.month)[1]).isoformat()
+            derived.append('end_date')
+        except (TypeError, ValueError):
+            pass
+    return start_out, end_out, derived
 
 _DEFAULT_TIER_LABELS = {1: 'Level 1', 2: 'Level 2', 3: 'Level 3'}
 
@@ -288,6 +427,9 @@ def build_budget_view_config(
     # missing renders read-only rather than as free text into a foreign key.
     picklists = fetch_budget_picklists(project_id)
     escalation_sets = picklists.get('escalation_sets') or []
+    # The month period 1 lands in. None when the project has no analysis start
+    # date, which leaves every derived date empty rather than invented.
+    period_zero = _period_zero(project_id)
     # "Division" is not a real word either -- the deepest configured level's
     # own label is. Falls back only when the project has no levels configured.
     division_label = (levels[-1]['label'] if levels else 'Division')
@@ -301,6 +443,8 @@ def build_budget_view_config(
         amount = _num(record.get('amount'))
         uom = record.get('uom_code') or ''
         escalation_ref = _escalation_ref(record, escalation_sets)
+        start_date_cell, end_date_cell, dates_derived = _derived_dates(
+            record, period_zero)
         rows.append({
             # Same id the block schema uses, so the editing spine can map a
             # rendered cell back to its source row when slice 2 lands.
@@ -324,9 +468,10 @@ def build_budget_view_config(
                 'division': record.get('division_id'),
                 'vendor': record.get('vendor_name'),
                 'timing_method': record.get('timing_method'),
-                'start_date': _date_str(record.get('start_date')),
-                'end_date': _date_str(record.get('end_date')),
-                'cf_start': record.get('cf_start_flag'),
+                # Dates derive from the period integers when they were never
+                # typed — see _derived_dates. A typed date always wins.
+                'start_date': start_date_cell,
+                'end_date': end_date_cell,
                 'curve_profile': record.get('curve_profile'),
                 'curve_steepness': _num(record.get('curve_steepness')),
                 # Escalation displays what the line POINTS AT when it follows a
@@ -341,6 +486,9 @@ def build_budget_view_config(
             # Which of the two halves is authoritative on THIS line, so the
             # renderer can show a followed rate as derived rather than typed.
             'escalation_ref': escalation_ref,
+            # Which date cells on this row were computed rather than typed, so
+            # the renderer can mark them and the writer can tell them apart.
+            'derived_cells': dates_derived,
             # Double-clicking an amount opens this instead of merely refusing.
             # The quantity columns were removed from the table entirely in
             # rev 4; the quantity lives here, where it is actually wanted.
@@ -397,7 +545,6 @@ def build_budget_view_config(
          'kind': 'picklist', 'options': picklists.get('timing_method') or []},
         {'key': 'start_date', 'label': 'Start date', 'align': 'center', 'kind': 'date'},
         {'key': 'end_date', 'label': 'End date', 'align': 'center', 'kind': 'date'},
-        {'key': 'cf_start', 'label': 'CF start', 'align': 'center', 'kind': 'boolean'},
         {'key': 'curve_profile', 'label': 'Curve', 'align': 'left',
          'kind': 'picklist', 'options': picklists.get('curve_profile') or []},
         {'key': 'curve_steepness', 'label': 'Steep', 'align': 'right', 'kind': 'number'},
@@ -422,7 +569,7 @@ def build_budget_view_config(
         'all': ['division', 'category', 'stage', 'description', 'uom', 'rate',
                 'amount', 'start', 'duration', 'start_date', 'end_date',
                 'timing_method', 'curve_profile', 'curve_steepness',
-                'cf_start', 'vendor', 'notes'],
+                'vendor', 'notes'],
     }
 
     # Optional columns ride behind removable chips above the table — the answer
@@ -455,8 +602,6 @@ def build_budget_view_config(
          'reason': None},
         {'key': 'end_date', 'label': 'End date', 'available': True,
          'reason': None},
-        {'key': 'cf_start', 'label': 'CF start', 'available': True,
-         'reason': None},
         {'key': 'curve_profile', 'label': 'Curve', 'available': True,
          'reason': None},
         {'key': 'curve_steepness', 'label': 'Steep', 'available': True,
@@ -464,6 +609,7 @@ def build_budget_view_config(
     ]
 
     return {
+        'spec_version': BUDGET_VIEW_SPEC_VERSION,
         'topic': 'budget',
         'kicker': f'{project_name} · Costs' if project_name else 'Costs',
         'title': 'Development budget',
@@ -601,11 +747,24 @@ def fetch_budget_picklists(project_id: int) -> Dict[str, Any]:
             logger.exception('budget picklists: categories unavailable')
 
         # UOM — FK-constrained, active codes only.
+        #
+        # THE LABEL IS THE CODE, NOTHING ELSE. It used to read `LF — Linear
+        # Feet`, and the renderer shows an option's label in the CELL as well as
+        # in the dropdown (ScheduleArtifact: one label serves both), so every
+        # row carried a sentence where a two-letter code belongs. Gregg,
+        # 2026-08-24: "the UOM col doesnt need text descriptions of the UOMs.
+        # just the short name."
+        #
+        # The description is not lost so much as unnecessary: these codes are
+        # his own vocabulary — $/FF, $/Acre, LS, EA — and the only two that read
+        # cryptically ($$$, "% of") are price expressions the UOM taxonomy
+        # decision of 2026-08-21 retires anyway. Spending a display-label/
+        # option-label split on codes that are being removed would be waste.
         try:
             cursor.execute(
-                "SELECT uom_code, name FROM landscape.core_fin_uom "
+                "SELECT uom_code FROM landscape.core_fin_uom "
                 "WHERE is_active ORDER BY uom_code")
-            out['uom'] = [_opt(r[0], f'{r[0]} — {r[1]}') for r in cursor.fetchall()]
+            out['uom'] = [_opt(r[0], r[0]) for r in cursor.fetchall()]
         except Exception:  # noqa: BLE001
             logger.exception('budget picklists: uom unavailable')
 
