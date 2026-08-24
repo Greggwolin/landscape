@@ -29,6 +29,12 @@ name: Monthly Market Refresh
 on:
   schedule:
     - cron: '0 9 16 * *'   # 16th of each month, 09:00 UTC
+  # TEMPORARY -- SD17 verification only, removed before review completes.
+  # workflow_dispatch cannot be triggered until the workflow exists on the default
+  # branch, and this must not merge untested. Scoped to this one branch.
+  push:
+    branches:
+      - fix/market-refresh-and-cron-0821
   workflow_dispatch:
     inputs:
       geo_id:
