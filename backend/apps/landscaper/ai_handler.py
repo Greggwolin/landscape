@@ -1418,13 +1418,39 @@ REQUEST → REPORT_CODE MAPPING (call `render_report_as_artifact` directly):
   • Equity waterfall                                            → RPT_04
   • Assumptions summary                                         → RPT_05
   • Project summary                                             → RPT_06
-  • Parcel table (land dev)                                     → RPT_14
   • Budget cost summary (land dev)                              → RPT_15
   • Sales schedule (land dev)                                   → RPT_16
   • Cash flow monthly (land dev)                                → RPT_17
   • Cash flow annual (land dev)                                 → RPT_18
   • Cash flow by phase (land dev)                               → RPT_19
   • Budget vs actual                                            → RPT_20
+
+NOT ON THIS LIST ANY MORE — the parcel / land-use table. RPT_14 is a REPORT of
+the parcels. The user almost never wants a report of them; they want the
+PARCELS SCREEN, which already exists, is fully editable, and opens in the panel.
+So for "the parcel table", "the detailed parcel table", "the land plan", "the
+land use table", "the planning data", "show me the parcels", or anything of that
+shape:
+
+    call navigate_to_screen(folder='property', tab='parcels')
+
+Not `render_report_as_artifact`. Not `create_artifact`. The screen carries the
+hierarchy, the three land-use levels under the project's own names for them,
+the computed density and frontage per acre, and cascading pickers for family,
+type and product — everything RPT_14 shows plus everything it cannot do. The
+report shows the LOT PRODUCT under a column headed "Land Use", prints two
+different phases as the same number, reads "Unassigned" for a parcel that has a
+land use but no product, and carries price columns that are zero on every parcel
+that has no price. Sending someone there instead of to the screen is a downgrade
+they did not ask for.
+
+RPT_14 remains available if — and only if — the user explicitly asks for a
+REPORT or an EXPORT of the parcels ("the parcel report", "export the parcel
+table"). A request to SEE the parcels is a request for the screen.
+
+Land use is the neighbouring sub-tab: navigate_to_screen(folder='property',
+tab='land-use') for "the land use picker", "which land uses are selected",
+"turn on townhomes".
 
 If the user's request matches any of the above (even loosely — "show me the
 rent roll" matches RPT_07; "give me a P&L" matches RPT_09; "cash flow for

@@ -4720,9 +4720,16 @@ LANDSCAPER_TOOLS = [
             "budget?') — answer those in place. folder is one of: home, "
             "property, budget, operations, feasibility, valuation, capital, "
             "reports, documents, map. tab is the optional sub-tab id within the "
-            "folder (e.g. market, landuse, parcels, sales, cashflow, debt, "
+            "folder (e.g. market, land-use, parcels, sales, cashflow, debt, "
             "equity); omit for folders with no sub-tabs. Invalid ids degrade "
-            "gracefully."
+            "gracefully. (The land-use tab id is hyphenated — 'land-use'. It was "
+            "written 'landuse' here until 2026-08-25, which matches no tab.) "
+            "\n\n"
+            "USE THIS for the parcels and land-use screens on a land-development "
+            "project — folder='property' with tab='parcels' or tab='land-use'. "
+            "Those screens are fully editable and are what someone asking to SEE "
+            "their parcel table or land plan wants. Do not answer that with a "
+            "report; see the report-mapping block in your instructions."
         ),
         "input_schema": {
             "type": "object",

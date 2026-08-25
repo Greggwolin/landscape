@@ -880,6 +880,26 @@ function TableBlockRenderer({
                         }
                         stageable={Boolean(cellRef) && Boolean(staging)}
                         formatNumeric={!isLabelCol}
+                        /* A LEFT-ALIGNED COLUMN IS A TEXT COLUMN.
+                         *
+                         * Formatting used to be decided by position alone —
+                         * every column except the first was treated as
+                         * numeric, on the assumption that only the first
+                         * column holds words. That is wrong the moment a table
+                         * has two text columns, and it fails silently: the
+                         * parcel report's Phase column holds "1.1", "1.2",
+                         * "2.1", "2.2", and numeric formatting rounds them, so
+                         * four distinct phases rendered as "1", "1", "2", "2".
+                         * Two different phases shown as the same phase, in a
+                         * table whose entire job is telling parcels apart.
+                         *
+                         * Alignment is the signal that was already there and
+                         * already correct: a generator that says align:'left'
+                         * has said the column holds words. This suppresses ONLY
+                         * the string-to-number coercion — dates still render as
+                         * Mmm-YY, empty and zero still render as an em dash,
+                         * and an explicit numeric `format` still wins. */
+                        textColumn={col.align === 'left'}
                         // CC2: a per-cell format wins over the column's. One
                         // column can then hold mixed units (the cash-flow
                         // assumptions strip stacks rates, periods and dollars),
@@ -983,6 +1003,18 @@ function _formatIsoDateAsMmmYy(s: string): string | null {
 export function formatCellValue(
   value: string | number | null | undefined,
   format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent',
+  /** A TEXT column: never read a numeric-looking string as a number.
+   *
+   * "1.1" and "1.2" are phase names, not quantities, and reading them as
+   * numbers rounded both to "1" — two different phases displayed identically
+   * in a table whose whole job is telling parcels apart. A column that states
+   * `align: 'left'` has said it holds words.
+   *
+   * Everything else still applies: ISO dates still render as Mmm-YY, empty
+   * and zero still render as an em dash, and an explicit numeric `format`
+   * still wins — a generator that asks for number formatting gets it whatever
+   * the alignment says. */
+  textColumn = false,
 ): string {
   if (value == null) return '—';
 
@@ -1028,7 +1060,9 @@ export function formatCellValue(
   let cleaned = s.replace(/[$,\s]/g, '').replace(/^\(/, '-').replace(/\)$/, '');
   if (format === 'percent') cleaned = cleaned.replace(/%$/, '');
   const n = Number(cleaned);
-  if (Number.isFinite(n) && /^-?\d/.test(cleaned)) {
+  const mayCoerce = !textColumn || format === 'currency' || format === 'currency2'
+    || format === 'percent' || format === 'number';
+  if (mayCoerce && Number.isFinite(n) && /^-?\d/.test(cleaned)) {
     if (n === 0) return '—';
     const formatted = _formatNumeric(n);
     if (formatted !== null) return formatted;
@@ -1195,6 +1229,9 @@ interface EditableCellProps {
   stageable?: boolean;
   /** When true, value is rendered via formatCellValue (accounting style). */
   formatNumeric?: boolean;
+  /** A TEXT column — a numeric-looking string is a name, not a quantity.
+   *  See formatCellValue for why "1.1" and "1.2" both used to print as "1". */
+  textColumn?: boolean;
   /** Column-level format hint (currency, currency2, number, date) from
    *  the schema column metadata. Passed through to formatCellValue so
    *  currency cells include $ + correct decimal precision. */
@@ -1231,7 +1268,7 @@ function _statusBadgeClass(value: unknown): string | null {
   return _STATUS_BADGE_CLASS[probe] ?? null;
 }
 
-function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, format, options, expectedRef }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stageable, formatNumeric = true, textColumn = false, format, options, expectedRef }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
   const [saving, setSaving] = useState(false);
@@ -1283,7 +1320,7 @@ function EditableCell({ value, editable, path, onUpdate, onCommitFieldEdit, stag
   // Display path: committed value formatted via the tabular standard. When a
   // cell is staged, show its dirty typed value instead, marked visibly.
   const committedDisplay = formatNumeric
-    ? formatCellValue(value, format)
+    ? formatCellValue(value, format, textColumn)
     : (value == null ? '—' : value);
   const display = isStaged ? stagedEntry!.value : committedDisplay;
 
