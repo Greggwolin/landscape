@@ -175,6 +175,10 @@ class LotMatchResult:
     tracts: list[MatchedTract] = field(default_factory=list)
     #: Tract labels present in the table that were not matched.
     unresolved_tracts: list[str] = field(default_factory=list)
+    #: Why each unmatched tract was refused, in plain English. Same discipline
+    #: as `infill_refusals`: a refusal stated is the mechanism working, a
+    #: refusal omitted reads as a tract nobody looked for.
+    tract_refusals: list = field(default_factory=list)
 
     @property
     def scale_ft_per_inch(self) -> float:
@@ -438,7 +442,21 @@ _TRACT_MERGED = re.compile(r"^TRACT[\s.]*([A-Z0-9](?:-\d{1,2})?)$")
 _TRACT_NOT_A_LABEL = frozenset({"TRACTS"})
 
 
-def tract_tokens(page, min_height_pt: float = 10.0, labels=None):
+#: Tract labels are set smaller than lot numbers on some sheets, and a 10pt
+#: floor silently dropped tracts the plat's own table names (F-1 on Red Valley
+#: sheet 4). The floor is safe to lower because `labels` gates every candidate
+#: against that table — the drawing proposes, the table decides — so a small
+#: word can only be admitted if the plat already declared a tract by that name.
+_TRACT_LABEL_MIN_HEIGHT_PT = 6.0
+
+#: How far a tract outline may sit from its stated area. Wider than the 1% used
+#: for lots because tracts are drawn to less precise boundaries — curved
+#: retention edges, easement offsets — and because the label has already
+#: identified the tract, so this figure is a veto, not an identifier.
+TRACT_AREA_TOLERANCE = 0.03
+
+
+def tract_tokens(page, min_height_pt: float = _TRACT_LABEL_MIN_HEIGHT_PT, labels=None):
     """Tract labels as live text — matches TRACT A, TRACT B, etc.
 
     Tracts on a plat are labelled with alpha identifiers, not lot numbers.
@@ -712,13 +730,23 @@ def unnamed_faces(faces, tokens):
 # ------------------------------------------------------------------- API
 
 
-def _tract_sole_occupancy(faces, tract_toks, lot_tokens):
+def _tract_sole_occupancy(faces, tract_toks, lot_tokens, all_candidates: bool = False):
     """Associate tract labels with their faces.
 
     Tracts are larger than lots — a drainage tract might be 0.5 to 5 acres
     while lots are 0.1 acres. The face must contain the tract label and must
     NOT contain any lot number (a face holding both is a merged region, not a
     tract).
+
+    With ``all_candidates`` the value is every qualifying face rather than the
+    largest. Taking the largest is wrong far more often for a tract than for a
+    lot: a tract label frequently sits inside a sliver left by an easement line
+    while the tract's own outline never closed, and it equally often sits
+    inside a huge unclosed region that swallowed half the sheet. Measured on
+    Red Valley, the largest containing face was off by −97%, +2,640% and −99%
+    on three of five labels. The caller picks by stated area instead, which is
+    disambiguation between faces already identified by the label — not
+    identification by area, which the plat has taught us never to do.
     """
     from shapely.strtree import STRtree
 
@@ -729,7 +757,7 @@ def _tract_sole_occupancy(faces, tract_toks, lot_tokens):
     found: dict[str, object] = {}
 
     for label, point in tract_toks:
-        best = None
+        candidates = []
         for face in faces:
             if not face.contains(point):
                 continue
@@ -741,10 +769,13 @@ def _tract_sole_occupancy(faces, tract_toks, lot_tokens):
                 )
                 if lot_inside:
                     continue
-            if best is None or face.area > best.area:
-                best = face
-        if best is not None:
-            found[label] = best
+            candidates.append(face)
+        if not candidates:
+            continue
+        if all_candidates:
+            found.setdefault(label, []).extend(candidates)
+        else:
+            found[label] = max(candidates, key=lambda f: f.area)
     return found
 
 
@@ -823,15 +854,12 @@ def match_lots(
             got = face.area * scale
             return abs(got - stated_areas[value]) / stated_areas[value] <= AREA_TOLERANCE
 
-        def _tract_agrees(face, label, scale):
-            if label not in tract_areas:
-                return False
-            got = face.area * scale
-            stated = tract_areas[label]
-            # Tracts are less precisely drawn than lots — allow 3% tolerance
-            return abs(got - stated) / stated <= 0.03
-
         seen_refusals: set[tuple] = set()
+        #: Best area error seen for each tract label, across every sheet and
+        #: every rung of the gap ladder. Kept so a tract that is never accepted
+        #: can still say how close it got, which is the difference between "we
+        #: could not find it" and "we found it and it was 12% out".
+        seen_tract_error: dict[str, float] = {}
 
         for grow in gap_ladder:
             per_sheet: dict[int, tuple] = {}
@@ -849,8 +877,11 @@ def match_lots(
                 # at all (the infill).
                 every = _sole_occupancy(faces, tokens, all_candidates=True)
                 sole = {v: max(c, key=lambda f: f.area) for v, c in every.items()}
-                # Tract extraction
-                tract_found = _tract_sole_occupancy(faces, t_toks, tokens)
+                # Tract extraction. Every containing face, not the largest —
+                # see `_tract_sole_occupancy`.
+                tract_found = _tract_sole_occupancy(
+                    faces, t_toks, tokens, all_candidates=True
+                )
                 per_sheet[pi] = (faces, tokens, sole, every, t_toks, tract_found)
                 for value, face in sole.items():
                     found[value] = (pi, face)
@@ -918,16 +949,30 @@ def match_lots(
             if tract_areas:
                 for pi in sheets:
                     _, _, _, _, _, tract_found = per_sheet[pi]
-                    for label, face in tract_found.items():
+                    for label, candidates in tract_found.items():
                         if label in accepted_tracts:
                             continue
-                        if _tract_agrees(face, label, scale):
+                        stated = tract_areas.get(label)
+                        if not stated:
+                            continue
+                        # The label names the tract; the stated area chooses
+                        # between the faces that label sits inside, and vetoes
+                        # them all if none is close enough.
+                        best = min(
+                            candidates,
+                            key=lambda f: abs(f.area * scale - stated),
+                        )
+                        best_error = abs(best.area * scale - stated) / stated
+                        seen_tract_error[label] = min(
+                            seen_tract_error.get(label, best_error), best_error
+                        )
+                        if best_error <= TRACT_AREA_TOLERANCE:
                             accepted_tracts[label] = MatchedTract(
                                 label=label,
                                 page=pi,
-                                ring=[(float(x), float(y)) for x, y in face.exterior.coords],
-                                area_sqft=face.area * scale,
-                                stated_sqft=tract_areas[label],
+                                ring=[(float(x), float(y)) for x, y in best.exterior.coords],
+                                area_sqft=best.area * scale,
+                                stated_sqft=stated,
                                 gap_used_pt=grow,
                             )
 
@@ -938,11 +983,18 @@ def match_lots(
             outstanding = set(stated_areas) - set(accepted)
             if outstanding:
                 # Collect tract faces to exclude from unnamed pool
+                # Only the largest face per tract label, which is what this
+                # excluded before candidates were kept. Excluding every
+                # containing face would pull genuine unnamed lot faces out of
+                # infill's pool whenever they sit inside a region that also
+                # holds a tract label — a silent cut to lot recall, paid for a
+                # tract improvement. The two passes stay independent.
                 tract_faces = set()
                 for pi in sheets:
                     _, _, _, _, _, tract_found = per_sheet[pi]
-                    for face in tract_found.values():
-                        tract_faces.add(id(face))
+                    for candidates in tract_found.values():
+                        if candidates:
+                            tract_faces.add(id(max(candidates, key=lambda f: f.area)))
 
                 for pi in sheets:
                     faces, tokens, sole, _, _, _ = per_sheet[pi]
@@ -986,6 +1038,26 @@ def match_lots(
         result.unresolved = sorted(set(stated_areas) - set(accepted))
         result.tracts = [accepted_tracts[k] for k in sorted(accepted_tracts)]
         result.unresolved_tracts = sorted(set(tract_areas) - set(accepted_tracts))
+        # Say WHY each one is unresolved. A bare list of labels reads as "the
+        # reader has no opinion", and the three causes want different work:
+        # a label the drawing never rendered as text needs the vector-glyph
+        # path, a label with no closed face around it needs gap closure, and a
+        # label whose best face is 12% out is a judgement about tolerance.
+        labelled_anywhere = {
+            label for pi in sheets for label, _ in prepared[pi][3]
+        }
+        for label in result.unresolved_tracts:
+            if label not in labelled_anywhere:
+                why = ("no label for this tract appears as text on any lot sheet — "
+                       "the drawing flattened it into line-work")
+            elif label not in seen_tract_error:
+                why = ("the label was found but no closed outline contains it — "
+                       "its boundary never closed at any gap tolerance tried")
+            else:
+                why = (f"the closest outline containing the label is "
+                       f"{seen_tract_error[label] * 100:.0f}% away from the "
+                       f"{tract_areas[label]:,} sq ft the plat states")
+            result.tract_refusals.append(([label], why))
         if not result.scale_is_round:
             logger.warning(
                 "fitted scale 1in = %.2f ft is not a round engineering scale — "

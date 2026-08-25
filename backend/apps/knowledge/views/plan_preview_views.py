@@ -277,6 +277,17 @@ def build_preview(reading, doc, draped: Optional[dict[int, int]] = None) -> dict
                 "are shown separately rather than guessed into place."
             ),
         },
+        "tracts": {
+            # The plat's own tract table is the denominator, exactly as the lot
+            # area table is for lots. Placed + refused must equal stated.
+            "stated": len(getattr(reading, "tract_table", None).areas)
+            if getattr(reading, "tract_table", None) else 0,
+            "placed": len(getattr(reading, "tracts", []) or []),
+            "refusals": [
+                {"labels": list(labels), "reason": reason}
+                for labels, reason in (getattr(reading, "tract_refusals", []) or [])
+            ],
+        },
         "refusals": outstanding,
         "refusal_summary": {
             # Distinct lots declined by some pass and still without an outline.

@@ -116,6 +116,11 @@ class PlanReading:
     #: table. Kept apart from `lots`: a tract is in no parcel and counts toward
     #: no lot total.
     tracts: list[DerivedTract] = field(default_factory=list)
+    #: Why each stated tract was not placed, in plain English, one entry per
+    #: label. Carried through so the preview can show it: 30 of Red Valley's 34
+    #: tracts do not place, and "30 unresolved" with no reason is the kind of
+    #: silence that reads as nobody having looked.
+    tract_refusals: list = field(default_factory=list)
     #: page index -> tract label -> ring, IN PAGE COORDINATES, same caveat as
     #: `rings_by_sheet`.
     tract_rings_by_sheet: dict[int, dict[str, list]] = field(default_factory=dict)
@@ -379,6 +384,7 @@ def read_plan(
             table=table,
             tract_table=tract_table,
             tracts=tracts,
+            tract_refusals=list(getattr(match, "tract_refusals", []) or []),
             tract_rings_by_sheet={p: dict(r) for p, r in tract_rings_by_sheet.items()},
             lots=lots,
             sheets=lot_sheets,
