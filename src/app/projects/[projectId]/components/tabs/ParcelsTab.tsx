@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useState } from 'react';
-import PlanningContent, { type PlanningViewState } from '@/app/components/Planning/PlanningContent';
+import PlanningContent from '@/app/components/Planning/PlanningContent';
 import { CCard, CCardBody } from '@coreui/react';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
@@ -13,18 +13,9 @@ interface Project {
 
 interface ParcelsTabProps {
   project: Project;
-  /** Passed straight through to the screen. Both optional and both absent
-   *  everywhere except the Parcels workspace artifact, which uses them so the
-   *  filters and open sections survive closing it. */
-  initialViewState?: PlanningViewState | null;
-  onViewStateChange?: (state: PlanningViewState) => void;
 }
 
-export default function ParcelsTab({
-  project,
-  initialViewState,
-  onViewStateChange,
-}: ParcelsTabProps) {
+export default function ParcelsTab({ project }: ParcelsTabProps) {
   const isLandDevelopment = project.project_type_code === 'LAND';
 
   // Force child remount on Landscaper mutations via key increment
@@ -68,12 +59,6 @@ export default function ParcelsTab({
   }
 
   return (
-    <PlanningContent
-      key={refreshKey}
-      projectId={project.project_id}
-      projectIdStr={project.project_id.toString()}
-      initialViewState={initialViewState}
-      onViewStateChange={onViewStateChange}
-    />
+    <PlanningContent key={refreshKey} projectId={project.project_id} projectIdStr={project.project_id.toString()} />
   );
 }

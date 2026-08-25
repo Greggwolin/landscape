@@ -10201,13 +10201,14 @@ def handle_open_parcels(
                 'parcel_count': count,
                 'noun': plural,
                 'instruction': (
-                    'The parcels workspace has ALREADY been opened in the right '
-                    'panel and is fully editable. Do NOT call create_artifact, do '
-                    'NOT call render_report_as_artifact, and do NOT compose or '
-                    'restate the table. Reply with ONE short sentence saying it is '
-                    f'open and how many {plural} it holds, using parcel_count. '
-                    'It stays in the artifacts list, so it can be reopened with '
-                    'one click rather than asked for again.'
+                    'The parcels table has ALREADY been opened in the right '
+                    'panel. Do NOT call create_artifact, do NOT call '
+                    'render_report_as_artifact, and do NOT compose or restate '
+                    'the table — it is rendered from real data and anything you '
+                    'write about its contents is a second, unsourced copy. '
+                    'Reply with ONE short sentence saying it is open and how '
+                    f'many {plural} it holds, using parcel_count. It stays in '
+                    'the artifacts list and reopens in one click.'
                 ),
             }
 

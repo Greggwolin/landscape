@@ -215,7 +215,7 @@ class ParcelsViewStateSurvivesDedupTests(SimpleTestCase):
 
     These two tests are the reason for the shape. The first proves the sibling
     key survives; the second proves that the obvious alternative — tucking the
-    view inside ``parcels_config`` — is silently destroyed. Without the second
+    view inside ``parcels_view_config`` — is silently destroyed. Without the second
     test the first looks like an arbitrary choice, and a later reader would
     reasonably "tidy" the view back inside the config and reintroduce the loss.
     """
@@ -225,14 +225,14 @@ class ParcelsViewStateSurvivesDedupTests(SimpleTestCase):
         # view state at all — it cannot; it does not know one.
         return {
             'kind': 'parcels',
-            'parcels_config': {'project_id': 9, 'surface': 'parcels'},
+            'parcels_view_config': {'project_id': 9, 'surface': 'parcels'},
         }
 
     def test_view_state_stored_beside_the_config_survives_a_re_ask(self):
         merged = _merge_dedup_params(
             stored={
                 'kind': 'parcels',
-                'parcels_config': {'project_id': 9, 'surface': 'parcels'},
+                'parcels_view_config': {'project_id': 9, 'surface': 'parcels'},
                 'parcels_view_state': {'areaFilters': [3], 'sections': {'parcels': True}},
             },
             fresh=self._fresh_builder_output(),
@@ -242,17 +242,17 @@ class ParcelsViewStateSurvivesDedupTests(SimpleTestCase):
             {'areaFilters': [3], 'sections': {'parcels': True}},
         )
         # And the tool's own keys still refresh — that is what dedup is for.
-        self.assertEqual(merged['parcels_config']['surface'], 'parcels')
+        self.assertEqual(merged['parcels_view_config']['surface'], 'parcels')
 
     def test_view_state_nested_inside_the_config_would_be_lost(self):
         """The alternative shape, demonstrated failing. Do not adopt it."""
         merged = _merge_dedup_params(
             stored={
-                'parcels_config': {
+                'parcels_view_config': {
                     'project_id': 9,
                     'view_state': {'areaFilters': [3]},
                 },
             },
-            fresh={'parcels_config': {'project_id': 9}},
+            fresh={'parcels_view_config': {'project_id': 9}},
         )
-        self.assertNotIn('view_state', merged['parcels_config'])
+        self.assertNotIn('view_state', merged['parcels_view_config'])

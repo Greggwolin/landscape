@@ -1,39 +1,37 @@
 """The Parcels workspace as a durable artifact.
 
-Gregg, 2026-08-25, after finding the screen opened as an overlay he could not
-get back to: *"the functionality of this modal is what needs to be converted
-into an artifact(s)."*
+Built from ``_cowork/PARCELS-SPEC-2026-08-25.html`` rev 2.
 
-WHAT THIS IS, AND WHAT IT IS NOT
---------------------------------
-It is NOT a rendering of the parcels. It is an artifact RECORD whose renderer is
-the real, editable Parcels screen — the same component the overlay hosts. The
-screen does not change; its container does.
+HISTORY, BECAUSE IT EXPLAINS THE SHAPE
+--------------------------------------
+The first version of this module hosted the existing parcels screen inside an
+artifact frame. Gregg saw it running: *"this is just the existing modal, poorly
+formatted, within an artifact."* The instruction had been *"just as we did with
+the budget interface"* — the budget's FORMAT. So the record no longer carries a
+project id and a label for a mounted screen; it carries a real view
+specification, built by ``parcels_view_spec``.
 
-That distinction is the whole point. The overlay holds one value, forgets it on
-close, and has no list, so there is nothing to hang a reopen on — which is
-exactly what Gregg hit. An artifact is a saved row with a version log, a place
-in Pinned and Recent, and one-click reopen without leaving the conversation.
+WHAT SURVIVED THAT REVERSAL, AND WHY IT IS STILL HERE
+------------------------------------------------------
+The record itself. One canonical Parcels artifact per project, reopened from the
+list in one click, is what the overlay could never be — the overlay holds one
+value, forgets it on close, and has nowhere to reopen from. That part was right
+and is unchanged; only the payload changed.
 
-THE PRECEDENT THIS COPIES
--------------------------
-``map_tools.generate_map_artifact``. A live MapLibre instance — stateful,
-imperative, writing back to the project — lives happily in an artifact record.
-It does it by storing a minimal valid text block as the schema purely to satisfy
-the document validator, and putting the real payload in ``params_json`` under a
-namespaced key that the panel dispatches on. Same shape here.
-
-The alternative — expressing 43 parcels as a block document — is what the
-reverted land-plan build did, and it produced something strictly less capable
-than the screen Gregg already owned.
+THE SCHEMA BLOCK IS A PLACEHOLDER, DELIBERATELY
+------------------------------------------------
+The block grammar describes COMPOSED content. This artifact's content is a view
+specification rendered by a component, exactly as the budget schedule and the map
+are, so the schema holds one text block purely to satisfy
+``validate_block_document`` and the real payload rides in ``params_json``. The
+precedent is ``map_tools.generate_map_artifact``.
 
 NAMING
 ------
 The artifact is **Parcels**. Not "Land Plan": a land plan is the GRAPHIC — the
 plat, the site plan — and the parcel table is the tabular expression of the same
-subject. Two different but related things (Gregg, 2026-08-25). Calling the table
-a land plan confuses them, and the graphic is a real separate surface with its
-own extraction pipeline.
+subject (Gregg, 2026-08-25). Calling the table a land plan confuses two real,
+separate things.
 """
 
 from __future__ import annotations
@@ -47,54 +45,47 @@ logger = logging.getLogger(__name__)
 # rather than stacking copies.
 #
 # The refresh shallow-merges params_json with the tool's values winning on every
-# key it sends — so anything this builder writes is authoritative and anything
-# NESTED inside it is replaced wholesale on the next ask. That is why the panel
-# stores the user's view under its own top-level key beside `parcels_config`
-# rather than inside it: a view saved inside the config would be discarded the
-# next time somebody said "show me the parcels", which is precisely the class of
-# loss the budget artifact hit.
+# key it sends. So the specification below is authoritative on every open — which
+# is what makes a village added from inside the table show up in the chips — and
+# anything a user's own view state ever needs to survive must be written BESIDE
+# this key, never nested inside it. Nested, it is replaced wholesale on the next
+# ask; that is the class of silent loss the budget artifact hit.
 PARCELS_DEDUP_KEY = 'parcels'
 
 # The panel reads this key off params_json to decide it is looking at a Parcels
 # workspace. Namespaced the way map_config / budget_view_config /
 # clarification_config are.
-PARCELS_CONFIG_KEY = 'parcels_config'
+PARCELS_CONFIG_KEY = 'parcels_view_config'
 
 
-def build_parcels_config(
-    project_id: int,
-    *,
-    project_name: Optional[str] = None,
-    level_labels: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any]:
-    """The payload the panel needs to mount the screen.
+def build_parcels_config(project_id: int) -> Dict[str, Any]:
+    """The view specification the panel renders from.
 
-    Deliberately thin. The screen fetches its own parcels, containers and
-    taxonomy — it always has — so duplicating any of that here would create a
-    second copy of the truth that goes stale the moment anything is edited. The
-    record carries only what the panel cannot work out for itself: which project,
-    and what to call it.
+    Thin by design in the first version — it carried a project id and a label,
+    and the renderer mounted the existing screen. That was the wrong shape and
+    Gregg said so. It now carries a real specification: rows, the chip members,
+    the columns at each detail rung, and what to group by. See
+    ``parcels_view_spec`` for the reasoning behind each part.
 
-    The user's view — which filters are applied, which sections are open — is
-    NOT part of this config. The panel writes it as its own sibling key
-    (``parcels_view_state``) so it survives a re-ask; see the note on
-    ``PARCELS_DEDUP_KEY`` above. That is Gregg's decision 2a: those survive a
-    close, and nothing else does. An in-progress row edit is NOT carried,
-    because a half-typed change that reappears later without having been agreed
-    to is worse than losing it.
+    Built fresh on every open, which is what makes a village or phase added from
+    inside the table appear in the chips at once.
     """
-    config: Dict[str, Any] = {
-        'project_id': int(project_id),
-        'surface': 'parcels',
-    }
-    if project_name:
-        config['project_name'] = project_name
-    if level_labels:
-        # Carried for the artifact TITLE only. The screen reads the project's
-        # configuration itself; this is so the panel can label the card without
-        # a second round-trip.
-        config['level_labels'] = level_labels
-    return config
+    from .parcels_view_spec import (
+        build_parcels_view_config,
+        fetch_level_labels,
+        fetch_levels,
+        fetch_parcel_records,
+    )
+
+    labels = fetch_level_labels(project_id)
+    header = fetch_project_header(project_id)
+    return build_parcels_view_config(
+        project_id=project_id,
+        project_name=header.get('project_name'),
+        records=fetch_parcel_records(project_id),
+        levels=fetch_levels(project_id, labels),
+        labels=labels,
+    )
 
 
 def fetch_project_header(project_id: int) -> Dict[str, Any]:
@@ -183,11 +174,7 @@ def create_parcels_artifact(
     plural = noun if noun.endswith('s') else f'{noun}s'
     title = f'{project_name} — {plural}' if project_name else plural
 
-    config = build_parcels_config(
-        project_id,
-        project_name=project_name,
-        level_labels=labels,
-    )
+    config = build_parcels_config(project_id)
 
     try:
         return create_artifact_record(
@@ -196,9 +183,9 @@ def create_parcels_artifact(
                 'type': 'text',
                 'id': 'parcels_note',
                 'content': (
-                    'The parcels workspace — opens as the live, editable screen '
-                    'in the panel. This block is a placeholder; the workspace is '
-                    'not composed content.'
+                    'The parcels table — rendered in the panel from a view '
+                    'specification. This block is a placeholder; the real '
+                    'payload is in params_json.'
                 ),
             }]},
             project_id=project_id,
