@@ -33,6 +33,10 @@ ARTIFACT_TOOLS = [
     'review_budget_variance',
     'open_clarification',
     'get_operating_statement',
+    # The Parcels workspace artifact (PL, 2026-08-25). Caught by
+    # test_every_artifact_tool_is_covered_by_this_list, which is the point of
+    # that test — it calls create_parcels_artifact, so it is one of these.
+    'open_parcels',
 ]
 
 # Three ways an exit may direct the model, all acceptable:
