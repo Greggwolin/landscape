@@ -36,6 +36,7 @@ import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLandscapeCommand, emitLandscapeCommand } from '@/lib/landscape-command-bus';
+import { navigateScreenTarget } from '@/lib/navigateScreenTarget';
 import { redirectToLoginExpired } from '@/lib/authHeaders';
 import '@/styles/wrapper.css';
 
@@ -270,17 +271,54 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   useLandscapeCommand('navigate', handleNavigateCommand);
 
   // navigate_to_screen targets the studio in-panel folder/sub-tab surface, which
-  // the /w/ shell doesn't have. Bridge the screens that have an input modal to
-  // that modal here so "open the budget" still works in /w/ (additive — this
-  // command was previously unhandled here). Screens without a modal are a no-op.
+  // the /w/ shell doesn't have. Bridge the screens that have a registered form
+  // to that form here, so "open the budget" and "show me the parcels" work in
+  // /w/ the same way they work in studio.
+  //
+  // THE TAB WAS BEING IGNORED, AND THAT MADE THE FAILURE SILENT.
+  //
+  // The map was keyed on FOLDER alone and held two entries. Everything else fell
+  // through to `undefined` and returned — no command, no error, no log. Landscaper
+  // would say "Opening the parcels screen now", the tool would fire correctly with
+  // { folder: 'property', tab: 'parcels' }, the command would reach this handler,
+  // and nothing would happen. Verified from the stored thread on 2026-08-25: the
+  // tool call and its result are both there, correct, and the screen never opened.
+  //
+  // Nearly every screen worth opening lives under the `property` folder, so keying
+  // on the folder alone could not tell parcels from land use from the rent roll in
+  // the first place. The tab has always been carried on the command
+  // (landscape-command-bus: `navigate_screen: { folder, tab? }`); this handler
+  // simply threw it away.
+  //
+  // The map, and the rule for adding to it, live in ./lib/navigateScreenTarget.
   const handleNavigateScreen = useCallback(
-    (payload: { folder?: string }) => {
-      const FOLDER_TO_MODAL: Record<string, string> = {
-        budget: 'budget',
-        operations: 'operating_statement',
-      };
-      const modal = payload?.folder ? FOLDER_TO_MODAL[payload.folder] : undefined;
-      if (modal) emitLandscapeCommand('open_modal', { modal_name: modal });
+    (payload: { folder?: string; tab?: string }) => {
+      const folder = payload?.folder;
+      const tab = payload?.tab;
+      // The mapping lives in ./lib/navigateScreenTarget so it is a plain
+      // function with a test, rather than a lookup buried in a callback that
+      // only a running browser can exercise — which is how it stayed broken.
+      const modal = navigateScreenTarget(folder, tab);
+
+      if (modal) {
+        emitLandscapeCommand('open_modal', { modal_name: modal });
+        return;
+      }
+
+      // NEVER FAIL SILENTLY HERE AGAIN. Landscaper has already told the user it
+      // is opening the screen by the time this runs, so a quiet return leaves
+      // them looking at an unchanged panel with no way to tell what went wrong.
+      // Several screens that ARE registered forms — the rent roll, the cost and
+      // income approaches, reconciliation, acquisition, renovation, the sales
+      // comparables, loan inputs, equity structure — still have no entry above
+      // and will land here. Adding them is a deliberate decision, not a tidy-up:
+      // each needs the same two-way check as the entries above.
+      console.warn(
+        '[WrapperLayout] navigate_screen: no form registered for '
+        + `"${folder}${tab ? '/' + tab : ''}" — the chat panel announced a screen `
+        + 'that will not open. Add a verified entry to the maps in this handler.',
+        payload,
+      );
     },
     [],
   );
