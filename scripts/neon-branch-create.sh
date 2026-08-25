@@ -27,18 +27,49 @@ if [ -z "$NEON_API_KEY" ]; then
   exit 1
 fi
 
+# HOW LONG A PREVIEW DATABASE LIVES
+# ---------------------------------
+# Every preview branch is a ROOT branch, because --schema-only branches are
+# roots — that is the June 2026 privacy fix (previews must carry no real tester
+# data) and it is not negotiable. Neon caps ROOT branches by plan, and this
+# account is on Launch: five. So each concurrently-open pull request holds one
+# of five slots, and on 2026-08-25 creation for PR #263 was rejected outright
+# with "root branches limit exceeded".
+#
+# The sweep in .github/workflows/neon-branch-sweep.yml reclaims slots from
+# CLOSED requests. It can do nothing about requests that are legitimately open,
+# which is where the pressure actually comes from.
+#
+# So the branch expires on its own. Three days: long enough for a request opened
+# and reviewed in a normal turnaround to keep its preview, short enough that one
+# parked for a week stops holding a slot. Deliberately NOT the Console's 1-day
+# default — several of these sit two or three days waiting to be run.
+#
+# When it fires, Neon deletes the branch. The next push recreates it, because
+# the existence check below treats an absent branch as "create one" — an expired
+# preview costs a rebuild, not a red check.
+TTL_DAYS=3
+# GNU date (ubuntu-latest, where this actually runs) and BSD date (a developer's
+# Mac) spell relative dates differently and neither accepts the other's form.
+EXPIRES_AT=$(date -u -d "+${TTL_DAYS} days" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+  || date -u -v+${TTL_DAYS}d +%Y-%m-%dT%H:%M:%SZ)
+
 echo "🚀 Creating Neon branch for PR #${PR_NUMBER}..."
 
 # Check if branch already exists
-EXISTING_BRANCH=$(neonctl branches list \
-  --project-id "$NEON_PROJECT" \
-  --output json \
+BRANCHES_JSON=$(neonctl branches list --project-id "$NEON_PROJECT" --output json)
+EXISTING_BRANCH=$(echo "$BRANCHES_JSON" \
   | jq -r ".[] | select(.name == \"$BRANCH_NAME\") | .id" || echo "")
 
 if [ -n "$EXISTING_BRANCH" ]; then
   echo "⚠️  Branch $BRANCH_NAME already exists (ID: $EXISTING_BRANCH)"
   echo "Using existing branch..."
   BRANCH_ID=$EXISTING_BRANCH
+  # Print the expiry it is already carrying, so a preview that later vanishes is
+  # explained by its own log rather than investigated from scratch.
+  EXISTING_EXPIRY=$(echo "$BRANCHES_JSON" \
+    | jq -r ".[] | select(.name == \"$BRANCH_NAME\") | .expires_at // \"none\"")
+  echo "   Expires at: $EXISTING_EXPIRY (not extended by this run)"
 else
   # Create new branch from production's SCHEMA ONLY (no data copied).
   # Privacy: preview environments must never carry real tester data (FB privacy
@@ -46,12 +77,14 @@ else
   # run-migrations.sh then applies the PR's migrations on top. Requires the
   # project's legacy web-access roles to be cleared (done 2026-06-19).
   echo "📝 Creating schema-only branch $BRANCH_NAME from production (no data)..."
+  echo "   Expires at: $EXPIRES_AT (${TTL_DAYS} days) — a later push recreates it"
   BRANCH_RESPONSE=$(neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$BRANCH_NAME" \
     --parent production \
     --schema-only \
     --role-name neondb_owner \
+    --expires-at "$EXPIRES_AT" \
     --output json)
 
   BRANCH_ID=$(echo "$BRANCH_RESPONSE" | jq -r '.id // .branch.id // empty')
@@ -86,6 +119,7 @@ echo ""
 echo "✅ Neon branch ready!"
 echo "   Branch Name: $BRANCH_NAME"
 echo "   Branch ID: $BRANCH_ID"
+echo "   Expires: $(neonctl branches get "$BRANCH_ID" --project-id "$NEON_PROJECT" --output json 2>/dev/null | jq -r '.expires_at // "none"')"
 echo "   Connection: ${CONNECTION_STRING:0:50}..." # Show partial for security
 echo ""
 echo "Next steps:"
