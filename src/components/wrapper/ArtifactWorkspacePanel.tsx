@@ -606,6 +606,15 @@ export function ArtifactWorkspacePanel({
               (active.params_json as { parcels_view_config: ParcelsViewConfig })
                 .parcels_view_config
             }
+            // The BLOCK SCHEMA carries the per-cell source refs and is what the
+            // server resolves a write against; the view specification carries
+            // none. Same three props, same batch helper, as the budget — one
+            // write path and one impact banner, not a second copy.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
             onClose={() => setActiveArtifactId(null)}
           />
         ) : active.tool_name === 'generate_location_brief' &&

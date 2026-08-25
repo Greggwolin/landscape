@@ -1327,6 +1327,111 @@ def _coerce_sale_date(raw_value):
     return None
 
 
+_EDITABLE_PARCEL_CELL_COLUMNS = {
+    'acres_gross', 'units_total', 'lot_width', 'lots_frontfeet', 'sale_period',
+}
+
+# Which of those are whole numbers. Acres and lot width are not — a parcel is
+# 32.4 acres and a lot is 47.5 feet wide, and rounding either would quietly
+# change the plan.
+_INTEGER_PARCEL_COLUMNS = {'units_total', 'sale_period'}
+
+
+def _write_parcel_cell(*, project_id, parcel_id, column, raw_value, user_id=None):
+    """Write one editable parcel cell.
+
+    EMPTY MEANS UNKNOWN, AND IS ALLOWED. Clearing acres stores NULL rather than
+    zero, because a parcel whose acreage nobody has recorded and a parcel of zero
+    acres are different facts and the table shows them the same way only because
+    the formatting standard says so. The old screen could not do this: its update
+    path skipped any value that was null, so a field could be emptied on screen
+    and silently keep its previous value. That is the specific bug this must not
+    reproduce.
+
+    The parcel is checked to belong to the project before anything is written —
+    the row id arrives from a stored artifact, and an artifact can outlive the
+    row it points at.
+    """
+    if column not in _EDITABLE_PARCEL_CELL_COLUMNS:
+        return {
+            'success': False,
+            'error': 'column_not_writable',
+            'detail': (
+                f'{column!r} is not an editable parcel cell. Editable columns: '
+                f'{sorted(_EDITABLE_PARCEL_CELL_COLUMNS)}.'
+            ),
+        }
+    if project_id is None:
+        return {'success': False, 'error': 'project_required',
+                'detail': 'parcels artifact missing project_id'}
+    try:
+        parcel_id_int = int(parcel_id)
+    except (TypeError, ValueError):
+        return {'success': False, 'error': 'invalid_row_id',
+                'detail': f'parcel_id must be an integer; got {parcel_id!r}'}
+
+    # Blank clears. Anything else must be a number.
+    coerced = None
+    if raw_value is not None and str(raw_value).strip() != '':
+        # Commas and stray spaces are how people type numbers; a currency
+        # symbol is not, on a parcel table, so it is not stripped and lands as
+        # an error the user can see.
+        text = str(raw_value).replace(',', '').strip()
+        try:
+            coerced = float(text)
+        except (TypeError, ValueError):
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': f'{raw_value!r} is not a number.',
+                'suggested_user_question': (
+                    f'I could not read {raw_value!r} as a number — what should '
+                    'that value be?'
+                ),
+            }
+        if coerced < 0:
+            return {'success': False, 'error': 'invalid_value',
+                    'detail': 'a parcel cannot hold a negative value here.'}
+        if column in _INTEGER_PARCEL_COLUMNS:
+            if coerced != int(coerced):
+                return {
+                    'success': False,
+                    'error': 'invalid_value',
+                    'detail': f'{column} is a whole number; got {coerced}.',
+                }
+            coerced = int(coerced)
+
+    from django.db import connection as _conn
+    with _conn.cursor() as cursor:
+        cursor.execute(
+            'SELECT project_id FROM landscape.tbl_parcel WHERE parcel_id = %s',
+            [parcel_id_int])
+        owner = cursor.fetchone()
+        if not owner:
+            return {'success': False, 'error': 'row_not_found',
+                    'detail': f'parcel {parcel_id_int} does not exist.'}
+        if int(owner[0]) != int(project_id):
+            return {
+                'success': False,
+                'error': 'wrong_project',
+                'detail': (f'parcel {parcel_id_int} belongs to project '
+                           f'{owner[0]}, not {project_id}.'),
+            }
+        # The column name is never caller-supplied — it is checked against the
+        # allowlist above before it can reach here, so it is safe to embed.
+        cursor.execute(
+            f'UPDATE landscape.tbl_parcel SET {column} = %s '
+            'WHERE parcel_id = %s RETURNING parcel_id',
+            [coerced, parcel_id_int])
+        if not cursor.fetchone():
+            return {'success': False, 'error': 'row_not_found',
+                    'detail': f'parcel {parcel_id_int} was not updated.'}
+
+    return {'success': True, 'coerced_value': coerced,
+            'meta': {'table': 'tbl_parcel', 'row_id': parcel_id_int,
+                     'column': column}}
+
+
 def _write_sale_cell(*, project_id, parcel_id, column, raw_value, user_id=None):
     """Write one editable parcel-sale cell (sale_date | commission_amount), then
     recalc the row so gross / costs / net stay consistent (CB9).
@@ -1748,6 +1853,11 @@ def _dispatch_edit_write(project_id, source_ref, new_value, user_id):
         return _write_sale_cell(project_id=project_id, parcel_id=row_id,
                                 column=column, raw_value=new_value,
                                 user_id=user_id)
+    if table == 'tbl_parcel':
+        # Parcels slice 2a. row_id is the parcel_id the render read.
+        return _write_parcel_cell(project_id=project_id, parcel_id=row_id,
+                                  column=column, raw_value=new_value,
+                                  user_id=user_id)
     if table == 'tbl_dcf_analysis':
         # CC2: row_id is the dcf_analysis_id the render read. The writer refuses
         # if the engine now reads a different record (a project may hold both a
@@ -1797,6 +1907,8 @@ _STALE_CHECK_TABLES = {
         'landscape.tbl_parcel_sale_assumptions', 'parcel_id', _EDITABLE_SALE_CELL_COLUMNS),
     'tbl_dcf_analysis': (
         'landscape.tbl_dcf_analysis', 'dcf_analysis_id', None),  # None → resolved lazily
+    'tbl_parcel': (
+        'landscape.tbl_parcel', 'parcel_id', _EDITABLE_PARCEL_CELL_COLUMNS),
 }
 
 
@@ -2391,6 +2503,50 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                         'assumptions to re-render after the write'
                     ),
                 }
+        elif artifact.tool_name == 'open_parcels':
+            # Parcels slice 2a: rebuild from the same read path the tool opens
+            # with, so the refreshed artifact carries the written value AND
+            # fresh captured_value pointers. Without this branch the write lands
+            # and the response is a 500, the stored pointers keep the values the
+            # panel was drawn with, and every later edit in the same session is
+            # refused as stale_cell.
+            from apps.landscaper.tools.parcels_artifact_builder import (
+                PARCELS_CONFIG_KEY,
+                build_parcels_payload,
+            )
+            project_id = artifact.project_id
+            if project_id is None:
+                return {
+                    'success': False,
+                    'error': 'project_required',
+                    'detail': 'parcels artifact missing project_id',
+                }
+            payload = build_parcels_payload(project_id) or {}
+            new_schema = payload.get('schema')
+            if not new_schema:
+                return {
+                    'success': False,
+                    'error': 'no_parcel_rows',
+                    'detail': (
+                        f'project {project_id} has no parcels to re-render '
+                        'after the write'
+                    ),
+                }
+            # Both halves live on the same record and must move together, or the
+            # table on screen and the allowlist the server writes through would
+            # disagree — the same failure the budget branch above closes.
+            try:
+                view_config = payload.get('config')
+                if view_config:
+                    params = dict(artifact.params_json or {})
+                    params[PARCELS_CONFIG_KEY] = view_config
+                    artifact.params_json = params
+                    artifact.save(update_fields=['params_json'])
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    'parcels view specification refresh failed after write'
+                )
         elif artifact.tool_name == 'get_cashflow_schedule':
             # Editing spine (CC2): rebuild the cash-flow schedule from the same
             # read path the tool uses, so the refreshed artifact shows the

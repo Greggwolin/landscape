@@ -204,3 +204,72 @@ class EmptyProject(SimpleTestCase):
         self.assertEqual(cfg['totals'], {'acres': 0, 'units': 0, 'parcels': 0})
         self.assertTrue(cfg['rung_columns']['summary'])
         self.assertEqual(len(cfg['levels'][0]['members']), 2)
+
+
+class TheWriteAllowlist(SimpleTestCase):
+    """The stored schema IS the allowlist, so these are security tests.
+
+    A cell can be written only if the block document the server holds carries a
+    pointer for it. Nothing the client sends names a table, a row or a column.
+    """
+
+    def schema(self, records=None):
+        from apps.landscaper.tools.parcels_view_spec import (
+            build_parcels_artifact_schema,
+        )
+        records = SIX if records is None else records
+        return build_parcels_artifact_schema(build(records), records)
+
+    def test_the_two_halves_line_up_row_for_row(self):
+        """A rendered cell is matched to its source row BY POSITION. If the two
+        halves ever disagree on order, an edit lands on the wrong parcel."""
+        cfg = build(SIX)
+        block = self.schema()['blocks'][0]
+        self.assertEqual([r['id'] for r in cfg['rows']],
+                         [r['id'] for r in block['rows']])
+
+    def test_only_the_five_plain_values_carry_a_pointer(self):
+        block = self.schema()['blocks'][0]
+        refs = block['rows'][0]['cell_source_refs']
+        self.assertEqual(set(refs), {'acres', 'units', 'lot_width',
+                                     'front_feet', 'sale_period'})
+        # The ones deliberately left out of this slice, and the one that can
+        # never be writable anywhere.
+        for key in ('family', 'type', 'product', 'level1', 'level2',
+                    'parcel', 'dua'):
+            self.assertNotIn(key, refs)
+
+    def test_every_pointer_names_a_declared_column(self):
+        """The validator rejects a pointer aimed at a column the block does not
+        declare — which is what stops a ref drifting from the thing it addresses."""
+        block = self.schema()['blocks'][0]
+        declared = {c['key'] for c in block['columns']}
+        for row in block['rows']:
+            for key in row.get('cell_source_refs', {}):
+                self.assertIn(key, declared)
+
+    def test_pointers_carry_the_real_column_names_not_the_cell_keys(self):
+        block = self.schema()['blocks'][0]
+        refs = block['rows'][0]['cell_source_refs']
+        self.assertEqual(refs['acres']['column'], 'acres_gross')
+        self.assertEqual(refs['units']['column'], 'units_total')
+        self.assertEqual(refs['front_feet']['column'], 'lots_frontfeet')
+        self.assertEqual(refs['acres']['table'], 'tbl_parcel')
+        self.assertEqual(refs['acres']['row_id'], 1)
+
+    def test_captured_value_is_what_the_cell_was_showing(self):
+        """The write path compares this against what is stored immediately
+        before writing, and refuses on a mismatch."""
+        block = self.schema()['blocks'][0]
+        refs = block['rows'][0]['cell_source_refs']
+        self.assertEqual(refs['acres']['captured_value'], 32.0)
+        self.assertEqual(refs['units']['captured_value'], 128.0)
+
+    def test_a_row_with_no_parcel_id_gets_no_pointers_at_all(self):
+        """Fails closed. Without an id there is nothing to write to, so the row
+        renders read-only rather than offering an edit that cannot land."""
+        rows = [record(parcel_id=None, parcel_code='ghost', acres_gross=5.0,
+                       area_id=8, area_no=1)]
+        block = self.schema(rows)['blocks'][0]
+        self.assertNotIn('cell_source_refs', block['rows'][0])
+        self.assertNotIn('editable', block['rows'][0])

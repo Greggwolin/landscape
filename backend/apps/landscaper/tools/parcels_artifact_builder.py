@@ -18,13 +18,14 @@ list in one click, is what the overlay could never be — the overlay holds one
 value, forgets it on close, and has nowhere to reopen from. That part was right
 and is unchanged; only the payload changed.
 
-THE SCHEMA BLOCK IS A PLACEHOLDER, DELIBERATELY
-------------------------------------------------
-The block grammar describes COMPOSED content. This artifact's content is a view
-specification rendered by a component, exactly as the budget schedule and the map
-are, so the schema holds one text block purely to satisfy
-``validate_block_document`` and the real payload rides in ``params_json``. The
-precedent is ``map_tools.generate_map_artifact``.
+TWO REPRESENTATIONS, AND WHY
+----------------------------
+``params_json`` holds the view specification the renderer draws from.
+The stored schema holds one row per parcel carrying a per-cell pointer at its
+real source row — and a WRITE is resolved against that, never against anything
+the client sends. A cell with no pointer cannot be written, whatever the screen
+offers. Both halves are built from the same records in the same order; see
+``parcels_view_spec.build_parcels_artifact_schema``.
 
 NAMING
 ------
@@ -58,19 +59,14 @@ PARCELS_DEDUP_KEY = 'parcels'
 PARCELS_CONFIG_KEY = 'parcels_view_config'
 
 
-def build_parcels_config(project_id: int) -> Dict[str, Any]:
-    """The view specification the panel renders from.
-
-    Thin by design in the first version — it carried a project id and a label,
-    and the renderer mounted the existing screen. That was the wrong shape and
-    Gregg said so. It now carries a real specification: rows, the chip members,
-    the columns at each detail rung, and what to group by. See
-    ``parcels_view_spec`` for the reasoning behind each part.
+def build_parcels_payload(project_id: int) -> Dict[str, Any]:
+    """Both halves of the artifact: what to draw, and what may be written.
 
     Built fresh on every open, which is what makes a village or phase added from
     inside the table appear in the chips at once.
     """
     from .parcels_view_spec import (
+        build_parcels_artifact_schema,
         build_parcels_view_config,
         fetch_level_labels,
         fetch_levels,
@@ -79,13 +75,21 @@ def build_parcels_config(project_id: int) -> Dict[str, Any]:
 
     labels = fetch_level_labels(project_id)
     header = fetch_project_header(project_id)
-    return build_parcels_view_config(
+    records = fetch_parcel_records(project_id)
+    config = build_parcels_view_config(
         project_id=project_id,
         project_name=header.get('project_name'),
-        records=fetch_parcel_records(project_id),
+        records=records,
         levels=fetch_levels(project_id, labels),
         labels=labels,
     )
+    # The two halves are built from the SAME records in the same order, which is
+    # what lets a rendered cell be matched to its source row by position. Build
+    # them apart and that correspondence is the first thing to rot.
+    return {
+        'config': config,
+        'schema': build_parcels_artifact_schema(config, records),
+    }
 
 
 def fetch_project_header(project_id: int) -> Dict[str, Any]:
@@ -150,12 +154,10 @@ def create_parcels_artifact(
 
     Returns the artifact service envelope, or ``{'success': False, 'error': ...}``.
 
-    The schema is a single text block and that is deliberate, not a shortcut:
-    the block grammar exists to describe COMPOSED content, and this artifact's
-    content is a live component. Forcing the parcels through it is what the
-    reverted land-plan build did. The block exists only because
-    ``validate_block_document`` requires one, and it says plainly what it is so
-    a future reader does not mistake it for the payload.
+    The stored schema carries only the columns that can be typed into. That is
+    not a partial rendering — it is the write allowlist expressed as data, and
+    the validator refuses a pointer aimed at a column the block does not
+    declare, so the two cannot drift apart.
     """
     try:
         from apps.artifacts.services import create_artifact_record
@@ -174,25 +176,22 @@ def create_parcels_artifact(
     plural = noun if noun.endswith('s') else f'{noun}s'
     title = f'{project_name} — {plural}' if project_name else plural
 
-    config = build_parcels_config(project_id)
+    payload = build_parcels_payload(project_id)
 
     try:
         return create_artifact_record(
             title=title,
-            schema={'blocks': [{
-                'type': 'text',
-                'id': 'parcels_note',
-                'content': (
-                    'The parcels table — rendered in the panel from a view '
-                    'specification. This block is a placeholder; the real '
-                    'payload is in params_json.'
-                ),
-            }]},
+            # The stored schema is no longer a placeholder: it carries one row
+            # per parcel with a per-cell pointer at the real source row, and the
+            # server resolves every write against it. See
+            # parcels_view_spec.build_parcels_artifact_schema for why there are
+            # two representations of the same rows.
+            schema=payload['schema'],
             project_id=project_id,
             user_id=user_id,
             thread_id=thread_id,
             tool_name='open_parcels',
-            params_json={'kind': 'parcels', PARCELS_CONFIG_KEY: config},
+            params_json={'kind': 'parcels', PARCELS_CONFIG_KEY: payload['config']},
             dedup_key=PARCELS_DEDUP_KEY,
             prior_tool_calls=['open_parcels'],
         )

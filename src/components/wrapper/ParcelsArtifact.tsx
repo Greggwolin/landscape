@@ -3,7 +3,13 @@
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import styles from './ScheduleArtifact.module.css';
+import type { BlockDocument } from '@/types/artifact';
 import { useArtifactWidthRequest, widthForColumns } from './artifactWidthRequest';
+// Generic despite the name: it takes a schema, a row id and a cell key, and
+// resolves them through `cell_source_refs`. Nothing in it knows about budgets.
+// Renaming it is a follow-up, not something to fork a copy over.
+import { budgetCellTarget } from './budgetCellTarget';
+import { useStagedEdits, stagedKey, type CommitEditsFn } from './useStagedEdits';
 
 /**
  * ParcelsArtifact — one topic plus one view specification.
@@ -31,13 +37,23 @@ import { useArtifactWidthRequest, widthForColumns } from './artifactWidthRequest
  * measure, and this file goes away. That is a deliberate deferral, written down
  * so the duplication is not mistaken for someone not noticing.
  *
- * WHAT SLICE 1 IS
- * ---------------
- * Read-only. Chips, rungs, grouping, the figures across the top, group lines,
- * the tabular standard. Editing — the cascading use pickers, the container move,
- * + New village and phase — is slice 2, and the specification describes it.
- * Shipping the view first is the order the budget went in, and it is the half
- * that answers "does this read right".
+ * WHAT IS EDITABLE, AND WHAT IS NOT YET
+ * -------------------------------------
+ * Typeable now: acres, units, lot width, front feet, sale period. Staged as you
+ * type and committed as one set, through the same path the budget uses.
+ *
+ * NOT yet, and each for its own reason rather than for want of time:
+ *   the use family / type / product pickers — each narrows the next, and a
+ *     dependent picker is new machinery, not another column;
+ *   village and phase — changing those MOVES a parcel between containers, which
+ *     is a different operation and has to read as one;
+ *   the parcel number — derived from where the parcel sits whenever it sits
+ *     somewhere, so it is only typeable on a project with no levels at all;
+ *   units per acre — computed, and never writable anywhere.
+ *
+ * Which cells offer an edit is decided by the SERVER's refs, never by a list in
+ * this file. A local list drifts away from what the server will accept and
+ * offers edits that bounce.
  */
 
 /* ─── The specification, as the server sends it ────────────────────────── */
@@ -82,6 +98,21 @@ export interface ParcelsViewConfig {
 interface Props {
   config: ParcelsViewConfig;
   onClose?: () => void;
+  /**
+   * The artifact's BLOCK SCHEMA — where the per-cell source refs live, and what
+   * the server resolves a write against. The view specification carries no refs
+   * of its own, deliberately: if the client could name the table and row, the
+   * allowlist would be on the wrong side of the wire.
+   *
+   * Absent → every cell renders read-only. That is the correct behaviour for an
+   * artifact stored before editing existed, rather than offering an edit that
+   * cannot land.
+   */
+  schema?: BlockDocument | null;
+  /** Clears staging when the panel switches artifacts. */
+  artifactId?: number;
+  /** Batch commit. Without it nothing is editable — staging has nowhere to go. */
+  onCommitFieldEdits?: CommitEditsFn;
 }
 
 const RUNGS = ['summary', 'standard', 'detail', 'all'] as const;
@@ -118,13 +149,21 @@ function cellText(key: string, value: string | number | null): string {
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
-export function ParcelsArtifact({ config, onClose }: Props) {
+export function ParcelsArtifact({
+  config, onClose, schema, artifactId, onCommitFieldEdits,
+}: Props) {
   const [rung, setRung] = useState<string>(config.default_rung || 'summary');
   const [grouping, setGrouping] = useState<string>(config.default_grouping || 'use');
   const [level1, setLevel1] = useState<number[]>([]);
   const [level2, setLevel2] = useState<number[]>([]);
   const [families, setFamilies] = useState<string[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  /* Staged edits — typed, held, then committed as one set. The same hook and
+   * the same commit path the budget uses, so there is one write path and one
+   * impact banner rather than a parcels-specific copy of either. */
+  const edits = useStagedEdits(onCommitFieldEdits, artifactId);
 
   const levelOne = config.levels.find((l) => l.level === 1);
   const levelTwo = config.levels.find((l) => l.level === 2);
@@ -384,13 +423,55 @@ export function ParcelsArtifact({ config, onClose }: Props) {
                       {g.rows.map((row) => (
                         <tr key={row.id}>
                           {columns.map((c) => {
-                            const text = cellText(c.key, row.cells[c.key] ?? null);
-                            const empty = text === '—';
+                            /* Whether a cell can be typed into is answered by the
+                             * SERVER's refs, never by a list held here — a local
+                             * list drifts away from what the server will accept
+                             * and offers edits that bounce. */
+                            const target = onCommitFieldEdits
+                              ? budgetCellTarget(schema, row.id, c.key)
+                              : null;
+                            const key = target ? stagedKey(target.cellPath) : null;
+                            const staged = key ? edits.staged[key] : undefined;
+                            const committed = row.cells[c.key] ?? null;
+                            const shown = staged ? staged.value : cellText(c.key, committed);
+                            const empty = !staged && shown === '—';
+
+                            if (target && editing === key) {
+                              return (
+                                <td key={c.key} className={align(c)}>
+                                  <input
+                                    className={styles.cellInput}
+                                    autoFocus
+                                    defaultValue={
+                                      staged ? staged.value
+                                        : (committed === null || committed === undefined ? '' : String(committed))
+                                    }
+                                    onBlur={(e) => {
+                                      edits.stageEdit(target.cellPath, e.target.value,
+                                                      committed, target.expectedRef);
+                                      setEditing(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                      if (e.key === 'Escape') setEditing(null);
+                                    }}
+                                  />
+                                </td>
+                              );
+                            }
+
                             return (
                               <td key={c.key}
-                                  className={[align(c), c.kind === 'computed' ? styles.computed : '', empty ? styles.emptyCell : '']
-                                    .filter(Boolean).join(' ')}>
-                                {text}
+                                  className={[
+                                    align(c),
+                                    c.kind === 'computed' ? styles.computed : '',
+                                    empty ? styles.emptyCell : '',
+                                    target ? styles.editable : '',
+                                    staged?.error ? styles.cellError : '',
+                                  ].filter(Boolean).join(' ')}
+                                  title={staged?.error}
+                                  onClick={target && key ? () => setEditing(key) : undefined}>
+                                {shown}
                               </td>
                             );
                           })}
@@ -424,6 +505,30 @@ export function ParcelsArtifact({ config, onClose }: Props) {
           </table>
         )}
       </div>
+
+      {/* Nothing posts on a keystroke. The whole set lands through ONE batch
+        * request, which is what lets the server report a single impact line for
+        * the set — and what lets a change be thought better of before it is
+        * real. Same hook, same commit path as the budget. */}
+      {edits.stagedCount > 0 && (
+        <div className={styles.commitBar} role="region" aria-label="Staged changes">
+          <span className={styles.commitCount}>
+            {edits.stagedCount} change{edits.stagedCount === 1 ? '' : 's'} staged
+          </span>
+          <span className={styles.commitActions}>
+            <button type="button" className={styles.commitButton}
+                    disabled={edits.committing}
+                    onClick={() => { void edits.commitStaged(); }}>
+              {edits.committing ? 'Saving…' : 'Commit'}
+            </button>
+            <button type="button" className={styles.discardButton}
+                    disabled={edits.committing}
+                    onClick={edits.discardStaged}>
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
 
       {hiddenRowCount > 0 && !isGrouped && (
         <button type="button" className={styles.hint} onClick={() => setExpanded(true)}

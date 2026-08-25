@@ -102,7 +102,8 @@ class CheckedTables(SimpleTestCase):
         # silently lose the protection — so assert the set explicitly.
         self.assertEqual(
             set(_STALE_CHECK_TABLES),
-            {'core_fin_fact_budget', 'tbl_parcel_sale_assumptions', 'tbl_dcf_analysis'},
+            {'core_fin_fact_budget', 'tbl_parcel_sale_assumptions',
+             'tbl_dcf_analysis', 'tbl_parcel'},
         )
 
     def test_each_entry_names_a_key_column(self):

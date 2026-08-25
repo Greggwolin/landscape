@@ -120,6 +120,34 @@ _COLUMN_META: Dict[str, Dict[str, Any]] = {
 _DROPPABLE = ('lot_width', 'front_feet', 'sale_period')
 
 
+# ── What can be typed into, and where it actually lives ─────────────────────
+#
+# The artifact's cell key is not always the database's column name, so the
+# mapping is stated once here and nowhere else. An unmapped key gets NO ref and
+# is therefore read-only — presence of the ref IS the write allowlist, checked
+# server-side before any writer runs, so a cell can never become editable by
+# accident.
+#
+# Slice 2a — the plain values. Deliberately NOT here yet:
+#   family / type / product — each narrows the next, and a dependent picker is
+#     new machinery rather than another column (slice 2b).
+#   level1 / level2 — changing these MOVES a parcel between containers. It is a
+#     different operation from editing a value and has to read as one.
+#   parcel — derived from where the parcel sits whenever it sits somewhere
+#     (Gregg, 25 Aug). Typeable only on a project with no level 1 and no level 2,
+#     which is not project 9 and not this slice.
+#   dua — computed. Never writable anywhere.
+_EDITABLE_PARCEL_CELLS = ('acres', 'units', 'lot_width', 'front_feet', 'sale_period')
+
+_PARCEL_CELL_TO_COLUMN = {
+    'acres': 'acres_gross',
+    'units': 'units_total',
+    'lot_width': 'lot_width',
+    'front_feet': 'lots_frontfeet',
+    'sale_period': 'sale_period',
+}
+
+
 def _num(value: Any) -> Optional[float]:
     """A number, or None. Never a silent zero — an empty acre count and a zero
     acre count are different facts and the renderer shows them differently."""
@@ -358,3 +386,70 @@ def build_parcels_view_config(
 
 def _plural(noun: str) -> str:
     return noun if noun.endswith('s') else f'{noun}s'
+
+
+def build_parcels_artifact_schema(
+    config: Dict[str, Any],
+    records: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """The stored block document — the half that makes cells writable.
+
+    WHY THERE ARE TWO REPRESENTATIONS OF THE SAME ROWS
+    --------------------------------------------------
+    The view specification (``params_json``) is what the renderer draws from.
+    This block document (the artifact's stored state) is what a WRITE is resolved
+    against: the server takes the clicked cell's path, walks it in the stored
+    schema, and reads the ``cell_source_ref`` sitting there. It never trusts the
+    client for the table, the row or the column.
+
+    That is the whole security model of inline editing, and it is why this exists
+    rather than the renderer simply posting a parcel id. It also means a cell with
+    no ref is read-only no matter what any flag says, which is how a computed
+    value can never be made writable by an oversight.
+
+    ``captured_value`` is the value the cell was DISPLAYING when drawn. The write
+    path compares it against what is stored immediately before writing, and
+    refuses when they differ — otherwise an edit aimed at a table that has since
+    been rebuilt lands on whatever row took that position.
+    """
+    captured_at = datetime.now(timezone.utc).isoformat()
+    by_index = {i: rec for i, rec in enumerate(records)}
+
+    rows: List[Dict[str, Any]] = []
+    for idx, row in enumerate(config['rows']):
+        record = by_index.get(idx, {})
+        parcel_id = record.get('parcel_id')
+        refs: Dict[str, Any] = {}
+        if parcel_id is not None:
+            for cell_key in _EDITABLE_PARCEL_CELLS:
+                column = _PARCEL_CELL_TO_COLUMN[cell_key]
+                refs[cell_key] = {
+                    'table': 'tbl_parcel',
+                    'row_id': parcel_id,
+                    'column': column,
+                    'captured_at': captured_at,
+                    'captured_value': _num(record.get(column)),
+                }
+        rows.append({
+            'id': row['id'],
+            **({'editable': True, 'cell_source_refs': refs} if refs else {}),
+            # Every column carrying a ref must also be DECLARED on the block —
+            # the schema validator rejects a ref pointing at a column the table
+            # does not show, which is what stops a ref drifting away from the
+            # thing it claims to address.
+            'cells': {key: row['cells'].get(key) for key in _EDITABLE_PARCEL_CELLS},
+        })
+
+    return {
+        'blocks': [
+            {
+                'type': 'table',
+                'id': 'parcels',
+                'columns': [
+                    {'key': key, 'label': _COLUMN_META[key]['label']}
+                    for key in _EDITABLE_PARCEL_CELLS
+                ],
+                'rows': rows,
+            }
+        ]
+    }
