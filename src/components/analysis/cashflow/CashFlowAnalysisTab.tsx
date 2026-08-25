@@ -18,6 +18,7 @@ import CashFlowSummaryMetrics from './CashFlowSummaryMetrics';
 import CollapsibleSection from '@/app/components/Planning/CollapsibleSection';
 import { useContainers } from '@/hooks/useContainers';
 import { useProjectConfig } from '@/hooks/useProjectConfig';
+import { containerMemberName } from '@/lib/containerMemberName';
 import { authFetch } from '@/lib/authFetch';
 import {
   transformCashFlow,
@@ -268,7 +269,7 @@ export default function CashFlowAnalysisTab({ projectId, exportButton, onSummary
               ) : (
                 areas.map((area, index) => {
                   const isSelected = !excludedAreaIds.includes(area.division_id);
-                  const cleanName = area.name.replace(/\bArea\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+                  const cleanName = containerMemberName(area.name, labels.level1Label);
                   const areaColor = getAreaColor(index);
                   return (
                     <CButton

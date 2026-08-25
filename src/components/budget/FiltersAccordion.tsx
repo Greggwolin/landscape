@@ -10,6 +10,7 @@ import { CBadge } from '@coreui/react'
 import CollapsibleSection from '@/app/components/Planning/CollapsibleSection'
 import { useContainers } from '@/hooks/useContainers'
 import { useProjectConfig } from '@/hooks/useProjectConfig'
+import { containerMemberName } from '@/lib/containerMemberName'
 
 interface Props {
   projectId: number
@@ -133,11 +134,10 @@ export default function FiltersAccordion({
 
             {!isLoading && validAreas.length > 0 && validAreas.map((area) => {
               const isSelected = selectedAreaIds.includes(area.division_id)
-              // Clean the name: remove redundant "Area" since we're already prefixing with the label
-              const cleanName = area.name
-                .replace(/\bArea\b/gi, '')
-                .replace(/\s{2,}/g, ' ')
-                .trim()
+              // Strip whichever level label is baked into the stored name — the
+              // project's own, or the legacy "Area" — so the label rendered
+              // below is never doubled. See lib/containerMemberName.
+              const cleanName = containerMemberName(area.name, labels.level1Label)
 
               return (
                 <div

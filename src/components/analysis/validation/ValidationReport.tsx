@@ -21,6 +21,7 @@ import {
 } from '@/types/validation-report';
 import { useContainers } from '@/hooks/useContainers';
 import { useProjectConfig } from '@/hooks/useProjectConfig';
+import { containerMemberName } from '@/lib/containerMemberName';
 import CollapsibleSection from '@/app/components/Planning/CollapsibleSection';
 import { exportProjectCostsToExcel } from '@/lib/exports/projectCostsExcel';
 
@@ -691,7 +692,7 @@ export default function ValidationReport({ projectId }: Props) {
               ) : (
                 areas.map(area => {
                   const isSelected = selectedAreaIds.includes(area.division_id);
-                  const cleanName = area.name.replace(/\bArea\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+                  const cleanName = containerMemberName(area.name, labels.level1Label);
                   return (
                     <button
                       key={area.division_id}

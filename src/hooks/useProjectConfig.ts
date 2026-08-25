@@ -47,9 +47,26 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
     [containersResponse]
   )
 
-  const level1Label = config?.tier_1_label ?? 'Area'
-  const level2Label = config?.tier_2_label ?? 'Phase'
-  const level3Label = config?.tier_3_label ?? 'Parcel'
+  /* THE PROJECT'S OWN LEVEL NAMES HAVE NEVER REACHED THE SCREEN.
+   *
+   * The endpoint selects `tier_1_label AS level1_label` (and the same for 2 and
+   * 3), so the response carries `level1_label`. This read asked for
+   * `tier_1_label`, which is not a key on the response, so every project on
+   * every screen fell through to Area / Phase / Parcel — including one
+   * configured as "Village" since November.
+   *
+   * Nothing surfaced it because the fallback is a plausible answer: the labels
+   * it invents are exactly the labels most projects would have chosen anyway.
+   * Every other consumer of this response already reads the aliased name
+   * (`granularity-settings`, `BudgetItemModalV2`); this hook was the only one
+   * asking for the column name instead.
+   *
+   * Both spellings are accepted below so the hook cannot break again if the
+   * alias is ever dropped, and so a caller that hands over a raw row rather
+   * than the endpoint's response still works. */
+  const level1Label = config?.level1_label ?? config?.tier_1_label ?? 'Area'
+  const level2Label = config?.level2_label ?? config?.tier_2_label ?? 'Phase'
+  const level3Label = config?.level3_label ?? config?.tier_3_label ?? 'Parcel'
   const pluralize = (label: string) => (label.endsWith('s') ? label : `${label}s`)
   const labels = {
     level1Label,

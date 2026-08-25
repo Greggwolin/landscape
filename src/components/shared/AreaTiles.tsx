@@ -8,6 +8,7 @@
 import React, { useMemo } from 'react'
 import { useContainers } from '@/hooks/useContainers'
 import { useProjectConfig } from '@/hooks/useProjectConfig'
+import { containerMemberName } from '@/lib/containerMemberName'
 import { useParcelsWithSales } from '@/hooks/useSalesAbsorption'
 
 interface Props {
@@ -111,13 +112,11 @@ export default function AreaTiles({
       {areas.map((area) => {
         const isSelected = selectedAreaIds.includes(area.division_id)
 
-        const rawName = area.name || area.code || `Area ${area.division_id}`;
-        // Remove standalone word "Area" while keeping other context (e.g., "Village Area 1" -> "Village 1")
-        const cleaned = rawName
-          .replace(/\bArea\b/gi, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim();
-        const displayName = cleaned.length > 0 ? cleaned : rawName;
+        const rawName = area.name || area.code || `${labels.level1Label} ${area.division_id}`;
+        // Strip whichever level label is baked into the stored name — the
+        // project's own, or the legacy "Area" — so the label rendered below is
+        // never doubled. See lib/containerMemberName.
+        const displayName = containerMemberName(rawName, labels.level1Label);
         const netProceeds = areaNetProceeds.get(area.division_id) || 0;
 
         return (
