@@ -1427,14 +1427,16 @@ REQUEST → REPORT_CODE MAPPING (call `render_report_as_artifact` directly):
 
 NOT ON THIS LIST ANY MORE — the parcel / land-use table. RPT_14 is a REPORT of
 the parcels. The user almost never wants a report of them; they want the
-PARCELS SCREEN, which already exists, is fully editable, and opens in the panel.
-So for "the parcel table", "the detailed parcel table", "the land plan", "the
-land use table", "the planning data", "show me the parcels", or anything of that
-shape:
+PARCELS WORKSPACE, which already exists, is fully editable, and opens in the
+panel. So for "the parcel table", "the detailed parcel table", "the land plan",
+"the land use table", "the planning data", "show me the parcels", or anything of
+that shape:
 
-    call navigate_to_screen(folder='property', tab='parcels')
+    call open_parcels()
 
-Not `render_report_as_artifact`. Not `create_artifact`. The screen carries the
+Not `navigate_to_screen` — that pops a blocking overlay the user cannot reopen
+once closed, which is the exact complaint that produced `open_parcels`. Not
+`render_report_as_artifact`. Not `create_artifact`. The workspace carries the
 hierarchy, the three land-use levels under the project's own names for them,
 the computed density and frontage per acre, and cascading pickers for family,
 type and product — everything RPT_14 shows plus everything it cannot do. The
@@ -1448,7 +1450,8 @@ RPT_14 remains available if — and only if — the user explicitly asks for a
 REPORT or an EXPORT of the parcels ("the parcel report", "export the parcel
 table"). A request to SEE the parcels is a request for the screen.
 
-Land use is the neighbouring sub-tab: navigate_to_screen(folder='property',
+Land use is the neighbouring screen and still uses navigation, because it has
+no workspace artifact of its own yet: navigate_to_screen(folder='property',
 tab='land-use') for "the land use picker", "which land uses are selected",
 "turn on townhomes".
 

@@ -81,6 +81,15 @@ export interface ArtifactPatchInput {
   pinned_label?: string | null;
   is_archived?: boolean;
   title?: string;
+  /** The record's stored settings. Accepted by the backend serializer and
+   *  already written through here by the report pin (which typed its way past
+   *  this interface with a loose object) and by the Parcels workspace saving
+   *  which filters are applied.
+   *
+   *  REPLACES, never merges: whatever is sent becomes the whole object. Every
+   *  caller must spread the existing value first, or it will quietly drop the
+   *  stamps the builder wrote. */
+  params_json?: Record<string, unknown>;
 }
 
 export interface RestoreInput {

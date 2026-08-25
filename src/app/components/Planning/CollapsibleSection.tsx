@@ -9,6 +9,17 @@ interface CollapsibleSectionProps {
   defaultExpanded?: boolean;
   headerActions?: React.ReactNode;
   locked?: boolean;
+  /** CONTROLLED MODE — opt-in, and absent everywhere it is not wanted.
+   *
+   *  Pass both to hand ownership of open/closed to the parent. The Parcels
+   *  workspace does, so which sections you left open survives closing the
+   *  artifact; the overlay and the classic screen pass neither and keep the
+   *  uncontrolled behaviour they have always had, unchanged.
+   *
+   *  Both or neither. One alone would give a section that looks controlled and
+   *  silently is not, which is worse than either mode. */
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 export default function CollapsibleSection({
@@ -18,8 +29,12 @@ export default function CollapsibleSection({
   defaultExpanded,
   headerActions,
   locked,
+  expanded,
+  onExpandedChange,
 }: CollapsibleSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(() => {
+  const controlled = expanded !== undefined && onExpandedChange !== undefined;
+
+  const [internalExpanded, setInternalExpanded] = useState(() => {
     if (locked) {
       return false;
     }
@@ -31,9 +46,18 @@ export default function CollapsibleSection({
     return itemCount > 0;
   });
 
+  // `locked` wins over a controlled value. A locked section cannot be opened by
+  // clicking, so it must not be openable by a restored one either — otherwise a
+  // saved view could show content the lock exists to withhold.
+  const isExpanded = locked ? false : (controlled ? Boolean(expanded) : internalExpanded);
+
   const toggleSection = () => {
     if (locked) return;
-    setIsExpanded((prev) => !prev);
+    if (controlled) {
+      onExpandedChange!(!isExpanded);
+      return;
+    }
+    setInternalExpanded((prev) => !prev);
   };
 
   return (

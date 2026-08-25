@@ -186,6 +186,11 @@ LAND_ONLY_TOOLS = [
     # Budget variance review against the firm's other comparable deals
     # (Commit·Impact·Variance §3). Read-only. LAND + income property.
     "review_budget_variance",
+    # Parcels workspace as a durable artifact — the real editable screen hosted
+    # in the panel rather than a blocking overlay it cannot be reopened from.
+    # LAND only: the hierarchy, land-use taxonomy and parcel table are land-dev
+    # concepts. PL — 2026-08-25.
+    "open_parcels",
     # Sales schedule artifact (parcel sales — LAND only; MF/office use opex, not
     # parcel sale assumptions). Deterministic server-rendered artifact.
     "get_sales_schedule",

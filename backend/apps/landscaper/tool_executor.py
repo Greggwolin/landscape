@@ -10156,6 +10156,78 @@ def handle_delete_phase(
 
 # ============ PARCEL TOOLS ============
 
+@register_tool('open_parcels')
+def handle_open_parcels(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Open the PARCELS WORKSPACE as a durable artifact in the right panel.
+
+    This is the real, editable Parcels screen — containers, phases, the parcel
+    table, the cascading land-use pickers — hosted as an artifact rather than as
+    a blocking overlay. The difference matters: an overlay cannot be reopened
+    once closed, which is the whole reason this exists.
+
+    Do NOT compose a parcel table. Do NOT call render_report_as_artifact. The
+    screen fetches its own data and always has.
+    """
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        from .tools.parcels_artifact_builder import (
+            create_parcels_artifact,
+            fetch_project_header,
+            parcel_count,
+        )
+
+        header = fetch_project_header(int(project_id))
+        count = parcel_count(int(project_id))
+        noun = (header['level_labels'].get('level3') or 'Parcel').lower()
+        plural = noun if noun.endswith('s') else f'{noun}s'
+
+        envelope = create_parcels_artifact(
+            project_id=int(project_id),
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        if envelope and envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': envelope,
+                'parcel_count': count,
+                'noun': plural,
+                'instruction': (
+                    'The parcels workspace has ALREADY been opened in the right '
+                    'panel and is fully editable. Do NOT call create_artifact, do '
+                    'NOT call render_report_as_artifact, and do NOT compose or '
+                    'restate the table. Reply with ONE short sentence saying it is '
+                    f'open and how many {plural} it holds, using parcel_count. '
+                    'It stays in the artifacts list, so it can be reopened with '
+                    'one click rather than asked for again.'
+                ),
+            }
+
+        # Could not register the artifact. Say so rather than pretending.
+        return {
+            'success': False,
+            'artifact_created': False,
+            'error': (envelope or {}).get('error', 'could not open the parcels workspace'),
+            'instruction': (
+                'The parcels workspace did NOT open. Tell the user plainly that it '
+                'could not be opened and do not describe parcel data you have not '
+                'been given.'
+            ),
+        }
+
+    except Exception as e:
+        logger.error(f"Error opening parcels workspace: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('get_parcels')
 def handle_get_parcels(
     tool_input: Dict[str, Any],

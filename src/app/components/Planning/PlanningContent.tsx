@@ -50,8 +50,36 @@ interface Area {
   label?: string;
 }
 
-type Props = { projectId?: number | null; projectIdStr?: string }
-const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) => {
+/** The part of this screen's state that is worth surviving a close.
+ *
+ *  Gregg's decision 2a: which filters are applied and which sections are open
+ *  come back; nothing else does. Deliberately NOT included — a row part-way
+ *  through being edited, and a half-typed new parcel. A change that reappears
+ *  later without having been agreed to is worse than losing it, and both are
+ *  edits in flight rather than a view.
+ */
+export interface PlanningViewState {
+  areaFilters?: number[]
+  phaseFilters?: string[]
+  /** Section key → open. Absent key means "use the screen's own default". */
+  sections?: Record<string, boolean>
+}
+
+type Props = {
+  projectId?: number | null
+  projectIdStr?: string
+  /** Both optional, and both absent on the classic screen and the overlay —
+   *  they keep exactly the behaviour they have always had. The Parcels
+   *  workspace passes them so the view survives closing the artifact. */
+  initialViewState?: PlanningViewState | null
+  onViewStateChange?: (state: PlanningViewState) => void
+}
+const PlanningContent: React.FC<Props> = ({
+  projectId = null,
+  projectIdStr,
+  initialViewState = null,
+  onViewStateChange,
+}) => {
   const [parcels, setParcels] = useState<Parcel[]>([])
   const [phases, setPhases] = useState<Phase[]>([])
   const [areas, setAreas] = useState<Area[]>([])
@@ -177,11 +205,68 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     }))
   }, [areaDisplayByNumber, parcels, level1Label, getAreaStats])
 
-  // Area filtering state - now supports multiple selections
-  const [selectedAreaFilters, setSelectedAreaFilters] = useState<number[]>([])
+  // Area filtering state - now supports multiple selections.
+  // Seeded from a restored view when the host supplies one (2a); an empty
+  // array otherwise, which is what every other host gets.
+  const [selectedAreaFilters, setSelectedAreaFilters] = useState<number[]>(
+    () => initialViewState?.areaFilters ?? []
+  )
 
   // Phase filtering state
-  const [selectedPhaseFilters, setSelectedPhaseFilters] = useState<string[]>([])
+  const [selectedPhaseFilters, setSelectedPhaseFilters] = useState<string[]>(
+    () => initialViewState?.phaseFilters ?? []
+  )
+
+  // Which sections are open. Held here rather than inside each section so it
+  // can be restored and reported as one piece. `undefined` for a key means the
+  // section falls back to its own default, so a host that restores nothing
+  // behaves exactly as before.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    () => initialViewState?.sections ?? {}
+  )
+  const setSectionOpen = React.useCallback((key: string, open: boolean) => {
+    setOpenSections((prev) => ({ ...prev, [key]: open }))
+  }, [])
+
+  /* Whether this host wants the view remembered at all. Only the Parcels
+   * workspace does; the classic screen and the overlay pass neither prop and
+   * every section below stays uncontrolled, exactly as before. */
+  const restoresView = typeof onViewStateChange === 'function'
+
+  /* Props for one section. Controlled only when the host is remembering —
+   * both `expanded` and `onExpandedChange` together, never one alone. */
+  const sectionControl = React.useCallback(
+    (key: string, fallbackOpen: boolean) => (
+      restoresView
+        ? {
+            expanded: openSections[key] ?? fallbackOpen,
+            onExpandedChange: (open: boolean) => setSectionOpen(key, open),
+          }
+        : {}
+    ),
+    [restoresView, openSections, setSectionOpen]
+  )
+
+  /* Report the view up whenever it CHANGES, so the host can persist it.
+   * Filters and sections only — see PlanningViewState for what is deliberately
+   * left out and why.
+   *
+   * The first run is skipped on purpose: on mount the state is whatever was
+   * just restored, so reporting it would write the record back to the value it
+   * already holds every single time the workspace is opened. */
+  const reportedOnceRef = React.useRef(false)
+  React.useEffect(() => {
+    if (!onViewStateChange) return
+    if (!reportedOnceRef.current) {
+      reportedOnceRef.current = true
+      return
+    }
+    onViewStateChange({
+      areaFilters: selectedAreaFilters,
+      phaseFilters: selectedPhaseFilters,
+      sections: openSections,
+    })
+  }, [onViewStateChange, selectedAreaFilters, selectedPhaseFilters, openSections])
 
   // Phase editing state
   const [isAnyPhaseEditing, setIsAnyPhaseEditing] = useState(false)
@@ -994,6 +1079,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
           title={level1LabelPlural}
           itemCount={areaCards.length}
           defaultExpanded={areaCards.length > 0}
+          {...sectionControl('level1', areaCards.length > 0)}
         >
           <div className="p-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1079,6 +1165,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
           title={level2LabelPlural}
           itemCount={filteredPhases.length}
           defaultExpanded={true}
+          {...sectionControl('level2', true)}
         >
           <div className="p-3">
             <div className="overflow-x-auto">
@@ -1119,6 +1206,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
         title={`${level3Label} Detail Table`}
         itemCount={filteredParcels.length}
         defaultExpanded={true}
+        {...sectionControl('parcels', true)}
         headerActions={
           <>
             {(selectedAreaFilters.length > 0 || selectedPhaseFilters.length > 0 || selectedLandUseFilter) && (

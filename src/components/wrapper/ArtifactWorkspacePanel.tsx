@@ -20,6 +20,8 @@ import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
+import { ParcelsArtifact, type ParcelsArtifactConfig } from './ParcelsArtifact';
+import type { PlanningViewState } from '@/app/components/Planning/PlanningContent';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -590,6 +592,50 @@ export function ArtifactWorkspacePanel({
             onCommitFieldEdits={(edits) =>
               runCommitFieldEdits(active.artifact_id, edits)
             }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'open_parcels' &&
+          active.params_json &&
+          (active.params_json as { parcels_config?: unknown }).parcels_config ? (
+          // The Parcels WORKSPACE — the real editable screen, hosted here rather
+          // than in a blocking overlay. Same component the overlay mounts; the
+          // change is the container, which is the whole point: an overlay holds
+          // one value, discards it on close, and has no list to reopen from.
+          //
+          // Keyed on the artifact so switching between workspaces remounts
+          // rather than reusing one screen's state for another project's data.
+          <ParcelsArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { parcels_config: ParcelsArtifactConfig })
+                .parcels_config
+            }
+            viewState={
+              (active.params_json as { parcels_view_state?: PlanningViewState })
+                .parcels_view_state ?? null
+            }
+            onViewStateChange={(viewState) => {
+              // Decision 2a — the applied filters and open sections ride on the
+              // record, so reopening returns you to the view you left rather
+              // than the top of an unfiltered table.
+              //
+              // Written BESIDE parcels_config, never inside it. Asking for the
+              // parcel table again refreshes the tool's own keys wholesale, so
+              // a view stored inside one of them would be silently discarded on
+              // the next ask. A sibling key survives, which is how the report
+              // toolbar's saved view already works.
+              //
+              // Spread first, or the builder's stamps go with it. Fire and
+              // forget — a lost view save costs a scroll position, and must
+              // never put an error over the work.
+              const existingParams = (active.params_json ?? {}) as Record<string, unknown>;
+              patchMutation.mutate({
+                artifactId: active.artifact_id,
+                patch: {
+                  params_json: { ...existingParams, parcels_view_state: viewState },
+                },
+              });
+            }}
             onClose={() => setActiveArtifactId(null)}
           />
         ) : active.tool_name === 'generate_location_brief' &&
