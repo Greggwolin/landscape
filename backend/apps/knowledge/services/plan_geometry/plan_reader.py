@@ -57,12 +57,14 @@ from typing import Optional, Sequence
 from .lot_dimensions import measure_lots
 from .lot_table import (
     LotAreaTable,
+    TractAreaTable,
     compare_to_drawn_labels,
     derive_missing_lots,
     read_lot_area_table,
+    read_tract_area_table,
 )
 from .lot_match import lot_number_tokens, match_lots
-from .parcel_rollup import DerivedLot
+from .parcel_rollup import DerivedLot, DerivedTract
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,21 @@ class PlanReading:
     label_disagreements: dict[str, list[int]] = field(default_factory=dict)
     #: Runs of lots that could not be rebuilt, each with a plain-English reason.
     refusals: list[tuple[list[int], str]] = field(default_factory=list)
+    #: The plat's own statement of its drainage and utility tracts. Empty when
+    #: the drawing carries no tract area table, which is common.
+    tract_table: TractAreaTable = field(default_factory=TractAreaTable)
+    #: Tracts whose outline was recovered and whose area agrees with that
+    #: table. Kept apart from `lots`: a tract is in no parcel and counts toward
+    #: no lot total.
+    tracts: list[DerivedTract] = field(default_factory=list)
+    #: Why each stated tract was not placed, in plain English, one entry per
+    #: label. Carried through so the preview can show it: 30 of Red Valley's 34
+    #: tracts do not place, and "30 unresolved" with no reason is the kind of
+    #: silence that reads as nobody having looked.
+    tract_refusals: list = field(default_factory=list)
+    #: page index -> tract label -> ring, IN PAGE COORDINATES, same caveat as
+    #: `rings_by_sheet`.
+    tract_rings_by_sheet: dict[int, dict[str, list]] = field(default_factory=dict)
     #: page index -> lot number -> ring, IN PAGE COORDINATES (PyMuPDF points,
     #: origin top-left, y down). Kept, not dropped: measuring needed these and
     #: then discarded them, which left "which sheet did the other 42 come from"
@@ -254,6 +271,8 @@ def read_plan(
     doc = doc or pymupdf.open(pdf_path)
     try:
         table = read_lot_area_table(doc)
+        # Read before the early return below only when there is a lot table to
+        # go with it: a tract area table on its own places nothing.
         if not table.areas:
             logger.info("no lot area table found — nothing to read")
             return PlanReading(table=table, sheet_scans=scan_sheets(doc, number_range))
@@ -289,8 +308,12 @@ def read_plan(
                 disagreements["drawn_but_not_tabulated"],
             )
 
+        # The tract area table gates tract extraction exactly as the lot area
+        # table gates lots: no stated area, no tract. A plat without one reads
+        # exactly as it did before.
+        tract_table = read_tract_area_table(doc)
         match = match_lots(pdf_path, sheets=lot_sheets, stated_areas=table.areas,
-                           number_range=(lo, hi))
+                           number_range=(lo, hi), tract_areas=tract_table.areas)
         derived, refusals = derive_missing_lots(match, table.areas, doc)
 
         ft_per_pt = math.sqrt(match.scale_sqft_per_pt2) if match.scale_sqft_per_pt2 else 0.0
@@ -336,8 +359,33 @@ def read_plan(
                 )
             )
 
+        tract_rings_by_sheet: dict[int, dict[str, list]] = defaultdict(dict)
+        for t in match.tracts:
+            tract_rings_by_sheet[t.page][t.label] = t.ring
+        tracts = [
+            DerivedTract(
+                label=t.label,
+                area_sqft=float(tract_table.areas.get(t.label, round(t.area_sqft))),
+                # Page coordinates are not world coordinates — same as lots,
+                # this stays None until georeferencing runs.
+                ring_3857=None,
+                page=t.page,
+            )
+            for t in match.tracts
+        ]
+        if tract_table.areas:
+            logger.info(
+                "tracts: %d of %d stated tracts placed%s",
+                len(tracts), len(tract_table.areas),
+                f"; unresolved {match.unresolved_tracts}" if match.unresolved_tracts else "",
+            )
+
         reading = PlanReading(
             table=table,
+            tract_table=tract_table,
+            tracts=tracts,
+            tract_refusals=list(getattr(match, "tract_refusals", []) or []),
+            tract_rings_by_sheet={p: dict(r) for p, r in tract_rings_by_sheet.items()},
             lots=lots,
             sheets=lot_sheets,
             # Every lot sheet gets a key, including one that recovered nothing.

@@ -131,12 +131,40 @@ def test_area_cannot_confirm_an_assignment_only_refuse_it():
     assert out.assigned[2].bounds[0] == 10.0 and out.assigned[3].bounds[0] == 20.0
 
 
-def test_a_run_spanning_a_hundred_block_is_not_a_run():
-    """180 and 201 are the last lot of one parcel and the first of another."""
+def test_a_short_run_spanning_a_hundred_block_is_walked():
+    """The hundred-block boundary is a naming convention, not a physical gap.
+
+    180 and 201 are the last lot of one parcel and the first of another, and
+    the original rule skipped every such pair outright. That also skipped the
+    case this plat actually has: two blocks that abut, with a lot or two
+    sitting on the boundary and nothing else between them.
+
+    Pass 2 attempts these, and the safety is unchanged — the walk must be
+    unique, the count exact, and every area must agree with the schedule. The
+    hundred-block test was standing in for "these anchors are probably far
+    apart"; the adjacency graph answers that question directly (PF1).
+    """
     a, mid, b = row(3)
     out = infill_by_position(
         named={180: a, 201: b}, unnamed=[mid],
         stated_areas={180: 100, 182: 100, 201: 100}, scale_sqft_per_pt2=SCALE,
+    )
+    assert out.assigned == {182: mid}
+
+
+def test_a_long_run_spanning_a_hundred_block_is_still_skipped():
+    """Pass 2 is for lots that abut across the boundary, not for whole parcels.
+
+    Four or more numbers between two anchors in different hundred blocks is
+    the case the original rule was written for: two anchors on opposite parts
+    of the drawing. It is skipped without a refusal, exactly as before.
+    """
+    faces = row(6)
+    out = infill_by_position(
+        named={180: faces[0], 201: faces[5]},
+        unnamed=faces[1:5],
+        stated_areas={180: 100, 181: 100, 182: 100, 183: 100, 184: 100, 201: 100},
+        scale_sqft_per_pt2=SCALE,
     )
     assert out.assigned == {}
     assert out.refusals == []          # skipped, not refused — never a run

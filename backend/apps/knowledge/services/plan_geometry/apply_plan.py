@@ -191,6 +191,7 @@ def apply_confirmed_plan(
         source_doc=doc_name,
         stage=stage,
         confidence=plan_profile.get("confidence"),
+        tracts=reading.tracts,
     )
 
     measured = reading.with_frontage
@@ -201,6 +202,13 @@ def apply_confirmed_plan(
         f"{measured} measured, {reading.total_frontage_ft:,.0f} front feet, "
         f"{reading.total_acres:.1f} acres."
     )
+    if reading.tracts:
+        message += (
+            f" {len(reading.tracts)} drainage or utility "
+            f"{'tract' if len(reading.tracts) == 1 else 'tracts'} were "
+            "identified alongside them; tracts are not saleable, so they are "
+            "recorded but counted toward no parcel."
+        )
     if measured < reading.lot_count:
         message += (
             f" The other {reading.lot_count - measured} are counted but not "
