@@ -29,12 +29,11 @@ name: Monthly Market Refresh
 on:
   schedule:
     - cron: '0 9 16 * *'   # 16th of each month, 09:00 UTC
-  # TEMPORARY -- SD17 verification only, removed before review completes.
-  # workflow_dispatch cannot be triggered until the workflow exists on the default
-  # branch, and this must not merge untested. Scoped to this one branch.
-  push:
-    branches:
-      - fix/market-refresh-and-cron-0821
+  # The branch-scoped push trigger that proved this workflow runs has done its
+  # job and is gone (2026-08-26). It existed because `workflow_dispatch` cannot
+  # be fired until the workflow sits on the default branch, so there was no
+  # other way to watch a real run before merging. It has run green; keeping it
+  # would mean every future push to that branch re-ran a monthly job.
   workflow_dispatch:
     inputs:
       geo_id:
