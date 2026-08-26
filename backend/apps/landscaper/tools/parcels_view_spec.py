@@ -138,11 +138,28 @@ _COLUMN_META: Dict[str, Dict[str, Any]] = {
 # products on project 9 that need this should be added to `res_lot_product`,
 # and then this fallback stops firing for them.
 #
-# Where neither yields a width — attached, build-for-rent and the two "pack"
-# products, plus everything that has no lots at all — front feet is None and
-# the cell shows a dash. A parcel whose frontage nobody can state and a parcel
-# with no frontage are different facts, and this is the more important column
-# on the table to get that distinction right on.
+# Where neither yields a width, front feet is None and the cell shows a dash.
+#
+# THAT DASH IS AN ANSWER, NOT A GAP — settled by Gregg, 2026-08-26, and
+# recorded here so nobody re-opens it. Build-for-rent, the two "pack" products
+# and townhomes are allocated PER UNIT, not per front foot, so they have no
+# frontage figure to be missing. `land_use_pricing` on project 9 agrees for
+# three of the four — BFR SFD, 6/6Pack and 7/8 Pack are all priced in $/Unit,
+# as are apartments; commercial and mixed use price per square foot and open
+# space per acre. Every product priced in $/FF is an SFD lot product, and every
+# one of those resolves a width.
+#
+# TOWNHOMES IS THE ONE DISAGREEMENT and it is a record problem, not a code one:
+# its pricing row reads FF at $0.00 while Gregg says the product is allocated
+# per unit. Four lots on project 9, so nothing turns on it financially, but the
+# row is wrong on its face — a rate of zero prices the parcel at nothing. Raised
+# with him 2026-08-26; do not quietly "fix" it here, because this module reads
+# the pricing table rather than owning it.
+#
+# A parcel whose frontage nobody can state and a parcel that is not measured in
+# frontage at all are different facts, and both are different again from zero.
+# None is the honest value for the second, which is why this column must never
+# fall back to 0.
 _PRODUCT_CODE_DIMENSIONS = re.compile(r'^\s*(\d+(?:\.\d+)?)\s*[xX]\s*\d')
 
 
