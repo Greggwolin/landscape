@@ -142,31 +142,29 @@ class ColumnsAndRungs(SimpleTestCase):
             self.assertNotIn('pct_acres', cfg['rung_columns'][rung])
             self.assertIn('parcel', cfg['rung_columns'][rung])
 
-    def test_a_column_nothing_carries_is_dropped_with_a_reason(self):
-        """Front feet on project 9 is non-null on two rows and both hold zero.
+    def test_product_facts_and_sale_period_are_not_on_this_table(self):
+        """Gregg ran it 2026-08-25 and named three columns that do not belong.
 
-        "Two parcels have front feet" is true about the storage and false about
-        the world, so the column has to disappear rather than print a column of
-        dashes and imply the data is merely sparse.
+        Lot width and front feet are facts about the PRODUCT — `50x125` already
+        says the lot is fifty feet wide and `res_lot_product` holds it as data,
+        so a second copy typed onto the parcel can only ever disagree with the
+        first. Sale period belongs to sales and absorption. None of the three
+        appears at any rung, and none is even offered as a hideable column.
         """
-        rows = [record(parcel_id=1, parcel_code='a', acres_gross=1.0,
-                       lots_frontfeet=0.0, area_id=8, area_no=1),
-                record(parcel_id=2, parcel_code='b', acres_gross=1.0,
-                       lots_frontfeet=None, area_id=8, area_no=1)]
-        cfg = build(rows)
-        dropped = {c['key'] for c in cfg['optional_columns']}
-        self.assertIn('front_feet', dropped)
-        for rung in RUNGS:
-            self.assertNotIn('front_feet', cfg['rung_columns'][rung])
+        cfg = build(SIX)
+        for key in ('lot_width', 'front_feet', 'sale_period'):
+            for rung in RUNGS:
+                self.assertNotIn(key, cfg['rung_columns'][rung])
+            self.assertNotIn(key, {c['key'] for c in cfg['columns']})
+            self.assertNotIn(key, {c['key'] for c in cfg['optional_columns']})
+            for row in cfg['rows']:
+                self.assertNotIn(key, row['cells'])
 
-    def test_one_real_value_keeps_the_column(self):
-        rows = [record(parcel_id=1, parcel_code='a', acres_gross=1.0,
-                       lots_frontfeet=0.0, area_id=8, area_no=1),
-                record(parcel_id=2, parcel_code='b', acres_gross=1.0,
-                       lots_frontfeet=1200.0, area_id=8, area_no=1)]
-        cfg = build(rows)
-        self.assertNotIn('front_feet', {c['key'] for c in cfg['optional_columns']})
-        self.assertIn('front_feet', cfg['rung_columns']['all'])
+    def test_nothing_is_hidden_behind_a_footnote_any_more(self):
+        """The "Not shown: Front feet — no parcel carries one" line read as a
+        data gap when it was a modelling one. With the column gone there is
+        nothing to explain, so the footnote must not render at all."""
+        self.assertEqual(build(SIX)['optional_columns'], [])
 
     def test_units_is_never_dropped_even_when_every_parcel_has_none(self):
         """Zero units on commercial land is a fact about the plan, not a gap in
@@ -228,15 +226,16 @@ class TheWriteAllowlist(SimpleTestCase):
         self.assertEqual([r['id'] for r in cfg['rows']],
                          [r['id'] for r in block['rows']])
 
-    def test_only_the_five_plain_values_carry_a_pointer(self):
+    def test_only_the_two_plain_values_carry_a_pointer(self):
         block = self.schema()['blocks'][0]
         refs = block['rows'][0]['cell_source_refs']
-        self.assertEqual(set(refs), {'acres', 'units', 'lot_width',
-                                     'front_feet', 'sale_period'})
-        # The ones deliberately left out of this slice, and the one that can
-        # never be writable anywhere.
+        self.assertEqual(set(refs), {'acres', 'units'})
+        # The ones deliberately left out of this slice, the one that can never
+        # be writable anywhere, and the three that came off the table on
+        # 2026-08-25. A pointer IS the write permission, so their absence here
+        # is what makes them read-only rather than merely hidden.
         for key in ('family', 'type', 'product', 'level1', 'level2',
-                    'parcel', 'dua'):
+                    'parcel', 'dua', 'lot_width', 'front_feet', 'sale_period'):
             self.assertNotIn(key, refs)
 
     def test_every_pointer_names_a_declared_column(self):
@@ -253,7 +252,6 @@ class TheWriteAllowlist(SimpleTestCase):
         refs = block['rows'][0]['cell_source_refs']
         self.assertEqual(refs['acres']['column'], 'acres_gross')
         self.assertEqual(refs['units']['column'], 'units_total')
-        self.assertEqual(refs['front_feet']['column'], 'lots_frontfeet')
         self.assertEqual(refs['acres']['table'], 'tbl_parcel')
         self.assertEqual(refs['acres']['row_id'], 1)
 

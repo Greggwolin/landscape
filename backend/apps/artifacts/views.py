@@ -1327,14 +1327,19 @@ def _coerce_sale_date(raw_value):
     return None
 
 
+# Narrowed 2026-08-25 after Gregg ran it. Lot width and front feet are facts
+# about the PRODUCT, not values typed onto a parcel, and sale period belongs to
+# sales and absorption; none of the three is offered on the parcels table any
+# more. This set is the second, server-side gate — a cell cannot become
+# writable by a client claiming it is, so removing them here is what actually
+# closes the write path rather than merely hiding the column.
 _EDITABLE_PARCEL_CELL_COLUMNS = {
-    'acres_gross', 'units_total', 'lot_width', 'lots_frontfeet', 'sale_period',
+    'acres_gross', 'units_total',
 }
 
-# Which of those are whole numbers. Acres and lot width are not — a parcel is
-# 32.4 acres and a lot is 47.5 feet wide, and rounding either would quietly
-# change the plan.
-_INTEGER_PARCEL_COLUMNS = {'units_total', 'sale_period'}
+# Which of those are whole numbers. Acres is not — a parcel is 32.4 acres, and
+# rounding it would quietly change the plan.
+_INTEGER_PARCEL_COLUMNS = {'units_total'}
 
 
 def _write_parcel_cell(*, project_id, parcel_id, column, raw_value, user_id=None):

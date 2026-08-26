@@ -141,8 +141,7 @@ function fmtPct(value: number | null): string {
  *  one decimal three of Peoria's four villages read the same. */
 function cellText(key: string, value: string | number | null): string {
   if (key === 'dua') return fmt(value, 2);
-  if (key === 'acres' || key === 'units' || key === 'lot_width'
-      || key === 'front_feet' || key === 'sale_period') return fmt(value);
+  if (key === 'acres' || key === 'units') return fmt(value);
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
 }
@@ -375,12 +374,20 @@ export function ParcelsArtifact({
             {r}
           </button>
         ))}
-        <span style={{ width: 10 }} />
+      </div>
+
+      {/* Grouping reads as its own row, the way Village, Phase, Use and Detail
+       *  do: one label on the left, bare names in the chips. It used to trail
+       *  the detail rungs with `group:` repeated on every button, which put two
+       *  unrelated controls on one line and said the word four times.
+       *  Gregg, 2026-08-25. */}
+      <div className={styles.bar}>
+        <span className={styles.barLabel}>Group</span>
         {config.group_options.map((g) => (
           <button key={g.value} type="button"
             className={`${styles.badge} ${grouping === g.value ? styles.badgeOn : ''}`}
             onClick={() => setGrouping(g.value)}>
-            group: {g.label}
+            {g.label}
           </button>
         ))}
       </div>

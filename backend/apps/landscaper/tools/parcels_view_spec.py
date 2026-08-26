@@ -72,11 +72,29 @@ _RUNG_COLUMNS: Dict[str, tuple] = {
     'standard': ('level1', 'level2', 'parcel', 'type', 'product',
                  'acres', 'units'),
     'detail':   ('level1', 'level2', 'parcel', 'type', 'product',
-                 'acres', 'units', 'dua', 'lot_width', 'sale_period'),
+                 'acres', 'units', 'dua'),
     'all':      ('level1', 'level2', 'parcel', 'family', 'type', 'product',
-                 'acres', 'units', 'dua', 'lot_width', 'front_feet',
-                 'sale_period'),
+                 'acres', 'units', 'dua'),
 }
+
+# WHAT IS DELIBERATELY ABSENT, AND WHY (Gregg, 2026-08-25, after running it)
+# --------------------------------------------------------------------------
+# LOT WIDTH. A parcel's dimensions come from its PRODUCT, not from a figure
+# typed onto the parcel. `50x125` already says the lot is fifty feet wide, and
+# `res_lot_product` holds that as data. The `tbl_parcel.lot_width` column is a
+# second copy of the same fact — on project 9 it is filled on 24 of 43 parcels
+# and agrees with the product on every one of them, so it adds no information
+# and creates a way for the two to disagree. It is neither shown nor writable
+# here.
+#
+# FRONT FEET. Dropped with lot width. It is derivable (product width × lots)
+# rather than stored, and the stored column holds zero on every parcel that has
+# it at all — which is what produced the "no parcel carries one" footnote that
+# read as a data gap when it was really a modelling one.
+#
+# SALE PERIOD. Not a parcel fact. It belongs to sales and absorption, which has
+# its own surface, and it was on this table by inheritance rather than by
+# decision.
 
 # The one rung whose rows are group lines rather than parcels.
 GROUPED_RUNG = 'summary'
@@ -96,9 +114,6 @@ _COLUMN_META: Dict[str, Dict[str, Any]] = {
     'type':       {'label': 'Type',        'align': 'left',  'kind': 'picklist'},
     'product':    {'label': 'Product',     'align': 'left',  'kind': 'picklist'},
     'dua':        {'label': 'Units / acre', 'align': 'right', 'kind': 'computed'},
-    'lot_width':  {'label': 'Lot width',   'align': 'right', 'kind': 'number'},
-    'front_feet': {'label': 'Front feet',  'align': 'right', 'kind': 'number'},
-    'sale_period': {'label': 'Sale period', 'align': 'right', 'kind': 'number'},
 }
 
 # Columns dropped when the project holds no usable value for them anywhere.
@@ -108,16 +123,17 @@ _COLUMN_META: Dict[str, Dict[str, Any]] = {
 # sale price, setbacks and site coverage, every one of them empty on all 43
 # parcels, and none of them offered here at all.
 #
-# ZERO COUNTS AS ABSENT FOR THESE, and that is not a shortcut. Front feet on
-# project 9 is non-null on two rows and both of those rows hold 0 — so "two
-# parcels have front feet" is true about the storage and false about the world.
-# Nothing carries a front-foot figure, and the column has to disappear rather
-# than print forty-three dashes and imply the data is merely sparse.
+# EMPTY TODAY, ON PURPOSE. The three columns that used to sit here — lot width,
+# front feet and sale period — are gone from the table entirely (see the note
+# under _RUNG_COLUMNS), so there is nothing left to drop conditionally. The
+# machinery stays because the next optional column will want it, and because a
+# hiding rule that only exists when something uses it is a rule nobody
+# maintains.
 #
 # `units` is deliberately NOT in this list: zero units on a commercial parcel is
 # a fact about the plan, not a gap in it, and it is one of the four figures
 # across the top.
-_DROPPABLE = ('lot_width', 'front_feet', 'sale_period')
+_DROPPABLE: tuple = ()
 
 
 # ── What can be typed into, and where it actually lives ─────────────────────
@@ -137,14 +153,12 @@ _DROPPABLE = ('lot_width', 'front_feet', 'sale_period')
 #     (Gregg, 25 Aug). Typeable only on a project with no level 1 and no level 2,
 #     which is not project 9 and not this slice.
 #   dua — computed. Never writable anywhere.
-_EDITABLE_PARCEL_CELLS = ('acres', 'units', 'lot_width', 'front_feet', 'sale_period')
+#   lot_width / front_feet / sale_period — no longer on this table at all.
+_EDITABLE_PARCEL_CELLS = ('acres', 'units')
 
 _PARCEL_CELL_TO_COLUMN = {
     'acres': 'acres_gross',
     'units': 'units_total',
-    'lot_width': 'lot_width',
-    'front_feet': 'lots_frontfeet',
-    'sale_period': 'sale_period',
 }
 
 
@@ -191,8 +205,7 @@ def fetch_parcel_records(project_id: int) -> List[Dict[str, Any]]:
         cursor.execute(
             """
             SELECT p.parcel_id, p.parcel_code, p.family_name, p.type_code,
-                   p.product_code, p.acres_gross, p.units_total, p.lot_width,
-                   p.lots_frontfeet, p.sale_period,
+                   p.product_code, p.acres_gross, p.units_total,
                    a.area_id, a.area_no, ph.phase_id, ph.phase_no
               FROM landscape.tbl_parcel p
               LEFT JOIN landscape.tbl_area  a  ON a.area_id  = p.area_id
@@ -304,9 +317,6 @@ def build_parcels_view_config(
                 # Density is derived, never stored, and never typed over.
                 'dua': (round(units / acres, 2)
                         if units is not None and acres else None),
-                'lot_width': _num(record.get('lot_width')),
-                'front_feet': _num(record.get('lots_frontfeet')),
-                'sale_period': record.get('sale_period'),
             },
         })
 
