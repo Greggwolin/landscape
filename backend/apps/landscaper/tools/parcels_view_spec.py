@@ -43,6 +43,7 @@ from ``tbl_project_config``. Hard-coding either is a defect, not a shortcut.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -67,14 +68,15 @@ RUNGS = ('summary', 'standard', 'detail', 'all')
 # column.
 _RUNG_COLUMNS: Dict[str, tuple] = {
     # Rows are groups.
-    'summary':  ('group', 'parcels', 'acres', 'units', 'pct_acres'),
+    'summary':  ('group', 'parcels', 'acres', 'units', 'front_feet',
+                 'pct_acres'),
     # Rows are parcels.
     'standard': ('level1', 'level2', 'parcel', 'type', 'product',
-                 'acres', 'units'),
+                 'acres', 'units', 'front_feet'),
     'detail':   ('level1', 'level2', 'parcel', 'type', 'product',
-                 'acres', 'units', 'dua'),
+                 'acres', 'units', 'front_feet', 'dua'),
     'all':      ('level1', 'level2', 'parcel', 'family', 'type', 'product',
-                 'acres', 'units', 'dua'),
+                 'acres', 'units', 'front_feet', 'dua'),
 }
 
 # WHAT IS DELIBERATELY ABSENT, AND WHY (Gregg, 2026-08-25, after running it)
@@ -87,9 +89,15 @@ _RUNG_COLUMNS: Dict[str, tuple] = {
 # and creates a way for the two to disagree. It is neither shown nor writable
 # here.
 #
-# FRONT FEET. Dropped with lot width. It is derivable (product width × lots)
-# rather than stored, and the stored column holds zero on every parcel that has
-# it at all — which is what produced the "no parcel carries one" footnote that
+# FRONT FEET is the exception, and it is BACK — computed, never stored, never
+# typed into. Gregg, 2026-08-25: "front feet is a computed value and it's
+# probably the most critical field for calculating revenues and allocating
+# costs." The platform already agreed with him in two places before this
+# module existed — `src/types/budget.ts` defines phase front feet as
+# `Sum(units * lot_width)`, and `apps/sales_absorption` allocates per front
+# foot — so this reuses that definition rather than inventing a second one.
+# `tbl_parcel.lots_frontfeet` stays ignored: it holds zero wherever it holds
+# anything, which is what produced the "no parcel carries one" footnote that
 # read as a data gap when it was really a modelling one.
 #
 # SALE PERIOD. Not a parcel fact. It belongs to sales and absorption, which has
@@ -114,7 +122,36 @@ _COLUMN_META: Dict[str, Dict[str, Any]] = {
     'type':       {'label': 'Type',        'align': 'left',  'kind': 'picklist'},
     'product':    {'label': 'Product',     'align': 'left',  'kind': 'picklist'},
     'dua':        {'label': 'Units / acre', 'align': 'right', 'kind': 'computed'},
+    'front_feet': {'label': 'Front feet', 'align': 'right', 'kind': 'computed'},
 }
+
+
+# ── Front feet ──────────────────────────────────────────────────────────────
+#
+# Lot width comes from the product catalogue (`res_lot_product.lot_w_ft`),
+# joined on the product code the parcel carries. Where the catalogue has no row
+# but the code itself states the dimensions — `35x95`, `40x100` — the width is
+# READ OFF THE CODE. That is reading a datum, not guessing one: the code is the
+# product's name and the number in front of the `x` is its width by the naming
+# convention the whole catalogue follows. It is still second best, because a
+# name cannot be corrected in one place the way a catalogue row can — the two
+# products on project 9 that need this should be added to `res_lot_product`,
+# and then this fallback stops firing for them.
+#
+# Where neither yields a width — attached, build-for-rent and the two "pack"
+# products, plus everything that has no lots at all — front feet is None and
+# the cell shows a dash. A parcel whose frontage nobody can state and a parcel
+# with no frontage are different facts, and this is the more important column
+# on the table to get that distinction right on.
+_PRODUCT_CODE_DIMENSIONS = re.compile(r'^\s*(\d+(?:\.\d+)?)\s*[xX]\s*\d')
+
+
+def width_from_product_code(code: Optional[str]) -> Optional[float]:
+    """The lot width a `WxD` product code states, or None."""
+    if not code:
+        return None
+    match = _PRODUCT_CODE_DIMENSIONS.match(str(code))
+    return float(match.group(1)) if match else None
 
 # Columns dropped when the project holds no usable value for them anywhere.
 #
@@ -123,12 +160,15 @@ _COLUMN_META: Dict[str, Dict[str, Any]] = {
 # sale price, setbacks and site coverage, every one of them empty on all 43
 # parcels, and none of them offered here at all.
 #
-# EMPTY TODAY, ON PURPOSE. The three columns that used to sit here — lot width,
-# front feet and sale period — are gone from the table entirely (see the note
-# under _RUNG_COLUMNS), so there is nothing left to drop conditionally. The
-# machinery stays because the next optional column will want it, and because a
-# hiding rule that only exists when something uses it is a rule nobody
-# maintains.
+# EMPTY TODAY, ON PURPOSE. The three columns that used to sit here are gone
+# (lot width and sale period entirely; front feet re-derived as a computed
+# column that always shows), so there is nothing left to drop conditionally.
+# Front feet in particular must NEVER be dropped for being empty: a project
+# whose products carry no widths is a project that needs to see the gap, not
+# one that should have the column quietly removed.
+# The machinery stays because the next optional column will want it, and
+# because a hiding rule that only exists when something uses it is a rule
+# nobody maintains.
 #
 # `units` is deliberately NOT in this list: zero units on a commercial parcel is
 # a fact about the plan, not a gap in it, and it is one of the four figures
@@ -206,10 +246,15 @@ def fetch_parcel_records(project_id: int) -> List[Dict[str, Any]]:
             """
             SELECT p.parcel_id, p.parcel_code, p.family_name, p.type_code,
                    p.product_code, p.acres_gross, p.units_total,
+                   rp.lot_w_ft AS product_lot_width,
                    a.area_id, a.area_no, ph.phase_id, ph.phase_no
               FROM landscape.tbl_parcel p
               LEFT JOIN landscape.tbl_area  a  ON a.area_id  = p.area_id
               LEFT JOIN landscape.tbl_phase ph ON ph.phase_id = p.phase_id
+              -- The product catalogue is where a lot's dimensions live. LEFT
+              -- so a parcel whose product is not catalogued still appears; its
+              -- width falls back to the code, then to nothing.
+              LEFT JOIN landscape.res_lot_product rp ON rp.code = p.product_code
              WHERE p.project_id = %s
              ORDER BY a.area_no NULLS LAST, ph.phase_no NULLS LAST, p.parcel_code
             """,
@@ -288,6 +333,9 @@ def build_parcels_view_config(
     for idx, record in enumerate(records, start=1):
         acres = _num(record.get('acres_gross'))
         units = _num(record.get('units_total'))
+        # Catalogue first, the product's own name second, nothing third.
+        lot_width = (_num(record.get('product_lot_width'))
+                     or width_from_product_code(record.get('product_code')))
         scope: Dict[str, int] = {}
         if record.get('area_id') is not None:
             scope['1'] = record['area_id']
@@ -317,6 +365,10 @@ def build_parcels_view_config(
                 # Density is derived, never stored, and never typed over.
                 'dua': (round(units / acres, 2)
                         if units is not None and acres else None),
+                # Frontage. Sum(units × lot width), the platform's own
+                # definition — see the note above _PRODUCT_CODE_DIMENSIONS.
+                'front_feet': (round(lot_width * units)
+                               if lot_width and units else None),
             },
         })
 
@@ -359,6 +411,7 @@ def build_parcels_view_config(
 
     total_acres = sum(r['cells']['acres'] or 0 for r in rows)
     total_units = sum(r['cells']['units'] or 0 for r in rows)
+    total_front_feet = sum(r['cells']['front_feet'] or 0 for r in rows)
 
     return {
         'topic': 'parcels',
@@ -386,7 +439,7 @@ def build_parcels_view_config(
         # the budget's do.
         'measures': ['acres', 'parcels', 'units', 'dua'],
         'totals': {'acres': total_acres, 'units': total_units,
-                   'parcels': len(rows)},
+                   'front_feet': total_front_feet, 'parcels': len(rows)},
         'row_count': len(rows),
         'truncate_at': 12,
         'generated_at': datetime.now(timezone.utc).isoformat(),

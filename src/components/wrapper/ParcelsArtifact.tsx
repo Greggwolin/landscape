@@ -141,7 +141,7 @@ function fmtPct(value: number | null): string {
  *  one decimal three of Peoria's four villages read the same. */
 function cellText(key: string, value: string | number | null): string {
   if (key === 'dua') return fmt(value, 2);
-  if (key === 'acres' || key === 'units') return fmt(value);
+  if (key === 'acres' || key === 'units' || key === 'front_feet') return fmt(value);
   if (value === null || value === undefined || value === '') return '—';
   return String(value);
 }
@@ -208,10 +208,19 @@ export function ParcelsArtifact({
   const kpis = useMemo(() => {
     const acres = rows.reduce((s, r) => s + (Number(r.cells.acres) || 0), 0);
     const units = rows.reduce((s, r) => s + (Number(r.cells.units) || 0), 0);
+    // Frontage joins the figures across the top because it is what revenue and
+    // cost allocation are actually struck against (Gregg, 2026-08-25). Null
+    // rather than zero when nothing on screen has a stated frontage.
+    const withFeet = rows.filter((r) => r.cells.front_feet !== null
+      && r.cells.front_feet !== undefined);
+    const frontFeet = withFeet.length
+      ? withFeet.reduce((s, r) => s + (Number(r.cells.front_feet) || 0), 0)
+      : null;
     return [
       { label: 'Total acres', value: fmt(acres) },
       { label: config.title, value: fmt(rows.length) },
       { label: 'Units', value: fmt(units) },
+      { label: 'Front feet', value: fmt(frontFeet) },
       { label: 'Units / acre', value: acres ? fmt(units / acres, 2) : '—' },
     ];
   }, [rows, config.title]);
@@ -237,12 +246,22 @@ export function ParcelsArtifact({
     return Array.from(buckets.entries()).map(([label, groupRows]) => {
       const acres = groupRows.reduce((s, r) => s + (Number(r.cells.acres) || 0), 0);
       const units = groupRows.reduce((s, r) => s + (Number(r.cells.units) || 0), 0);
+      // Frontage sums like acres and units do. A group holding nothing with a
+      // stated frontage reads as a dash rather than a zero — costs get
+      // allocated off this figure, and "none" and "not established" must not
+      // look the same on the line you allocate from.
+      const withFeet = groupRows.filter((r) => r.cells.front_feet !== null
+        && r.cells.front_feet !== undefined);
+      const frontFeet = withFeet.length
+        ? withFeet.reduce((s, r) => s + (Number(r.cells.front_feet) || 0), 0)
+        : null;
       return {
         label,
         rows: groupRows,
         parcels: groupRows.length,
         acres,
         units,
+        frontFeet,
         // Share of what is on screen, not of the project. A percentage that
         // silently means something other than the rows above it is worse than
         // no percentage.
@@ -374,15 +393,13 @@ export function ParcelsArtifact({
             {r}
           </button>
         ))}
-      </div>
 
-      {/* Grouping reads as its own row, the way Village, Phase, Use and Detail
-       *  do: one label on the left, bare names in the chips. It used to trail
-       *  the detail rungs with `group:` repeated on every button, which put two
-       *  unrelated controls on one line and said the word four times.
-       *  Gregg, 2026-08-25. */}
-      <div className={styles.bar}>
-        <span className={styles.barLabel}>Group</span>
+        {/* Grouping keeps the detail row but reads as a labelled control of its
+         *  own: one "Group" label, then bare names — the way Village, Phase and
+         *  Use already read. It used to repeat `group:` on all four buttons,
+         *  which said the word four times and gave the control no heading.
+         *  Gregg, 2026-08-25: one label, same row, to the right of Detail. */}
+        <span className={styles.barLabel} style={{ marginLeft: 18 }}>Group</span>
         {config.group_options.map((g) => (
           <button key={g.value} type="button"
             className={`${styles.badge} ${grouping === g.value ? styles.badgeOn : ''}`}
@@ -415,6 +432,7 @@ export function ParcelsArtifact({
                         if (c.key === 'parcels') return <td key={c.key} className={styles.right}>{fmt(g.parcels)}</td>;
                         if (c.key === 'acres') return <td key={c.key} className={styles.right}>{fmt(g.acres)}</td>;
                         if (c.key === 'units') return <td key={c.key} className={styles.right}>{fmt(g.units)}</td>;
+                        if (c.key === 'front_feet') return <td key={c.key} className={`${styles.right} ${styles.computed}`}>{fmt(g.frontFeet)}</td>;
                         if (c.key === 'pct_acres') return <td key={c.key} className={`${styles.right} ${styles.computed}`}>{fmtPct(g.pct)}</td>;
                         return <td key={c.key} />;
                       })}

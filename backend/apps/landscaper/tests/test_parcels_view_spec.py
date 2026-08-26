@@ -17,6 +17,7 @@ from django.test import SimpleTestCase
 from apps.landscaper.tools.parcels_view_spec import (
     GROUPED_RUNG,
     RUNGS,
+    build_parcels_artifact_schema,
     build_parcels_view_config,
 )
 
@@ -41,8 +42,8 @@ def record(**kwargs):
     base = {
         'parcel_id': 1, 'parcel_code': None, 'family_name': None,
         'type_code': None, 'product_code': None, 'acres_gross': None,
-        'units_total': None, 'lot_width': None, 'lots_frontfeet': None,
-        'sale_period': None, 'area_id': None, 'area_no': None,
+        'units_total': None, 'product_lot_width': None,
+        'area_id': None, 'area_no': None,
         'phase_id': None, 'phase_no': None,
     }
     base.update(kwargs)
@@ -59,11 +60,11 @@ def build(records):
 SIX = [
     record(parcel_id=1, parcel_code='1.101', family_name='Residential',
            type_code='SFD', product_code='50x125', acres_gross=32.0,
-           units_total=128, lot_width=50.0, sale_period=26,
+           units_total=128, product_lot_width=50.0,
            area_id=8, area_no=1, phase_id=21, phase_no=1),
     record(parcel_id=2, parcel_code='1.102', family_name='Residential',
            type_code='SFD', product_code='60x125', acres_gross=25.0,
-           units_total=82, lot_width=60.0, sale_period=26,
+           units_total=82, product_lot_width=60.0,
            area_id=8, area_no=1, phase_id=21, phase_no=1),
     record(parcel_id=3, parcel_code='1.104', family_name='Mixed Use',
            type_code='MX', product_code='MU', acres_gross=26.0,
@@ -142,17 +143,17 @@ class ColumnsAndRungs(SimpleTestCase):
             self.assertNotIn('pct_acres', cfg['rung_columns'][rung])
             self.assertIn('parcel', cfg['rung_columns'][rung])
 
-    def test_product_facts_and_sale_period_are_not_on_this_table(self):
-        """Gregg ran it 2026-08-25 and named three columns that do not belong.
+    def test_stored_lot_width_and_sale_period_are_not_on_this_table(self):
+        """Gregg ran it 2026-08-25 and named columns that do not belong.
 
-        Lot width and front feet are facts about the PRODUCT — `50x125` already
-        says the lot is fifty feet wide and `res_lot_product` holds it as data,
-        so a second copy typed onto the parcel can only ever disagree with the
-        first. Sale period belongs to sales and absorption. None of the three
-        appears at any rung, and none is even offered as a hideable column.
+        Lot width is a fact about the PRODUCT — `50x125` already says the lot is
+        fifty feet wide and `res_lot_product` holds it as data, so a second copy
+        typed onto the parcel can only ever disagree with the first. Sale period
+        belongs to sales and absorption. Neither appears at any rung, and
+        neither is even offered as a hideable column.
         """
         cfg = build(SIX)
-        for key in ('lot_width', 'front_feet', 'sale_period'):
+        for key in ('lot_width', 'sale_period'):
             for rung in RUNGS:
                 self.assertNotIn(key, cfg['rung_columns'][rung])
             self.assertNotIn(key, {c['key'] for c in cfg['columns']})
@@ -162,13 +163,13 @@ class ColumnsAndRungs(SimpleTestCase):
 
     def test_nothing_is_hidden_behind_a_footnote_any_more(self):
         """The "Not shown: Front feet — no parcel carries one" line read as a
-        data gap when it was a modelling one. With the column gone there is
-        nothing to explain, so the footnote must not render at all."""
+        data gap when it was a modelling one. Front feet is computed now and
+        always shows, so there is nothing left to explain."""
         self.assertEqual(build(SIX)['optional_columns'], [])
 
     def test_units_is_never_dropped_even_when_every_parcel_has_none(self):
         """Zero units on commercial land is a fact about the plan, not a gap in
-        it, and units is one of the four figures across the top."""
+        it, and units is one of the figures across the top."""
         rows = [record(parcel_id=1, parcel_code='a', acres_gross=5.0,
                        units_total=0, family_name='Commercial',
                        area_id=8, area_no=1)]
@@ -192,6 +193,76 @@ class ColumnsAndRungs(SimpleTestCase):
         self.assertIn('block', group_labels)
 
 
+class FrontFeet(SimpleTestCase):
+    """Frontage is computed, never stored and never typed into.
+
+    "Front feet is a computed value and it's probably the most critical field
+    for calculating revenues and allocating costs" — Gregg, 2026-08-25. The
+    definition is the platform's own: units × lot width.
+    """
+
+    def test_it_is_units_times_the_catalogued_product_width(self):
+        rows = build([record(parcel_id=1, parcel_code='1.101',
+                             product_code='50x125', product_lot_width=50.0,
+                             acres_gross=32.0, units_total=128,
+                             area_id=8, area_no=1)])['rows']
+        self.assertEqual(rows[0]['cells']['front_feet'], 6400)
+
+    def test_the_product_name_is_read_when_the_catalogue_has_no_row(self):
+        """`35x95` and `40x100` are on project 9 and absent from
+        `res_lot_product`. The code states the width; reading it is reading a
+        datum, not inventing one."""
+        rows = build([record(parcel_id=1, parcel_code='a', product_code='35x95',
+                             product_lot_width=None, acres_gross=16.0,
+                             units_total=120, area_id=8, area_no=1)])['rows']
+        self.assertEqual(rows[0]['cells']['front_feet'], 4200)
+
+    def test_the_catalogue_wins_over_the_name(self):
+        """A name can go stale; a catalogue row is the correctable copy."""
+        rows = build([record(parcel_id=1, parcel_code='a', product_code='50x125',
+                             product_lot_width=48.0, acres_gross=10.0,
+                             units_total=100, area_id=8, area_no=1)])['rows']
+        self.assertEqual(rows[0]['cells']['front_feet'], 4800)
+
+    def test_no_width_anywhere_is_none_and_never_zero(self):
+        """Apartments, commercial, open space and the "pack" products have no
+        stated frontage. A parcel with no frontage and a parcel whose frontage
+        nobody has established are different facts, and costs are allocated off
+        this column."""
+        for code in ('APTS', 'OS', '6/6Pack', 'Townhomes', None):
+            rows = build([record(parcel_id=1, parcel_code='a',
+                                 product_code=code, product_lot_width=None,
+                                 acres_gross=19.0, units_total=380,
+                                 area_id=8, area_no=1)])['rows']
+            self.assertIsNone(rows[0]['cells']['front_feet'], code)
+
+    def test_no_lots_means_no_frontage(self):
+        rows = build([record(parcel_id=1, parcel_code='a', product_code='50x125',
+                             product_lot_width=50.0, acres_gross=40.0,
+                             units_total=0, area_id=8, area_no=1)])['rows']
+        self.assertIsNone(rows[0]['cells']['front_feet'])
+
+    def test_it_is_on_every_parcel_rung_and_on_the_summary_line(self):
+        cfg = build(SIX)
+        for rung in RUNGS:
+            self.assertIn('front_feet', cfg['rung_columns'][rung])
+        self.assertEqual(
+            next(c for c in cfg['columns'] if c['key'] == 'front_feet')['kind'],
+            'computed')
+
+    def test_it_can_never_be_typed_into(self):
+        """Computed values are not writable anywhere, and the pointer IS the
+        permission — so the absence of a ref is the enforcement."""
+        schema = build_parcels_artifact_schema(build(SIX), SIX)
+        refs = schema['blocks'][0]['rows'][0]['cell_source_refs']
+        self.assertNotIn('front_feet', refs)
+
+    def test_the_total_sums_the_parcels(self):
+        cfg = build(SIX)
+        expected = sum(r['cells']['front_feet'] or 0 for r in cfg['rows'])
+        self.assertEqual(cfg['totals']['front_feet'], expected)
+
+
 class EmptyProject(SimpleTestCase):
 
     def test_a_project_with_no_parcels_produces_a_usable_specification(self):
@@ -199,7 +270,8 @@ class EmptyProject(SimpleTestCase):
         an empty table with its chips, not throw."""
         cfg = build([])
         self.assertEqual(cfg['row_count'], 0)
-        self.assertEqual(cfg['totals'], {'acres': 0, 'units': 0, 'parcels': 0})
+        self.assertEqual(cfg['totals'],
+                         {'acres': 0, 'units': 0, 'front_feet': 0, 'parcels': 0})
         self.assertTrue(cfg['rung_columns']['summary'])
         self.assertEqual(len(cfg['levels'][0]['members']), 2)
 
