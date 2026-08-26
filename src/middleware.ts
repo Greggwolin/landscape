@@ -9,6 +9,35 @@ import { UI_MODE_COOKIE } from '@/lib/uiMode';
 const LEGACY_PROJECT_BASE = /^\/projects\/(\d+)\/?$/;
 const UNIFIED_PROJECT_BASE = /^\/w\/projects\/(\d+)\/?$/;
 
+// ─────────────────────────────────────────────────────────────────────────
+// THROWAWAY BRANCH ONLY — DO NOT MERGE THIS FILE'S CHANGE.
+//
+// Gregg asked for a preview he could open without signing in, to review the
+// parcels table (2026-08-26). This lets the sign-in step be skipped, and it is
+// deliberately built so it CANNOT take effect anywhere else:
+//
+//   * it requires a Vercel PREVIEW deployment — never production, never local;
+//   * AND it requires the deployment to be built from this one named branch.
+//
+// Both conditions read from Vercel's own build environment, which the client
+// cannot influence. If this change were ever merged to the main line, the ref
+// would no longer match and it would do nothing — the guard fails closed
+// rather than open. That is the point of naming the branch here rather than
+// using a plain "is this a preview" flag: previews are public URLs pointed at
+// a copy of real project data, and a bypass that applied to all of them would
+// be an open door.
+//
+// This branch exists to be looked at and deleted.
+// ─────────────────────────────────────────────────────────────────────────
+const THROWAWAY_PREVIEW_REF = 'throwaway/preview-no-login-0826';
+
+function isThrowawayPreview(): boolean {
+  return (
+    process.env.VERCEL_ENV === 'preview' &&
+    process.env.VERCEL_GIT_COMMIT_REF === THROWAWAY_PREVIEW_REF
+  );
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -36,6 +65,12 @@ export function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token_exists');
 
   if (!authToken) {
+    // THROWAWAY BRANCH ONLY — see the note at the top of this file.
+    if (isThrowawayPreview()) {
+      const res = NextResponse.next();
+      res.cookies.set('auth_token_exists', '1', { path: '/', sameSite: 'lax' });
+      return res;
+    }
     // Redirect to login with return URL
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
