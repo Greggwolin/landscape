@@ -1335,11 +1335,64 @@ def _coerce_sale_date(raw_value):
 # closes the write path rather than merely hiding the column.
 _EDITABLE_PARCEL_CELL_COLUMNS = {
     'acres_gross', 'units_total',
+    # The land-use picklists (2026-08-26). Words, not numbers.
+    'family_name', 'type_code', 'product_code',
 }
 
 # Which of those are whole numbers. Acres is not — a parcel is 32.4 acres, and
 # rounding it would quietly change the plan.
 _INTEGER_PARCEL_COLUMNS = {'units_total'}
+
+# The picklist columns, and the catalogue each one is answerable to.
+#
+# tbl_parcel holds these as plain text with no foreign key, so nothing in the
+# database would stop `product_code` becoming "asdf" — and front feet, which is
+# derived by looking the product up, would silently go blank for that parcel.
+# The dropdown constrains what a person can pick; this constrains what the
+# server will accept, because the dropdown is not the gate.
+_PARCEL_PICKLIST_SOURCES = {
+    'family_name': 'SELECT 1 FROM landscape.lu_family WHERE name = %s AND active',
+    'type_code': 'SELECT 1 FROM landscape.lu_type WHERE code = %s AND active',
+    'product_code': 'SELECT 1 FROM landscape.res_lot_product WHERE code = %s AND is_active',
+}
+
+
+def _coerce_parcel_number(column, raw_value):
+    """A parcel's numeric cell value, or a rejection dict.
+
+    Blank clears — see the note in ``_write_parcel_cell`` on why an empty acre
+    count is stored as NULL rather than zero.
+    """
+    if raw_value is None or str(raw_value).strip() == '':
+        return None
+    # Commas and stray spaces are how people type numbers; a currency symbol is
+    # not, on a parcel table, so it is not stripped and lands as an error the
+    # user can see.
+    text = str(raw_value).replace(',', '').strip()
+    try:
+        coerced = float(text)
+    except (TypeError, ValueError):
+        return {
+            'success': False,
+            'error': 'invalid_value',
+            'detail': f'{raw_value!r} is not a number.',
+            'suggested_user_question': (
+                f'I could not read {raw_value!r} as a number — what should '
+                'that value be?'
+            ),
+        }
+    if coerced < 0:
+        return {'success': False, 'error': 'invalid_value',
+                'detail': 'a parcel cannot hold a negative value here.'}
+    if column in _INTEGER_PARCEL_COLUMNS:
+        if coerced != int(coerced):
+            return {
+                'success': False,
+                'error': 'invalid_value',
+                'detail': f'{column} is a whole number; got {coerced}.',
+            }
+        coerced = int(coerced)
+    return coerced
 
 
 def _write_parcel_cell(*, project_id, parcel_id, column, raw_value, user_id=None):
@@ -1375,36 +1428,34 @@ def _write_parcel_cell(*, project_id, parcel_id, column, raw_value, user_id=None
         return {'success': False, 'error': 'invalid_row_id',
                 'detail': f'parcel_id must be an integer; got {parcel_id!r}'}
 
-    # Blank clears. Anything else must be a number.
-    coerced = None
-    if raw_value is not None and str(raw_value).strip() != '':
-        # Commas and stray spaces are how people type numbers; a currency
-        # symbol is not, on a parcel table, so it is not stripped and lands as
-        # an error the user can see.
-        text = str(raw_value).replace(',', '').strip()
-        try:
-            coerced = float(text)
-        except (TypeError, ValueError):
-            return {
-                'success': False,
-                'error': 'invalid_value',
-                'detail': f'{raw_value!r} is not a number.',
-                'suggested_user_question': (
-                    f'I could not read {raw_value!r} as a number — what should '
-                    'that value be?'
-                ),
-            }
-        if coerced < 0:
-            return {'success': False, 'error': 'invalid_value',
-                    'detail': 'a parcel cannot hold a negative value here.'}
-        if column in _INTEGER_PARCEL_COLUMNS:
-            if coerced != int(coerced):
-                return {
-                    'success': False,
-                    'error': 'invalid_value',
-                    'detail': f'{column} is a whole number; got {coerced}.',
-                }
-            coerced = int(coerced)
+    # A picklist column holds a word. Blank clears it; anything else has to be
+    # a live entry in the catalogue behind that column. Falls through to the
+    # same ownership check and the same UPDATE as a number does — one write
+    # path, so the project check cannot be skipped on one branch and not the
+    # other.
+    if column in _PARCEL_PICKLIST_SOURCES:
+        from django.db import connection as _pconn
+        chosen = None if raw_value is None else str(raw_value).strip()
+        if chosen:
+            with _pconn.cursor() as cursor:
+                cursor.execute(_PARCEL_PICKLIST_SOURCES[column], [chosen])
+                if cursor.fetchone() is None:
+                    return {
+                        'success': False,
+                        'error': 'invalid_value',
+                        'detail': (
+                            f'{chosen!r} is not an active entry for {column}.'
+                        ),
+                        'suggested_user_question': (
+                            f'{chosen!r} is not in the land-use catalogue — '
+                            'should it be added there first?'
+                        ),
+                    }
+        coerced = chosen or None
+    else:
+        coerced = _coerce_parcel_number(column, raw_value)
+        if isinstance(coerced, dict):  # a rejection, not a value
+            return coerced
 
     from django.db import connection as _conn
     with _conn.cursor() as cursor:

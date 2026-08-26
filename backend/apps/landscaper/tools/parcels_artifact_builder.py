@@ -68,6 +68,7 @@ def build_parcels_payload(project_id: int) -> Dict[str, Any]:
     from .parcels_view_spec import (
         build_parcels_artifact_schema,
         build_parcels_view_config,
+        fetch_landuse_options,
         fetch_level_labels,
         fetch_levels,
         fetch_parcel_records,
@@ -82,6 +83,9 @@ def build_parcels_payload(project_id: int) -> Dict[str, Any]:
         records=records,
         levels=fetch_levels(project_id, labels),
         labels=labels,
+        # Read live, like the chips are, so a product added to the catalogue is
+        # offered on the next open without anything being rebuilt.
+        options=fetch_landuse_options(),
     )
     # The two halves are built from the SAME records in the same order, which is
     # what lets a rendered cell be matched to its source row by position. Build

@@ -298,17 +298,46 @@ class TheWriteAllowlist(SimpleTestCase):
         self.assertEqual([r['id'] for r in cfg['rows']],
                          [r['id'] for r in block['rows']])
 
-    def test_only_the_two_plain_values_carry_a_pointer(self):
+    def test_the_values_and_the_picklists_carry_a_pointer(self):
         block = self.schema()['blocks'][0]
         refs = block['rows'][0]['cell_source_refs']
-        self.assertEqual(set(refs), {'acres', 'units'})
-        # The ones deliberately left out of this slice, the one that can never
-        # be writable anywhere, and the three that came off the table on
-        # 2026-08-25. A pointer IS the write permission, so their absence here
-        # is what makes them read-only rather than merely hidden.
-        for key in ('family', 'type', 'product', 'level1', 'level2',
-                    'parcel', 'dua', 'lot_width', 'front_feet', 'sale_period'):
+        self.assertEqual(set(refs), {'acres', 'units', 'family', 'type', 'product'})
+        # What still cannot be written: the two that MOVE a parcel between
+        # containers, the number derived from where it sits, the two computed
+        # figures, and the columns that came off the table entirely. A pointer
+        # IS the write permission, so their absence here is the enforcement.
+        for key in ('level1', 'level2', 'parcel', 'dua', 'front_feet',
+                    'lot_width', 'sale_period'):
             self.assertNotIn(key, refs)
+
+    def test_a_picklist_captures_the_word_it_was_showing(self):
+        """captured_value is compared against what is stored before a write.
+        Run through the numeric coercion these would capture None, and the
+        second edit to any picklist would be refused as out of date."""
+        block = self.schema()['blocks'][0]
+        refs = block['rows'][0]['cell_source_refs']
+        self.assertEqual(refs['family']['captured_value'], 'Residential')
+        self.assertEqual(refs['type']['captured_value'], 'SFD')
+        self.assertEqual(refs['product']['captured_value'], '50x125')
+        self.assertEqual(refs['family']['column'], 'family_name')
+        self.assertEqual(refs['type']['column'], 'type_code')
+        self.assertEqual(refs['product']['column'], 'product_code')
+
+    def test_choices_ride_on_the_column_when_they_are_supplied(self):
+        cfg = build_parcels_view_config(
+            project_id=9, project_name='Peoria Meadows', records=SIX,
+            levels=LEVELS, labels=LABELS,
+            options={'family': [{'value': 'Residential', 'label': 'Residential'}],
+                     'type': [{'value': 'SFD', 'label': 'Single Family - Detached',
+                               'parent': 'Residential'}]},
+        )
+        by_key = {c['key']: c for c in cfg['columns']}
+        self.assertEqual(by_key['family']['options'][0]['value'], 'Residential')
+        self.assertEqual(by_key['type']['options'][0]['parent'], 'Residential')
+        # A column with no choices supplied stays a plain cell rather than
+        # rendering an empty dropdown.
+        self.assertNotIn('options', by_key['acres'])
+        self.assertNotIn('options', by_key['product'])
 
     def test_every_pointer_names_a_declared_column(self):
         """The validator rejects a pointer aimed at a column the block does not

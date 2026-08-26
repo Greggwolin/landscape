@@ -65,6 +65,11 @@ export interface ParcelsColumn {
   label: string | null;
   align?: 'left' | 'right' | 'center';
   kind?: string;
+  /* Choices ride on the column, the way the budget's do — the server reads the
+   * table that constrains the value, so the renderer never invents a list.
+   * `parent` is the PARENT'S STORED VALUE, not an id: a parcel holds its type
+   * as a code and its family as a name, and narrowing compares against those. */
+  options?: Array<{ value: string | number; label: string; parent?: string | null }>;
 }
 export interface ParcelsRow {
   id: string;
@@ -224,6 +229,41 @@ export function ParcelsArtifact({
       { label: 'Units / acre', value: acres ? fmt(units / acres, 2) : '—' },
     ];
   }, [rows, config.title]);
+
+  /* The choices for a picklist cell, narrowed by what the row already holds.
+   *
+   * Type narrows by the row's family and product by the row's type, which is
+   * how the classic screen behaves and how the budget's own picker behaves.
+   *
+   * NEVER STRAND A ROW. Where the row's current value matches no option —
+   * project 9 has parcels whose family reads "Open Space", which the taxonomy
+   * does not carry — narrowing would leave an empty dropdown, and an empty
+   * dropdown is indistinguishable from a broken one. In that case the full
+   * list is offered instead: a convenience that removes every choice is worse
+   * than no convenience. */
+  const optionsFor = React.useCallback(
+    (column: ParcelsColumn, row: ParcelsRow): Array<{ value: string; label: string }> | null => {
+      const all = column.options;
+      if (!all?.length) return null;
+      const parentKey = column.key === 'type' ? 'family'
+        : column.key === 'product' ? 'type' : null;
+      if (!parentKey) return all.map((o) => ({ value: String(o.value), label: o.label }));
+
+      const parentValue = row.cells[parentKey];
+      if (parentValue === null || parentValue === undefined || parentValue === '') {
+        return all.map((o) => ({ value: String(o.value), label: o.label }));
+      }
+      const narrowed = all.filter((o) => String(o.parent ?? '') === String(parentValue));
+      const usable = narrowed.length ? narrowed : all;
+      // One product can sit under several types, so the same code can appear
+      // twice once the parent filter is off. Show it once.
+      const seen = new Set<string>();
+      return usable
+        .filter((o) => (seen.has(String(o.value)) ? false : seen.add(String(o.value))))
+        .map((o) => ({ value: String(o.value), label: o.label }));
+    },
+    [],
+  );
 
   /* Which bucket a parcel falls in. A useCallback rather than a plain function
    * so the grouping below depends on it honestly — it changes with `grouping`
@@ -460,6 +500,37 @@ export function ParcelsArtifact({
                             const committed = row.cells[c.key] ?? null;
                             const shown = staged ? staged.value : cellText(c.key, committed);
                             const empty = !staged && shown === '—';
+
+                            const choices = optionsFor(c, row);
+
+                            if (target && editing === key && choices) {
+                              return (
+                                <td key={c.key} className={align(c)}>
+                                  <select
+                                    className={styles.cellInput}
+                                    autoFocus
+                                    defaultValue={
+                                      staged ? staged.value
+                                        : (committed === null || committed === undefined ? '' : String(committed))
+                                    }
+                                    onChange={(e) => {
+                                      edits.stageEdit(target.cellPath, e.target.value,
+                                                      committed, target.expectedRef);
+                                      setEditing(null);
+                                    }}
+                                    onBlur={() => setEditing(null)}
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null); }}>
+                                    {/* A cell can be empty today; without this the
+                                      * dropdown would show the first choice as
+                                      * though it were the stored value. */}
+                                    <option value="">—</option>
+                                    {choices.map((o) => (
+                                      <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              );
+                            }
 
                             if (target && editing === key) {
                               return (

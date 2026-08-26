@@ -209,14 +209,32 @@ _DROPPABLE: tuple = ()
 #   parcel — derived from where the parcel sits whenever it sits somewhere
 #     (Gregg, 25 Aug). Typeable only on a project with no level 1 and no level 2,
 #     which is not project 9 and not this slice.
-#   dua — computed. Never writable anywhere.
-#   lot_width / front_feet / sale_period — no longer on this table at all.
-_EDITABLE_PARCEL_CELLS = ('acres', 'units')
+#   level1 / level2 — changing these MOVES a parcel between containers. Still
+#     out: it is a different operation from editing a value.
+#   parcel — derived from where the parcel sits whenever it sits somewhere.
+#   dua / front_feet — computed. Never writable anywhere.
+#   lot_width / sale_period — no longer on this table at all.
+#
+# FAMILY, TYPE AND PRODUCT ARE IN AS OF 2026-08-26, and the reason they were
+# out was wrong. The note here used to say a picker where each field narrows
+# the next is "new machinery rather than another column". It is not: the
+# budget's own renderer has carried exactly that since CB10 — choices on the
+# column, narrowing by parent, a label shown for a stored code — and the whole
+# point of this table was to be editable the way the budget is. Reusing it was
+# always the smaller job than deferring it.
+_EDITABLE_PARCEL_CELLS = ('acres', 'units', 'family', 'type', 'product')
 
 _PARCEL_CELL_TO_COLUMN = {
     'acres': 'acres_gross',
     'units': 'units_total',
+    'family': 'family_name',
+    'type': 'type_code',
+    'product': 'product_code',
 }
+
+# The three that hold words rather than numbers. The writer coerces everything
+# else to a number, so a column missing from here would reject "Residential".
+TEXT_PARCEL_CELLS = ('family', 'type', 'product')
 
 
 def _num(value: Any) -> Optional[float]:
@@ -281,6 +299,50 @@ def fetch_parcel_records(project_id: int) -> List[Dict[str, Any]]:
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
+def fetch_landuse_options() -> Dict[str, List[Dict[str, Any]]]:
+    """The choices behind the Family, Type and Product cells.
+
+    Read live from the taxonomy on every open, so a product added in the
+    catalogue is offered here without anything being regenerated.
+
+    THE VALUE IS WHAT THE PARCEL STORES, not the catalogue's primary key.
+    ``tbl_parcel`` holds the family's NAME, the type's CODE and the product's
+    CODE as plain text, so those are what a selection has to write back. The
+    ``parent`` on each option is the parent's stored value for the same reason
+    — the renderer narrows by comparing against the row's current cell, and a
+    numeric id would never match the text sitting in it.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT name FROM landscape.lu_family WHERE active ORDER BY name')
+        families = [{'value': r[0], 'label': r[0]} for r in cursor.fetchall()]
+
+        cursor.execute(
+            'SELECT t.code, t.name, f.name '
+            '  FROM landscape.lu_type t '
+            '  JOIN landscape.lu_family f ON f.family_id = t.family_id '
+            ' WHERE t.active ORDER BY f.name, t.ord, t.code')
+        types = [{'value': r[0], 'label': r[1] or r[0], 'parent': r[2]}
+                 for r in cursor.fetchall()]
+
+        # A product reaches its type through the junction table, and can sit
+        # under more than one — 40x115 is offered for both detached and
+        # build-to-rent. One option row per pairing, so narrowing by either
+        # type finds it.
+        cursor.execute(
+            'SELECT DISTINCT p.code, t.code '
+            '  FROM landscape.res_lot_product p '
+            '  JOIN landscape.type_lot_product j ON j.product_id = p.product_id '
+            '  JOIN landscape.lu_type t ON t.type_id = j.type_id '
+            ' WHERE p.is_active AND t.active ORDER BY p.code')
+        products = [{'value': r[0], 'label': r[0], 'parent': r[1]}
+                    for r in cursor.fetchall()]
+
+    return {'family': families, 'type': types, 'product': products}
+
+
 def fetch_levels(project_id: int, labels: Dict[int, str]) -> List[Dict[str, Any]]:
     """The chip rows: villages, and the phases under them.
 
@@ -335,6 +397,7 @@ def build_parcels_view_config(
     records: List[Dict[str, Any]],
     levels: List[Dict[str, Any]],
     labels: Dict[int, str],
+    options: Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
     """The parcels artifact's view specification.
 
@@ -423,8 +486,14 @@ def build_parcels_view_config(
             label = labels[2]
         elif key == 'parcel':
             label = labels[3]
-        columns.append({'key': key, 'label': label,
-                        'align': meta['align'], 'kind': meta['kind']})
+        column: Dict[str, Any] = {'key': key, 'label': label,
+                                  'align': meta['align'], 'kind': meta['kind']}
+        # Choices ride on the column, the way the budget's do. Absent options
+        # leave the cell a text field rather than an empty dropdown.
+        choices = (options or {}).get(key)
+        if choices:
+            column['options'] = choices
+        columns.append(column)
 
     total_acres = sum(r['cells']['acres'] or 0 for r in rows)
     total_units = sum(r['cells']['units'] or 0 for r in rows)
@@ -503,12 +572,18 @@ def build_parcels_artifact_schema(
         if parcel_id is not None:
             for cell_key in _EDITABLE_PARCEL_CELLS:
                 column = _PARCEL_CELL_TO_COLUMN[cell_key]
+                # A word cell captures the word. Passing it through _num would
+                # capture None for every one of them, and the stale-cell guard
+                # compares this against what is stored — so every second edit
+                # to a picklist would be refused as out of date.
+                raw = record.get(column)
+                captured = (raw if cell_key in TEXT_PARCEL_CELLS else _num(raw))
                 refs[cell_key] = {
                     'table': 'tbl_parcel',
                     'row_id': parcel_id,
                     'column': column,
                     'captured_at': captured_at,
-                    'captured_value': _num(record.get(column)),
+                    'captured_value': captured,
                 }
         rows.append({
             'id': row['id'],
