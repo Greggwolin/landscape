@@ -101,7 +101,14 @@ export async function POST(request: NextRequest) {
       )
     `
 
-    // 3. Create project settings with defaults
+    // 3. Create project settings.
+    // global_inflation_rate starts NULL, not 0.03. Inflation is a user input --
+    // typed, picked from the benchmark list, or fetched on request by Landscaper --
+    // and is never seeded by the app (Gregg, 2026-09-04). A pre-filled number the
+    // user never chose is indistinguishable downstream from one they did. The
+    // intended future path to a pre-filled value is user-savable project templates
+    // carrying whatever base assumptions that user wants.
+    // discount_rate starts NULL for the same reason, on the same instruction.
     await sql`
       INSERT INTO landscape.tbl_project_settings (
         project_id,
@@ -118,12 +125,12 @@ export async function POST(request: NextRequest) {
         ${projectId},
         'USD',
         'monthly',
-        0.03,
+        NULL,
         NULL,
         NULL,
         ${body.startDate ?? null},
         NULL,
-        0.10
+        NULL
       )
     `
 
