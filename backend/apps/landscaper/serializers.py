@@ -263,6 +263,27 @@ class VarianceItemSerializer(serializers.Serializer):
     notes = serializers.CharField(allow_null=True)
 
 
+class UnavailableVarianceSerializer(serializers.Serializer):
+    """
+    Serializer for advice that cannot be compared to an actual.
+
+    Carries no actual_value and no variance_percent on purpose: the project
+    has no recorded figure for the key (or the suggestion was zero, making a
+    percentage undefined). `reason` lets the caller tell the user the
+    comparison is unavailable instead of implying the project is on plan.
+    """
+
+    assumption_key = serializers.CharField()
+    lifecycle_stage = serializers.CharField()
+    suggested_value = serializers.DecimalField(max_digits=15, decimal_places=4)
+    confidence_level = serializers.CharField()
+    advice_date = serializers.DateTimeField()
+    notes = serializers.CharField(allow_null=True)
+    reason = serializers.ChoiceField(
+        choices=['no_actual_recorded', 'suggested_value_zero']
+    )
+
+
 class ActivityItemSerializer(serializers.ModelSerializer):
     """Serializer for ActivityItem model."""
 
