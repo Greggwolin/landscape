@@ -15584,10 +15584,22 @@ def analyze_loss_to_lease(
             if response.get('rent_control') and response['rent_control'].get('rent_control_status', {}).get('is_rent_controlled'):
                 rc_status = response['rent_control']['rent_control_status']
                 rc_impact = response['rent_control'].get('recovery_impact', {})
-                response['narrative'] += (
-                    f" WARNING: Property is subject to {rc_status.get('ordinance_name', 'rent control')} "
-                    f"(max {(rc_status.get('max_annual_increase') or 0) * 100:.0f}% annual increase). "
-                )
+                rc_cap = rc_status.get('max_annual_increase')
+                ordinance = rc_status.get('ordinance_name') or 'rent control'
+                if rc_cap is not None:
+                    # Only state a cap that came from the jurisdiction record.
+                    response['narrative'] += (
+                        f" WARNING: Property is subject to {ordinance} "
+                        f"(max {rc_cap * 100:.0f}% annual increase per jurisdiction record). "
+                    )
+                else:
+                    # Cap unknown — say so. Never imply a limit we do not have.
+                    response['narrative'] += (
+                        f" WARNING: Property is subject to {ordinance}, but the maximum "
+                        f"allowable annual increase is not on record, so LTL recovery "
+                        f"cannot be quantified. Confirm the applicable cap against the "
+                        f"governing ordinance. "
+                    )
                 if rc_impact.get('years_to_full_recovery'):
                     response['narrative'] += f"Est. {rc_impact['years_to_full_recovery']:.1f} years to full LTL recovery."
         else:
