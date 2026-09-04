@@ -45,6 +45,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      # Mirrors the same step in preview.yml. Cheap, dependency-free, and fails
+      # in seconds if a change would have the app supply a financial assumption
+      # the user never chose.
+      - name: Assumption-defaults guard
+        run: npm run guard:assumptions
+
       - name: Lint
         run: |
           npm run lint

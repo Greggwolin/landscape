@@ -177,6 +177,13 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
+      # Runs before lint and build deliberately: it needs no dependencies of its
+      # own and fails in seconds, so a new invented assumption is reported before
+      # five minutes of build time. See the script header for what it enforces
+      # and why it is a ratchet rather than a rule.
+      - name: Assumption-defaults guard
+        run: npm run guard:assumptions
+
       - name: Lint
         run: npm run lint
 
