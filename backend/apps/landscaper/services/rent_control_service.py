@@ -110,6 +110,19 @@ class RentControlImpact:
         }
 
 
+def _jurisdiction_label(status: RentControlStatus) -> str:
+    """Human-readable jurisdiction for 'we need this from you' messages."""
+    city = (status.jurisdiction_city or '').strip()
+    state = (status.jurisdiction_state or '').strip()
+    if city and state:
+        return f'{city.title()}, {state}'
+    if city:
+        return city.title()
+    if state:
+        return state
+    return 'this jurisdiction'
+
+
 class RentControlService:
     """
     Service for rent control awareness in underwriting.
@@ -249,59 +262,78 @@ class RentControlService:
                 notes='No rent control - LTL can be fully recovered when leases expire.',
             )
 
-        if status.allows_vacancy_decontrol:
-            # With vacancy decontrol, can recover LTL on turnover
-            # But existing tenants are capped
-            max_increase = status.max_annual_increase or Decimal('0.05')
-            annual_rent = total_current_rent * 12
+        max_increase = status.max_annual_increase
 
-            # How much can we recover per year from existing tenants?
-            max_annual_recovery = annual_rent * max_increase
-
-            # How many years to fully recover LTL (from existing tenants)?
-            if max_annual_recovery > 0:
-                years_to_recover = float(annual_loss_to_lease / max_annual_recovery)
-            else:
-                years_to_recover = None
-
-            # How much LTL remains unrealized in Year 1?
-            year1_recovery = min(max_annual_recovery, annual_loss_to_lease)
-            unrealized_year1 = annual_loss_to_lease - year1_recovery
-
+        if max_increase is None:
+            # The jurisdiction is rent controlled but no allowable-increase figure is
+            # on record. Do NOT substitute one. A guessed cap would be reported to the
+            # user as though it were the statutory limit AND would silently drive the
+            # recovery figures below. Return the analysis as unavailable and name what
+            # is needed to complete it.
             return RentControlImpact(
                 has_impact=True,
-                max_annual_increase=max_increase,
-                years_to_full_recovery=years_to_recover,
-                annual_recovery_potential=max_annual_recovery,
-                unrealized_ltl_year1=unrealized_year1,
-                notes=f'Rent increases capped at {max_increase * 100:.0f}% annually for existing tenants. '
-                      f'Can raise to market on turnover (vacancy decontrol). '
-                      f'Est. {years_to_recover:.1f} years to fully recover LTL if no turnover.',
+                max_annual_increase=None,
+                years_to_full_recovery=None,
+                annual_recovery_potential=None,
+                unrealized_ltl_year1=None,
+                notes=(
+                    f'Subject to {status.ordinance_name or "rent control"}, but the maximum '
+                    f'allowable annual increase is not on record for '
+                    f'{_jurisdiction_label(status)}. Loss to Lease recovery cannot be '
+                    f'quantified without it — this analysis is unavailable until the '
+                    f'current allowable increase is confirmed against the governing '
+                    f'ordinance and entered for this project.'
+                ),
+            )
+
+        annual_rent = total_current_rent * 12
+
+        # How much can be recovered per year from existing tenants?
+        max_annual_recovery = annual_rent * max_increase
+
+        # How many years to fully recover LTL (from existing tenants)?
+        if max_annual_recovery > 0:
+            years_to_recover = float(annual_loss_to_lease / max_annual_recovery)
+        else:
+            years_to_recover = None
+
+        # How much LTL remains unrealized in Year 1?
+        year1_recovery = min(max_annual_recovery, annual_loss_to_lease)
+        unrealized_year1 = annual_loss_to_lease - year1_recovery
+
+        cap_clause = (
+            f'Per the {status.ordinance_name} record on file, rent increases are capped '
+            f'at {max_increase * 100:.0f}% annually for existing tenants. '
+            if status.ordinance_name
+            else f'Per the jurisdiction record on file, rent increases are capped at '
+                 f'{max_increase * 100:.0f}% annually for existing tenants. '
+        )
+
+        if status.allows_vacancy_decontrol:
+            notes = cap_clause + 'Can raise to market on turnover (vacancy decontrol). '
+            recovery_clause = (
+                f'Est. {years_to_recover:.1f} years to fully recover LTL if no turnover.'
+                if years_to_recover is not None
+                else 'Years to full recovery not calculable from the current rent roll.'
             )
         else:
-            # No vacancy decontrol - recovery severely constrained
-            max_increase = status.max_annual_increase or Decimal('0.03')
-            annual_rent = total_current_rent * 12
-            max_annual_recovery = annual_rent * max_increase
-
-            if max_annual_recovery > 0:
-                years_to_recover = float(annual_loss_to_lease / max_annual_recovery)
-            else:
-                years_to_recover = None
-
-            year1_recovery = min(max_annual_recovery, annual_loss_to_lease)
-            unrealized_year1 = annual_loss_to_lease - year1_recovery
-
-            return RentControlImpact(
-                has_impact=True,
-                max_annual_increase=max_increase,
-                years_to_full_recovery=years_to_recover,
-                annual_recovery_potential=max_annual_recovery,
-                unrealized_ltl_year1=unrealized_year1,
-                notes=f'Strict rent control: {max_increase * 100:.0f}% cap with no vacancy decontrol. '
-                      f'LTL recovery constrained even on turnover. '
-                      f'Est. {years_to_recover:.1f} years to fully recover LTL.',
+            notes = cap_clause + (
+                'No vacancy decontrol — LTL recovery constrained even on turnover. '
             )
+            recovery_clause = (
+                f'Est. {years_to_recover:.1f} years to fully recover LTL.'
+                if years_to_recover is not None
+                else 'Years to full recovery not calculable from the current rent roll.'
+            )
+
+        return RentControlImpact(
+            has_impact=True,
+            max_annual_increase=max_increase,
+            years_to_full_recovery=years_to_recover,
+            annual_recovery_potential=max_annual_recovery,
+            unrealized_ltl_year1=unrealized_year1,
+            notes=notes + recovery_clause,
+        )
 
     def _get_property_data(self) -> Dict[str, Any]:
         """Get property data from database."""
@@ -356,10 +388,22 @@ def format_rent_control_summary(
                 "Loss to Lease can be fully recovered when leases expire.",
             ])
     else:
+        if status.max_annual_increase is not None:
+            cap_line = (
+                f"**Max Annual Increase:** {status.max_annual_increase * 100:.1f}% "
+                f"(per jurisdiction record)"
+            )
+        else:
+            # Never assert a cap we do not have. Say it is unknown and name the input.
+            cap_line = (
+                "**Max Annual Increase:** Not on record — confirm the current allowable "
+                f"increase for {_jurisdiction_label(status)} against the governing ordinance."
+            )
+
         lines.extend([
             f"**Status:** Subject to rent control",
-            f"**Ordinance:** {status.ordinance_name}",
-            f"**Max Annual Increase:** {status.max_annual_increase * 100:.1f}%",
+            f"**Ordinance:** {status.ordinance_name or 'Not on record'}",
+            cap_line,
             f"**Vacancy Decontrol:** {'Yes' if status.allows_vacancy_decontrol else 'No'}",
         ])
 
@@ -367,12 +411,28 @@ def format_rent_control_summary(
             lines.extend(["", status.notes])
 
         if impact and impact.has_impact:
-            lines.extend([
-                "",
-                "### Impact on Loss to Lease Recovery",
-                f"- Max recoverable per year: ${impact.annual_recovery_potential:,.0f}",
-                f"- LTL not recoverable in Year 1: ${impact.unrealized_ltl_year1:,.0f}",
-                f"- Years to full recovery: {impact.years_to_full_recovery:.1f}",
-            ])
+            lines.extend(["", "### Impact on Loss to Lease Recovery"])
+
+            if impact.max_annual_increase is None:
+                lines.append(
+                    "- Recovery analysis unavailable: the allowable annual increase is not "
+                    "on record, so recoverable amounts and the recovery timeline cannot be "
+                    "calculated."
+                )
+            else:
+                lines.append(
+                    f"- Max recoverable per year: ${impact.annual_recovery_potential:,.0f}"
+                )
+                lines.append(
+                    f"- LTL not recoverable in Year 1: ${impact.unrealized_ltl_year1:,.0f}"
+                )
+                if impact.years_to_full_recovery is not None:
+                    lines.append(
+                        f"- Years to full recovery: {impact.years_to_full_recovery:.1f}"
+                    )
+                else:
+                    lines.append(
+                        "- Years to full recovery: not calculable from the current rent roll"
+                    )
 
     return "\n".join(lines)

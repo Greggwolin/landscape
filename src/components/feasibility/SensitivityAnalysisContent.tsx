@@ -36,7 +36,11 @@ interface Assumption {
 interface ImpactMetrics {
   landValue: number;
   irr: number | null;
-  npv: number;
+  // Null when the project has no discount rate and the slider has not been
+  // moved. The server declines to invent one, so there is no NPV to show and
+  // we say so rather than printing a figure discounted at a rate nobody chose.
+  npv: number | null;
+  npvUnavailableReason?: string | null;
   calculating: boolean;
 }
 
@@ -81,7 +85,8 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
   const [impactMetrics, setImpactMetrics] = useState<ImpactMetrics>({
     landValue: 0,
     irr: null,
-    npv: 0,
+    npv: null,
+    npvUnavailableReason: null,
     calculating: false,
   });
 
@@ -145,7 +150,8 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
       setImpactMetrics({
         landValue: data.landValue,
         irr: data.irr, // May be null if didn't converge
-        npv: data.npv,
+        npv: data.npv, // Null when no discount rate is set -- see npvUnavailableReason
+        npvUnavailableReason: data.npvUnavailableReason ?? null,
         calculating: false,
       });
     } catch (error) {
@@ -364,13 +370,31 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
               <div className="text-sm mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
                 Net Present Value (NPV)
               </div>
-              <div className="text-2xl font-bold" style={{ color: impactMetrics.npv >= 0 ? 'var(--cui-success)' : 'var(--cui-danger)' }}>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  color:
+                    impactMetrics.npv === null
+                      ? 'var(--cui-secondary-color)'
+                      : impactMetrics.npv >= 0
+                        ? 'var(--cui-success)'
+                        : 'var(--cui-danger)',
+                }}
+              >
                 {impactMetrics.calculating ? (
                   <CSpinner size="sm" />
+                ) : impactMetrics.npv === null ? (
+                  '—'
                 ) : (
                   formatValue(impactMetrics.npv, 'currency')
                 )}
               </div>
+              {!impactMetrics.calculating && impactMetrics.npv === null && (
+                <div className="text-sm mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                  {impactMetrics.npvUnavailableReason ??
+                    'No discount rate is set for this project.'}
+                </div>
+              )}
             </CCardBody>
           </CCard>
         </CCol>
