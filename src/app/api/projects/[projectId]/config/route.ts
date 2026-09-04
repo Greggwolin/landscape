@@ -31,7 +31,11 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   project_id: 0,
   default_currency: 'USD',
   default_period_type: 'monthly',
-  global_inflation_rate: 0.03,
+  // Blank, not 3%. Inflation is a user input -- typed, chosen from the benchmark
+  // picklist, or fetched on request by Landscaper -- and is never supplied by the
+  // app on the user's behalf (Gregg, 2026-09-04). Downstream, a pre-filled number
+  // the user never chose is indistinguishable from one they did.
+  global_inflation_rate: null,
   analysis_start_date: null,
   analysis_end_date: null,
   discount_rate: 0.1,
