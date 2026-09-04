@@ -81,11 +81,7 @@ SQFT_PER_ACRE = 43_560.0
 MIN_LOTS_PER_PARCEL = 5
 
 #: How an outline was obtained. Mirrors the CHECK constraint on the table.
-#: How a lot's geometry was established. Four values, because there are four
-#: things that happen and the previous two could not tell them apart — every
-#: unmatched lot was recorded as "derived", including lots nothing derived and
-#: which have no outline at all. That was a false statement in a stored column
-#: (logged MK51, corrected here).
+#: How a lot's geometry was established. Five values:
 #:
 #:   traced      its own number sat inside its own recovered outline
 #:   rebuilt     no outline closed, so it was reconstructed from the plat's
@@ -94,10 +90,11 @@ MIN_LOTS_PER_PARCEL = 5
 #:               was identified by walking the chain of shared edges between
 #:               two named neighbours (see `lot_infill`)
 #:   unplaced    counted in the schedule, no outline, on no sheet
+#:   tract       a drainage/utility tract identified by its alpha label
 #:
 #: Kept to 16 characters: `gis_plan_lot.source` is varchar(16), so the spoken
 #: name "identified by position" is stored as "positional".
-VALID_SOURCES = ("traced", "rebuilt", "positional", "unplaced")
+VALID_SOURCES = ("traced", "rebuilt", "positional", "unplaced", "tract")
 
 
 # ─────────────────────────────────────────────────────── the input contract
@@ -129,6 +126,47 @@ class DerivedLot:
     def parcel_number(self) -> int:
         """The hundred block: lot 214 belongs to parcel 2."""
         return self.number // 100
+
+    @property
+    def is_placed(self) -> bool:
+        return bool(self.ring_3857)
+
+
+@dataclass(frozen=True)
+class DerivedTract:
+    """One drainage or utility tract, exactly as the read hands it over.
+
+    A tract is not a lot and is deliberately not modelled as one. It carries a
+    letter rather than a number, so it belongs to no hundred block and to no
+    parcel; and it is not saleable, so it contributes to no parcel's lot count,
+    frontage or acreage. Rolling one into a parcel would overstate what the
+    parcel is worth, which is the reason tracts were left out entirely until
+    now.
+
+    It is stored because the outline is real, the plat states its area, and
+    infill has to know a tract face is not an unnamed lot.
+    """
+
+    label: str
+    area_sqft: float
+    #: Closed ring in EPSG:3857, or None when no outline was recovered. As with
+    #: lots, this stays None until georeferencing runs.
+    ring_3857: Optional[Sequence[Sequence[float]]] = None
+    #: Sheet the tract is drawn on.
+    page: Optional[int] = None
+    source: str = "tract"
+
+    @property
+    def number(self) -> str:
+        """The identifier `_insert_lot` writes into `lot_number varchar(32)`.
+
+        Named to match `DerivedLot` so one insert serves both; a tract's
+        identifier is its letter.
+        """
+        return self.label
+
+    #: Tracts are not sold by the front foot.
+    frontage_ft = None
 
     @property
     def is_placed(self) -> bool:
@@ -314,6 +352,9 @@ class RollupResult:
     lots_without_outline: int
     #: Parcel number -> the tbl_parcel row it became.
     parcel_ids: dict[int, int] = field(default_factory=dict)
+    #: Tract outlines stored. Counted separately from lots because a tract
+    #: belongs to no parcel and is not part of any lot total.
+    tracts_written: int = 0
 
     def summary(self) -> str:
         return (
@@ -324,6 +365,7 @@ class RollupResult:
                 if self.lots_without_outline
                 else ""
             )
+            + (f"; {self.tracts_written} tract outlines" if self.tracts_written else "")
         )
 
 
@@ -335,6 +377,7 @@ def write_rollup(
     source_doc: str,
     stage: int,
     confidence: Optional[float] = None,
+    tracts: Sequence[DerivedTract] = (),
 ) -> RollupResult:
     """
     Write the parcels and their lot outlines.
@@ -354,10 +397,11 @@ def write_rollup(
         raise ValueError(f"refusing to write an unverified grouping — {grouping.reason}")
 
     bad_sources = {
-        lot.source
-        for parcel in grouping.parcels
-        for lot in parcel.lots
-        if lot.source not in VALID_SOURCES
+        item.source
+        for item in (
+            [lot for parcel in grouping.parcels for lot in parcel.lots] + list(tracts)
+        )
+        if item.source not in VALID_SOURCES
     }
     if bad_sources:
         raise ValueError(
@@ -392,12 +436,34 @@ def write_rollup(
             )
             lots_written += 1
 
+    # Tracts, on the same vintage and the same supersede rule as lots, but with
+    # no parcel: a drainage tract sits between parcels rather than inside one,
+    # and gis_plan_lot.parcel_id is nullable for exactly this kind of row.
+    tracts_written = 0
+    for tract in tracts:
+        if not tract.is_placed:
+            continue
+        _supersede_lot(cursor, project_id, tract.label)
+        _insert_lot(
+            cursor,
+            project_id=project_id,
+            parcel_id=None,
+            lot=tract,
+            source_doc=source_doc,
+            stage=stage,
+            version=version,
+            confidence=confidence,
+            lot_type="tract",
+        )
+        tracts_written += 1
+
     result = RollupResult(
         version=version,
         parcels_written=len(grouping.parcels),
         lots_written=lots_written,
         lots_without_outline=lots_without_outline,
         parcel_ids=parcel_ids,
+        tracts_written=tracts_written,
     )
     logger.info("[project_id=%s] %s", project_id, result.summary())
     return result
@@ -485,20 +551,21 @@ def _insert_lot(
     cursor,
     *,
     project_id: int,
-    parcel_id: int,
-    lot: DerivedLot,
+    parcel_id: Optional[int],
+    lot,
     source_doc: str,
     stage: int,
     version: int,
     confidence: Optional[float],
+    lot_type: str = "lot",
 ) -> None:
     cursor.execute(
         """
         INSERT INTO landscape.gis_plan_lot
             (project_id, parcel_id, lot_number, geom, area_sqft, frontage_ft,
-             source, source_doc, stage, version, confidence)
+             source, source_doc, stage, version, confidence, lot_type)
         VALUES
-            (%s, %s, %s, ST_GeomFromText(%s, 3857), %s, %s, %s, %s, %s, %s, %s)
+            (%s, %s, %s, ST_GeomFromText(%s, 3857), %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         [
             project_id,
@@ -512,6 +579,7 @@ def _insert_lot(
             stage,
             version,
             confidence,
+            lot_type,
         ],
     )
 

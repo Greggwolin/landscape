@@ -1,0 +1,65 @@
+# GitHub Actions: Neon preview-branch sweep
+#
+# The close-triggered teardown in cleanup.yml fires at most ONCE per pull
+# request. A single failed run therefore leaks a database branch permanently,
+# and a request that stays open holds a root-branch slot for as long as it is
+# open. Both have already bitten: 89 branches accumulated in June 2026 behind a
+# broken neonctl flag, and on 2026-08-25 PR #263's create job failed outright
+# with "root branches limit exceeded".
+#
+# This sweep is the net underneath that trigger — idempotent, so whatever the
+# close event missed is picked up on the next run. cleanup.yml stays as the fast
+# path; nothing here replaces it.
+#
+# The protection rules live in scripts/neon-branch-sweep.sh, versioned with this
+# workflow: only `pr-<number>` names, only when the request is closed, merged or
+# genuinely absent, never the default branch, never a branch with children.
+
+name: Neon Branch Sweep
+
+on:
+  schedule:
+    # 09:15 UTC daily — after the overnight runs, before the working day.
+    - cron: '15 9 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'List what would be deleted without deleting it'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+
+jobs:
+  sweep:
+    name: Sweep orphaned preview branches
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Neon CLI
+        run: |
+          npm install -g neonctl
+          neonctl --version
+
+      - name: Sweep
+        # A scheduled run always deletes. A manual run defaults to dry-run, so
+        # the safe thing is what you get when you click the button without
+        # thinking about it.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x ./scripts/neon-branch-sweep.sh
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            ./scripts/neon-branch-sweep.sh --dry-run
+          else
+            ./scripts/neon-branch-sweep.sh
+          fi

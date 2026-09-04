@@ -32,7 +32,7 @@ from .plat_vector import (
     BoundaryFit,
     fit_to_known_boundary,
 )
-from .lot_match import MatchedLot, LotMatchResult, match_lots
+from .lot_match import MatchedLot, MatchedTract, LotMatchResult, match_lots
 
 from .plan_classify import (
     PLAN_DOC_TYPE,
@@ -53,9 +53,11 @@ from .plan_reader import (
 from .lot_table import (
     DerivedOutline,
     LotAreaTable,
+    TractAreaTable,
     compare_to_drawn_labels,
     derive_missing_lots,
     read_lot_area_table,
+    read_tract_area_table,
 )
 from .lot_dimensions import (
     FrontageBasis,
@@ -76,6 +78,7 @@ __all__ = [
     "ApplyOutcome", "apply_confirmed_plan", "why_not_ready",
     "PlanReading", "read_plan", "find_lot_sheets",
     "LotAreaTable", "read_lot_area_table", "compare_to_drawn_labels",
+    "TractAreaTable", "read_tract_area_table",
     "DerivedOutline", "derive_missing_lots",
     "FrontageBasis", "LotDimensions", "measure_lot", "measure_lots",
     "total_frontage",
@@ -92,6 +95,7 @@ __all__ = [
     "BoundaryFit",
     "fit_to_known_boundary",
     "MatchedLot",
+    "MatchedTract",
     "LotMatchResult",
     "match_lots",
 ]

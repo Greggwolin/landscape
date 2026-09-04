@@ -223,7 +223,17 @@ Ordered by cost.
    slots. 28 projects carry a primary, **10 already use the secondary**. The boundary side models
    any number and dissolves them; the project side caps at two and does not join (project record
    writes `502-07-001-0`, boundary record writes `502070010`).
-5. **Non-lot features: 0% recovered.** The reference holds 61 (16 ROW, 28 parks, 6 passive OS,
+5. **Non-lot features: 4 of 34 tracts, 0 of everything else.** The plat's own TRACT USE TABLE
+   reads correctly — 34 tracts, 25.44 acres, zero rows failing their own arithmetic. Matching
+   places 4 of them, each within 1.8% of its stated area. The other 30 carry a stated reason:
+   **23 have no label rendered as text on any lot sheet** (the drawing flattened them into
+   line-work — the same fault that hid 19 lot numbers), and **7 have a label but the closest
+   outline containing it is 19–100% away from the stated area** (their boundaries never closed).
+   A label-driven pass cannot reach the 23 however it is tuned. The next build is the complement
+   approach the spec already names for streets: subtract placed lots from the project boundary,
+   and what remains is tracts and rights-of-way, with the plat's table supplying each one's use
+   and area. ROW, parks, drainage and open space remain at 0%. The reference holds 61 non-lot
+   features (16 ROW, 28 parks, 6 passive OS,
    3 drainage, 2 electrical easement, 6 MSIDD improvement areas). Measured acreage for Phase 1:
    lots 38.1 ac against ~115 ac drawn excluding the overlapping district areas — the app models
    about a third of the ground. Blocks net-to-gross and first-pass budgeting.
@@ -314,6 +324,7 @@ From the target spec §7, revised against the 2026-08-19 decisions.
 | 2026-08-17 | Discovered `gis_plan_lot` had never been applied to the live database despite being recorded in `CLAUDE.md`. Trap 3. |
 | 2026-08-18 | Plat read end-to-end twice, prediction-first. One-point deduction removed (+170.9 ft frontage; lots now measure the printed 42.0/50.0/55.0 exactly). Neighbour-number swap found and fixed, 232 → 248 recovered. Four-value provenance. Preview window shipped. Confirm chain repaired end-to-end. Doc 764's reading restored after a profile save destroyed it. Target spec written. Arc parked. |
 | 2026-08-19 | Refusal reporting corrected to an outcome (trap 8); sheet image restored beneath the geometry (decision 7 had been on record and the code had ignored it). PR #247. Decisions 9–17 settled. Defects 1–4 found. |
+| 2026-08-25 | Full lot + tract extraction merged (#261). Red Valley reads 286 of 286 lots. Tract matching now chooses faces by stated area rather than taking the largest, and every unplaced tract carries a reason. Arc parked. |
 
 ---
 
