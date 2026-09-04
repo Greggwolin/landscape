@@ -47,7 +47,26 @@ export async function POST(
     const absorptionRate = adjustments.absorption_rate?.adjustedValue || 1;
     const developmentCost = adjustments.development_cost?.adjustedValue || 0;
     const operatingExpenses = adjustments.operating_expenses?.adjustedValue || 0;
-    const discountRate = adjustments.discount_rate?.adjustedValue || 0.10;
+
+    // Discount rate: the slider if the user moved it, otherwise the project's own
+    // setting. If neither exists we return no NPV rather than inventing a rate --
+    // this used to fall back to a hardcoded 0.10, so an unset project silently
+    // produced an NPV discounted at 10% that read exactly like a chosen one
+    // (Gregg, 2026-09-04). `??` not `||`, so a deliberate 0% is honoured.
+    const sliderRate = adjustments.discount_rate?.adjustedValue;
+    let discountRate: number | null =
+      typeof sliderRate === 'number' && Number.isFinite(sliderRate) ? sliderRate : null;
+
+    if (discountRate === null) {
+      const settingsRow = await sql`
+        SELECT discount_rate
+        FROM landscape.tbl_project_settings
+        WHERE project_id = ${id}
+      `;
+      const stored = settingsRow[0]?.discount_rate;
+      const storedNum = stored === null || stored === undefined ? NaN : Number(stored);
+      discountRate = Number.isFinite(storedNum) ? storedNum : null;
+    }
 
     // Calculate total revenue
     const totalRevenue = unitsSold * pricePerUnit;
@@ -70,13 +89,21 @@ export async function POST(
     // Calculate IRR (may return NaN if doesn't converge)
     const irr = calculateIRR(developmentCost, cashFlows, 0);
 
-    // Calculate NPV
-    const npv = calculateNPV(developmentCost, cashFlows, 0, discountRate);
+    // Calculate NPV -- only when a discount rate actually exists.
+    const npv =
+      discountRate === null
+        ? null
+        : calculateNPV(developmentCost, cashFlows, 0, discountRate);
 
     return NextResponse.json({
       landValue,
       irr: isNaN(irr) ? null : irr,
       npv,
+      discountRate,
+      npvUnavailableReason:
+        discountRate === null
+          ? 'No discount rate is set for this project. Set one in project settings, or move the discount rate slider, to see NPV.'
+          : null,
       calculatedAt: new Date().toISOString(),
     });
   } catch (error: unknown) {
