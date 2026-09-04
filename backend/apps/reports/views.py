@@ -263,6 +263,7 @@ class ReportViewSet(viewsets.ViewSet):
                 'credit_loss': float(egi_data['credit_loss']),
                 'effective_rental_income': float(egi_data['effective_rental_income']),
                 'other_income': float(egi_data['other_income']),
+                'other_income_available': egi_data['other_income_available'],
                 'effective_gross_income': float(egi_data['effective_gross_income']),
                 'vacancy_rate': float(vacancy_rate)
             })
@@ -323,6 +324,7 @@ class ReportViewSet(viewsets.ViewSet):
                 'vacancy_loss': float(noi_data['vacancy_loss']),
                 'effective_rental_income': float(noi_data['effective_rental_income']),
                 'other_income': float(noi_data['other_income']),
+                'other_income_available': noi_data['other_income_available'],
                 'effective_gross_income': float(noi_data['effective_gross_income']),
                 'total_opex': float(noi_data['total_opex']),
                 'opex_by_category': {
