@@ -38,7 +38,10 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   global_inflation_rate: null,
   analysis_start_date: null,
   analysis_end_date: null,
-  discount_rate: 0.1,
+  // Blank for the same reason as inflation above: an assumption the app supplies
+  // on the user's behalf is indistinguishable, downstream, from one they chose.
+  // Gregg, 2026-09-04.
+  discount_rate: null,
 }
 
 export async function GET(

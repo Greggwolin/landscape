@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
     // user never chose is indistinguishable downstream from one they did. The
     // intended future path to a pre-filled value is user-savable project templates
     // carrying whatever base assumptions that user wants.
+    // discount_rate starts NULL for the same reason, on the same instruction.
     await sql`
       INSERT INTO landscape.tbl_project_settings (
         project_id,
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
         NULL,
         ${body.startDate ?? null},
         NULL,
-        0.10
+        NULL
       )
     `
 
