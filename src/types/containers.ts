@@ -30,9 +30,24 @@ export interface ProjectConfig {
   project_id: number
   asset_type: string
   tier_0_label?: string
-  tier_1_label: string
-  tier_2_label: string
-  tier_3_label: string
+  /* THE LEVEL NAMES ARRIVE UNDER TWO SPELLINGS, AND THIS TYPE ONLY KNEW ONE.
+   *
+   * `tier_N_label` is the database column. The project-config endpoint selects
+   * `tier_1_label AS level1_label`, so its RESPONSE carries `levelN_label` —
+   * and this type declared only the column name. `useProjectConfig` therefore
+   * read a key that is never present, fell through to Area / Phase / Parcel on
+   * every project, and the compiler agreed with it, because the type described
+   * the table rather than the payload.
+   *
+   * Both are declared and both optional: consumers read the aliased name first
+   * and fall back to the column, so this works whether a caller hands over the
+   * endpoint's response or a raw row. */
+  tier_1_label?: string
+  tier_2_label?: string
+  tier_3_label?: string
+  level1_label?: string
+  level2_label?: string
+  level3_label?: string
   level1_enabled?: boolean
   level2_enabled?: boolean
   land_use_level1_label?: string

@@ -1803,6 +1803,36 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "open_parcels",
+        "description": (
+            "Open the PARCELS WORKSPACE in the right panel — the real, editable "
+            "screen holding the hierarchy containers, the phases, and the parcel "
+            "table with its cascading land-use pickers. LAND development only. "
+            "\n\n"
+            "Call this whenever the user wants to SEE or WORK ON their parcels: "
+            "'show me the parcel table', 'the detailed parcel table', 'open the "
+            "parcels', 'the land use table', 'the planning data', 'let me edit "
+            "the parcels'. "
+            "\n\n"
+            "It opens as a durable artifact, so it lists in the artifacts panel "
+            "and reopens with one click — unlike navigate_to_screen, which pops a "
+            "blocking overlay the user cannot get back to once closed. Prefer "
+            "this over navigate_to_screen for parcels, and over "
+            "render_report_as_artifact in every case: RPT_14 is a frozen report "
+            "that cannot be edited. "
+            "\n\n"
+            "The artifact is returned ALREADY created and the screen fetches its "
+            "own data. Do NOT call create_artifact, do NOT compose a parcel "
+            "table, and do NOT restate its contents — announce it in one short "
+            "sentence. Use get_parcels when you need the raw rows to ANSWER a "
+            "question rather than a screen to work in."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "get_sales_schedule",
         "description": (
             "Render the parcel-sales schedule as a DETERMINISTIC artifact (a KPI "
@@ -4720,9 +4750,16 @@ LANDSCAPER_TOOLS = [
             "budget?') — answer those in place. folder is one of: home, "
             "property, budget, operations, feasibility, valuation, capital, "
             "reports, documents, map. tab is the optional sub-tab id within the "
-            "folder (e.g. market, landuse, parcels, sales, cashflow, debt, "
+            "folder (e.g. market, land-use, parcels, sales, cashflow, debt, "
             "equity); omit for folders with no sub-tabs. Invalid ids degrade "
-            "gracefully."
+            "gracefully. (The land-use tab id is hyphenated — 'land-use'. It was "
+            "written 'landuse' here until 2026-08-25, which matches no tab.) "
+            "\n\n"
+            "USE THIS for the parcels and land-use screens on a land-development "
+            "project — folder='property' with tab='parcels' or tab='land-use'. "
+            "Those screens are fully editable and are what someone asking to SEE "
+            "their parcel table or land plan wants. Do not answer that with a "
+            "report; see the report-mapping block in your instructions."
         ),
         "input_schema": {
             "type": "object",

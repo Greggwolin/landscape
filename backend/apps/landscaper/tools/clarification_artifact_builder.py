@@ -220,16 +220,30 @@ def _normalize_preliminary(raw: Any) -> Optional[Dict[str, Any]]:
 
 
 def _default_display(step: Dict[str, Any]) -> str:
-    """Human-readable current value for the static fallback table."""
+    """Human-readable current value for the static fallback table.
+
+    A number is formatted HERE rather than left for the renderer to notice.
+    The Current column is left-aligned, and a left-aligned column is a text
+    column — the renderer stopped reading numeric-looking strings as numbers
+    once a phase named "1.2" turned out to be printing as "1". So a bare
+    6500000 would have arrived as 6500000 instead of 6,500,000. Formatting it
+    at the source also makes it read identically here and in the stepped
+    renderer, which is where it should have been all along.
+    """
     default = step['default']
     if step['input_type'] in _OPTION_TYPES:
         for opt in step.get('options', []):
             if opt['value'] == default:
                 return opt['label']
+    shown = default
+    if isinstance(default, bool):
+        shown = 'Yes' if default else 'No'
+    elif isinstance(default, (int, float)):
+        shown = f'{default:,.0f}' if float(default).is_integer() else f'{default:,}'
     unit = step.get('unit')
     if unit:
-        return f'{default} {unit}'
-    return str(default)
+        return f'{shown} {unit}'
+    return str(shown)
 
 
 def build_clarification_config(

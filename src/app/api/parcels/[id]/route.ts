@@ -27,46 +27,63 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       hasUpdates = true
     }
 
-    // Handle other numeric fields (only if not null)
+    /* A NUMERIC FIELD COULD NOT BE EMPTIED, ONLY CHANGED.
+     *
+     * These six branches each skipped when the value was null, so "clear this"
+     * arrived and was discarded. It matters most on units: when a parcel stops
+     * being residential the Parcels screen sends `units: null` to blank the
+     * count, the write is dropped, and the old number stays on a parcel that no
+     * longer has units. Acres, planning efficiency, front feet and both lot
+     * dimensions had the same hole.
+     *
+     * The distinction that was missing is between a key that is ABSENT (the
+     * caller is not touching this field) and one that is present and NULL (the
+     * caller means empty). `sale_period` below already draws it, with the
+     * comment "allow null to clear the field" — these now match it. Empty
+     * string is treated as null for the same reason it is there: an emptied
+     * input arrives that way.
+     *
+     * Checked before changing: the only other caller of this endpoint sends
+     * `sale_period` alone, so nothing else was relying on a null being
+     * ignored. */
+    const clearable = (primary: unknown, alias?: unknown) => {
+      const value = primary !== undefined ? primary : alias
+      return value === null || value === '' ? null : value
+    }
+
     if (body.acres_gross !== undefined || body.acres !== undefined) {
-      const acres_gross = body.acres_gross ?? body.acres
-      if (acres_gross !== null) {
-        await sql`UPDATE landscape.tbl_parcel SET acres_gross = ${acres_gross}::numeric WHERE parcel_id = ${id}::bigint`
-        hasUpdates = true
-      }
-    }
-
-    if (body.units_total !== undefined || body.units !== undefined) {
-      const units_total = body.units_total ?? body.units
-      if (units_total !== null) {
-        await sql`UPDATE landscape.tbl_parcel SET units_total = ${units_total}::integer WHERE parcel_id = ${id}::bigint`
-        hasUpdates = true
-      }
-    }
-
-    if (body.plan_efficiency !== undefined || body.efficiency !== undefined) {
-      const plan_efficiency = body.plan_efficiency ?? body.efficiency
-      if (plan_efficiency !== null) {
-        await sql`UPDATE landscape.tbl_parcel SET plan_efficiency = ${plan_efficiency}::numeric WHERE parcel_id = ${id}::bigint`
-        hasUpdates = true
-      }
-    }
-
-    if (body.lots_frontfeet !== undefined || body.frontfeet !== undefined) {
-      const lots_frontfeet = body.lots_frontfeet ?? body.frontfeet
-      if (lots_frontfeet !== null) {
-        await sql`UPDATE landscape.tbl_parcel SET lots_frontfeet = ${lots_frontfeet}::numeric WHERE parcel_id = ${id}::bigint`
-        hasUpdates = true
-      }
-    }
-
-    if (body.lot_width !== undefined && body.lot_width !== null) {
-      await sql`UPDATE landscape.tbl_parcel SET lot_width = ${body.lot_width}::numeric WHERE parcel_id = ${id}::bigint`
+      const acres_gross = clearable(body.acres_gross, body.acres)
+      await sql`UPDATE landscape.tbl_parcel SET acres_gross = ${acres_gross}::numeric WHERE parcel_id = ${id}::bigint`
       hasUpdates = true
     }
 
-    if (body.lot_depth !== undefined && body.lot_depth !== null) {
-      await sql`UPDATE landscape.tbl_parcel SET lot_depth = ${body.lot_depth}::numeric WHERE parcel_id = ${id}::bigint`
+    if (body.units_total !== undefined || body.units !== undefined) {
+      const units_total = clearable(body.units_total, body.units)
+      await sql`UPDATE landscape.tbl_parcel SET units_total = ${units_total}::integer WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.plan_efficiency !== undefined || body.efficiency !== undefined) {
+      const plan_efficiency = clearable(body.plan_efficiency, body.efficiency)
+      await sql`UPDATE landscape.tbl_parcel SET plan_efficiency = ${plan_efficiency}::numeric WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.lots_frontfeet !== undefined || body.frontfeet !== undefined) {
+      const lots_frontfeet = clearable(body.lots_frontfeet, body.frontfeet)
+      await sql`UPDATE landscape.tbl_parcel SET lots_frontfeet = ${lots_frontfeet}::numeric WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.lot_width !== undefined) {
+      const lot_width = clearable(body.lot_width)
+      await sql`UPDATE landscape.tbl_parcel SET lot_width = ${lot_width}::numeric WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    if (body.lot_depth !== undefined) {
+      const lot_depth = clearable(body.lot_depth)
+      await sql`UPDATE landscape.tbl_parcel SET lot_depth = ${lot_depth}::numeric WHERE parcel_id = ${id}::bigint`
       hasUpdates = true
     }
 

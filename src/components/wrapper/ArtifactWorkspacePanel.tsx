@@ -20,6 +20,7 @@ import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
+import { ParcelsArtifact, type ParcelsViewConfig } from './ParcelsArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -585,6 +586,30 @@ export function ArtifactWorkspacePanel({
             // commit callback is the SAME panel-level batch helper the generic
             // renderer uses, so there is one write path and one impact banner,
             // not a budget-specific copy of either.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'open_parcels' &&
+          active.params_json &&
+          (active.params_json as { parcels_view_config?: unknown }).parcels_view_config ? (
+          // The parcels table, rendered from its view specification — the same
+          // format the budget schedule uses, not the old screen in a frame.
+          // Keyed on the artifact so switching workspaces remounts rather than
+          // carrying one project's filters into another's data.
+          <ParcelsArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { parcels_view_config: ParcelsViewConfig })
+                .parcels_view_config
+            }
+            // The BLOCK SCHEMA carries the per-cell source refs and is what the
+            // server resolves a write against; the view specification carries
+            // none. Same three props, same batch helper, as the budget — one
+            // write path and one impact banner, not a second copy.
             schema={active.current_state_json}
             artifactId={active.artifact_id}
             onCommitFieldEdits={(edits) =>
