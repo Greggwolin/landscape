@@ -103,26 +103,54 @@ class MultifamilyCalculator:
         """
         return gsr * vacancy_rate
 
-    def calculate_other_income(self) -> Dict:
+    def calculate_other_income(self, scenario: str = 'current') -> Dict:
         """
         Calculate other income (laundry, late fees, etc.).
 
-        For Chadron: $61,513 annual
+        Read from the project's stored figure — `tbl_project.current_other_income`
+        for the current scenario, `proforma_other_income` for proforma. These are
+        the same fields the Project > Profile screen and the extraction pipeline
+        write, so the report shows the number the user actually supplied.
+
+        When the project has no stored figure the amount is zero and `available`
+        is False, so callers can render the line as unavailable rather than
+        asserting a total nobody entered. Nothing is ever substituted from
+        another project or another scenario.
+
+        Args:
+            scenario: 'current' for the current figure, 'proforma' for proforma
 
         Returns:
             {
                 'annual_amount': Decimal,
                 'monthly_amount': Decimal,
+                'available': bool,   # False when the project stores no figure
+                'source': str,       # the column read, or 'unavailable'
                 'items': [...]
             }
         """
-        # For now, hardcode Chadron data
-        # TODO: Pull from tbl_revenue_other or similar
-        annual_amount = Decimal('61513.00')
+        column = (
+            'proforma_other_income' if scenario == 'proforma'
+            else 'current_other_income'
+        )
+        stored = getattr(self.project, column, None)
+
+        if stored is None:
+            return {
+                'annual_amount': Decimal('0.00'),
+                'monthly_amount': Decimal('0.00'),
+                'available': False,
+                'source': 'unavailable',
+                'items': []
+            }
+
+        annual_amount = Decimal(str(stored))
 
         return {
             'annual_amount': annual_amount,
             'monthly_amount': annual_amount / 12,
+            'available': True,
+            'source': column,
             'items': [
                 {'category': 'Other Income', 'annual_amount': annual_amount}
             ]
@@ -151,6 +179,7 @@ class MultifamilyCalculator:
                 'credit_loss': Decimal,
                 'effective_rental_income': Decimal,
                 'other_income': Decimal,
+                'other_income_available': bool,  # False when nothing is stored
                 'effective_gross_income': Decimal
             }
         """
@@ -162,7 +191,7 @@ class MultifamilyCalculator:
         credit_loss = effective_rental_income * credit_loss_rate
         effective_rental_income = effective_rental_income - credit_loss
 
-        other_income_data = self.calculate_other_income()
+        other_income_data = self.calculate_other_income(scenario)
         other_income = other_income_data['annual_amount']
 
         egi = effective_rental_income + other_income
@@ -173,6 +202,7 @@ class MultifamilyCalculator:
             'credit_loss': credit_loss,
             'effective_rental_income': effective_rental_income + credit_loss,  # Before credit loss
             'other_income': other_income,
+            'other_income_available': other_income_data['available'],
             'effective_gross_income': egi,
             'vacancy_rate': vacancy_rate,
             'credit_loss_rate': credit_loss_rate
@@ -301,6 +331,7 @@ class MultifamilyCalculator:
             'vacancy_loss': egi_data['vacancy_loss'],
             'effective_rental_income': egi_data['effective_rental_income'],
             'other_income': egi_data['other_income'],
+            'other_income_available': egi_data['other_income_available'],
             'effective_gross_income': egi,
             'total_opex': total_opex,
             'opex_by_category': opex_data['expenses_by_category'],
