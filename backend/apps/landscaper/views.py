@@ -25,13 +25,14 @@ from django.db.models import Q, Count, Avg
 from django.db import connection
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from .models import ChatMessage, LandscaperAdvice, ActivityItem, ExtractionMapping, ExtractionLog
 from .serializers import (
     ChatMessageSerializer,
     ChatMessageCreateSerializer,
     LandscaperAdviceSerializer,
     VarianceItemSerializer,
+    UnavailableVarianceSerializer,
     ActivityItemSerializer,
     ActivityItemCreateSerializer,
     ExtractionMappingSerializer,
@@ -699,8 +700,24 @@ class VarianceView(APIView):
             }
         ],
         "threshold": 10,
-        "count": 1
+        "count": 1,
+        "unavailable": [
+            {
+                "assumption_key": "grading_cost_per_sf",
+                "lifecycle_stage": "PLANNING",
+                "suggested_value": 2.50,
+                "confidence_level": "medium",
+                "advice_date": "2025-11-20T...",
+                "notes": "...",
+                "reason": "no_actual_recorded"
+            }
+        ],
+        "unavailable_count": 1
     }
+
+    Actuals come from landscape.tbl_project_assumption. Where the project
+    has recorded no value for a key, the advice is listed under
+    "unavailable" with a reason -- never given a substituted figure.
     """
 
     def get(self, request, project_id):
@@ -715,35 +732,66 @@ class VarianceView(APIView):
             ).order_by('-created_at')
 
             variances = []
+            unavailable = []
             for advice in advice_records:
-                # Get actual value from project (stubbed for Phase 6)
+                # Real recorded value for this project, or None if never entered.
                 actual_value = self._get_actual_value(project_id, advice.assumption_key)
 
-                if actual_value is not None:
-                    # Calculate variance percentage
-                    variance_percent = abs(
-                        (actual_value - advice.suggested_value) / advice.suggested_value * 100
-                    )
+                if actual_value is None:
+                    # No actual on record. Say so explicitly -- an empty
+                    # variance list would otherwise read as "on plan".
+                    unavailable.append({
+                        'assumption_key': advice.assumption_key,
+                        'lifecycle_stage': advice.lifecycle_stage,
+                        'suggested_value': advice.suggested_value,
+                        'confidence_level': advice.confidence_level,
+                        'advice_date': advice.created_at,
+                        'notes': advice.notes,
+                        'reason': 'no_actual_recorded',
+                    })
+                    continue
 
-                    # Only include if above threshold
-                    if variance_percent >= threshold:
-                        variances.append({
-                            'assumption_key': advice.assumption_key,
-                            'lifecycle_stage': advice.lifecycle_stage,
-                            'suggested_value': advice.suggested_value,
-                            'actual_value': actual_value,
-                            'variance_percent': round(variance_percent, 2),
-                            'confidence_level': advice.confidence_level,
-                            'advice_date': advice.created_at,
-                            'notes': advice.notes,
-                        })
+                if not advice.suggested_value:
+                    # Percentage variance is undefined against a zero
+                    # suggestion; report it rather than dividing by zero.
+                    unavailable.append({
+                        'assumption_key': advice.assumption_key,
+                        'lifecycle_stage': advice.lifecycle_stage,
+                        'suggested_value': advice.suggested_value,
+                        'confidence_level': advice.confidence_level,
+                        'advice_date': advice.created_at,
+                        'notes': advice.notes,
+                        'reason': 'suggested_value_zero',
+                    })
+                    continue
+
+                # Calculate variance percentage
+                variance_percent = abs(
+                    (actual_value - advice.suggested_value) / advice.suggested_value * 100
+                )
+
+                # Only include if above threshold
+                if variance_percent >= threshold:
+                    variances.append({
+                        'assumption_key': advice.assumption_key,
+                        'lifecycle_stage': advice.lifecycle_stage,
+                        'suggested_value': advice.suggested_value,
+                        'actual_value': actual_value,
+                        'variance_percent': round(variance_percent, 2),
+                        'confidence_level': advice.confidence_level,
+                        'advice_date': advice.created_at,
+                        'notes': advice.notes,
+                    })
 
             serializer = VarianceItemSerializer(variances, many=True)
+            unavailable_serializer = UnavailableVarianceSerializer(unavailable, many=True)
 
             return Response({
                 'variances': serializer.data,
                 'threshold': threshold,
                 'count': len(serializer.data),
+                'unavailable': unavailable_serializer.data,
+                'unavailable_count': len(unavailable_serializer.data),
             })
 
         except Exception as e:
@@ -753,21 +801,44 @@ class VarianceView(APIView):
 
     def _get_actual_value(self, project_id, assumption_key):
         """
-        Get actual value from project data.
+        Look up the project's actual recorded value for an assumption key.
 
-        PHASE 6 STUB: Returns placeholder values for demonstration.
-        Phase 7+: Query actual project budget/assumptions.
+        Reads landscape.tbl_project_assumption -- the same table the
+        operations, land-planning and income-approach save paths write to.
+
+        Returns None when the project has no recorded value for the key.
+        The caller reports that as explicitly unavailable; it must never
+        substitute a figure the user did not enter, because downstream an
+        invented number is indistinguishable from a real one.
         """
-        # TODO: Query real project data based on assumption_key
-        # For now, return stub values to demonstrate variance calculation
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT assumption_value
+                FROM landscape.tbl_project_assumption
+                WHERE project_id = %s
+                  AND assumption_key = %s
+                  AND assumption_value IS NOT NULL
+                ORDER BY updated_at DESC NULLS LAST, assumption_id DESC
+                LIMIT 1
+                """,
+                [project_id, assumption_key],
+            )
+            row = cursor.fetchone()
 
-        stub_actuals = {
-            'land_price_per_acre': Decimal('85000.00'),  # 13% variance from suggestion
-            'grading_cost_per_sf': Decimal('2.75'),      # 10% variance
-            'contingency_percent': Decimal('5.0'),       # 33% variance
-        }
+        if not row or row[0] is None:
+            return None
 
-        return stub_actuals.get(assumption_key)
+        try:
+            return Decimal(str(row[0]))
+        except (InvalidOperation, ValueError, TypeError):
+            logger.warning(
+                "Non-numeric assumption_value for project %s key %s; "
+                "reporting actual as unavailable",
+                project_id,
+                assumption_key,
+            )
+            return None
 
 
 class ActivityFeedViewSet(viewsets.ModelViewSet):
