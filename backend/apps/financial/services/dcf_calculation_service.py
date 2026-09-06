@@ -40,6 +40,21 @@ from .income_approach_service import IncomeApproachDataService
 EXIT_NOT_MEANINGFUL_REASON = 'Terminal NOI is negative — reversion floored at $0'
 
 
+# W2-D2 — the post-renovation rent premium is a USER assumption, not something
+# the app is entitled to invent. This module used to read it as
+# ``float(value_add.get('rent_premium_pct', 0.15) or 0.15)``: in Python a stored
+# 0 is falsy, so a user who deliberately set the rent lift to ZERO got 15%, and
+# so did a user who never set it at all. Both inflated rent, NOI and the return.
+# Per the product owner's rule (2026-09-04) the app must never supply a
+# financial assumption the user did not choose, so an unset premium now means NO
+# rent lift and the schedule carries a flag saying so — the same
+# say-why-the-line-reads-zero treatment as EXIT_NOT_MEANINGFUL_REASON above,
+# rather than a silent zero the reader could mistake for a real assumption.
+RENT_PREMIUM_NOT_SET_REASON = (
+    'Post-renovation rent premium is not set — no rent lift assumed'
+)
+
+
 def _exit_value_or_floor(terminal_noi: float, cap_rate: float) -> tuple:
     """Capitalized terminal value, floored at zero when terminal income is
     non-positive.
@@ -82,6 +97,8 @@ def build_renovation_schedule(
         - units_in_reno: Count of units under renovation
         - units_in_relet: Count of units in relet lag
         - units_renovated: Cumulative units completed and re-leased
+        - rent_premium_not_set: True when no rent premium was configured, in
+          which case no rent lift is assumed (the app does not invent one).
     """
     # Parse assumptions
     renovate_all = value_add.get('renovate_all', True)
@@ -92,7 +109,13 @@ def build_renovation_schedule(
     start_month = int(value_add.get('reno_start_month', 3) or 3)
     months_to_complete = int(value_add.get('months_to_complete', 3) or 3)
     relet_lag = int(value_add.get('relet_lag_months', 2) or 2)
-    rent_premium_pct = float(value_add.get('rent_premium_pct', 0.15) or 0.15)
+    # An EXPLICIT ``is None`` test, never ``or`` — a stored 0 is falsy and must
+    # survive as 0. When the premium is genuinely unset we do not substitute one
+    # (see RENT_PREMIUM_NOT_SET_REASON): the renovation produces no rent lift and
+    # the caller is handed a flag so the $0 premium line can be explained.
+    _raw_rent_premium = value_add.get('rent_premium_pct')
+    rent_premium_not_set = _raw_rent_premium is None
+    rent_premium_pct = 0.0 if rent_premium_not_set else float(_raw_rent_premium)
 
     reno_cost_basis = value_add.get('reno_cost_basis', 'sf')
     reno_cost_per_sf = float(value_add.get('reno_cost_per_sf', 0) or 0)
@@ -183,6 +206,10 @@ def build_renovation_schedule(
         'units_renovated': units_renovated,
         'units_to_renovate': units_to_renovate,
         'premium_per_unit': premium_per_unit,
+        # True when NO premium was configured. Distinct from a configured 0:
+        # both produce zero rent lift, but only this one means "the user never
+        # told us", which a renderer must be able to say out loud.
+        'rent_premium_not_set': rent_premium_not_set,
     }
 
 
@@ -259,7 +286,13 @@ class DCFCalculationService:
                 'reno_starts_per_month': va_row[6],
                 'reno_start_month': va_row[7],
                 'months_to_complete': va_row[8],
-                'rent_premium_pct': self._decimal_to_float(va_row[9]),
+                # NOT _decimal_to_float here: that collapses NULL to 0.0, which
+                # would hide "never configured" behind a value indistinguishable
+                # from a deliberate zero. build_renovation_schedule needs to tell
+                # them apart, so the None is passed through untouched.
+                'rent_premium_pct': (
+                    None if va_row[9] is None else float(va_row[9])
+                ),
                 'relet_lag_months': va_row[10],
             }
 
@@ -1070,6 +1103,13 @@ class DCFCalculationService:
                 'total_relocation_cost': round(sum(reno_schedule['relocation_cost']), 2),
                 'total_vacancy_loss': round(sum(reno_schedule['reno_vacancy_loss']), 2),
                 'total_rent_premium': round(sum(reno_schedule['rent_premium_gain']), 2),
+                # So a renderer can say WHY the rent-premium line reads $0
+                # instead of leaving the reader to assume a premium was applied.
+                'rent_premium_not_set': reno_schedule['rent_premium_not_set'],
+                'rent_premium_note': (
+                    RENT_PREMIUM_NOT_SET_REASON
+                    if reno_schedule['rent_premium_not_set'] else None
+                ),
                 'program_duration_months': max(
                     (m for m in range(len(reno_schedule['units_renovated']))
                      if reno_schedule['units_renovated'][m] < reno_schedule['units_to_renovate']),

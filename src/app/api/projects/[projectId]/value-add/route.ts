@@ -25,7 +25,10 @@ const DEFAULTS = {
   reno_cost_per_sf: 25.0,
   reno_cost_basis: 'sf',
   relocation_incentive: 3500.0,
-  rent_premium_pct: 0.40,
+  // W2-D2: rent_premium_pct deliberately has NO default. The post-renovation
+  // rent lift is a user assumption and the app must not supply one the user did
+  // not choose. The other keys here are the same class of problem and are left
+  // alone as separate work — see the commit message.
   relet_lag_months: 2,
   renovate_all: true,
   units_to_renovate: null,
@@ -101,7 +104,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       ...row,
       reno_cost_per_sf: parseFloat(row.reno_cost_per_sf) || DEFAULTS.reno_cost_per_sf,
       relocation_incentive: parseFloat(row.relocation_incentive) || DEFAULTS.relocation_incentive,
-      rent_premium_pct: parseFloat(row.rent_premium_pct) || DEFAULTS.rent_premium_pct,
+      // W2-D2: was `parseFloat(...) || DEFAULTS.rent_premium_pct` (0.40).
+      // `||` treats a stored 0 as absent, so a user who deliberately set the
+      // rent lift to zero, saved, and reloaded was shown 40% — and the DCF then
+      // projected on it. Explicit null check; a NULL premium stays null, which
+      // is exactly what useValueAddAssumptions already expects ("null means not
+      // configured yet") and what RentalIncomeSection already renders.
+      rent_premium_pct:
+        row.rent_premium_pct === null || row.rent_premium_pct === undefined
+          ? null
+          : parseFloat(row.rent_premium_pct),
       reno_starts_per_month: parseInt(row.reno_starts_per_month) || DEFAULTS.reno_starts_per_month,
       months_to_complete: parseInt(row.months_to_complete) || DEFAULTS.months_to_complete,
       reno_cost_basis: row.reno_cost_basis || DEFAULTS.reno_cost_basis,
@@ -147,7 +159,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const renoCostPerSf = body.reno_cost_per_sf ?? DEFAULTS.reno_cost_per_sf;
     const renoCostBasis = body.reno_cost_basis ?? DEFAULTS.reno_cost_basis;
     const relocationIncentive = body.relocation_incentive ?? DEFAULTS.relocation_incentive;
-    const rentPremiumPct = body.rent_premium_pct ?? DEFAULTS.rent_premium_pct;
+    // W2-D2: no substituted premium on write either — omitting the field must
+    // not persist an assumption the user never chose. The column is nullable
+    // and its CHECK admits NULL (migration 20260219).
+    const rentPremiumPct = body.rent_premium_pct ?? null;
     const reletLagMonths = body.relet_lag_months ?? DEFAULTS.relet_lag_months;
     const renovateAll = body.renovate_all ?? DEFAULTS.renovate_all;
     const unitsToRenovate = body.units_to_renovate ?? DEFAULTS.units_to_renovate;
@@ -206,7 +221,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       ...row,
       reno_cost_per_sf: parseFloat(row.reno_cost_per_sf),
       relocation_incentive: parseFloat(row.relocation_incentive),
-      rent_premium_pct: parseFloat(row.rent_premium_pct),
+      // Explicit null rather than letting parseFloat(null) produce NaN.
+      rent_premium_pct:
+        row.rent_premium_pct === null || row.rent_premium_pct === undefined
+          ? null
+          : parseFloat(row.rent_premium_pct),
     });
   } catch (error) {
     console.error('Error saving value-add assumptions:', error);

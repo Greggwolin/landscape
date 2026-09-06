@@ -130,7 +130,13 @@ class UnitRentScheduleService:
                         'reno_cost_per_sf': float(row[5] or 25.0),
                         'reno_cost_basis': row[6] or 'sf',
                         'relocation_incentive': float(row[7] or 3500.0),
-                        'rent_premium_pct': float(row[8] or 0.30),
+                        # W2-D2: was ``float(row[8] or 0.30)`` — a stored 0 is
+                        # falsy, so a deliberately zeroed rent lift came back as
+                        # 30%. Explicit ``is None``, and an unset premium stays
+                        # None rather than becoming a number nobody chose.
+                        'rent_premium_pct': (
+                            None if row[8] is None else float(row[8])
+                        ),
                         'renovate_all': bool(row[9]) if row[9] is not None else True,
                         'units_to_renovate': int(row[10]) if row[10] else None,
                     }
@@ -273,7 +279,11 @@ class UnitRentScheduleService:
                         # Matches DCF logic: rent_premium_gain = per_unit_rent * premium_pct
                         # so post-reno rent = current_rent * (1 + premium_pct)
                         # Use market_rent if available, otherwise current_rent as base
-                        premium_pct = value_add.get('rent_premium_pct', 0.30)
+                        # No invented premium: unset means no rent lift, so the
+                        # re-leased rent is just the base rent (0.30 here used
+                        # to fabricate a 30% lift the user never chose).
+                        _raw_premium = value_add.get('rent_premium_pct')
+                        premium_pct = 0.0 if _raw_premium is None else float(_raw_premium)
                         base_rent = unit['market_rent'] if unit['market_rent'] > 0 else unit['current_rent']
                         rent = base_rent * (1 + premium_pct) * growth_factor
                 else:
