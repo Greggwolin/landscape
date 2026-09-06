@@ -456,7 +456,16 @@ LANDSCAPER_TOOLS = [
                             "unit_amount": {"type": "number"},
                             "amount_per_sf": {"type": "number"},
                             "expense_type": {"type": "string"},
-                            "escalation_rate": {"type": "number"},
+                            "escalation_rate": {
+                                "type": "number",
+                                "description": (
+                                    "Annual escalation as a decimal (0.03 = 3%). "
+                                    "Omit this entirely unless the user or the source "
+                                    "document actually states an escalation — do NOT "
+                                    "supply a customary 3%. An omitted rate is stored "
+                                    "as unset; 0 means the expense does not escalate."
+                                ),
+                            },
                             "is_recoverable": {"type": "boolean"},
                         },
                         "required": ["label", "annual_amount"],

@@ -106,6 +106,16 @@ export async function POST(
     const discriminator = statementDiscriminator || activeResult[0]?.active_opex_discriminator || 'default';
 
     // Upsert operating expenses
+    // escalation_rate / recovery_rate use `??`, never `||`. A deliberate 0 (an
+    // expense the user chose not to escalate, or one recovered from nobody) is a
+    // real assumption: `||` treated it as absent and silently wrote 3% / 100%
+    // over the top of it, and the stored result was indistinguishable from a
+    // number the user had picked. When a rate genuinely was not supplied we now
+    // store NULL rather than inventing one — on INSERT that NULL has to be
+    // explicit, because the columns carry DEFAULT 0.03 / DEFAULT 1.0 and an
+    // omitted column would reinstate the invented value at the database level.
+    // On UPDATE, COALESCE(...) keeps an omitted field from erasing a stored
+    // rate; a supplied 0 is not NULL in SQL, so it still lands as 0.
     for (const expense of expenses) {
       if (expense.opex_id) {
         // Update existing — preserve source/provenance (don't overwrite ingestion flag)
@@ -117,9 +127,9 @@ export async function POST(
             annual_amount = ${expense.annual_amount},
             amount_per_sf = ${expense.amount_per_sf || null},
             is_recoverable = ${expense.is_recoverable !== undefined ? expense.is_recoverable : true},
-            recovery_rate = ${expense.recovery_rate || 1.0},
+            recovery_rate = COALESCE(${expense.recovery_rate ?? null}::numeric, recovery_rate),
             escalation_type = ${expense.escalation_type || 'FIXED_PERCENT'},
-            escalation_rate = ${expense.escalation_rate || 0.03},
+            escalation_rate = COALESCE(${expense.escalation_rate ?? null}::numeric, escalation_rate),
             start_period = ${expense.start_period},
             payment_frequency = ${expense.payment_frequency || 'MONTHLY'},
             notes = ${expense.notes || null},
@@ -154,9 +164,9 @@ export async function POST(
             ${expense.annual_amount},
             ${expense.amount_per_sf || null},
             ${expense.is_recoverable !== undefined ? expense.is_recoverable : true},
-            ${expense.recovery_rate || 1.0},
+            ${expense.recovery_rate ?? null},
             ${expense.escalation_type || 'FIXED_PERCENT'},
-            ${expense.escalation_rate || 0.03},
+            ${expense.escalation_rate ?? null},
             ${expense.start_period},
             ${expense.payment_frequency || 'MONTHLY'},
             ${expense.notes || null},
