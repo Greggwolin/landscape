@@ -18,6 +18,16 @@ import {
 } from '@coreui/react';
 import type { BudgetItem } from '@/types/budget';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import {
+  contingencyAmountOf,
+  editDraft,
+  formatContingencyInput,
+  initDraft,
+  markSaved,
+  parseContingencyInput,
+  saveIntent,
+  type FieldDraft,
+} from './costControlsSave';
 import './cost-controls-tile.css';
 
 interface Contact {
@@ -34,6 +44,11 @@ interface CostControlsTileProps {
   onFieldChange: (field: keyof BudgetItem, value: any) => Promise<void> | void;
 }
 
+/**
+ * Contingency percentages that are typical for each confidence level. These are
+ * offered to the estimator, never applied on their behalf — picking a
+ * confidence level says nothing about what buffer this line should carry.
+ */
 const contingencyMap: Record<string, number> = {
   'high': 5.0,
   'medium': 10.0,
@@ -46,11 +61,16 @@ export default function CostControlsTile({
   projectId,
   onFieldChange,
 }: CostControlsTileProps) {
-  const [contingencyPct, setContingencyPct] = useState<number>(item.contingency_pct || 10.0);
-  const [confidenceLevel, setConfidenceLevel] = useState<string>(item.confidence_level || 'medium');
-  const [vendorName, setVendorName] = useState<string>(item.vendor_name || '');
+  // Drafts open on the stored value and stay untouched until a person edits
+  // them. An unset contingency stays unset — the tile supplies no number of its
+  // own, and saves nothing at all until something is actually changed.
+  const [contingency, setContingency] = useState<FieldDraft<number | null>>(() =>
+    initDraft(item.contingency_pct ?? null),
+  );
+  const [confidenceLevel, setConfidenceLevel] = useState<string>(item.confidence_level || '');
+  const [vendor, setVendor] = useState<FieldDraft<string>>(() => initDraft(item.vendor_name || ''));
   const [vendorContactId, setVendorContactId] = useState<number | null>(item.vendor_contact_id || null);
-  const [notes, setNotes] = useState<string>(item.notes || '');
+  const [notes, setNotes] = useState<FieldDraft<string>>(() => initDraft(item.notes || ''));
   const [vendorSuggestions, setVendorSuggestions] = useState<Contact[]>([]);
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
 
@@ -70,37 +90,39 @@ export default function CostControlsTile({
       });
   }, []);
 
-  // Calculate contingency amount for display
-  const contingencyAmount = useMemo(() => {
-    return (item.amount || 0) * (contingencyPct / 100);
-  }, [item.amount, contingencyPct]);
+  // Contingency amount for display. Null — not $0 — while no contingency has
+  // been set, so nothing downstream reads an unset buffer as a decision.
+  const contingencyAmount = useMemo(
+    () => contingencyAmountOf(item.amount, contingency.value),
+    [item.amount, contingency.value],
+  );
 
-  // Handle confidence level change with contingency auto-update
+  // Confidence level is the user's own field. Picking one OFFERS the typical
+  // contingency for that level; it never writes a contingency by itself.
   const handleConfidenceLevelChange = (newLevel: string) => {
     setConfidenceLevel(newLevel);
-    onFieldChange('confidence_level', newLevel);
+    onFieldChange('confidence_level', newLevel || null);
 
     const suggestedContingency = contingencyMap[newLevel];
-    const displayLevel = newLevel.charAt(0).toUpperCase() + newLevel.slice(1);
+    if (suggestedContingency === undefined) return;
+    if (contingency.value === suggestedContingency) return;
 
-    // Show confirmation if user has manually set a different contingency
-    if (contingencyPct !== suggestedContingency && contingencyPct !== 0 && contingencyPct !== (item.contingency_pct || 10.0)) {
-      const confirmed = window.confirm(
-        `Change contingency from ${contingencyPct}% to ${suggestedContingency}% (typical for ${displayLevel} confidence)?`
-      );
-      if (confirmed) {
-        setContingencyPct(suggestedContingency);
-        onFieldChange('contingency_pct', suggestedContingency);
-      }
-    } else {
-      setContingencyPct(suggestedContingency);
-      onFieldChange('contingency_pct', suggestedContingency);
+    const displayLevel = newLevel.charAt(0).toUpperCase() + newLevel.slice(1);
+    const currentLabel =
+      contingency.value === null ? 'not set' : `${contingency.value}%`;
+
+    const confirmed = window.confirm(
+      `Contingency is ${currentLabel}. Set it to ${suggestedContingency}% ` +
+        `(typical for ${displayLevel} confidence)? Cancel leaves it as it is.`
+    );
+    if (confirmed) {
+      setContingency(draft => editDraft(draft, suggestedContingency));
     }
   };
 
   // Vendor autocomplete search
   const handleVendorSearch = async (query: string) => {
-    setVendorName(query);
+    setVendor(draft => editDraft(draft, query));
 
     if (query.length < 2) {
       setVendorSuggestions([]);
@@ -122,7 +144,9 @@ export default function CostControlsTile({
   };
 
   const handleVendorSelect = (contact: Contact) => {
-    setVendorName(contact.company_name);
+    // Picking a vendor is a deliberate act, so it saves straight away — and the
+    // draft is marked saved so the debounce does not write it a second time.
+    setVendor(draft => markSaved(editDraft(draft, contact.company_name), contact.company_name));
     setVendorContactId(contact.contact_id);
     setShowVendorDropdown(false);
 
@@ -148,28 +172,50 @@ export default function CostControlsTile({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced save for contingency and notes
+  // Debounced save for contingency. saveIntent is false on mount and false
+  // whenever the control matches what is stored, so opening a line — or typing
+  // a value and undoing it — writes nothing. A contingency the user genuinely
+  // set to 0 is a decision and does save.
   useEffect(() => {
+    const intent = saveIntent(contingency);
+    if (!intent.save) return;
+
     const timer = setTimeout(() => {
-      onFieldChange('contingency_pct', contingencyPct);
+      onFieldChange('contingency_pct', intent.value);
+      setContingency(draft => markSaved(draft, intent.value));
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [contingencyPct]);
+  }, [contingency]);
 
+  // Debounced save for notes, gated the same way.
   useEffect(() => {
+    const intent = saveIntent(notes);
+    if (!intent.save) return;
+
     const timer = setTimeout(() => {
-      onFieldChange('notes', notes);
-      // Save vendor name as free text if not linked to contact
-      if (!vendorContactId && vendorName) {
-        onFieldChange('vendor_name', vendorName);
-      }
+      onFieldChange('notes', intent.value);
+      setNotes(draft => markSaved(draft, intent.value));
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [notes, vendorName, vendorContactId]);
+  }, [notes]);
 
-  const charCount = notes.length;
+  // Debounced save for a vendor typed as free text (one picked from the list is
+  // saved on selection). Untouched drafts never reach here.
+  useEffect(() => {
+    const intent = saveIntent(vendor);
+    if (!intent.save || vendorContactId) return;
+
+    const timer = setTimeout(() => {
+      onFieldChange('vendor_name', intent.value);
+      setVendor(draft => markSaved(draft, intent.value));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [vendor, vendorContactId]);
+
+  const charCount = notes.value.length;
   const charCountClass = charCount > 950 ? 'text-danger' : charCount > 800 ? 'text-warning' : 'text-muted';
 
   return (
@@ -186,7 +232,7 @@ export default function CostControlsTile({
                 const value = e.target.value;
                 if (value === 'add_new') {
                   setVendorContactId(null);
-                  setVendorName('');
+                  setVendor(draft => editDraft(draft, ''));
                 } else if (value) {
                   const contact = vendorSuggestions.find(c => c.contact_id === parseInt(value));
                   if (contact) {
@@ -194,7 +240,7 @@ export default function CostControlsTile({
                   }
                 } else {
                   setVendorContactId(null);
-                  setVendorName('');
+                  setVendor(draft => markSaved(editDraft(draft, ''), ''));
                   onFieldChange('vendor_contact_id', null);
                   onFieldChange('vendor_name', '');
                 }
@@ -218,10 +264,13 @@ export default function CostControlsTile({
             <CFormInput
               type="text"
               id="contingencyPct"
-              value={`${Math.round(contingencyPct)}%`}
+              value={formatContingencyInput(contingency.value)}
+              placeholder="Not set"
               onChange={(e) => {
-                const numValue = parseFloat(e.target.value.replace('%', '')) || 0;
-                setContingencyPct(numValue);
+                // An empty field means not set — never 0, and never a value of
+                // the app's own choosing.
+                const next = parseContingencyInput(e.target.value);
+                setContingency(draft => editDraft(draft, next));
               }}
               className="text-center"
             />
@@ -248,6 +297,7 @@ export default function CostControlsTile({
                 value={confidenceLevel}
                 onChange={(e) => handleConfidenceLevelChange(e.target.value)}
               >
+                <option value="">Not set</option>
                 <option value="high">High</option>
                 <option value="medium">Med</option>
                 <option value="low">Low</option>
@@ -264,8 +314,8 @@ export default function CostControlsTile({
         <CFormFloating>
           <CFormTextarea
             id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            value={notes.value}
+            onChange={(e) => setNotes(draft => editDraft(draft, e.target.value))}
             placeholder="Notes..."
             style={{ minHeight: '50px' }}
             maxLength={1000}
