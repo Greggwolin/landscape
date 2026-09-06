@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { FieldGroup as FieldGroupType, FieldDefinition, ComplexityTier } from '@/types/assumptions';
 import { FieldRenderer } from './FieldRenderer';
+import type { ChangeOrigin } from '@/lib/assumptions/autoSave';
 
 interface FieldGroupProps {
   group: FieldGroupType;
   fields: FieldDefinition[];
   values: Record<string, any>;
   currentMode: ComplexityTier;
-  onChange: (key: string, value: any) => void;
+  /** `origin` distinguishes a person's edit from a derived (autoCalc) value. */
+  onChange: (key: string, value: any, origin: ChangeOrigin) => void;
 }
 
 export function FieldGroup({
@@ -92,7 +94,7 @@ export function FieldGroup({
               field={field}
               value={values[field.key]}
               currentMode={currentMode}
-              onChange={(value) => onChange(field.key, value)}
+              onChange={(value, origin) => onChange(field.key, value, origin)}
               allValues={values}
             />
           ))}
