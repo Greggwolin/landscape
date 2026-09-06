@@ -30,33 +30,33 @@ class DcfAnalysisSerializer(serializers.ModelSerializer):
     income_growth_rate = serializers.SerializerMethodField()
     expense_growth_rate = serializers.SerializerMethodField()
 
+    # A growth rate is resolved from a growth-rate SET the user picked. With no
+    # set linked there is no rate to report, so these return None rather than a
+    # 3% house number the caller cannot tell apart from a real selection.
+
     def get_price_growth_rate(self, obj):
-        """Get the flat price growth rate from the set."""
+        """Flat price growth rate from the linked set, or None if none linked."""
         if obj.price_growth_set_id:
-            rate = GrowthRateService.get_flat_rate(obj.price_growth_set_id)
-            return float(rate)
-        return 0.03  # Default 3%
+            return float(GrowthRateService.get_flat_rate(obj.price_growth_set_id))
+        return None
 
     def get_cost_inflation_rate(self, obj):
-        """Get the flat cost inflation rate from the set."""
+        """Flat cost inflation rate from the linked set, or None if none linked."""
         if obj.cost_inflation_set_id:
-            rate = GrowthRateService.get_flat_rate(obj.cost_inflation_set_id)
-            return float(rate)
-        return 0.03  # Default 3%
+            return float(GrowthRateService.get_flat_rate(obj.cost_inflation_set_id))
+        return None
 
     def get_income_growth_rate(self, obj):
-        """Get the flat income growth rate from the set (CRE only)."""
+        """Flat income growth rate from the linked set (CRE), or None."""
         if obj.income_growth_set_id:
-            rate = GrowthRateService.get_flat_rate(obj.income_growth_set_id)
-            return float(rate)
-        return 0.03  # Default 3%
+            return float(GrowthRateService.get_flat_rate(obj.income_growth_set_id))
+        return None
 
     def get_expense_growth_rate(self, obj):
-        """Get the flat expense growth rate from the set (CRE only)."""
+        """Flat expense growth rate from the linked set (CRE), or None."""
         if obj.expense_growth_set_id:
-            rate = GrowthRateService.get_flat_rate(obj.expense_growth_set_id)
-            return float(rate)
-        return 0.03  # Default 3%
+            return float(GrowthRateService.get_flat_rate(obj.expense_growth_set_id))
+        return None
 
     class Meta:
         model = DcfAnalysis

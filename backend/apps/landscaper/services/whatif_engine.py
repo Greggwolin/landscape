@@ -372,8 +372,10 @@ class WhatIfEngine:
                 hold_period_years = int(row[0]) if row[0] else None
                 result['tbl_dcf_analysis'] = {
                     'hold_period_years': hold_period_years,
-                    'discount_rate': float(row[1]) if row[1] else 0.10,
-                    'selling_costs_pct': float(row[2]) if row[2] else 0.0,
+                    # None, not 10%. An unset discount rate means NPV cannot be
+                    # computed; it does not mean the deal discounts at 10%.
+                    'discount_rate': float(row[1]) if row[1] is not None else None,
+                    'selling_costs_pct': float(row[2]) if row[2] is not None else None,
                     'price_growth_set_id': row[3],
                     'cost_inflation_set_id': row[4],
                 }
@@ -398,12 +400,13 @@ class WhatIfEngine:
                         result['tbl_dcf_analysis'][rate_key] = 0.0
             else:
                 hold_period_years = None
+                # No DCF record at all. Nothing is known, so nothing is claimed.
                 result['tbl_dcf_analysis'] = {
                     'hold_period_years': None,
-                    'discount_rate': 0.10,
-                    'selling_costs_pct': 0.0,
-                    'price_growth_rate': 0.0,
-                    'cost_inflation_rate': 0.0,
+                    'discount_rate': None,
+                    'selling_costs_pct': None,
+                    'price_growth_rate': None,
+                    'cost_inflation_rate': None,
                 }
 
             # 2. Project config
@@ -553,7 +556,7 @@ class WhatIfEngine:
             }
 
         land_model = {
-            'discount_rate': result.get('tbl_dcf_analysis', {}).get('discount_rate', 0.10),
+            'discount_rate': result.get('tbl_dcf_analysis', {}).get('discount_rate'),
             'hold_period_years': result.get('tbl_dcf_analysis', {}).get('hold_period_years'),
             'analysis_start_date': result.get('tbl_project', {}).get('analysis_start_date'),
             'total_project_months': result.get('tbl_project', {}).get('total_project_months'),
@@ -1097,9 +1100,12 @@ class WhatIfEngine:
             except Exception:
                 pass
 
-        discount_rate = float(model.get('discount_rate') or 0.10)
+        # No discount rate entered → no NPV. Reporting one computed at a house
+        # 10% would be indistinguishable from the user's own answer.
+        _dr = model.get('discount_rate')
+        discount_rate = float(_dr) if _dr is not None else None
         npv = None
-        if discount_rate > 0:
+        if discount_rate and discount_rate > 0:
             try:
                 monthly_rate = (1 + discount_rate) ** (1 / 12) - 1
                 npv_result = npf.npv(monthly_rate, cash_flows)
@@ -1292,7 +1298,7 @@ class WhatIfEngine:
                     assumptions.get('revenue_summary', {}).get('total_net_revenue', 0),
                 ),
                 'peak_equity': summary.get('peakEquity'),
-                'discount_rate': assumptions.get('tbl_dcf_analysis', {}).get('discount_rate', 0.10),
+                'discount_rate': assumptions.get('tbl_dcf_analysis', {}).get('discount_rate'),
             }
 
             adjustments = assumptions.get('_scenario_adjustments') or []
@@ -1341,7 +1347,8 @@ class WhatIfEngine:
 
         # Simple IRR estimate: costs upfront, revenue at end
         hold_years = dcf.get('hold_period_years') or 5
-        discount_rate = dcf.get('discount_rate', 0.10)
+        # None when the user has not entered one; NPV is then simply not reported.
+        discount_rate = dcf.get('discount_rate')
 
         irr = None
         if total_costs > 0 and net_revenue > 0:
@@ -1355,7 +1362,7 @@ class WhatIfEngine:
                 pass
 
         npv = None
-        if discount_rate > 0 and total_costs > 0:
+        if discount_rate and discount_rate > 0 and total_costs > 0:
             try:
                 cf = [-total_costs] + [0] * (hold_years - 1) + [net_revenue]
                 npv_result = npf.npv(discount_rate, cf)

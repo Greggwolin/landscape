@@ -92,7 +92,24 @@ export type DcfAnalysisUpdatePayload = Partial<Omit<DcfAnalysis,
 >>;
 
 export interface DcfAnalysisResponse extends DcfAnalysis {
-  created?: boolean;  // True if record was just created with defaults
+  /**
+   * False when no tbl_dcf_analysis row exists for this project yet. Every
+   * assumption is then null and MUST render as unavailable — a GET never
+   * creates a record, and the app supplies no assumption the user did not
+   * choose.
+   */
+  exists?: boolean;
+  /** Always false — retained for older callers. A GET cannot create anything. */
+  created?: boolean;
+
+  /**
+   * Resolved from the growth-rate SET the user linked. Null when no set is
+   * linked: there is no rate to report, and it is not 0% or 3%.
+   */
+  price_growth_rate?: number | null;
+  cost_inflation_rate?: number | null;
+  income_growth_rate?: number | null;
+  expense_growth_rate?: number | null;
 }
 
 // ============================================================================
