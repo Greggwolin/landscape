@@ -37,6 +37,7 @@ export async function GET() {
         trailing_12mo_pct_change,
         trailing_12mo_decimal
       FROM landscape.v_current_cpi_inflation
+      WHERE series_code = 'CPIAUCSL'
     `;
 
     if (!result.length) {

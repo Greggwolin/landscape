@@ -10,6 +10,7 @@ import requests
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from .config import redact_params
 from .normalize import NormalizedObservation, parse_decimal
 
 
@@ -26,7 +27,7 @@ class BlsClient:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
     def _post(self, payload: Dict[str, object]) -> Dict[str, object]:
-        logger.debug("BLS request payload={}", payload)
+        logger.debug("BLS request payload={}", redact_params(payload))
         response = self.session.post(self.BASE_URL, json=payload, timeout=30)
         if response.status_code >= 400:
             raise BlsError(f"BLS API error {response.status_code}: {response.text}")
