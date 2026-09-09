@@ -24,20 +24,31 @@ class DcfAnalysisView(APIView):
     """
     GET/PATCH DCF analysis parameters for a project.
 
-    Creates default record if none exists, using DcfAnalysis.get_or_create_for_project().
-    property_type is automatically determined from project.project_type_code.
+    GET NEVER WRITES. property_type is automatically determined from
+    project.project_type_code. A record is created only on PATCH — i.e. only
+    when the user actually saves an assumption.
     """
 
     def get(self, request, project_id):
         """
-        Get DCF analysis for project. Creates with defaults if none exists.
+        Get DCF analysis for project. Reads only — never creates a record.
+
+        With no record, every assumption serializes as null and ``exists`` is
+        false. Callers must render those as unavailable, not as zero.
         """
         project = get_object_or_404(Project, pk=project_id)
-        dcf, created = DcfAnalysis.get_or_create_for_project(project)
+        dcf = DcfAnalysis.get_for_project(project)
+        exists = dcf is not None
+        if dcf is None:
+            # Unsaved, all-null instance: stable response shape, zero writes.
+            dcf = DcfAnalysis.blank_for_project(project)
 
         serializer = DcfAnalysisSerializer(dcf)
         response_data = serializer.data
-        response_data['created'] = created
+        response_data['exists'] = exists
+        # Retained for backwards compatibility with existing clients. A GET can
+        # no longer create anything, so this is always False.
+        response_data['created'] = False
 
         return Response(response_data)
 

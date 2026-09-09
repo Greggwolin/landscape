@@ -1244,9 +1244,13 @@ class IncomeApproach(models.Model):
 
     # Stabilized Vacancy Rate - separate from physical_vacancy_pct in tbl_project_assumption
     # This is market-standard vacancy specifically for stabilized NOI calculation
+    # NO model-level default. A 0.05 default here meant every IncomeApproach row
+    # ever created carried a 5% stabilized vacancy nobody chose — and afterwards
+    # nothing distinguished it from a rate the appraiser entered. Unset is unset.
     stabilized_vacancy_rate = models.DecimalField(
-        max_digits=5, decimal_places=4, default=0.05, null=True, blank=True,
-        help_text='Market-standard vacancy for stabilized NOI (0.05 = 5%)'
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Market-standard vacancy for stabilized NOI (0.05 = 5%). '
+                  'NULL until the user enters one — never defaulted.'
     )
 
     # Sensitivity Analysis Intervals - UI parameters for sensitivity matrix
@@ -1942,12 +1946,57 @@ class DcfAnalysis(models.Model):
         return 'land_dev' if project.project_type_code == 'LAND' else 'cre'
 
     @classmethod
+    def get_for_project(cls, project):
+        """
+        Read the DCF analysis record for a project, or None if none exists.
+
+        READ PATHS MUST USE THIS. It never writes. Opening a screen is not a
+        decision, and a record conjured by a page view is indistinguishable
+        afterwards from one the user built.
+
+        Args:
+            project: Project instance
+
+        Returns:
+            DcfAnalysis instance, or None
+        """
+        return cls.objects.filter(
+            project=project,
+            property_type=cls.get_property_type_for_project(project),
+        ).first()
+
+    @classmethod
+    def blank_for_project(cls, project):
+        """
+        An UNSAVED, empty DcfAnalysis for a project.
+
+        For read paths that need a stable object shape when no record exists.
+        Every assumption field is None; nothing is persisted. Callers must not
+        call ``.save()`` on it.
+        """
+        return cls(
+            project=project,
+            property_type=cls.get_property_type_for_project(project),
+        )
+
+    @classmethod
     def get_or_create_for_project(cls, project):
         """
-        Get or create DCF analysis for a project.
+        Get, or create an EMPTY, DCF analysis record for a project.
 
-        Creates with sensible defaults if no record exists.
-        property_type is automatically determined from project.project_type_code.
+        WRITE PATHS ONLY — call this when the user is actually saving something.
+
+        Historically this created the record with eight financial assumptions
+        baked in (discount rate 10%, exit cap 6%, selling costs 2%, going-in cap
+        5.5%, credit loss 1%, management fee 3%, stabilized vacancy 5%, bulk-sale
+        discount 15%, plus a 10-year hold). Because three call sites reached it —
+        two of them pure reads — merely opening a screen persisted all of them,
+        and from that moment nothing on the record, in the API, or on the page
+        distinguished them from figures the user had chosen.
+
+        The record now carries the discriminator and nothing else. Every
+        assumption stays NULL until a person supplies it. Consumers must render
+        a missing assumption as unavailable, never substitute their own number.
 
         Args:
             project: Project instance
@@ -1955,36 +2004,8 @@ class DcfAnalysis(models.Model):
         Returns:
             Tuple of (DcfAnalysis instance, created boolean)
         """
-        property_type = cls.get_property_type_for_project(project)
-
-        defaults = {
-            # Common defaults
-            'hold_period_years': 10,
-            'discount_rate': 0.10,  # 10%
-            'exit_cap_rate': 0.06,  # 6%
-            'selling_costs_pct': 0.02,  # 2%
-        }
-
-        if property_type == 'cre':
-            defaults.update({
-                'going_in_cap_rate': 0.055,  # 5.5%
-                'cap_rate_method': 'comp_sales',
-                'sensitivity_interval': 0.005,  # 50 bps
-                'vacancy_rate': 0.05,  # 5%
-                'stabilized_vacancy': 0.05,
-                'credit_loss': 0.01,  # 1%
-                'management_fee_pct': 0.03,  # 3%
-                'reserves_per_unit': 300,
-            })
-        else:
-            # Land Dev defaults
-            defaults.update({
-                'bulk_sale_enabled': False,
-                'bulk_sale_discount_pct': 0.15,  # 15%
-            })
-
         return cls.objects.get_or_create(
             project=project,
-            property_type=property_type,
-            defaults=defaults
+            property_type=cls.get_property_type_for_project(project),
+            defaults={},
         )

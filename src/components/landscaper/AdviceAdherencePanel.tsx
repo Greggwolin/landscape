@@ -23,6 +23,21 @@ interface Variance {
   notes?: string | null;
 }
 
+/**
+ * Advice the backend could not compare to an actual. Deliberately carries
+ * no actual_value / variance_percent -- the project has no recorded figure,
+ * and the API does not substitute one.
+ */
+interface UnavailableVariance {
+  assumption_key: string;
+  lifecycle_stage: string;
+  suggested_value: number;
+  confidence_level: string;
+  advice_date: string;
+  notes?: string | null;
+  reason: 'no_actual_recorded' | 'suggested_value_zero';
+}
+
 interface AdviceAdherencePanelProps {
   projectId: number;
   variances: Variance[];
@@ -39,6 +54,7 @@ export default function AdviceAdherencePanel({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localVariances, setLocalVariances] = useState<Variance[]>(variances);
+  const [unavailable, setUnavailable] = useState<UnavailableVariance[]>([]);
 
   // Load variances when threshold changes
   useEffect(() => {
@@ -60,8 +76,10 @@ export default function AdviceAdherencePanel({
 
       const data = await response.json();
       setLocalVariances(data.variances || []);
+      setUnavailable(data.unavailable || []);
     } catch (err) {
       console.error('Error loading variances:', err);
+      setUnavailable([]);
       setError('Failed to load variances');
     } finally {
       setIsLoading(false);
@@ -130,7 +148,11 @@ export default function AdviceAdherencePanel({
           {/* Variances list */}
           {!isLoading && localVariances.length === 0 && (
             <div className="text-center py-4 text-muted">
-              <p className="mb-0">No variances above {threshold}% threshold</p>
+              <p className="mb-0">
+                {unavailable.length > 0
+                  ? `No comparable variances above ${threshold}% threshold`
+                  : `No variances above ${threshold}% threshold`}
+              </p>
               <p className="small mt-2">
                 {threshold > 0
                   ? 'Lower the threshold to see more variances'
@@ -153,6 +175,31 @@ export default function AdviceAdherencePanel({
                 notes={variance.notes}
               />
             ))}
+
+          {/* Advice with no recorded actual. Listed by name so an empty
+              variance list is never mistaken for "on plan". */}
+          {!isLoading && unavailable.length > 0 && (
+            <div className="alert alert-warning small mt-3 mb-0" role="alert">
+              <strong>
+                {unavailable.length} suggestion{unavailable.length === 1 ? '' : 's'} not
+                comparable
+              </strong>
+              <p className="mb-1 mt-1">
+                No actual value is recorded on this project for the following, so no
+                variance can be calculated:
+              </p>
+              <ul className="mb-0 ps-3">
+                {unavailable.map((item, idx) => (
+                  <li key={`${item.assumption_key}-unavailable-${idx}`}>
+                    {item.assumption_key}
+                    {item.reason === 'suggested_value_zero'
+                      ? ' (suggested value was zero)'
+                      : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </CCardBody>
       </CCard>
     </div>

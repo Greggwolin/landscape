@@ -644,6 +644,29 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
         except (InvalidOperation, ZeroDivisionError):
             amount_per_sf = None
 
+    # ── Escalation / recovery: honour the caller, invent nothing ───────
+    # These two were hardcoded into the INSERT below as `... 1.0,
+    # 'FIXED_PERCENT', 0.03`, which did two wrong things at once. It threw away
+    # the escalation_rate the caller had explicitly passed in the selector
+    # (upsert_operating_expense sends one on every call), and it asserted a 3%
+    # escalation and 100% tenant recovery on rows where nobody had chosen
+    # either — the recovery figure inflating income, the escalation compounding
+    # for the life of the projection.
+    #
+    # Now: a supplied value is stored as supplied (including 0, which is a real
+    # assumption meaning "does not escalate" / "recovered from nobody"), and an
+    # unsupplied rate is stored as NULL. The NULL is passed explicitly because
+    # both columns carry a DEFAULT (0.03 / 1.0) that would otherwise reinstate
+    # the invented number the moment the column was left out of the statement.
+    #
+    # is_recoverable is deliberately NOT read from the selector here: it is a
+    # categorical gate rather than a rate, its column default is TRUE, and
+    # upsert_operating_expense defaults it to False, so honouring it would flip
+    # every tool-created row TRUE -> False. That is a separate decision from
+    # this defect and is left alone.
+    escalation_rate = selector.get('escalation_rate')
+    recovery_rate = selector.get('recovery_rate')
+
     with conn.cursor() as cursor:
         # Match by expense_category (exact label match) - this preserves distinct
         # line items from documents (e.g., "Utilities - Water" and "Utilities - Gas"
@@ -701,8 +724,8 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
                 created_at,
                 updated_at
             ) VALUES (
-                %s, %s, %s, %s, %s, TRUE, 1.0,
-                'FIXED_PERCENT', 0.03, 1, 'MONTHLY', NULL,
+                %s, %s, %s, %s, %s, TRUE, %s,
+                'FIXED_PERCENT', %s, 1, 'MONTHLY', NULL,
                 %s, 'FIXED_AMOUNT', %s, FALSE, %s, %s, %s, NOW(), NOW()
             )
             ON CONFLICT (project_id, category_id, statement_discriminator)
@@ -720,6 +743,8 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
             expense_type,
             dec_amount,
             amount_per_sf,
+            recovery_rate,
+            escalation_rate,
             account_id,
             unit_amount,
             category_id,

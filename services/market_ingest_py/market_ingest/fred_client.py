@@ -11,6 +11,7 @@ import requests
 from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from .config import redact_params
 from .normalize import NormalizedObservation, build_revision_tag, parse_date, parse_decimal
 
 
@@ -39,7 +40,7 @@ class FredClient:
 
     @retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=1, min=1, max=10))
     def _request(self, params: dict) -> dict:
-        logger.debug("FRED request params={}", params)
+        logger.debug("FRED request params={}", redact_params(params))
         response = self.session.get(self.BASE_URL, params=params, timeout=30)
         # 400 errors typically mean bad series or frequency - treat as empty result
         if response.status_code == 400:

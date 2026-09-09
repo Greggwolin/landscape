@@ -16,6 +16,26 @@ from .serializers import AcquisitionEventSerializer, PropertyAcquisitionSerializ
 from apps.projects.models import Project
 
 
+# The acquisition-assumption fields a client binds form inputs to. When no
+# record exists every one of them is returned as null: the shape stays stable
+# so the form can render, but the app names no value the user did not choose.
+# Derived from the serializer so a field added there cannot silently drop out
+# of the empty response (project_id is added separately by the view).
+EMPTY_ASSUMPTION_FIELDS = tuple(
+    f for f in PropertyAcquisitionSerializer.Meta.fields
+    if f not in (
+        'acquisition_id', 'project_id', 'created_at', 'updated_at',
+        # Omitted rather than nulled. is_1031_exchange is a non-null boolean:
+        # sending null makes the payload unsavable (the serializer rejects it),
+        # so a client that echoes what it loaded could never save at all.
+        # Leaving the key out is the honest "not stated" — and it is an election
+        # about deal structure, not a figure that feeds a calculation, so the
+        # neutral "no 1031" that a save without it lands on names no number.
+        'is_1031_exchange',
+    )
+)
+
+
 class AcquisitionCategoriesView(APIView):
     """
     API endpoint for acquisition cost categories.
@@ -169,7 +189,19 @@ class PropertyAcquisitionViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         """
         Get acquisition assumptions for a project.
-        Returns defaults if no record exists.
+
+        When no record exists the response carries the field set EMPTY. It used
+        to carry a full set of deal terms — a 7-year hold, a 5.5% exit cap, 1.5%
+        closing costs, a 2.5% broker commission, 30 due-diligence days and a
+        20/80 land/improvement split (which drives depreciation) — handed to the
+        client as though they were this project's own. A client that echoes what
+        it was given back on save then made them permanent, and nobody had
+        chosen any of them.
+
+        The app must never supply a financial assumption the user did not
+        choose (product owner, 2026-09-04). `exists: False` tells a client the
+        difference between "not set" and "set to nothing" without naming a
+        number.
         """
         project_id = self.kwargs.get('project_pk')
         project = get_object_or_404(Project, project_id=project_id)
@@ -179,30 +211,10 @@ class PropertyAcquisitionViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(instance)
             return Response(serializer.data)
         except PropertyAcquisition.DoesNotExist:
-            # Return default values
-            defaults = {
-                'project_id': project_id,
-                'purchase_price': None,
-                'acquisition_date': None,
-                'hold_period_years': 7.0,
-                'exit_cap_rate': 0.055,
-                'sale_date': None,
-                'closing_costs_pct': 0.015,
-                'due_diligence_days': 30,
-                'earnest_money': None,
-                'sale_costs_pct': 0.015,
-                'broker_commission_pct': 0.025,
-                'price_per_unit': None,
-                'price_per_sf': None,
-                'legal_fees': None,
-                'financing_fees': None,
-                'third_party_reports': None,
-                'depreciation_basis': None,
-                'land_pct': 20.0,
-                'improvement_pct': 80.0,
-                'is_1031_exchange': False
-            }
-            return Response(defaults)
+            empty = {field: None for field in EMPTY_ASSUMPTION_FIELDS}
+            empty['project_id'] = project_id
+            empty['exists'] = False
+            return Response(empty)
 
     def create(self, request, *args, **kwargs):
         """

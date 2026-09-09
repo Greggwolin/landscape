@@ -1217,16 +1217,23 @@ class MutationService:
 
                     if existing:
                         # Update
+                        # escalation_rate: COALESCE, not a bare assignment with a
+                        # 3% fallback. `.get(key, 0.03)` invented an escalation
+                        # whenever the caller stayed silent, and that invented
+                        # number was then indistinguishable from a chosen one.
+                        # A supplied 0 is not NULL, so it still lands as 0; an
+                        # absent rate leaves whatever the row already had.
                         cursor.execute("""
                             UPDATE landscape.tbl_operating_expenses
                             SET annual_amount = %s, expense_type = %s,
-                                escalation_rate = %s, is_recoverable = %s,
+                                escalation_rate = COALESCE(%s, escalation_rate),
+                                is_recoverable = %s,
                                 updated_at = NOW()
                             WHERE opex_id = %s
                         """, [
                             expense.get("annual_amount", 0),
                             expense.get("expense_type", "OTHER"),
-                            expense.get("escalation_rate", 0.03),
+                            expense.get("escalation_rate"),
                             expense.get("is_recoverable", False),
                             existing[0],
                         ])
@@ -1244,7 +1251,11 @@ class MutationService:
                             label,
                             expense.get("expense_type", "OTHER"),
                             expense.get("annual_amount", 0),
-                            expense.get("escalation_rate", 0.03),
+                            # None, not 0.03. The escalation_rate column carries
+                            # DEFAULT 0.03, so this NULL is passed explicitly --
+                            # dropping the column from the INSERT would let the
+                            # database reinstate the 3% we are refusing to invent.
+                            expense.get("escalation_rate"),
                             expense.get("is_recoverable", False),
                         ])
                         new_id = cursor.fetchone()[0]

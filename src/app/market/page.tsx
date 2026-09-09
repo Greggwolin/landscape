@@ -368,6 +368,26 @@ const MarketPage: React.FC = () => {
   };
   */
 
+  // What the page can honestly claim about freshness: the newest observation
+  // across every series actually loaded, rather than a hardcoded promise.
+  const latestObservation = useMemo(() => {
+    let newest: string | null = null;
+    for (const payload of [macroData, laborData, housingData, demographicsData, cityData]) {
+      for (const serie of payload?.series ?? []) {
+        const last = serie.data[serie.data.length - 1];
+        if (last?.date && (newest === null || last.date > newest)) {
+          newest = last.date;
+        }
+      }
+    }
+    if (!newest) return null;
+    return new Date(`${newest}T00:00:00Z`).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }, [macroData, laborData, housingData, demographicsData, cityData]);
+
   const macroSeries = useMemo(
     () => macroData?.series.filter((serie) => ['CPIAUCSL', 'CPIAUCNS', 'PPIACO', 'FEDFUNDS', 'MORTGAGE30US', 'MORTGAGE15US'].includes(serie.series_code)) ?? [],
     [macroData]
@@ -662,58 +682,20 @@ const MarketPage: React.FC = () => {
           </TabsPrimitive.Content>
         </TabsPrimitive.Root>
 
-        <div className="flex items-center justify-between border border-gray-800 rounded-lg p-4 bg-gray-900">
-          <div>
-            <div className="text-sm text-gray-300">Need fresher data?</div>
-            <div className="text-xs text-gray-500">
-              Queue a new market ingestion bundle and track status in market_fetch_job.
-            </div>
+        <div className="border border-gray-800 rounded-lg p-4 bg-gray-900">
+          <div className="text-sm text-gray-300">How this data stays current</div>
+          <div className="text-xs text-gray-500 mt-1">
+            Market data refreshes on a schedule, not on demand — a monthly job re-fetches every
+            series on this page. The economic series publish monthly; the census series publish
+            once a year, in December.
           </div>
-          <RefreshButton projectId={activeProject.project_id} />
+          {latestObservation ? (
+            <div className="text-xs text-gray-500 mt-2">
+              Newest observation currently loaded: {latestObservation}.
+            </div>
+          ) : null}
         </div>
       </div>
-    </div>
-  );
-};
-
-const RefreshButton: React.FC<{ projectId: number }> = ({ projectId }) => {
-  const [isSubmitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const handleRefresh = async () => {
-    setSubmitting(true);
-    setStatus(null);
-    try {
-      const res = await fetch('/api/market/refresh', {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_id: projectId,
-          bundle: 'macro_v1',
-        }),
-      });
-      if (!res.ok) throw new Error('Request failed');
-      const payload = await res.json();
-      setStatus(`Queued job #${payload.job_id}`);
-    } catch (error) {
-      console.error('Refresh request failed', error);
-      setStatus('Failed to queue job.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-end gap-2">
-      <button
-        type="button"
-        disabled={isSubmitting}
-        onClick={handleRefresh}
-        className="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-      >
-        {isSubmitting ? 'Queuing...' : 'Refresh Data'}
-      </button>
-      {status ? <span className="text-xs text-gray-400">{status}</span> : null}
     </div>
   );
 };

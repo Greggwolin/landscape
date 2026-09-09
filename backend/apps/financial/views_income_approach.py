@@ -60,13 +60,13 @@ def _get_income_approach_data(project_id: int) -> dict:
     # Use the data service to aggregate assumptions from multiple tables
     data_service = IncomeApproachDataService(project_id)
 
-    # Ensure an income_approach record exists (for storing cap rate)
+    # Ensure an income_approach record exists (a container for the cap rate the
+    # user will choose). It is created EMPTY: this is a read, and a 5.25% cap
+    # rate plus a "comparable sales" derivation persisted here by a page view
+    # were indistinguishable afterwards from an appraiser's own conclusions.
     income_approach, created = IncomeApproach.objects.get_or_create(
         project_id=project_id,
-        defaults={
-            'selected_cap_rate': Decimal('0.0525'),
-            'market_cap_rate_method': 'comp_sales',
-        }
+        defaults={},
     )
 
     with connection.cursor() as cursor:

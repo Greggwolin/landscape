@@ -75,9 +75,24 @@ class Database:
         if not series_codes:
             return {}
         with self.connection() as conn, conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
+            # public.market_series holds duplicate rows for some series_code
+            # (PERMIT_TOTAL/1UNIT/5PLUS, POP_STATE, SOFR). This method returns a
+            # dict keyed by series_code, so before DISTINCT ON the winner was
+            # whichever row Postgres happened to return last -- non-deterministic
+            # run to run, and the losing pick has real consequences: the CITY-only
+            # PERMIT_* rows would silently stop permits being fetched at
+            # US/STATE/MSA/COUNTY, and the empty POP_STATE row would orphan the 47
+            # observations already written under the other series_id.
+            #
+            # Preference, most significant first:
+            #   1. the row that already carries observations  -- keeps new writes
+            #      landing where the existing history is, rather than splitting it
+            #   2. the broadest coverage_level                -- never narrow what
+            #      a series is fetched for
+            #   3. the lowest series_id                       -- stable tie-break
             cur.execute(
                 """
-                SELECT
+                SELECT DISTINCT ON (ms.series_code)
                   ms.series_id,
                   ms.series_code,
                   ms.category,
@@ -87,8 +102,18 @@ class Database:
                   ms.source,
                   ms.coverage_level
                 FROM public.market_series ms
+                LEFT JOIN LATERAL (
+                  SELECT count(*) AS obs
+                  FROM public.market_data md
+                  WHERE md.series_id = ms.series_id
+                ) o ON TRUE
                 WHERE ms.series_code = ANY(%s)
                   AND ms.is_active = TRUE
+                ORDER BY
+                  ms.series_code,
+                  o.obs DESC,
+                  length(ms.coverage_level) DESC,
+                  ms.series_id ASC
                 """,
                 (list(series_codes),),
             )
