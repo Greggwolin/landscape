@@ -43,8 +43,28 @@ _RESULTS = {
 }
 
 
+# The engine-selected tbl_dcf_analysis row for an income deal. Values here are
+# what a user actually entered; the strip must echo THESE, not the payload.
+_DCF_CRE = {
+    'dcf_analysis_id': 7,
+    'property_type': 'cre',
+    'discount_rate': 0.09,
+    'hold_period_years': 3,
+    'exit_cap_rate': 0.055,
+    'selling_costs_pct': 0.03,
+    'going_in_cap_rate': None,
+    'vacancy_rate': None,
+    'stabilized_vacancy': None,
+    'credit_loss': None,
+    'management_fee_pct': None,
+    'reserves_per_unit': None,
+    'income_growth_set_id': None,
+    'expense_growth_set_id': None,
+}
+
+
 # The engine-selected tbl_dcf_analysis row for a land deal. exit_cap_rate is
-# deliberately NULL here so the Assumed-vs-Entered split is exercised.
+# deliberately NULL here so the Not-set-vs-Entered split is exercised.
 _DCF_LAND = {
     'dcf_analysis_id': 1,
     'property_type': 'land_dev',
@@ -129,19 +149,35 @@ def test_assumptions_strip_is_the_only_editable_surface():
         assert not r.get('editable')
 
 
-def test_assumptions_render_present_keys_as_editable_numbers():
+def test_assumptions_render_stored_values_as_editable_numbers():
     rows = {r['cells']['assumption']: r['cells']['value']
-            for r in _build()['blocks'][1]['rows']}
+            for r in _build(dcf_row=_DCF_CRE)['blocks'][1]['rows']}
     # PERCENT UNITS, as a number — the cell must stay numerically editable, and
     # what the user reads is the unit the user types.
     assert rows['Discount Rate'] == 9.0
     assert rows['Hold Period (yrs)'] == 3
     assert rows['Exit Cap Rate'] == 5.5
-    # A key absent from the payload produces no row (no fabrication).
-    assert build_cashflow_artifact_schema(
+    # A column the user has not filled in reads EMPTY. It is not dropped (the
+    # gap has to be visible) and it is not filled with a house number.
+    assert rows['Going-In Cap Rate'] is None
+    assert rows['Management Fee'] is None
+
+
+def test_an_unset_assumption_is_shown_empty_not_hidden_and_not_invented():
+    """The rule (2026-09-04): the app never supplies an assumption the user did
+    not choose. So a NULL column renders as a row with no value and a basis of
+    'Not set' — visible as a gap to fill, never as a number, never omitted."""
+    schema = build_cashflow_artifact_schema(
         _ROWS, {'discount_rate': 0.09}, _RESULTS,
         net_revenue_label='Net Revenue', period_type='year', total_periods=3,
-    )['blocks'][1]['rows'].__len__() == 1
+        dcf_row={**_DCF_CRE, 'discount_rate': None},
+    )
+    rows = {r['cells']['assumption']: r['cells'] for r in schema['blocks'][1]['rows']}
+    assert rows['Discount Rate']['value'] is None
+    assert rows['Discount Rate']['basis'] == 'Not set'
+    # The payload carrying 0.09 must not leak into the cell: the DCF row is the
+    # only place a user's own value can live.
+    assert 9.0 not in [c['value'] for c in rows.values()]
 
 
 def test_percent_rows_carry_a_percent_cell_format():
@@ -267,29 +303,36 @@ def test_benchmark_and_non_allowlisted_rows_carry_no_ref():
     assert 'cell_source_refs' not in rows['Bulk Sale at Exit']
 
 
-def test_basis_distinguishes_entered_assumed_and_benchmark():
-    rows = {r['cells']['assumption']: r['cells']['basis']
-            for r in _land(dcf_row={**_DCF_LAND, 'bulk_sale_discount_pct': None},
-                           growth_set_names={45: 'Price Inflaton'})['blocks'][1]['rows']}
+def test_basis_distinguishes_entered_not_set_and_benchmark():
+    built = _land(dcf_row={**_DCF_LAND, 'bulk_sale_discount_pct': None},
+                  growth_set_names={45: 'Price Inflaton'})['blocks'][1]['rows']
+    cells = {r['cells']['assumption']: r['cells'] for r in built}
+    rows = {k: v['basis'] for k, v in cells.items()}
     assert rows['Discount Rate'] == 'Entered'          # stored value
-    assert rows['Bulk Sale Discount'] == 'Assumed'     # column is NULL → default
+    # Column is NULL. Nothing stands in for it — the basis says so and the cell
+    # is empty, rather than a 15% discount nobody chose wearing an 'Assumed' tag.
+    assert rows['Bulk Sale Discount'] == 'Not set'
+    assert cells['Bulk Sale Discount']['value'] is None
     assert rows['Price Growth'] == 'Benchmark · Price Inflaton'
-    # A benchmark row with no explicit set says so rather than implying a link.
-    assert rows['Cost Inflation'] == 'Benchmark · project default'
+    # A benchmark row with no set linked has no rate to report.
+    assert rows['Cost Inflation'] == 'Not set'
+    assert cells['Cost Inflation']['value'] is None
     # No row is ever blank about where its number came from.
     assert all(v for v in rows.values())
 
 
 def test_no_dcf_record_means_nothing_is_editable():
-    """A project with no assumption record yet shows every value as Assumed and
+    """A project with no assumption record yet shows every value as Not set and
     offers NO editable cell — the ref is the allowlist, so absence fails closed
     rather than writing to a record that does not exist."""
     schema = _land(dcf_row=None)
     rows = schema['blocks'][1]['rows']
-    assert rows, 'rows still render — the user sees the defaults in play'
+    assert rows, 'rows still render — the user sees which assumptions are missing'
     assert all('cell_source_refs' not in r for r in rows)
-    assert all(r['cells']['basis'] in ('Assumed', 'Benchmark · project default')
-               for r in rows)
+    assert all(r['cells']['basis'] == 'Not set' for r in rows)
+    # And not one of them carries a number the user never supplied.
+    assert all(r['cells']['value'] is None for r in rows
+               if r['cells']['assumption'] != 'Bulk Sale at Exit')
 
 
 def test_kpi_header_is_never_editable():

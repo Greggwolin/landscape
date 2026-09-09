@@ -53,10 +53,14 @@ percent convention. There is no magnitude heuristic anywhere on this path: what
 the user types is the unit they see, and the writer scales by exactly 100 for the
 fields declared percent. Out-of-band input is refused, never coerced.
 
-*Provenance is not decoration.* A value the service substituted because the
-stored column is NULL is tagged ``Assumed`` — never presented like a decision.
-A stored value is ``Entered``; a growth row is ``Benchmark · <set name>``. There
-is no silent fourth state: every row states its basis.
+*Provenance is not decoration.* A stored value is ``Entered``; a growth row is
+``Benchmark · <set name>``; an assumption nobody has supplied is ``Not set`` and
+its cell is EMPTY. There is no silent fourth state: every row states its basis.
+
+There used to be one — ``Assumed`` — covering values the service invented to
+stand in for a NULL column. That basis is gone with the substitution behind it
+(2026-09-04): the app must never supply a financial assumption the user did not
+choose, so a NULL column now renders as a gap to fill, not as a number.
 """
 
 from __future__ import annotations
@@ -431,6 +435,13 @@ def _build_assumption_rows(
 
         if kind == 'flag':
             raw = (dcf_row or {}).get(column)
+        elif column:
+            # A column-backed assumption is read from the DCF ROW, not from the
+            # service payload. The row is the only place a user's own value can
+            # live, and the service no longer substitutes one when it is NULL.
+            # The row is always rendered — a gap the user has to fill is shown,
+            # never silently dropped from the strip.
+            raw = (dcf_row or {}).get(column)
         else:
             if key not in assumptions:
                 # Driver-1 floor: a dimension absent from the payload is not a row.
@@ -441,15 +452,23 @@ def _build_assumption_rows(
         if s.get('benchmark_set_key'):
             set_id = (dcf_row or {}).get(s['benchmark_set_key'])
             set_name = growth_set_names.get(set_id) if set_id else None
-            # No explicit set on the record → the service resolved a project or
-            # global default. Say that plainly rather than implying a direct link.
-            basis = f'Benchmark · {set_name}' if set_name else 'Benchmark · project default'
+            if set_name:
+                basis = f'Benchmark · {set_name}'
+            elif set_id:
+                basis = 'Benchmark · unnamed set'
+            else:
+                # No set linked. There is no rate — say so rather than showing a
+                # figure with a basis that implies somebody selected it.
+                basis = 'Not set'
+                raw = None
         elif dcf_row is not None and column and dcf_row.get(column) is not None:
             basis = 'Entered'
         else:
-            # The stored column is NULL (or there is no record yet) and the
-            # service supplied a default. That is an assumption, not a decision.
-            basis = 'Assumed'
+            # The stored column is NULL (or there is no record yet). Nothing
+            # supplies a value here: the app must not invent an assumption the
+            # user did not choose. The cell reads empty and says why.
+            basis = 'Not set'
+            raw = None
 
         cells: Dict[str, Any] = {
             'assumption': s['label'],

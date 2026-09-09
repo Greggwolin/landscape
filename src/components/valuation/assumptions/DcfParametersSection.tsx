@@ -190,16 +190,22 @@ function PercentInput({
   max = 1,
   tooltip,
 }: PercentInputProps) {
-  const safeValue = value ?? 0;
-  const [localValue, setLocalValue] = useState((safeValue * 100).toFixed(2));
+  // An unset assumption renders EMPTY, never "0.00%". The backend no longer
+  // invents a discount rate / cap rate / selling cost, so null here means the
+  // user has not chosen one — and a 0.00% on screen would read as if they had.
+  const isUnset = value === null || value === undefined;
+  const toText = (v: number | null | undefined) =>
+    v === null || v === undefined ? '' : (v * 100).toFixed(2);
+
+  const [localValue, setLocalValue] = useState(toText(value));
   const [isFocused, setIsFocused] = useState(false);
 
   // Sync local value with prop when not focused
   useEffect(() => {
     if (!isFocused) {
-      setLocalValue((safeValue * 100).toFixed(2));
+      setLocalValue(toText(value));
     }
-  }, [safeValue, isFocused]);
+  }, [value, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/[^0-9.-]/g, '');
@@ -208,17 +214,28 @@ function PercentInput({
 
   const handleBlur = () => {
     setIsFocused(false);
+    if (localValue.trim() === '') {
+      // Cleared on purpose: hand back null so the column goes back to unset
+      // rather than being pinned at zero.
+      onChange(null);
+      setLocalValue('');
+      return;
+    }
     const numValue = parseFloat(localValue) / 100;
     if (!isNaN(numValue)) {
       const clampedValue = Math.max(min, Math.min(max, numValue));
       onChange(clampedValue);
       setLocalValue((clampedValue * 100).toFixed(2));
     } else {
-      setLocalValue((safeValue * 100).toFixed(2));
+      setLocalValue(toText(value));
     }
   };
 
-  const displayValue = isFocused ? localValue : `${localValue}%`;
+  const displayValue = isFocused
+    ? localValue
+    : localValue === ''
+      ? ''
+      : `${localValue}%`;
 
   return (
     <div className="flex items-center justify-between">
@@ -232,6 +249,8 @@ function PercentInput({
       <input
         type="text"
         value={displayValue}
+        placeholder={isUnset ? 'Not set' : undefined}
+        title={isUnset ? `${label} has not been set for this project` : tooltip}
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
@@ -256,15 +275,19 @@ interface NumberInputProps {
 }
 
 function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: NumberInputProps) {
-  const safeValue = value ?? 0;
-  const [localValue, setLocalValue] = useState(String(safeValue));
+  // Same rule as PercentInput: unset renders empty, not "0 yrs".
+  const isUnset = value === null || value === undefined;
+  const toText = (v: number | null | undefined) =>
+    v === null || v === undefined ? '' : String(v);
+
+  const [localValue, setLocalValue] = useState(toText(value));
   const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     if (!isFocused) {
-      setLocalValue(String(safeValue));
+      setLocalValue(toText(value));
     }
-  }, [safeValue, isFocused]);
+  }, [value, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/[^0-9]/g, '');
@@ -273,18 +296,24 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
 
   const handleBlur = () => {
     setIsFocused(false);
+    if (localValue.trim() === '') {
+      onChange(null);
+      setLocalValue('');
+      return;
+    }
     const numValue = parseInt(localValue, 10);
     if (!isNaN(numValue)) {
       const clampedValue = Math.max(min, Math.min(max, numValue));
       onChange(clampedValue);
       setLocalValue(String(clampedValue));
     } else {
-      setLocalValue(String(safeValue));
+      setLocalValue(toText(value));
     }
   };
 
   const formatDisplayValue = () => {
     if (isFocused) return localValue;
+    if (localValue === '') return '';
     const suffixText = suffix ? ` ${suffix}` : '';
     return `${localValue}${suffixText}`;
   };
@@ -300,6 +329,8 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
       <input
         type="text"
         value={formatDisplayValue()}
+        placeholder={isUnset ? 'Not set' : undefined}
+        title={isUnset ? `${label} has not been set for this project` : undefined}
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}

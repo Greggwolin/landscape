@@ -21,15 +21,35 @@ from apps.financial.models_valuation import DcfAnalysis
 from .growth_rate_service import GrowthRateService
 
 
+def _opt_float(value: Any) -> Optional[float]:
+    """float(value), or None when the assumption was never set.
+
+    Deliberately NOT ``float(value or 0)``: an unset assumption and a
+    user-entered zero are different answers and must stay different.
+    """
+    return None if value is None else float(value)
+
+
 class DcfAssumptionsService:
     """
     Service for resolving DCF assumptions from tbl_dcf_analysis.
 
     Provides a unified interface for calculation services to get assumptions
     without worrying about:
-    - Record creation (auto-creates with defaults)
-    - Growth rate set resolution (falls back to defaults)
     - Property type differences (land_dev vs cre)
+    - Growth rate set resolution (library link, with an explicit basis)
+
+    TWO THINGS THIS SERVICE DELIBERATELY DOES NOT DO (2026-09-04):
+
+    1. **It never creates a record.** It used to call
+       ``get_or_create_for_project``, so any calculation that merely *read*
+       assumptions persisted a full set of them.
+
+    2. **It never substitutes a figure.** It used to fill a NULL column with its
+       own number (``dcf.discount_rate or Decimal('0.10')``), so a stored NULL
+       and a user-entered 10% came back identical. Every unset assumption is now
+       returned as ``None``. Consumers must show it as unavailable and say why —
+       never a zero, never a house number.
     """
 
     def __init__(self, project_id: int):
@@ -46,10 +66,22 @@ class DcfAssumptionsService:
 
     @property
     def dcf_analysis(self) -> DcfAnalysis:
-        """Lazy-load or create DCF analysis record."""
+        """Lazy-load the DCF analysis record. READ ONLY — never creates one.
+
+        When the project has no record, an unsaved all-null instance stands in
+        so field access keeps working; nothing is written.
+        """
         if self._dcf_analysis is None:
-            self._dcf_analysis, _ = DcfAnalysis.get_or_create_for_project(self.project)
+            self._dcf_analysis = (
+                DcfAnalysis.get_for_project(self.project)
+                or DcfAnalysis.blank_for_project(self.project)
+            )
         return self._dcf_analysis
+
+    @property
+    def has_saved_record(self) -> bool:
+        """True when a real row exists in tbl_dcf_analysis for this project."""
+        return self.dcf_analysis.pk is not None
 
     @property
     def property_type(self) -> str:
@@ -200,15 +232,18 @@ class DcfAssumptionsService:
         Get common DCF assumptions applicable to all property types.
 
         Returns:
-            Dict with hold_period_years, discount_rate, exit_cap_rate, selling_costs_pct
+            Dict with hold_period_years, discount_rate, exit_cap_rate,
+            selling_costs_pct. Any of them is None when the user has not set it.
         """
         dcf = self.dcf_analysis
 
         return {
-            'hold_period_years': dcf.hold_period_years or 10,
-            'discount_rate': float(dcf.discount_rate or Decimal('0.10')),
-            'exit_cap_rate': float(dcf.exit_cap_rate or Decimal('0.065')),
-            'selling_costs_pct': float(dcf.selling_costs_pct or Decimal('0.02')),
+            'hold_period_years': (
+                int(dcf.hold_period_years) if dcf.hold_period_years is not None else None
+            ),
+            'discount_rate': _opt_float(dcf.discount_rate),
+            'exit_cap_rate': _opt_float(dcf.exit_cap_rate),
+            'selling_costs_pct': _opt_float(dcf.selling_costs_pct),
         }
 
     def get_land_dev_assumptions(self) -> Dict[str, Any]:
@@ -229,14 +264,22 @@ class DcfAssumptionsService:
         return {
             # Growth rate sets
             'price_growth_set_id': price_set_id,
-            'price_growth_rate': float(GrowthRateService.get_flat_rate(price_set_id) if price_set_id else 0),
+            # A growth rate is a LIBRARY LINK. With no set resolved there is no
+            # rate — not 0%, which is itself a forecast.
+            'price_growth_rate': (
+                _opt_float(GrowthRateService.get_flat_rate(price_set_id)) if price_set_id else None
+            ),
             'cost_inflation_set_id': cost_set_id,
-            'cost_inflation_rate': float(GrowthRateService.get_flat_rate(cost_set_id) if cost_set_id else 0),
+            'cost_inflation_rate': (
+                _opt_float(GrowthRateService.get_flat_rate(cost_set_id)) if cost_set_id else None
+            ),
 
-            # Bulk sale settings
+            # Bulk sale settings. The discount is NOT defaulted to 15% — an
+            # unset discount means the user has not told us what a bulk buyer
+            # would pay, and inventing one silently moves the sellout value.
             'bulk_sale_enabled': dcf.bulk_sale_enabled or False,
             'bulk_sale_period': dcf.bulk_sale_period,
-            'bulk_sale_discount_pct': float(dcf.bulk_sale_discount_pct or Decimal('0.15')),
+            'bulk_sale_discount_pct': _opt_float(dcf.bulk_sale_discount_pct),
         }
 
     def get_cre_assumptions(self) -> Dict[str, Any]:
@@ -256,19 +299,24 @@ class DcfAssumptionsService:
         return {
             # Growth rate sets
             'income_growth_set_id': income_set_id,
-            'income_growth_rate': float(GrowthRateService.get_flat_rate(income_set_id) if income_set_id else Decimal('0.03')),
+            'income_growth_rate': (
+                _opt_float(GrowthRateService.get_flat_rate(income_set_id)) if income_set_id else None
+            ),
             'expense_growth_set_id': expense_set_id,
-            'expense_growth_rate': float(GrowthRateService.get_flat_rate(expense_set_id) if expense_set_id else Decimal('0.03')),
+            'expense_growth_rate': (
+                _opt_float(GrowthRateService.get_flat_rate(expense_set_id)) if expense_set_id else None
+            ),
 
-            # CRE-specific rates
-            'going_in_cap_rate': float(dcf.going_in_cap_rate or Decimal('0.05')),
-            'vacancy_rate': float(dcf.vacancy_rate or Decimal('0.05')),
-            'stabilized_vacancy': float(dcf.stabilized_vacancy or Decimal('0.05')),
-            'credit_loss': float(dcf.credit_loss or Decimal('0.01')),
-            'management_fee_pct': float(dcf.management_fee_pct or Decimal('0.03')),
+            # CRE-specific rates. None when unset — a cap rate, a vacancy factor
+            # and a management fee are underwriting positions, not constants.
+            'going_in_cap_rate': _opt_float(dcf.going_in_cap_rate),
+            'vacancy_rate': _opt_float(dcf.vacancy_rate),
+            'stabilized_vacancy': _opt_float(dcf.stabilized_vacancy),
+            'credit_loss': _opt_float(dcf.credit_loss),
+            'management_fee_pct': _opt_float(dcf.management_fee_pct),
 
             # Reserves
-            'reserves_per_unit': float(dcf.reserves_per_unit or Decimal('300')),
+            'reserves_per_unit': _opt_float(dcf.reserves_per_unit),
         }
 
     def get_all_assumptions(self) -> Dict[str, Any]:
