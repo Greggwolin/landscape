@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useParams } from 'next/navigation';
 import { ComplexityTier } from '@/types/assumptions';
 import { basket1Config } from '@/config/assumptions/basket1-the-deal';
@@ -11,7 +12,14 @@ import { basket5Config } from '@/config/assumptions/basket5-equity';
 import { AssumptionBasket } from '@/app/components/assumptions/AssumptionBasket';
 import { getFieldsForTier } from '@/config/assumptions';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import {
+  armsAutoSave,
+  shouldAutoSaveAssumptions,
+  type ChangeOrigin
+} from '@/lib/assumptions/autoSave';
 import '@/app/styles/assumptions.css';
+
+type BasketKey = 'acquisition' | 'revenue' | 'expenses' | 'financing' | 'equity';
 
 export default function AssumptionsPage() {
   const params = useParams();
@@ -36,6 +44,32 @@ export default function AssumptionsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Which baskets a PERSON has edited since this page loaded. Nothing is saved
+  // for a basket that is not in here.
+  //
+  // Loading the page is itself a state change — the fetched payload lands in
+  // state, and auto-calculated fields fire on mount — so without this gate the
+  // 1s debounce below wrote back whatever the server handed over as though the
+  // user had entered it. For a project with no acquisition record the server
+  // used to hand over a full set of deal terms it had invented (7-year hold,
+  // 5.5% exit cap, 20/80 land split, ...), and visiting the page made them
+  // permanent. The server no longer invents them; this makes sure the page
+  // could not persist them even if something else did.
+  const [editedBaskets, setEditedBaskets] = useState<Set<BasketKey>>(new Set());
+
+  const recordChange = useCallback(
+    (
+      basket: BasketKey,
+      setter: Dispatch<SetStateAction<Record<string, string | number | boolean | null>>>
+    ) => (key: string, value: string | number | boolean | null, origin: ChangeOrigin) => {
+      setter(prev => ({ ...prev, [key]: value }));
+      if (armsAutoSave(origin)) {
+        setEditedBaskets(prev => (prev.has(basket) ? prev : new Set(prev).add(basket)));
+      }
+    },
+    []
+  );
 
   // Define save functions before useEffect hooks that reference them
   const saveAcquisitionData = useCallback(async () => {
@@ -100,7 +134,17 @@ export default function AssumptionsPage() {
     }
   }, [globalMode]);
 
-  // Load all assumptions data
+  // Load all assumptions data.
+  //
+  // NOTE (2026-09-04): these five relative `/api/projects/:id/assumptions/*`
+  // paths have NO Next.js route file and no rewrite — `next.config.ts` defines
+  // redirects only, and `middleware.ts` passes `/api` straight through. Every
+  // request 404s with an HTML body, `.json()` throws, `Promise.all` rejects and
+  // the catch below leaves all five baskets empty. The Django endpoint that
+  // backs acquisition is `POST/GET {DJANGO_API_URL}/api/projects/:id/
+  // assumptions/acquisition/` (note the absolute host and trailing slash); the
+  // other four baskets have no server at all. Left as-is deliberately: this
+  // change is about not inventing assumptions, not about waking a dead path.
   useEffect(() => {
     const fetchAllData = async () => {
       setIsLoading(true);
@@ -136,49 +180,49 @@ export default function AssumptionsPage() {
     fetchAllData();
   }, [projectId]);
 
-  // Auto-save acquisition data
+  // Auto-save acquisition data — only once a person has edited this basket.
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (Object.keys(acquisitionData).length > 0 && acquisitionData.project_id) {
-        saveAcquisitionData();
-      }
-    }, 1000);
+    if (!shouldAutoSaveAssumptions({
+      values: acquisitionData,
+      userEdited: editedBaskets.has('acquisition')
+    })) return;
 
+    const timeoutId = setTimeout(saveAcquisitionData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [acquisitionData, saveAcquisitionData]);
+  }, [acquisitionData, saveAcquisitionData, editedBaskets]);
 
   // Auto-save revenue data
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (Object.keys(revenueData).length > 0) {
-        saveRevenueData();
-      }
-    }, 1000);
+    if (!shouldAutoSaveAssumptions({
+      values: revenueData,
+      userEdited: editedBaskets.has('revenue')
+    })) return;
 
+    const timeoutId = setTimeout(saveRevenueData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [revenueData, saveRevenueData]);
+  }, [revenueData, saveRevenueData, editedBaskets]);
 
   // Auto-save expense data
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (Object.keys(expenseData).length > 0) {
-        saveExpenseData();
-      }
-    }, 1000);
+    if (!shouldAutoSaveAssumptions({
+      values: expenseData,
+      userEdited: editedBaskets.has('expenses')
+    })) return;
 
+    const timeoutId = setTimeout(saveExpenseData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [expenseData, saveExpenseData]);
+  }, [expenseData, saveExpenseData, editedBaskets]);
 
   // Auto-save equity data
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (Object.keys(equityData).length > 0) {
-        saveEquityData();
-      }
-    }, 1000);
+    if (!shouldAutoSaveAssumptions({
+      values: equityData,
+      userEdited: editedBaskets.has('equity')
+    })) return;
 
+    const timeoutId = setTimeout(saveEquityData, 1000);
     return () => clearTimeout(timeoutId);
-  }, [equityData, saveEquityData]);
+  }, [equityData, saveEquityData, editedBaskets]);
 
   // Calculate total field counts across all baskets
   const fieldCounts = {
@@ -273,7 +317,7 @@ export default function AssumptionsPage() {
         basket={basket1Config}
         values={acquisitionData}
         currentMode={globalMode}
-        onChange={(key, value) => setAcquisitionData(prev => ({ ...prev, [key]: value }))}
+        onChange={recordChange('acquisition', setAcquisitionData)}
         onModeChange={setGlobalMode}
         showModeToggle={false}
       />
@@ -283,7 +327,7 @@ export default function AssumptionsPage() {
         basket={basket2Config}
         values={revenueData}
         currentMode={globalMode}
-        onChange={(key, value) => setRevenueData(prev => ({ ...prev, [key]: value }))}
+        onChange={recordChange('revenue', setRevenueData)}
         showModeToggle={false}
       />
 
@@ -292,7 +336,7 @@ export default function AssumptionsPage() {
         basket={basket3Config}
         values={expenseData}
         currentMode={globalMode}
-        onChange={(key, value) => setExpenseData(prev => ({ ...prev, [key]: value }))}
+        onChange={recordChange('expenses', setExpenseData)}
         showModeToggle={false}
       />
 
@@ -301,7 +345,7 @@ export default function AssumptionsPage() {
         basket={basket4Config}
         values={financingData}
         currentMode={globalMode}
-        onChange={(key, value) => setFinancingData(prev => ({ ...prev, [key]: value }))}
+        onChange={recordChange('financing', setFinancingData)}
         showModeToggle={false}
       />
 
@@ -310,7 +354,7 @@ export default function AssumptionsPage() {
         basket={basket5Config}
         values={equityData}
         currentMode={globalMode}
-        onChange={(key, value) => setEquityData(prev => ({ ...prev, [key]: value }))}
+        onChange={recordChange('equity', setEquityData)}
         showModeToggle={false}
       />
 

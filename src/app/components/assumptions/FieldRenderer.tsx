@@ -3,12 +3,19 @@
 import { useEffect, useState, useRef } from 'react';
 import { FieldDefinition, ComplexityTier } from '@/types/assumptions';
 import { HelpTooltip } from './HelpTooltip';
+import type { ChangeOrigin } from '@/lib/assumptions/autoSave';
 
 interface FieldRendererProps {
   field: FieldDefinition;
   value: any;
   currentMode: ComplexityTier;
-  onChange: (value: any) => void;
+  /**
+   * `origin` is 'user' for anything a person typed, picked or toggled, and
+   * 'derived' for an autoCalc result. autoCalc fires on mount as soon as its
+   * dependencies are present, so without this distinction a page load is
+   * indistinguishable from a person filling the form in.
+   */
+  onChange: (value: any, origin: ChangeOrigin) => void;
   allValues: Record<string, any>;
 }
 
@@ -39,7 +46,9 @@ export function FieldRenderer({
         if (calculatedValue !== null && calculatedValue !== undefined && calculatedValue !== lastCalculatedValue.current) {
           lastCalculatedValue.current = calculatedValue;
           setDisplayValue(calculatedValue);
-          onChange(calculatedValue);
+          // 'derived': the form computed this, nobody chose it. It rides along
+          // with a save a person has already armed, but never arms one itself.
+          onChange(calculatedValue, 'derived');
         }
       }
     }
@@ -95,6 +104,11 @@ export function FieldRenderer({
     return 'field-md';
   };
 
+  // Every handler below is wired to a real interaction — typing, picking a
+  // date, choosing an option, clicking the toggle — so all of them report
+  // 'user'. The only 'derived' emitter is the autoCalc effect above.
+  const emitUserChange = (nextValue: any) => onChange(nextValue, 'user');
+
   // Render input based on field type
   const renderInput = () => {
     switch (field.type) {
@@ -104,7 +118,7 @@ export function FieldRenderer({
             type="text"
             className="form-control"
             value={displayValue || ''}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => emitUserChange(e.target.value)}
             disabled={isReadOnly}
             required={isRequired}
           />
@@ -116,7 +130,7 @@ export function FieldRenderer({
             type="text"
             className="form-control"
             value={displayValue !== null && displayValue !== undefined ? formatNumber(displayValue) : ''}
-            onChange={(e) => onChange(parseFormattedNumber(e.target.value))}
+            onChange={(e) => emitUserChange(parseFormattedNumber(e.target.value))}
             disabled={isReadOnly}
             required={isRequired}
           />
@@ -132,7 +146,7 @@ export function FieldRenderer({
               type="text"
               className="form-control"
               value={displayValue !== null && displayValue !== undefined ? formatNumber(displayValue) : ''}
-              onChange={(e) => onChange(parseFormattedNumber(e.target.value))}
+              onChange={(e) => emitUserChange(parseFormattedNumber(e.target.value))}
               disabled={isReadOnly}
               required={isRequired}
             />
@@ -146,7 +160,7 @@ export function FieldRenderer({
               type="text"
               className="form-control"
               value={displayValue !== null && displayValue !== undefined ? displayValue : ''}
-              onChange={(e) => onChange(e.target.value ? parseFloat(e.target.value) : null)}
+              onChange={(e) => emitUserChange(e.target.value ? parseFloat(e.target.value) : null)}
               disabled={isReadOnly}
               required={isRequired}
             />
@@ -162,7 +176,7 @@ export function FieldRenderer({
             type="date"
             className="form-control"
             value={displayValue || ''}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => emitUserChange(e.target.value)}
             disabled={isReadOnly}
             required={isRequired}
           />
@@ -173,7 +187,7 @@ export function FieldRenderer({
           <select
             className="form-control"
             value={displayValue || ''}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => emitUserChange(e.target.value)}
             required={isRequired}
           >
             <option value="">Select...</option>
@@ -190,7 +204,7 @@ export function FieldRenderer({
           <div className="toggle-group">
             <div
               className={`toggle-switch ${displayValue ? 'active' : ''}`}
-              onClick={() => onChange(!displayValue)}
+              onClick={() => emitUserChange(!displayValue)}
             >
               <span className="toggle-slider"></span>
             </div>
@@ -204,7 +218,7 @@ export function FieldRenderer({
             type="text"
             className="form-control"
             value={displayValue || ''}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => emitUserChange(e.target.value)}
           />
         );
     }

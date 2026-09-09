@@ -4,12 +4,18 @@ import { useEffect, useState } from 'react';
 import { BasketConfig, ComplexityTier } from '@/types/assumptions';
 import { FieldGroup } from './FieldGroup';
 import { getFieldsForTier, getGroupsForTier } from '@/config/assumptions';
+import type { ChangeOrigin } from '@/lib/assumptions/autoSave';
 
 interface AssumptionBasketProps {
   basket: BasketConfig;
   values: Record<string, any>;
   currentMode: ComplexityTier;
-  onChange: (key: string, value: any) => void;
+  /**
+   * `origin` says whether a person made this change or the form derived it
+   * (autoCalc). Only 'user' may arm an auto-save — see
+   * `src/lib/assumptions/autoSave.ts`.
+   */
+  onChange: (key: string, value: any, origin: ChangeOrigin) => void;
   onModeChange?: (mode: ComplexityTier) => void;
   showModeToggle?: boolean;
 }

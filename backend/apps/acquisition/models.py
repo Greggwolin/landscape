@@ -5,7 +5,6 @@ Maps to landscape.tbl_acquisition and landscape.tbl_property_acquisition tables.
 """
 
 from django.db import models
-from decimal import Decimal
 
 
 class AcquisitionEvent(models.Model):
@@ -160,18 +159,19 @@ class PropertyAcquisition(models.Model):
     )
 
     # Transaction Costs
+    # No `default=` on any assumption below. A value the model supplies is as
+    # invented as one the view supplies: a save that omits the field would
+    # write it anyway, and the user never chose it. Absent means absent.
     closing_costs_pct = models.DecimalField(
         max_digits=6,
         decimal_places=3,
         null=True,
         blank=True,
-        default=Decimal('0.015'),
         help_text='Closing costs as % of purchase price'
     )
     due_diligence_days = models.IntegerField(
         null=True,
         blank=True,
-        default=30,
         help_text='Due diligence period in days'
     )
     earnest_money = models.DecimalField(
@@ -188,7 +188,6 @@ class PropertyAcquisition(models.Model):
         decimal_places=3,
         null=True,
         blank=True,
-        default=Decimal('0.015'),
         help_text='Sale closing costs as % of sale price'
     )
     broker_commission_pct = models.DecimalField(
@@ -196,7 +195,6 @@ class PropertyAcquisition(models.Model):
         decimal_places=3,
         null=True,
         blank=True,
-        default=Decimal('0.025'),
         help_text='Broker commission as % of sale price'
     )
     acquisition_fee_pct = models.DecimalField(
@@ -254,12 +252,13 @@ class PropertyAcquisition(models.Model):
         blank=True,
         help_text='Depreciable basis for tax purposes'
     )
+    # The land/improvement split drives depreciation. A 20/80 the user never
+    # chose is a tax position taken on their behalf, so there is no default.
     land_pct = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         null=True,
         blank=True,
-        default=Decimal('20.0'),
         help_text='Land percentage of total basis'
     )
     improvement_pct = models.DecimalField(
@@ -267,7 +266,6 @@ class PropertyAcquisition(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        default=Decimal('80.0'),
         help_text='Improvement percentage of total basis'
     )
 
