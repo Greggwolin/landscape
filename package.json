@@ -9,6 +9,7 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
+    "guard:assumptions": "node scripts/guards/assumption-defaults-guard.mjs",
     "test": "npm run test:unit && npm run test:contrast",
     "test:unit": "jest",
     "test:contrast": "playwright test --config=playwright.config.ts tests/e2e/contrast.e2e.spec.ts",
