@@ -38,6 +38,41 @@ from apps.calculations.engines.lotbank_engine import (
 )
 from apps.financial.models_debt import Loan, LoanContainer
 
+# ---------------------------------------------------------------------------
+# Curve steepness scale
+#
+# core_fin_fact_budget.curve_steepness is stored on a 0-100 scale with 50 as the
+# neutral midpoint. That is enforced in the database by
+# core_fin_fact_budget_curve_steepness_check (0 <= value <= 100) and is the scale
+# every other reader uses: src/lib/financial-engine/scurve-allocation.ts,
+# src/lib/financial-engine/cashflow/costs.ts, src/lib/timeline-engine/
+# cpm-calculator.ts, the budget timing tile's 0-100 slider, and the 0-100
+# validator in apps/artifacts/views.py.
+#
+# The logistic in _calculate_scurve_weights is parameterised by a 0-1 intensity
+# where 0.5 is neutral. This module converts 0-100 -> 0-1 at that single
+# boundary; nothing else here should divide or multiply a steepness by 100.
+# ---------------------------------------------------------------------------
+NEUTRAL_CURVE_STEEPNESS = 50.0
+MAX_CURVE_STEEPNESS = 100.0
+
+
+def _normalize_curve_steepness(steepness: Optional[float]) -> float:
+    """Convert a stored 0-100 curve steepness to the logistic's 0-1 intensity.
+
+    50 (the neutral midpoint) maps to 0.5, which leaves the logistic's x scaling
+    at 1.0 and reproduces the moderate S-curve. Values are clamped to the same
+    0-100 range the database CHECK constraint enforces, so a value that somehow
+    escaped validation degrades to the nearest legal curve instead of
+    saturating the logistic into a single-period spike.
+    """
+    if steepness is None:
+        steepness = NEUTRAL_CURVE_STEEPNESS
+    value = float(steepness)
+    value = min(MAX_CURVE_STEEPNESS, max(0.0, value))
+    return value / MAX_CURVE_STEEPNESS
+
+
 class LandDevCashFlowService:
     """
     Calculates cash flow projections for Land Development projects.
@@ -754,8 +789,13 @@ class LandDevCashFlowService:
             })
 
         elif method == 'curve':
-            # S-curve distribution
-            steepness = curve_steepness or 0.5
+            # S-curve distribution. curve_steepness arrives on the stored 0-100
+            # scale; _calculate_scurve_weights takes that scale directly.
+            # Note: an explicit 0 is a legitimate steepness (flattest curve),
+            # so fall back to the neutral default only when the value is absent.
+            steepness = (
+                NEUTRAL_CURVE_STEEPNESS if curve_steepness is None else curve_steepness
+            )
             weights = self._calculate_scurve_weights(actual_periods, steepness)
 
             for i, weight in enumerate(weights):
@@ -786,20 +826,36 @@ class LandDevCashFlowService:
         return period_values
 
     def _calculate_scurve_weights(self, period_count: int, steepness: float) -> List[float]:
-        """Calculate S-curve distribution weights."""
+        """Calculate S-curve distribution weights.
+
+        ``steepness`` is on the stored 0-100 scale (50 = neutral), the same
+        scale held by ``core_fin_fact_budget.curve_steepness`` and read by every
+        frontend consumer. It is converted once, here, to the 0-1 intensity the
+        logistic below expects. Do not pass an already-normalized 0-1 value.
+        """
         if period_count <= 1:
             return [1.0]
 
-        # Ensure steepness is a float
-        steepness = float(steepness) if isinstance(steepness, Decimal) else steepness
+        # Ensure steepness is a float, then convert the stored 0-100 scale to
+        # the 0-1 intensity the logistic wants (50 -> 0.5 -> neutral).
+        steepness = float(steepness)
+        intensity = _normalize_curve_steepness(steepness)
+
+        # Steepness 0 means "no curve at all". The logistic degenerates there
+        # (every cumulative value collapses to 0.5, which would dump the whole
+        # amount into the first period), so spread evenly instead. This matches
+        # applySteepness() in src/lib/financial-engine/scurve-allocation.ts,
+        # where a steepness of 0 flattens the curve to linear.
+        if intensity <= 0:
+            return [1.0 / period_count] * period_count
 
         # Use logistic function for S-curve
         weights = []
         for i in range(period_count):
             # Map i to range [-6, 6] for logistic function
             x = (i / (period_count - 1)) * 12 - 6
-            # Adjust steepness (0.5 = moderate, higher = steeper)
-            x *= steepness * 2
+            # Adjust steepness (intensity 0.5 = moderate, higher = steeper)
+            x *= intensity * 2
             weight = 1 / (1 + np.exp(-x))
             weights.append(weight)
 
