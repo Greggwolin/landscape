@@ -998,7 +998,7 @@ def upsert_operating_expense(
     expense_label: str,
     annual_amount: float,
     expense_type: str = None,
-    escalation_rate: float = 0.03,
+    escalation_rate: Optional[float] = None,
     is_recoverable: bool = False,
     notes: str = None,
     unit_amount: Optional[float] = None,
@@ -1021,7 +1021,11 @@ def upsert_operating_expense(
         expense_label: Human-readable expense name (e.g., "Property Taxes", "Insurance")
         annual_amount: Annual expense amount in dollars
         expense_type: Override expense type (CAM, TAXES, INSURANCE, MANAGEMENT, UTILITIES, REPAIRS, OTHER)
-        escalation_rate: Annual escalation rate (default 3%)
+        escalation_rate: Annual escalation rate. None means the caller did not
+            supply one; it is stored as NULL rather than defaulted to 3%, so an
+            assumption the user never chose is never invented on their behalf.
+            An explicit 0.0 is a real choice ("this expense does not escalate")
+            and is stored as 0.
         is_recoverable: Whether expense is tenant-recoverable
         notes: Optional notes about the expense
         unit_count: Project unit count (for $/unit derivation)
@@ -1510,7 +1514,9 @@ def bulk_upsert_operating_expenses(
             - label: Expense name (required)
             - annual_amount: Amount in dollars (required)
             - expense_type: Optional override
-            - escalation_rate: Optional (default 3%)
+            - escalation_rate: Optional. Omit it when the user has not stated
+              one — it is then stored as NULL, not defaulted to 3%. An
+              explicit 0 means "does not escalate" and is stored as 0.
             - is_recoverable: Optional (default False)
         source_document: Optional document name for activity logging
         unit_count: Project unit count (for deriving $/unit from annual amounts)
@@ -1586,7 +1592,14 @@ def bulk_upsert_operating_expenses(
                 expense_label=label,
                 annual_amount=float(amount),
                 expense_type=expense.get('expense_type'),
-                escalation_rate=float(expense.get('escalation_rate', 0.03)),
+                # Convert only what was actually supplied. `float(get(k, 0.03))`
+                # manufactured a 3% escalation for every expense the caller left
+                # silent about; None flows through and is stored as NULL.
+                escalation_rate=(
+                    float(expense['escalation_rate'])
+                    if expense.get('escalation_rate') is not None
+                    else None
+                ),
                 is_recoverable=expense.get('is_recoverable', False),
                 notes=expense.get('notes'),
                 unit_amount=unit_amount,
@@ -1904,7 +1917,10 @@ def handle_update_operating_expenses(
                     'expense_category': expense.get('label', expense.get('expense_category', '')),
                     'annual_amount': expense.get('annual_amount', 0),
                     'expense_type': expense.get('expense_type', 'OTHER'),
-                    'escalation_rate': expense.get('escalation_rate', 0.03),
+                    # None when unsupplied: the proposal shown to the user must
+                    # not carry a 3% escalation nobody asked for, since the user
+                    # confirming it would be confirming an invented assumption.
+                    'escalation_rate': expense.get('escalation_rate'),
                     'is_recoverable': expense.get('is_recoverable', False),
                     'source_document': source_doc,
                 },

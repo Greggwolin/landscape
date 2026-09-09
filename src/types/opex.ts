@@ -8,9 +8,12 @@ export interface OpExExpense {
   annual_amount: number;
   amount_per_sf?: number;
   is_recoverable?: boolean;
-  recovery_rate?: number;
+  // null is a real, meaningful state on these two: "no rate was ever chosen",
+  // as distinct from 0 ("chosen, and it is zero"). The save path stores NULL
+  // rather than inventing 3% / 100%, so readers must handle it.
+  recovery_rate?: number | null;
   escalation_type?: 'NONE' | 'FIXED_PERCENT' | 'CPI';
-  escalation_rate?: number;
+  escalation_rate?: number | null;
   start_period: number;
   payment_frequency?: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   notes?: string;
