@@ -78,7 +78,14 @@ class RenovationScheduleService:
                 'reno_cost_per_sf': float(va.reno_cost_per_sf or 0),
                 'reno_cost_basis': va.reno_cost_basis or 'sf',
                 'relocation_incentive': float(va.relocation_incentive or 0),
-                'rent_premium_pct': float(va.rent_premium_pct or 0),
+                # W2-D2: this key is loaded but not consumed by this service
+                # (post-renovation rent comes from market_rent). Kept None-safe
+                # so an unset premium reads as unset rather than as a chosen 0,
+                # and so a future consumer is forced to decide rather than
+                # inheriting a fabricated number.
+                'rent_premium_pct': (
+                    None if va.rent_premium_pct is None else float(va.rent_premium_pct)
+                ),
                 'renovate_all': va.renovate_all,
                 'units_to_renovate': va.units_to_renovate,
             }
@@ -92,7 +99,8 @@ class RenovationScheduleService:
                 'reno_cost_per_sf': 25.0,
                 'reno_cost_basis': 'sf',
                 'relocation_incentive': 3500.0,
-                'rent_premium_pct': 0.30,
+                # No row at all — there is no user-chosen premium to report.
+                'rent_premium_pct': None,
                 'renovate_all': True,
                 'units_to_renovate': None,
             }
