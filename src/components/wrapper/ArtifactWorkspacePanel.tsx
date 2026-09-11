@@ -21,6 +21,7 @@ import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
 import { ParcelsArtifact, type ParcelsViewConfig } from './ParcelsArtifact';
+import { CashflowArtifact, type CashflowViewConfig } from './CashflowArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -610,6 +611,28 @@ export function ArtifactWorkspacePanel({
             // server resolves a write against; the view specification carries
             // none. Same three props, same batch helper, as the budget — one
             // write path and one impact banner, not a second copy.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_cashflow_schedule' &&
+          active.params_json &&
+          (active.params_json as { cashflow_view_config?: unknown }).cashflow_view_config ? (
+          // Cash flow, parity slice CF1 (2026-09-11). One row per PERIOD rather
+          // than per thing, and two halves that play different parts: the
+          // assumptions strip carries every write pointer on the artifact, the
+          // period grid is calculated end to end. Same carve-out shape as the
+          // budget and parcels — cash flows stored before this existed fall
+          // through to the block renderer below and are unaffected.
+          <CashflowArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { cashflow_view_config: CashflowViewConfig })
+                .cashflow_view_config
+            }
             schema={active.current_state_json}
             artifactId={active.artifact_id}
             onCommitFieldEdits={(edits) =>
