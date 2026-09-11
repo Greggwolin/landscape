@@ -21,6 +21,7 @@ import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
 import { ParcelsArtifact, type ParcelsViewConfig } from './ParcelsArtifact';
+import { CapitalizationArtifact, type CapitalizationViewConfig } from './CapitalizationArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -610,6 +611,27 @@ export function ArtifactWorkspacePanel({
             // server resolves a write against; the view specification carries
             // none. Same three props, same batch helper, as the budget — one
             // write path and one impact banner, not a second copy.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_capitalization_schedule' &&
+          active.params_json &&
+          (active.params_json as { capitalization_view_config?: unknown }).capitalization_view_config ? (
+          // Capitalization, parity slice CAP2 (2026-09-11). The capital stack and
+          // the waterfall as one artifact, because the tiers divide out what the
+          // stack put in. Nothing on it is writable yet — the engine does not
+          // return the id of the row each tier came from — and the surface says
+          // so rather than offering an edit that cannot land.
+          <CapitalizationArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { capitalization_view_config: CapitalizationViewConfig })
+                .capitalization_view_config
+            }
             schema={active.current_state_json}
             artifactId={active.artifact_id}
             onCommitFieldEdits={(edits) =>

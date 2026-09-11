@@ -223,6 +223,11 @@ def create_capitalization_artifact(
     )
     title = f'{project_name} — Capitalization' if project_name else 'Capitalization'
 
+    from .capitalization_view_spec import (
+        CAPITALIZATION_CONFIG_KEY,
+        build_capitalization_view_config,
+    )
+
     try:
         return create_artifact_record(
             title=title,
@@ -231,7 +236,18 @@ def create_capitalization_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_capitalization_schedule',
-            params_json={'server_rendered': True},
+            # The view specification the screen draws from, read off the schema
+            # above. Nothing on this surface is writable yet and the
+            # specification says so in one line — see capitalization_view_spec.
+            params_json={
+                'server_rendered': True,
+                'kind': 'capitalization',
+                CAPITALIZATION_CONFIG_KEY: build_capitalization_view_config(
+                    project_id=project_id,
+                    project_name=project_name,
+                    schema=schema,
+                ),
+            },
             dedup_key='capitalization:schedule_detail',
             prior_tool_calls=['get_capitalization_schedule'],
         )
