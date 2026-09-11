@@ -57,6 +57,18 @@ export interface CashflowViewConfig {
   period_type: string;
   total_periods: number;
   scales: Array<{ value: string; label: string }>;
+  /** Every area and phase this cash flow could be re-run for. */
+  containers: Array<{
+    id: number;
+    label: string;
+    code: string | null;
+    tier: number;
+    tier_label: string;
+    parent_id: number | null;
+  }>;
+  /** Which of them THIS cash flow was run for. Null means the whole project. */
+  container_filter: { ids: number[]; labels: string[] } | null;
+  scope_label: string;
   unavailable_controls: string | null;
   /** When period 0 starts and where the date came from. A null date means the
    *  analysis is not anchored to a calendar — it is solving for a present value. */
@@ -297,6 +309,30 @@ export function CashflowArtifact({
           <div className={styles.hint}>
             Period 0 starts {config.period_zero.date}
             {config.period_zero.source ? ` — from the ${config.period_zero.source}` : ''}.
+          </div>
+        )}
+
+        {/* What this cash flow covers. A filtered one is a SEPARATE card built by
+          * re-running the engine for those containers, so the project-wide cash
+          * flow is never overwritten by a narrower view. The names are listed
+          * rather than made into buttons: nothing on this screen can re-run the
+          * engine yet, and a control that looks live and does nothing is worse
+          * than a sentence saying how to get it. */}
+        {(config.container_filter || (config.containers?.length ?? 0) > 0) && (
+          <div className={styles.hint}>
+            {config.container_filter
+              ? `This cash flow covers ${config.container_filter.labels.join(', ')} only — the whole-project cash flow is a separate card and is unchanged.`
+              : 'This cash flow covers the whole project.'}
+            {(config.containers?.length ?? 0) > 0 && (
+              <>
+                {' '}Ask for any of these by name to get its own cash flow:{' '}
+                {config.containers
+                  .filter((c) => !config.container_filter?.ids.includes(c.id))
+                  .map((c) => `${c.label} (${c.tier_label.toLowerCase()})`)
+                  .join(', ')}
+                .
+              </>
+            )}
           </div>
         )}
 

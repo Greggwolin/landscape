@@ -2610,7 +2610,7 @@ def _refresh_artifact_after_write(*, artifact, user_id):
             # records this as a user_edit. Nothing is stored between the
             # assumption and the grid — the engine recomputes on this read.
             from apps.landscaper.tools.cashflow_artifact_builder import (
-                build_cashflow_schema_for_project,
+                build_cashflow_refresh_payload,
             )
             project_id = artifact.project_id
             if project_id is None:
@@ -2619,8 +2619,16 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                     'error': 'project_required',
                     'detail': 'cash-flow schedule artifact missing project_id',
                 }
-            new_schema = build_cashflow_schema_for_project(project_id)
-            if new_schema is None:
+            # The scope this artifact was built under. A cash flow filtered to
+            # two phases must re-run for those two phases; rebuilding it
+            # project-wide would quietly replace the numbers with a different
+            # question's answer.
+            _params = artifact.params_json or {}
+            _container_ids = [int(i) for i in (_params.get('container_ids') or [])]
+            payload = build_cashflow_refresh_payload(
+                project_id, container_ids=_container_ids or None
+            )
+            if payload is None:
                 return {
                     'success': False,
                     'error': 'no_cashflow_periods',
@@ -2629,6 +2637,24 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                         're-render after the write'
                     ),
                 }
+            new_schema = payload['schema']
+            # The view specification lives on the same artifact record and holds
+            # its own copy of the rows — which is what the screen draws. Without
+            # this, an edited assumption re-ran the engine and then displayed the
+            # numbers from before the edit.
+            try:
+                from apps.landscaper.tools.cashflow_view_spec import (
+                    CASHFLOW_CONFIG_KEY,
+                )
+                params = dict(artifact.params_json or {})
+                params[CASHFLOW_CONFIG_KEY] = payload['view_config']
+                artifact.params_json = params
+                artifact.save(update_fields=['params_json'])
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    'cash-flow view specification refresh failed after write'
+                )
         else:
             return {
                 'success': False,
