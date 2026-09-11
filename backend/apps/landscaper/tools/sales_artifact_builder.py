@@ -432,7 +432,10 @@ def fetch_sales_schedule_data(project_id: int) -> Dict[str, Any]:
                 p.parcel_id,
                 p.parcel_code,
                 p.product_code,
-                COALESCE(a.area_alias, NULLIF('Area ' || a.area_no, 'Area ')) AS area,
+                -- The column header already says Area, so the cell says which
+                -- one, not "Area 1" (Gregg, 2026-09-11). A project that names
+                -- its areas keeps the name.
+                COALESCE(a.area_alias, NULLIF(a.area_no::text, '')) AS area,
                 ph.phase_name AS phase,
                 psa.sale_date,
                 psa.gross_sale_proceeds,
