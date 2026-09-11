@@ -221,7 +221,10 @@ def create_capitalization_artifact(
     schema = build_capitalization_artifact_schema(
         lp_summary, gp_summary, project_summary, tier_config,
     )
-    title = f'{project_name} — Capitalization' if project_name else 'Capitalization'
+    # EQUITY, not "Capitalization" (Gregg, 2026-09-11): the retired interface had
+    # equity and debt as two separate tabs with nothing in common, and debt has no
+    # artifact yet. Calling this one Capitalization would imply it covers both.
+    title = f'{project_name} — Equity' if project_name else 'Equity'
 
     from .capitalization_view_spec import (
         CAPITALIZATION_CONFIG_KEY,

@@ -1,10 +1,18 @@
 /**
- * Capitalization — the capital stack and the distribution waterfall.
+ * Equity — the capital stack and the distribution waterfall.
  *
- * Parity slice CAP2 (2026-09-11). Fourth surface. In the retired interface this
- * was one folder with two sub-tabs, equity and debt; here it is one artifact,
- * because the stack and the waterfall are a coupled pair — the tiers divide out
- * what the stack put in.
+ * Parity slice CAP2 (2026-09-11), corrected the same day. Gregg: *"The equity
+ * waterfall was its own tab with the inputs at the top that would update when
+ * various assumptions were modified. Debt was handled on a completely different
+ * tab."* The retired code agrees — equity and debt were two separate screens.
+ *
+ * So this is EQUITY. The stack and the waterfall belong together because the
+ * tiers divide out what the stack put in. **Debt is a different artifact that
+ * does not exist yet.**
+ *
+ * The old equity tab also carried an equity-partners table, a waterfall type
+ * switch (IRR / multiple / both), and total committed, deployed and remaining
+ * across the top. Those gaps are recorded rather than quietly dropped.
  *
  * NOTHING ON THIS SURFACE IS EDITABLE YET, AND THAT IS DELIBERATE.
  * The column definitions mark the hurdle, the splits, the promote and the

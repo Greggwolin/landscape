@@ -1,8 +1,34 @@
-"""The capitalization artifact's VIEW SPECIFICATION.
+"""The EQUITY artifact's VIEW SPECIFICATION.
 
-Parity slice CAP2 (2026-09-11). Fourth surface, land development and income
-property alike — Capital was one folder with two sub-tabs, equity and debt, in
-the retired interface.
+Parity slice CAP2 (2026-09-11), corrected the same day.
+
+WHAT THIS IS, AND WHAT IT IS NOT
+--------------------------------
+Gregg, 2026-09-11: *"The equity waterfall was its own tab with the inputs at the
+top that would update when various assumptions were modified. Debt was handled on
+a completely different tab."* He is right, and the retired code says so — the old
+interface had `capitalization/equity/page.tsx` and `capitalization/debt/page.tsx`
+as two separate screens with nothing in common.
+
+So this artifact is **Equity**, not "Capitalization". It carries the capital stack
+and the distribution waterfall, which belong together because the tiers divide out
+what the stack put in. **Debt is a different artifact that does not exist yet** —
+no builder, no surface. The old debt screen held loan cards (amount, rate,
+interest-only months, amortisation, term), summary cards (total commitment,
+outstanding balance, weighted rate, monthly payment) and a leveraged cash flow.
+
+WHAT THE OLD EQUITY TAB HAD THAT THIS DOES NOT, YET
+---------------------------------------------------
+Read out of `ad3eff84^` rather than remembered:
+  * Three figures across the top: total equity committed, equity DEPLOYED, and
+    remaining to deploy. This artifact shows returns instead — deployment is not
+    in the engine's summary.
+  * An equity PARTNERS table, one row per partner. This has one row for LP and
+    one for GP.
+  * A waterfall TYPE switch — IRR, equity multiple, or both.
+  * Inputs at the top that re-run the results when changed. The platform already
+    does this half: a committed edit rebuilds the schema through the same builder,
+    so results redraw. What is missing is the ability to make the edit at all.
 
 WHAT THIS SLICE DOES NOT DO, AND WHY
 ------------------------------------
@@ -72,10 +98,10 @@ def build_capitalization_view_config(
             ],
         }
 
-    title = f'{project_name} — Capitalization' if project_name else 'Capitalization'
+    title = f'{project_name} — Equity' if project_name else 'Equity'
     return {
-        'topic': 'capitalization',
-        'kicker': 'Capitalization',
+        'topic': 'equity',
+        'kicker': 'Equity',
         'title': title,
         'source_label': 'the waterfall engine and this project’s deal terms',
         'binding': {'state': 'live', 'label': 'live'},
