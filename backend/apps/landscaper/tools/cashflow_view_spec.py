@@ -38,6 +38,58 @@ from typing import Any, Dict, List, Optional
 CASHFLOW_CONFIG_KEY = 'cashflow_view_config'
 
 
+def resolve_period_zero(project_id: int) -> Dict[str, Any]:
+    """When period 0 starts, and where that date came from.
+
+    Gregg, 2026-09-11: *"period 0 = project start date which was entered initially
+    on the project setup modal or homepage but gets overridden if the acquisition
+    table includes an initial closing date. if no initial closing date, then its
+    assumed that the cashflow analysis solves for the PV of the project net income
+    stream to arrive at the land value."*
+
+    So the precedence is: the acquisition closing date wins; the project's own
+    analysis start date is the fallback; and neither means the analysis is not
+    anchored to a calendar at all — it is solving for a present value, and the
+    screen says so rather than drawing dates it does not have.
+
+    The table is ``landscape.tbl_acquisition`` — the acquisition LEDGER, one row
+    per event, which is what ``AcquisitionEvent`` maps to (``managed = False``).
+    Read off the model rather than guessed: a first attempt at this query invented
+    a table name that exists nowhere.
+
+    **The INITIAL closing, not the latest.** `apps/acquisition/views.py` reads the
+    most recent CLOSING event (`order_by('-event_date').first()`); a deal with
+    staged takedowns has several, and the first one is when the clock starts.
+    Recorded rather than quietly matched: the two now disagree, deliberately, and
+    which is right for the acquisition summary is Gregg's call.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT MIN(event_date) FROM landscape.tbl_acquisition
+            WHERE project_id = %s AND event_type = 'CLOSING' AND event_date IS NOT NULL
+            """,
+            [project_id],
+        )
+        row = cursor.fetchone()
+        closing = row[0] if row else None
+        if closing is not None:
+            return {'date': closing.isoformat()[:10], 'source': 'acquisition closing'}
+
+        cursor.execute(
+            'SELECT analysis_start_date FROM landscape.tbl_project WHERE project_id = %s',
+            [project_id],
+        )
+        row = cursor.fetchone()
+        start = row[0] if row else None
+
+    if start is not None:
+        return {'date': start.isoformat()[:10], 'source': 'project start date'}
+    return {'date': None, 'source': None}
+
+
 def build_cashflow_view_config(
     *,
     project_id: int,
@@ -82,6 +134,11 @@ def build_cashflow_view_config(
     if monthly and len(period_rows) > 12:
         scales.append({'value': 'year', 'label': 'by year'})
 
+    try:
+        period_zero = resolve_period_zero(project_id)
+    except Exception:  # noqa: BLE001 — a missing date must never fail the artifact
+        period_zero = {'date': None, 'source': None}
+
     title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
     return {
         'topic': 'cashflow',
@@ -104,6 +161,17 @@ def build_cashflow_view_config(
         'period_type': period_type or 'period',
         'total_periods': total_periods or len(period_rows),
         'scales': scales,
+        # When period 0 starts, and where the date came from — so buckets can be
+        # labelled with real dates instead of ordinals. None means the analysis is
+        # not anchored to a calendar and the screen says so.
+        'period_zero': period_zero,
+        'unanchored_note': (
+            None if period_zero.get('date') else
+            'No closing date and no project start date, so this analysis is not '
+            'anchored to a calendar: it is solving for the present value of the net '
+            'income stream — the land value — and the periods are counted from the '
+            'start of that stream.'
+        ),
         # Said on the screen rather than left as a silent absence. Two of the
         # three controls the retired screen carried cannot be done here from the
         # rows the engine emits, and doing them anyway would produce confident

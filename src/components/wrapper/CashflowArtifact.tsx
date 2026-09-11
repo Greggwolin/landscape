@@ -58,6 +58,10 @@ export interface CashflowViewConfig {
   total_periods: number;
   scales: Array<{ value: string; label: string }>;
   unavailable_controls: string | null;
+  /** When period 0 starts and where the date came from. A null date means the
+   *  analysis is not anchored to a calendar — it is solving for a present value. */
+  period_zero: { date: string | null; source: string | null };
+  unanchored_note: string | null;
   truncate_at: number;
   generated_at: string;
   project_id: number;
@@ -113,6 +117,11 @@ export function CashflowArtifact({
 
   const periodColumns = config.periods.columns;
 
+  /* Dated labels only make sense when the periods are months — which is exactly
+   * when the server offers a quarter or year scale. Read from that rather than
+   * parsing the period word. */
+  const monthly = config.scales.some((s) => s.value === 'year' || s.value === 'quarter');
+
   /** Regroup the engine's rows into larger buckets.
    *
    *  Flows SUM. Cumulative takes the value at the END of the bucket, because a
@@ -125,6 +134,32 @@ export function CashflowArtifact({
    *  Buckets are SEQUENTIAL from the first period — Quarter 1, Year 1 — not
    *  calendar quarters and years. The engine states a period order, not a
    *  calendar, and aligning to one would invent a start date it never gave. */
+  /** A bucket's name. Ordinal on its own when nothing anchors the analysis to a
+   *  calendar; ordinal PLUS the real months it covers when period 0 has a date.
+   *
+   *  The buckets still run from period 0 rather than snapping to calendar
+   *  quarters and years — a deal that closes in March has a first year ending in
+   *  February, and shifting it to December would move cash between years. The
+   *  date range is shown so nobody has to assume which convention is in force. */
+  const bucketLabel = React.useCallback(
+    (word: string, n: number, offset: number, length: number): string => {
+      const anchor = config.period_zero?.date;
+      if (!anchor || !monthly) return `${word} ${n}`;
+      const start = new Date(`${anchor}T00:00:00`);
+      if (Number.isNaN(start.getTime())) return `${word} ${n}`;
+      const from = new Date(start);
+      from.setMonth(from.getMonth() + offset);
+      const to = new Date(start);
+      to.setMonth(to.getMonth() + offset + length - 1);
+      const label = (d: Date) =>
+        d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      return length === 1
+        ? `${word} ${n} · ${label(from)}`
+        : `${word} ${n} · ${label(from)} – ${label(to)}`;
+    },
+    [config.period_zero, monthly],
+  );
+
   const rolledRows = useMemo((): CashflowRow[] => {
     const size = scale === 'year' ? 12 : scale === 'quarter' ? 3 : 1;
     if (size === 1) return config.periods.rows;
@@ -137,7 +172,9 @@ export function CashflowArtifact({
     for (let i = 0; i < config.periods.rows.length; i += size) {
       const chunk = config.periods.rows.slice(i, i + size);
       const n = Math.floor(i / size) + 1;
-      const cells: Record<string, string | number | null> = { period: `${word} ${n}` };
+      const cells: Record<string, string | number | null> = {
+        period: bucketLabel(word, n, i, chunk.length),
+      };
       for (const key of flowKeys) {
         const present = chunk.filter((r) => r.cells[key] !== null && r.cells[key] !== undefined);
         cells[key] = present.length
@@ -149,7 +186,7 @@ export function CashflowArtifact({
       out.push({ id: `${prefix}${n}`, cells });
     }
     return out;
-  }, [scale, config.periods.rows, periodColumns]);
+  }, [scale, config.periods.rows, periodColumns, bucketLabel]);
 
   const visibleRows = useMemo(
     () => (expanded ? rolledRows : rolledRows.slice(0, config.truncate_at)),
@@ -253,6 +290,15 @@ export function CashflowArtifact({
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {/* One line of prose, above the numbers it explains. */}
         {config.note && <div className={styles.hint}>{config.note}</div>}
+        {config.unanchored_note && (
+          <div className={styles.hint}>{config.unanchored_note}</div>
+        )}
+        {config.period_zero?.date && (
+          <div className={styles.hint}>
+            Period 0 starts {config.period_zero.date}
+            {config.period_zero.source ? ` — from the ${config.period_zero.source}` : ''}.
+          </div>
+        )}
 
         {/* The editable half, first — it is the only part anyone can change. */}
         {config.assumptions.rows.length > 0 && (
