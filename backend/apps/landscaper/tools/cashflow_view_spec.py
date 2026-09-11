@@ -68,11 +68,19 @@ def build_cashflow_view_config(
 
     period_rows = periods.get('rows', [])
 
-    # An annual rollup is offered ONLY for monthly periods, and only when there
-    # is more than a year of them. Anything else and the control would either do
-    # nothing or invent a calendar the engine never stated.
+    # Time scale. Offered only where regrouping the rows the engine already
+    # emitted would actually produce fewer, different rows — a control that
+    # yields one bucket, or the same buckets, is a control that does nothing.
+    #
+    # The groupings are SEQUENTIAL from the first period, not calendar quarters
+    # and years: the engine states a period order, not a calendar, and aligning
+    # to one would be inventing a start date it never gave.
     monthly = (period_type or '').lower().startswith('month')
-    can_roll_up = monthly and len(period_rows) > 12
+    scales: List[Dict[str, Any]] = [{'value': 'period', 'label': f'by {period_type or "period"}'}]
+    if monthly and len(period_rows) > 3:
+        scales.append({'value': 'quarter', 'label': 'by quarter'})
+    if monthly and len(period_rows) > 12:
+        scales.append({'value': 'year', 'label': 'by year'})
 
     title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
     return {
@@ -95,7 +103,16 @@ def build_cashflow_view_config(
         'periods': table(periods),
         'period_type': period_type or 'period',
         'total_periods': total_periods or len(period_rows),
-        'can_roll_up': can_roll_up,
+        'scales': scales,
+        # Said on the screen rather than left as a silent absence. Two of the
+        # three controls the retired screen carried cannot be done here from the
+        # rows the engine emits, and doing them anyway would produce confident
+        # wrong totals — see next_actions.md 2026-09-11.
+        'unavailable_controls': (
+            'Cost detail and filtering by area or phase are not offered here: the '
+            'engine emits one aggregated figure per period, so both would have to '
+            'be recomputed server-side rather than regrouped on screen.'
+        ),
         'truncate_at': 36,
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'project_id': project_id,

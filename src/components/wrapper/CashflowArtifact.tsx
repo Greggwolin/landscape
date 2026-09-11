@@ -14,7 +14,7 @@
  *   - The period grid is calculated by the engine end to end. Nothing in it is
  *     writable and nothing in it should look as though it is.
  *
- * A monthly project can be read a year at a time. The rollup sums the flows and
+ * A monthly project can be read by quarter or by year. The rollup sums the flows and
  * takes the LAST cumulative in each year rather than summing cumulatives, which
  * would be a number that means nothing. It is offered only for monthly periods
  * and only past a year of them — otherwise the control would either do nothing
@@ -56,7 +56,8 @@ export interface CashflowViewConfig {
   periods: CashflowTable;
   period_type: string;
   total_periods: number;
-  can_roll_up: boolean;
+  scales: Array<{ value: string; label: string }>;
+  unavailable_controls: string | null;
   truncate_at: number;
   generated_at: string;
   project_id: number;
@@ -104,7 +105,7 @@ function cellText(key: string, value: string | number | null): string {
 export function CashflowArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [annual, setAnnual] = useState(false);
+  const [scale, setScale] = useState('period');
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -112,19 +113,31 @@ export function CashflowArtifact({
 
   const periodColumns = config.periods.columns;
 
-  /** Twelve months to a year. Flows sum; cumulative is the value at the END of
-   *  the year, because a sum of running totals is not a running total. */
+  /** Regroup the engine's rows into larger buckets.
+   *
+   *  Flows SUM. Cumulative takes the value at the END of the bucket, because a
+   *  sum of running totals is not a running total — it is a number that means
+   *  nothing, and it would sit in a column people read as the balance.
+   *
+   *  A bucket that carries no value for a column reads as absent rather than
+   *  zero, the same rule every other surface here follows.
+   *
+   *  Buckets are SEQUENTIAL from the first period — Quarter 1, Year 1 — not
+   *  calendar quarters and years. The engine states a period order, not a
+   *  calendar, and aligning to one would invent a start date it never gave. */
   const rolledRows = useMemo((): CashflowRow[] => {
-    if (!annual || !config.can_roll_up) return config.periods.rows;
+    const size = scale === 'year' ? 12 : scale === 'quarter' ? 3 : 1;
+    if (size === 1) return config.periods.rows;
+    const word = scale === 'year' ? 'Year' : 'Quarter';
+    const prefix = scale === 'year' ? 'y' : 'q';
     const flowKeys = periodColumns
       .map((c) => c.key)
       .filter((k) => k !== 'period' && k !== 'cumulative');
     const out: CashflowRow[] = [];
-    for (let i = 0; i < config.periods.rows.length; i += 12) {
-      const chunk = config.periods.rows.slice(i, i + 12);
-      const cells: Record<string, string | number | null> = {
-        period: `Year ${Math.floor(i / 12) + 1}`,
-      };
+    for (let i = 0; i < config.periods.rows.length; i += size) {
+      const chunk = config.periods.rows.slice(i, i + size);
+      const n = Math.floor(i / size) + 1;
+      const cells: Record<string, string | number | null> = { period: `${word} ${n}` };
       for (const key of flowKeys) {
         const present = chunk.filter((r) => r.cells[key] !== null && r.cells[key] !== undefined);
         cells[key] = present.length
@@ -133,10 +146,10 @@ export function CashflowArtifact({
       }
       const last = chunk[chunk.length - 1];
       if (last && 'cumulative' in last.cells) cells.cumulative = last.cells.cumulative;
-      out.push({ id: `y${Math.floor(i / 12) + 1}`, cells });
+      out.push({ id: `${prefix}${n}`, cells });
     }
     return out;
-  }, [annual, config.can_roll_up, config.periods.rows, periodColumns]);
+  }, [scale, config.periods.rows, periodColumns]);
 
   const visibleRows = useMemo(
     () => (expanded ? rolledRows : rolledRows.slice(0, config.truncate_at)),
@@ -268,20 +281,13 @@ export function CashflowArtifact({
 
         <div className={styles.bar} style={{ marginTop: 18 }}>
           <span className={styles.barLabel}>{config.periods.title || 'Cash flow'}</span>
-          {config.can_roll_up && (
-            <>
-              <button type="button"
-                className={`${styles.badge} ${!annual ? styles.badgeOn : ''}`}
-                onClick={() => setAnnual(false)}>
-                by {config.period_type}
-              </button>
-              <button type="button"
-                className={`${styles.badge} ${annual ? styles.badgeOn : ''}`}
-                onClick={() => setAnnual(true)}>
-                by year
-              </button>
-            </>
-          )}
+          {config.scales.length > 1 && config.scales.map((s) => (
+            <button key={s.value} type="button"
+              className={`${styles.badge} ${scale === s.value ? styles.badgeOn : ''}`}
+              onClick={() => setScale(s.value)}>
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {/* Calculated end to end. Nothing here takes an edit, and the styling
@@ -337,6 +343,10 @@ export function CashflowArtifact({
             </button>
           </span>
         </div>
+      )}
+
+      {config.unavailable_controls && (
+        <div className={styles.hint}>{config.unavailable_controls}</div>
       )}
 
       <div className={styles.foot}>
