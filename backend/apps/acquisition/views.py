@@ -275,13 +275,23 @@ class AcquisitionPriceSummaryView(APIView):
             event_type='CLOSING'
         ).exists()
 
-        # Get closing date if exists
+        # Get closing date if exists.
+        #
+        # THE FIRST CLOSING, NOT THE LAST (Gregg, 2026-09-11). A deal with staged
+        # takedowns has several CLOSING events, and the one that matters is when
+        # the deal started — it is what period 0 of the cash flow is anchored to.
+        # This previously ordered by '-event_date', which returned the most recent.
+        #
+        # Nothing consumed the date when this was changed: searched
+        # backend/apps/acquisition and all of src — the two consumers
+        # (IndicatedValueSummary, ProjectProfileTile) read only has_closing_date.
+        # Changed while it is still free to change.
         closing_date = None
         if has_closing_date:
             closing_event = AcquisitionEvent.objects.filter(
                 project_id=project_pk,
                 event_type='CLOSING'
-            ).order_by('-event_date').first()
+            ).order_by('event_date').first()
             if closing_event and closing_event.event_date:
                 closing_date = closing_event.event_date.isoformat()
 
