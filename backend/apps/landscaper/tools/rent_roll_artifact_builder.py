@@ -276,6 +276,11 @@ def create_rent_roll_artifact(
         logger.exception('rent_roll_artifact_builder: artifact service unavailable')
         return {'success': False, 'error': f'artifact service unavailable: {exc}'}
 
+    from .rent_roll_view_spec import (
+        RENT_ROLL_CONFIG_KEY,
+        build_rent_roll_view_config,
+    )
+
     schema = build_rent_roll_artifact_schema(
         unit_rows,
         unit_count=unit_count,
@@ -294,7 +299,19 @@ def create_rent_roll_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_rent_roll_schedule',
-            params_json={'server_rendered': True},
+            # Two representations of the same rows: the view specification is
+            # what the screen draws, the schema above is what a write resolves
+            # against. Built from the same unit_rows in the same order, with the
+            # same row ids, which is how a cell finds its pointer.
+            params_json={
+                'server_rendered': True,
+                'kind': 'rent_roll',
+                RENT_ROLL_CONFIG_KEY: build_rent_roll_view_config(
+                    project_id=project_id,
+                    project_name=project_name,
+                    unit_rows=unit_rows,
+                ),
+            },
             dedup_key='rent_roll:schedule_detail',
             prior_tool_calls=['get_rent_roll_schedule'],
         )
