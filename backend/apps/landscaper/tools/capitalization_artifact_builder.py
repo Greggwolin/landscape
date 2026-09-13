@@ -221,7 +221,15 @@ def create_capitalization_artifact(
     schema = build_capitalization_artifact_schema(
         lp_summary, gp_summary, project_summary, tier_config,
     )
-    title = f'{project_name} — Capitalization' if project_name else 'Capitalization'
+    # EQUITY, not "Capitalization" (Gregg, 2026-09-11): the retired interface had
+    # equity and debt as two separate tabs with nothing in common, and debt has no
+    # artifact yet. Calling this one Capitalization would imply it covers both.
+    title = f'{project_name} — Equity' if project_name else 'Equity'
+
+    from .capitalization_view_spec import (
+        CAPITALIZATION_CONFIG_KEY,
+        build_capitalization_view_config,
+    )
 
     try:
         return create_artifact_record(
@@ -231,7 +239,18 @@ def create_capitalization_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_capitalization_schedule',
-            params_json={'server_rendered': True},
+            # The view specification the screen draws from, read off the schema
+            # above. Nothing on this surface is writable yet and the
+            # specification says so in one line — see capitalization_view_spec.
+            params_json={
+                'server_rendered': True,
+                'kind': 'capitalization',
+                CAPITALIZATION_CONFIG_KEY: build_capitalization_view_config(
+                    project_id=project_id,
+                    project_name=project_name,
+                    schema=schema,
+                ),
+            },
             dedup_key='capitalization:schedule_detail',
             prior_tool_calls=['get_capitalization_schedule'],
         )
