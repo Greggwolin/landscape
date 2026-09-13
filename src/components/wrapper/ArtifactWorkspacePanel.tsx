@@ -21,6 +21,7 @@ import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
 import { ParcelsArtifact, type ParcelsViewConfig } from './ParcelsArtifact';
+import { RentRollArtifact, type RentRollViewConfig } from './RentRollArtifact';
 import { SalesArtifact, type SalesViewConfig } from './SalesArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
@@ -633,6 +634,30 @@ export function ArtifactWorkspacePanel({
             config={
               (active.params_json as { sales_view_config: SalesViewConfig })
                 .sales_view_config
+            }
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_rent_roll_schedule' &&
+          active.params_json &&
+          (active.params_json as { rent_roll_view_config?: unknown }).rent_roll_view_config ? (
+          // Rent roll, parity slice RR3 (2026-09-11). Same carve-out shape as
+          // the budget and parcels: the view specification rides in
+          // params_json on the SAME artifact record as the block schema, so
+          // rent rolls stored before this existed fall through to the block
+          // renderer below and are unaffected. The schema comes along because
+          // that is where the per-cell write pointers live, and the commit
+          // callback is the panel's shared batch helper — one write path and
+          // one impact banner, not a rent-roll copy of either.
+          <RentRollArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { rent_roll_view_config: RentRollViewConfig })
+                .rent_roll_view_config
             }
             schema={active.current_state_json}
             artifactId={active.artifact_id}
