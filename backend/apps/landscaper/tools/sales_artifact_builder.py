@@ -360,6 +360,8 @@ def create_sales_artifact(
         logger.exception('sales_artifact_builder: artifact service unavailable')
         return {'success': False, 'error': f'artifact service unavailable: {exc}'}
 
+    from .sales_view_spec import SALES_CONFIG_KEY, build_sales_view_config
+
     schema = build_sales_artifact_schema(
         parcel_rows,
         pricing_rows,
@@ -380,7 +382,18 @@ def create_sales_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_sales_schedule',
-            params_json={'server_rendered': True},
+            # The view specification the screen draws from, built FROM the schema
+            # above rather than from a second pass over the database — one source
+            # of rows, so a rendered cell and its write pointer cannot disagree.
+            params_json={
+                'server_rendered': True,
+                'kind': 'sales',
+                SALES_CONFIG_KEY: build_sales_view_config(
+                    project_id=project_id,
+                    project_name=project_name,
+                    schema=schema,
+                ),
+            },
             dedup_key='sales:schedule_detail',
             prior_tool_calls=['get_sales_schedule'],
         )

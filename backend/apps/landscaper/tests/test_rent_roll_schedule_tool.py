@@ -119,3 +119,99 @@ def test_get_rent_roll_schedule_advertised_and_gated_mf_only():
     land_tools = get_tools_for_page('chat', project_type_code='land')
     assert 'get_rent_roll_schedule' in mf_tools
     assert 'get_rent_roll_schedule' not in land_tools
+
+
+# ── Slice RR2 (2026-09-11): the rent-roll grid became writable ──────────────
+# Presence of a per-cell pointer IS the write allowlist. These tests exist so a
+# calculated cell can never acquire one by accident, and so a ref can never point
+# at a column the block does not declare.
+
+def _sample_units():
+    return [
+        {
+            'unit_id': 11, 'unit_number': '101', 'building_name': 'A',
+            'unit_type': '2BR', 'square_feet': 900, 'market_rent': 1800,
+            'current_rent': 1650, 'occupancy_status': 'Occupied',
+            'lease_end_date': None, 'past_due_amount': 0,
+            'is_section8': False, 'renovation_status': '',
+        },
+        {
+            'unit_id': 12, 'unit_number': '102', 'building_name': 'A',
+            'unit_type': '1BR', 'square_feet': 700, 'market_rent': 1500,
+            'current_rent': 1500, 'occupancy_status': 'Vacant',
+            'lease_end_date': None, 'past_due_amount': 0,
+            'is_section8': False, 'renovation_status': '',
+        },
+    ]
+
+
+def _grid(schema):
+    return next(b for b in schema['blocks'] if b['id'] == 'rent_roll_grid')
+
+
+def test_rent_roll_rows_carry_write_pointers():
+    from apps.landscaper.tools.rent_roll_artifact_builder import (
+        build_rent_roll_artifact_schema,
+    )
+    schema = build_rent_roll_artifact_schema(
+        _sample_units(), unit_count=2, occupied_count=1,
+        total_in_place=3150, total_market=3300, total_loss_to_lease=150,
+    )
+    rows = _grid(schema)['rows']
+    assert all(r.get('editable') for r in rows)
+    first = rows[0]['cell_source_refs']
+    assert first['in_place'] == {
+        'table': 'tbl_multifamily_unit', 'row_id': 11, 'column': 'current_rent',
+        'captured_at': first['in_place']['captured_at'], 'captured_value': 1650.0,
+    }
+    # A word cell captures the word, not None.
+    assert first['status']['captured_value'] == 'Occupied'
+
+
+def test_calculated_and_identity_cells_have_no_write_pointer():
+    from apps.landscaper.tools.rent_roll_artifact_builder import (
+        build_rent_roll_artifact_schema,
+    )
+    schema = build_rent_roll_artifact_schema(
+        _sample_units(), unit_count=2, occupied_count=1,
+        total_in_place=3150, total_market=3300, total_loss_to_lease=150,
+    )
+    refs = _grid(schema)['rows'][0]['cell_source_refs']
+    for never_writable in ('loss_to_lease', 'unit', 'building', 'unit_type',
+                           'evidence', 'subsidy', 'lease_end'):
+        assert never_writable not in refs
+
+
+def test_no_pointer_aims_at_a_column_the_block_does_not_declare():
+    from apps.landscaper.tools.rent_roll_artifact_builder import (
+        build_rent_roll_artifact_schema,
+    )
+    # No market rents and no renovation status → those columns are not shown,
+    # so they must not carry a pointer either.
+    units = _sample_units()
+    for u in units:
+        u['market_rent'] = None
+    schema = build_rent_roll_artifact_schema(
+        units, unit_count=2, occupied_count=1,
+        total_in_place=3150, total_market=None, total_loss_to_lease=None,
+    )
+    grid = _grid(schema)
+    declared = {c['key'] for c in grid['columns']}
+    for row in grid['rows']:
+        assert set(row.get('cell_source_refs', {})) <= declared
+    assert 'market' not in grid['rows'][0]['cell_source_refs']
+
+
+def test_a_unit_without_an_id_is_read_only():
+    from apps.landscaper.tools.rent_roll_artifact_builder import (
+        build_rent_roll_artifact_schema,
+    )
+    units = _sample_units()
+    units[0].pop('unit_id')
+    schema = build_rent_roll_artifact_schema(
+        units, unit_count=2, occupied_count=1,
+        total_in_place=3150, total_market=3300, total_loss_to_lease=150,
+    )
+    rows = _grid(schema)['rows']
+    assert 'cell_source_refs' not in rows[0]
+    assert not rows[0].get('editable')
