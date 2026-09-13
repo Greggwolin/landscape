@@ -21,6 +21,8 @@ import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ClarificationArtifact, type ClarificationArtifactConfig } from './ClarificationArtifact';
 import { ScheduleArtifact, type ScheduleViewConfig } from './ScheduleArtifact';
 import { ParcelsArtifact, type ParcelsViewConfig } from './ParcelsArtifact';
+import { RentRollArtifact, type RentRollViewConfig } from './RentRollArtifact';
+import { SalesArtifact, type SalesViewConfig } from './SalesArtifact';
 import { CapitalizationArtifact, type CapitalizationViewConfig } from './CapitalizationArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
@@ -611,6 +613,53 @@ export function ArtifactWorkspacePanel({
             // server resolves a write against; the view specification carries
             // none. Same three props, same batch helper, as the budget — one
             // write path and one impact banner, not a second copy.
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_sales_schedule' &&
+          active.params_json &&
+          (active.params_json as { sales_view_config?: unknown }).sales_view_config ? (
+          // Sales schedule, parity slice SL1 (2026-09-11). Same carve-out shape
+          // as the budget and parcels: the view specification rides in
+          // params_json on the SAME artifact record as the block schema, so
+          // schedules stored before this existed fall through to the block
+          // renderer below and are unaffected. Two tables — the parcel schedule
+          // and the rate card — at different grains, which is why they are not
+          // merged. Editing runs through the panel's shared batch helper.
+          <SalesArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { sales_view_config: SalesViewConfig })
+                .sales_view_config
+            }
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_rent_roll_schedule' &&
+          active.params_json &&
+          (active.params_json as { rent_roll_view_config?: unknown }).rent_roll_view_config ? (
+          // Rent roll, parity slice RR3 (2026-09-11). Same carve-out shape as
+          // the budget and parcels: the view specification rides in
+          // params_json on the SAME artifact record as the block schema, so
+          // rent rolls stored before this existed fall through to the block
+          // renderer below and are unaffected. The schema comes along because
+          // that is where the per-cell write pointers live, and the commit
+          // callback is the panel's shared batch helper — one write path and
+          // one impact banner, not a rent-roll copy of either.
+          <RentRollArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { rent_roll_view_config: RentRollViewConfig })
+                .rent_roll_view_config
+            }
             schema={active.current_state_json}
             artifactId={active.artifact_id}
             onCommitFieldEdits={(edits) =>
