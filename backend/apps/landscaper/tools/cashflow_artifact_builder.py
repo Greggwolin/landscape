@@ -698,6 +698,8 @@ def create_cashflow_artifact(
     )
     title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
 
+    from .cashflow_view_spec import CASHFLOW_CONFIG_KEY, build_cashflow_view_config
+
     try:
         return create_artifact_record(
             title=title,
@@ -706,7 +708,20 @@ def create_cashflow_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_cashflow_schedule',
-            params_json={'server_rendered': True},
+            # The view specification the screen draws from, read off the schema
+            # above — one source of rows, so a rendered cell and its write
+            # pointer cannot disagree.
+            params_json={
+                'server_rendered': True,
+                'kind': 'cashflow',
+                CASHFLOW_CONFIG_KEY: build_cashflow_view_config(
+                    project_id=project_id,
+                    project_name=project_name,
+                    schema=schema,
+                    period_type=period_type,
+                    total_periods=total_periods,
+                ),
+            },
             dedup_key='cashflow:schedule_detail',
             prior_tool_calls=['get_cashflow_schedule'],
         )
