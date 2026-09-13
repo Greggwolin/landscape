@@ -27,6 +27,7 @@ separators, em-dash zero, no ``$``); occupancy is a pre-formatted percent string
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,40 @@ def _date_label(value: Any) -> str:
         return value.isoformat()[:10]
     except AttributeError:
         return str(value)[:10]
+
+
+# ── What can be typed into, and where it actually lives ─────────────────────
+#
+# Same shape as the parcels artifact: the artifact's cell key is not the
+# database's column name, so the mapping is stated once here and nowhere else.
+# An unmapped key gets NO ref and is therefore read-only. **Presence of the ref
+# IS the write allowlist**, checked server-side before any writer runs, so a cell
+# can never become editable by accident — and a calculated cell (Loss-to-Lease)
+# can never become writable by an oversight.
+#
+# Deliberately NOT here yet:
+#   lease_end — the cell DISPLAYS a formatted date string while the column holds
+#     a date. The stale-cell guard compares the captured value against what is
+#     stored, and a formatted string will not match a date, so every second edit
+#     would be refused as out of date. It needs the same treatment the picklist
+#     cells got on the parcels artifact, which is its own slice.
+#   loss_to_lease — calculated (market − in-place). Never writable anywhere.
+#   subsidy / evidence / unit / building / unit_type — read-only by nature.
+_RENT_ROLL_CELL_TO_COLUMN = {
+    'sf': 'square_feet',
+    'in_place': 'current_rent',
+    'market': 'market_rent',
+    'status': 'occupancy_status',
+    'delinquency': 'past_due_amount',
+    'reno': 'renovation_status',
+}
+
+# Word cells capture the word. Passing one through _num would capture None for
+# every one of them, and the stale-cell guard compares this against what is
+# stored — so every second edit to a status would be refused as out of date.
+_TEXT_RENT_ROLL_CELLS = {'status', 'reno'}
+
+RENT_ROLL_SOURCE_TABLE = 'tbl_multifamily_unit'
 
 
 def build_rent_roll_artifact_schema(
@@ -122,6 +157,22 @@ def build_rent_roll_artifact_schema(
         columns.append({'key': 'reno', 'label': 'Reno Status', 'align': 'left', 'editable': True})
     columns.append({'key': 'evidence', 'label': 'Evidence', 'align': 'left', 'editable': False})
 
+    # Shown-and-writable: a ref is only attached for a column this table actually
+    # declares. The schema validator rejects a ref pointing at a column the block
+    # does not show, which is what stops a ref drifting away from the thing it
+    # claims to address.
+    shown = {'in_place', 'status'}
+    if show_sf:
+        shown.add('sf')
+    if show_market:
+        shown.add('market')
+    if show_delinquency:
+        shown.add('delinquency')
+    if show_reno:
+        shown.add('reno')
+    writable = [k for k in _RENT_ROLL_CELL_TO_COLUMN if k in shown]
+    captured_at = datetime.now(timezone.utc).isoformat()
+
     rows: List[Dict[str, Any]] = []
     for idx, r in enumerate(unit_rows, start=1):
         in_place = _num(r.get('current_rent'))
@@ -149,7 +200,32 @@ def build_rent_roll_artifact_schema(
             cells['delinquency'] = _num(r.get('past_due_amount'))
         if show_reno:
             cells['reno'] = r.get('renovation_status') or ''
-        rows.append({'id': f'u{idx}', 'cells': cells})
+        # The WRITE is resolved against these pointers, never against anything
+        # the client sends: the server takes the clicked cell's path, walks it in
+        # the stored schema and reads the ref sitting there. ``captured_value`` is
+        # what the cell was DISPLAYING when drawn; the write path compares it
+        # against what is stored immediately before writing and refuses when they
+        # differ, so an edit aimed at a table that has since been rebuilt cannot
+        # land on whatever row took that position.
+        unit_id = r.get('unit_id')
+        refs: Dict[str, Any] = {}
+        if unit_id is not None:
+            for cell_key in writable:
+                column = _RENT_ROLL_CELL_TO_COLUMN[cell_key]
+                raw = r.get(column)
+                captured = raw if cell_key in _TEXT_RENT_ROLL_CELLS else _num(raw)
+                refs[cell_key] = {
+                    'table': RENT_ROLL_SOURCE_TABLE,
+                    'row_id': unit_id,
+                    'column': column,
+                    'captured_at': captured_at,
+                    'captured_value': captured,
+                }
+        rows.append({
+            'id': f'u{idx}',
+            **({'editable': True, 'cell_source_refs': refs} if refs else {}),
+            'cells': cells,
+        })
 
     return {
         'blocks': [
@@ -200,6 +276,11 @@ def create_rent_roll_artifact(
         logger.exception('rent_roll_artifact_builder: artifact service unavailable')
         return {'success': False, 'error': f'artifact service unavailable: {exc}'}
 
+    from .rent_roll_view_spec import (
+        RENT_ROLL_CONFIG_KEY,
+        build_rent_roll_view_config,
+    )
+
     schema = build_rent_roll_artifact_schema(
         unit_rows,
         unit_count=unit_count,
@@ -218,7 +299,19 @@ def create_rent_roll_artifact(
             user_id=user_id,
             thread_id=thread_id,
             tool_name='get_rent_roll_schedule',
-            params_json={'server_rendered': True},
+            # Two representations of the same rows: the view specification is
+            # what the screen draws, the schema above is what a write resolves
+            # against. Built from the same unit_rows in the same order, with the
+            # same row ids, which is how a cell finds its pointer.
+            params_json={
+                'server_rendered': True,
+                'kind': 'rent_roll',
+                RENT_ROLL_CONFIG_KEY: build_rent_roll_view_config(
+                    project_id=project_id,
+                    project_name=project_name,
+                    unit_rows=unit_rows,
+                ),
+            },
             dedup_key='rent_roll:schedule_detail',
             prior_tool_calls=['get_rent_roll_schedule'],
         )
