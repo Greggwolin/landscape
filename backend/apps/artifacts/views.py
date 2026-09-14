@@ -2655,6 +2655,44 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                 _logging.getLogger(__name__).exception(
                     'cash-flow view specification refresh failed after write'
                 )
+        elif artifact.tool_name == 'get_pricing_register':
+            # The pricing REGISTER (PR1). Both halves rebuilt from one read — the
+            # screen draws from the view specification, so refreshing the schema
+            # alone would show the price from before the edit.
+            from apps.landscaper.tools.pricing_register_builder import (
+                build_pricing_register_refresh,
+            )
+            from apps.landscaper.tools.pricing_register_view_spec import (
+                PRICING_CONFIG_KEY,
+            )
+            project_id = artifact.project_id
+            if project_id is None:
+                return {
+                    'success': False,
+                    'error': 'project_required',
+                    'detail': 'pricing register artifact missing project_id',
+                }
+            payload = build_pricing_register_refresh(project_id)
+            if payload is None:
+                return {
+                    'success': False,
+                    'error': 'no_pricing_rows',
+                    'detail': (
+                        f'project {project_id} has no land-use pricing rows to '
+                        're-render after the write'
+                    ),
+                }
+            new_schema = payload['schema']
+            try:
+                params = dict(artifact.params_json or {})
+                params[PRICING_CONFIG_KEY] = payload['view_config']
+                artifact.params_json = params
+                artifact.save(update_fields=['params_json'])
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    'pricing register view specification refresh failed after write'
+                )
         else:
             return {
                 'success': False,

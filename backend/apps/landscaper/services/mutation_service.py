@@ -439,7 +439,12 @@ MUTABLE_FIELDS = {
         "probability_weight", "notes", "scenario_id",
     ],
     "land_use_pricing": [
+        # The pricing register (PR1, 2026-09-13) is the surface that sets these.
+        # growth_rate_set_id and price_effective_date joined the list when it was
+        # built: a register that shows a field and cannot save it is the defect
+        # that surface exists to end.
         "price_per_unit", "unit_of_measure", "growth_rate",
+        "growth_rate_set_id", "price_effective_date",
     ],
     "tbl_parcel_sale_assumptions": [
         "sale_date", "base_price_per_unit", "price_uom", "inflation_rate",

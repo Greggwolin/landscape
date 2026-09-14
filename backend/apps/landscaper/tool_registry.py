@@ -200,6 +200,10 @@ LAND_ONLY_TOOLS = [
     # Capitalization (capital stack + distribution waterfall) artifact (LAND +
     # income; deterministic server-rendered). CAP1 — LSCMD-CAP-CAPSCHED-0724.
     "get_capitalization_schedule",
+    # The pricing REGISTER — where land-use prices, their escalation and their
+    # as-of date are SET. LAND only: land-use pricing is a land-dev concept.
+    # PR1 — 2026-09-13, D-2026-09-13-SURFACES.
+    "get_pricing_register",
     # Land planning
     "configure_project_hierarchy", "create_land_dev_containers",
     "update_lot_mix", "update_land_use_budget",
@@ -249,6 +253,7 @@ INCOME_PROPERTY_TOOLS = [
     "review_budget_variance",
     "get_cashflow_schedule",
     "get_capitalization_schedule",
+    "get_pricing_register",
     # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
     # had executors but were ungated; income-property scoped, not land dev).
     "get_expense_comparables", "update_expense_comparable", "delete_expense_comparable",

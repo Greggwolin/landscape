@@ -9209,6 +9209,74 @@ def handle_get_cashflow_schedule(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('get_pricing_register')
+def handle_get_pricing_register(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render the PRICING REGISTER — where land-use prices, their escalation and
+    their as-of date are SET — as a deterministic artifact in the right panel.
+
+    This is a register, not a report: every price, unit, growth source, growth
+    rate and as-of date on it is writable, and the one derived column (the price
+    a whole lot implies) is drawn as computed. Server-side render — the model
+    must NOT compose the table."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        from .tools.pricing_register_builder import (
+            create_pricing_register_artifact,
+            fetch_pricing_register_data,
+        )
+
+        data = fetch_pricing_register_data(int(project_id))
+        if not data['rows']:
+            return {
+                'success': True, 'artifact_created': False, 'product_count': 0,
+                'message': 'This project has no land-use pricing set up yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
+            }
+
+        envelope = create_pricing_register_artifact(
+            project_id=int(project_id),
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+
+        rows = data['rows']
+        priced = sum(1 for r in rows if r.get('price_per_unit'))
+        undated = sum(1 for r in rows if not r.get('price_effective_date'))
+
+        if envelope.get('success'):
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': envelope,
+                'product_count': len(rows),
+                'priced_count': priced,
+                'undated_count': undated,
+                'instruction': (
+                    'The pricing register has ALREADY been created and is open in '
+                    'the right panel. Do NOT call create_artifact. Reply with one '
+                    'short sentence stating product_count, and say that prices, '
+                    'escalation and the as-of date are set there — do NOT restate '
+                    'the table.'
+                ),
+            }
+
+        return {
+            'success': True, 'artifact_created': False,
+            'product_count': len(rows), 'priced_count': priced,
+            'instruction': _DEGRADED_ARTIFACT_RELAY,
+        }
+
+    except Exception as e:
+        logger.error(f"Error building pricing register artifact: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('open_clarification')
 def handle_open_clarification(
     tool_input: Dict[str, Any],

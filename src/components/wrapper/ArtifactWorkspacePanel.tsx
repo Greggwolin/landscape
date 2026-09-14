@@ -25,6 +25,7 @@ import { RentRollArtifact, type RentRollViewConfig } from './RentRollArtifact';
 import { SalesArtifact, type SalesViewConfig } from './SalesArtifact';
 import { CapitalizationArtifact, type CapitalizationViewConfig } from './CapitalizationArtifact';
 import { CashflowArtifact, type CashflowViewConfig } from './CashflowArtifact';
+import { PricingRegisterArtifact, type PricingRegisterViewConfig } from './PricingRegisterArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
@@ -636,6 +637,27 @@ export function ArtifactWorkspacePanel({
             config={
               (active.params_json as { sales_view_config: SalesViewConfig })
                 .sales_view_config
+            }
+            schema={active.current_state_json}
+            artifactId={active.artifact_id}
+            onCommitFieldEdits={(edits) =>
+              runCommitFieldEdits(active.artifact_id, edits)
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'get_pricing_register' &&
+          active.params_json &&
+          (active.params_json as { pricing_register_view_config?: unknown }).pricing_register_view_config ? (
+          // The pricing REGISTER (PR1, 2026-09-13) — the first surface built as a
+          // register rather than a report. Same carve-out shape as the others;
+          // what differs is that the view specification says, per column, whether
+          // a cell is an input, a computed value or neither, so the screen can
+          // colour it by what it IS rather than by a flag that can lie.
+          <PricingRegisterArtifact
+            key={active.artifact_id}
+            config={
+              (active.params_json as { pricing_register_view_config: PricingRegisterViewConfig })
+                .pricing_register_view_config
             }
             schema={active.current_state_json}
             artifactId={active.artifact_id}
