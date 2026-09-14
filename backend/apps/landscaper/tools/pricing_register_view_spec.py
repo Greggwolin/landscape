@@ -57,6 +57,7 @@ def build_pricing_register_view_config(
     project_name: Optional[str],
     schema: Dict[str, Any],
     growth_sets: List[Dict[str, Any]],
+    growth_default: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     blocks = {b.get('id'): b for b in schema.get('blocks', [])}
     kpis = blocks.get('pricing_register_kpis', {})
@@ -72,6 +73,7 @@ def build_pricing_register_view_config(
             # off the schema, so the renderer never infers either from a key
             # name. Any field with an established list carries that list here.
             **({'options': c['options']} if c.get('options') else {}),
+            **({'allow_custom': True} if c.get('allow_custom') else {}),
             **({'format': c['format']} if c.get('format') else {}),
         }
         for c in table.get('columns', [])
@@ -82,6 +84,9 @@ def build_pricing_register_view_config(
             'id': r['id'],
             'cells': dict(r.get('cells', {})),
             **({'curve_break': True} if r.get('curve_break') else {}),
+            # Shown but not stored: the rate came from the project, and typing
+            # over it writes this product's own.
+            **({'growth_inherited': True} if r.get('growth_inherited') else {}),
         }
         for r in table.get('rows', [])
     ]
@@ -89,6 +94,7 @@ def build_pricing_register_view_config(
     breaks = [r for r in rows if r.get('curve_break')]
     undated = [r for r in rows if not r['cells'].get('as_of')]
     flat = [r for r in rows if not r['cells'].get('growth_rate')]
+    inherited = [r for r in rows if r.get('growth_inherited')]
 
     title = f'{project_name} — Pricing' if project_name else 'Pricing'
     return {
@@ -116,6 +122,11 @@ def build_pricing_register_view_config(
         # judgement to the reader.
         'notices': [
             n for n in [
+                (f'{len(inherited)} of {len(rows)} products take the project\'s growth '
+                 f'assumption of {growth_default["rate"] * 100:.1f}% '
+                 f'({growth_default["label"]}). Type over any one of them to give that '
+                 'product its own rate.')
+                if (inherited and growth_default) else None,
                 (f'{len(breaks)} product'
                  f'{"" if len(breaks) == 1 else "s"} priced above a narrower lot in the '
                  'same use type — the rate is meant to fall as lots get wider.')

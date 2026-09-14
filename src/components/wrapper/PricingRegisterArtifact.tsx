@@ -41,6 +41,10 @@ export interface PricingColumn {
    *  (units from core_fin_uom, growth sources from the growth-rate sets). Where
    *  one exists the field offers it instead of free text. */
   options?: Array<{ value: string; label: string }>;
+  /** The list is a set of published values to pick from AND the field stays
+   *  typeable. A growth rate nobody has published is still a legitimate rate,
+   *  so the picklist must not become a cage. */
+  allow_custom?: boolean;
   /** 'percent' means the value is STORED as a decimal fraction and both shown
    *  and typed as a percent. Declared on the column, never guessed from a name. */
   format?: 'percent';
@@ -49,6 +53,10 @@ export interface PricingRow {
   id: string;
   cells: Record<string, string | number | null>;
   curve_break?: boolean;
+  /** The growth rate shown came from the project's own assumption rather than
+   *  from this row. It is still an input — typing over it stores a rate for this
+   *  product alone. */
+  growth_inherited?: boolean;
 }
 export interface PricingRegisterViewConfig {
   topic: string;
@@ -113,6 +121,23 @@ function percentToFraction(text: string): string | null {
   return String(n / 100);
 }
 
+/** The option a stored value corresponds to, as the select's own value string.
+ *  A rate stored as 0 and an option spelled "0.0" are the same rate, so a
+ *  numeric column is matched numerically. Returns '' when nothing matches, which
+ *  lands on the list's first entry. */
+function optionValueFor(c: PricingColumn, value: unknown): string {
+  if (!c.options?.length) return String(value ?? '');
+  const asText = String(value ?? '');
+  const exact = c.options.find((o) => o.value === asText);
+  if (exact) return exact.value;
+  const n = Number(value);
+  if (value !== null && value !== undefined && value !== '' && Number.isFinite(n)) {
+    const numeric = c.options.find((o) => o.value !== '' && Number(o.value) === n);
+    if (numeric) return numeric.value;
+  }
+  return '';
+}
+
 function cellText(c: PricingColumn, value: unknown): string {
   if (c.format === 'percent') return pct(value);
   if (c.key === 'price' || c.key === 'price_per_lot') return fmt(value);
@@ -132,6 +157,10 @@ export function PricingRegisterArtifact({
   const [rung, setRung] = useState<string>(config.default_rung || 'standard');
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  // A cell whose picklist the user answered with "type a value". Held
+  // separately so choosing Custom swaps the control without committing an
+  // empty rate on the way through.
+  const [typingCustom, setTypingCustom] = useState<string | null>(null);
   const edits = useStagedEdits(onCommitFieldEdits, artifactId);
 
   const columnKeys = config.rung_columns[rung] ?? config.rung_columns[config.default_rung] ?? [];
@@ -182,14 +211,27 @@ export function PricingRegisterArtifact({
             edits.stageEdit(target.cellPath, value, committed, target.expectedRef);
           }
           setEditing(null);
+          setTypingCustom(null);
         },
       };
-      if (c.options?.length) {
+      if (c.options?.length && typingCustom !== key) {
         return (
           <td key={c.key} className={align(c)}>
             <select
               {...common}
-              defaultValue={String(committed ?? '')}
+              // Matched by VALUE, and numerically where the column is numeric:
+              // a stored 0 and an option spelled "0.0" are the same rate, and
+              // comparing them as strings opened the list on the wrong entry.
+              defaultValue={optionValueFor(c, committed)}
+              // On a list that allows a typed value, the blank entry means
+              // "type one" — swap to the input rather than staging an empty.
+              onChange={(e) => {
+                if (c.allow_custom && e.target.value === '') setTypingCustom(key);
+              }}
+              onBlur={(e) => {
+                if (c.allow_custom && e.target.value === '') return;
+                common.onBlur(e);
+              }}
               onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null); }}
             >
               {c.options.map((o) => (
@@ -219,7 +261,7 @@ export function PricingRegisterArtifact({
             }
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              if (e.key === 'Escape') setEditing(null);
+              if (e.key === 'Escape') { setEditing(null); setTypingCustom(null); }
             }}
           />
         </td>
@@ -237,8 +279,18 @@ export function PricingRegisterArtifact({
         key={c.key}
         className={cls || undefined}
         onClick={target ? () => setEditing(key) : undefined}
+        style={
+          // Inherited from the project rather than set on this row. Still blue,
+          // because a person did type it — just one level up. Dimmed so the
+          // rows carrying their own rate are the ones that stand out.
+          target && c.key === 'growth_rate' && row.growth_inherited && !staged
+            ? { opacity: 0.6 }
+            : undefined
+        }
         title={
-          target ? 'Click to change — this is an input'
+          target && c.key === 'growth_rate' && row.growth_inherited
+            ? "From the project's growth assumption — type here to give this product its own rate"
+            : target ? 'Click to change — this is an input'
             : c.kind === 'computed' ? 'Worked out from the price and the lot width'
             : undefined
         }
@@ -288,8 +340,9 @@ export function PricingRegisterArtifact({
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <div className={styles.hint}>{config.lede}</div>
         <div className={styles.hint}>
-          Rates are typed as percentages — enter 3 for 3%. Units and growth sources
-          offer the platform&rsquo;s own lists.
+          Units, growth sources and growth rates all offer the platform&rsquo;s own
+          lists. A rate that is not on the list is still a rate — choose
+          &ldquo;Type a rate&rdquo; and enter 3 for 3%.
         </div>
         {config.notices.map((n) => (
           <div className={styles.hint} key={n}>{n}</div>

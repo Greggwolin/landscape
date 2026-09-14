@@ -29,9 +29,9 @@ def test_parse_lot_width(code, expected):
     assert parse_lot_width(code) == expected
 
 
-def _row(product, price, uom='$/FF', lu='SFD'):
+def _row(product, price, uom='$/FF', lu='SFD', growth=None):
     return {'id': hash(product) & 0xffff, 'lu_type_code': lu, 'product_code': product,
-            'price_per_unit': price, 'unit_of_measure': uom, 'growth_rate': None,
+            'price_per_unit': price, 'unit_of_measure': uom, 'growth_rate': growth,
             'growth_rate_set_id': None, 'price_effective_date': None, 'set_name': None}
 
 
@@ -101,3 +101,101 @@ def test_every_editable_cell_carries_a_pointer():
     row = table['rows'][0]
     editable = {c['key'] for c in table['columns'] if c.get('editable')}
     assert editable == set(row['cell_source_refs'].keys())
+
+
+# ── 2026-09-14: units resolved to the administered list, headers named, and the
+# project's growth assumption inherited by rows that set none of their own. ──
+
+def test_a_legacy_unit_spelling_resolves_to_the_administered_code():
+    """Gregg, 2026-09-14: the Unit column must not offer "(not on the platform
+    list)" entries. The fix is resolution, not suppression — dropping the option
+    would have left those cells blank."""
+    from apps.landscaper.tools.picklists import normalize_measure_code
+
+    assert normalize_measure_code('$/FF') == 'FF'
+    assert normalize_measure_code('$/Unit') == 'UNIT'
+    assert normalize_measure_code('$/Acre') == 'AC'
+    assert normalize_measure_code('$$$') == 'LS'
+    # Case is how it was typed, not what it means.
+    assert normalize_measure_code('Unit') == 'UNIT'
+    # Anything unrecognised passes through rather than being invented away.
+    assert normalize_measure_code('WIDGETS') == 'WIDGETS'
+    assert normalize_measure_code(None) == ''
+
+
+def test_the_curve_and_the_lot_price_see_through_a_legacy_spelling():
+    """A row stored as $/FF is a front-foot row. Before normalisation it was
+    excluded from both the curve check and the per-lot price."""
+    rows = [_row('35x95', 2400, uom='$/FF'), _row('45x115', 2400, uom='FF'),
+            _row('55x125', 2600, uom='$/FF')]
+    annotate_curve_breaks(rows)
+    assert rows[-1].get('curve_break') is True
+
+    schema = build_pricing_register_schema(rows, [])
+    table = next(b for b in schema['blocks'] if b['id'] == 'pricing_register_rows')
+    by_product = {r['cells']['product']: r['cells'] for r in table['rows']}
+    assert by_product['35x95']['uom'] == 'FF'
+    assert by_product['35x95']['price_per_lot'] == 2400 * 35
+
+
+def test_the_price_columns_say_what_the_number_is():
+    schema = build_pricing_register_schema([_row('50x125', 2400)], [])
+    table = next(b for b in schema['blocks'] if b['id'] == 'pricing_register_rows')
+    labels = {c['key']: c['label'] for c in table['columns']}
+    assert labels['price'] == '$ / Unit'
+    assert labels['price_per_lot'] == '$ / Lot'
+
+
+def test_a_row_with_no_rate_of_its_own_takes_the_project_rate():
+    """Gregg, 2026-09-14: *"if a global growth rate is adopted, then all lines in
+    the column will contain the global growth rate but can be overwritten."*"""
+    default = {'rate': 0.03, 'label': 'Revenue Inflation', 'set_id': 72, 'source': 'set'}
+    rows = [
+        _row('50x125', 2400, growth=None),
+        _row('55x125', 2300, growth=0.045),
+    ]
+    schema = build_pricing_register_schema(rows, [], growth_default=default)
+    table = next(b for b in schema['blocks'] if b['id'] == 'pricing_register_rows')
+    by_product = {r['cells']['product']: r for r in table['rows']}
+
+    inherited = by_product['50x125']
+    assert inherited['cells']['growth_rate'] == 0.03
+    assert inherited.get('growth_inherited') is True
+    # Still an input: the pointer is what lets a person type over it.
+    assert 'growth_rate' in inherited['cell_source_refs']
+
+    own = by_product['55x125']
+    assert own['cells']['growth_rate'] == 0.045
+    assert own.get('growth_inherited') is None
+
+
+def test_a_row_that_points_at_a_set_does_not_inherit():
+    """Naming a growth source IS an answer. Overwriting it with the project
+    default would silently discard the set the row was pointed at."""
+    default = {'rate': 0.03, 'label': 'Revenue Inflation', 'set_id': 72, 'source': 'set'}
+    row = _row('50x125', 2400, growth=None)
+    row['growth_rate_set_id'] = 71
+    schema = build_pricing_register_schema([row], [], growth_default=default)
+    table = next(b for b in schema['blocks'] if b['id'] == 'pricing_register_rows')
+    assert table['rows'][0].get('growth_inherited') is None
+
+
+def test_with_no_project_default_nothing_is_invented():
+    rows = [_row('50x125', 2400, growth=None)]
+    schema = build_pricing_register_schema(rows, [], growth_default=None)
+    table = next(b for b in schema['blocks'] if b['id'] == 'pricing_register_rows')
+    assert table['rows'][0]['cells']['growth_rate'] is None
+    assert table['rows'][0].get('growth_inherited') is None
+
+
+def test_the_rate_column_offers_a_list_and_stays_typeable():
+    choices = [{'value': '', 'label': 'Type a rate…'},
+               {'value': '0.03', 'label': '3.0% — Revenue Inflation (this project)'}]
+    schema = build_pricing_register_schema(
+        [_row('50x125', 2400)], [], growth_rate_choices=choices)
+    table = next(b for b in schema['blocks'] if b['id'] == 'pricing_register_rows')
+    rate_col = next(c for c in table['columns'] if c['key'] == 'growth_rate')
+    assert rate_col['options'] == choices
+    # A published list must not become a cage: a rate nobody published is still
+    # a rate, so the column declares that it remains typeable.
+    assert rate_col['allow_custom'] is True

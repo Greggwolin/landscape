@@ -452,7 +452,10 @@ export function ArtifactWorkspacePanel({
         </div>
       )}
 
-      {/* ── Standard Reports (5a) ── (suppressed in takeover mode).
+      {/* ── Standard Artifacts (5a) ── (suppressed in takeover mode).
+          Named "artifacts", not "reports": the list holds registers and
+          workspaces as well as reports, and calling the whole set reports
+          misdescribes the two thirds of it you can type into. Gregg, 2026-09-14.
           Listed whether or not a card exists yet: Pinned and Recent can only
           show what has already been built, so a surface nobody has opened was
           invisible and the panel could never say what the app can produce.
@@ -460,7 +463,7 @@ export function ArtifactWorkspacePanel({
       {!takeoverMode && catalogEntries.length > 0 && (
         <div className="w-rail-card">
           <CollapsibleSection
-            title="Standard Reports"
+            title="Standard Artifacts"
             icon={<LayoutList size={15} />}
             count={catalogEntries.length}
             collapsed={catalogCollapsed}

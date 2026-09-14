@@ -48,6 +48,8 @@ from typing import Any, Dict, List, Optional
 
 from django.db import connection
 
+from .picklists import normalize_measure_code
+
 logger = logging.getLogger(__name__)
 
 # The real column on ``landscape.land_use_pricing`` each editable cell writes.
@@ -178,17 +180,21 @@ def fetch_pricing_register_data(project_id: int) -> Dict[str, Any]:
     # The platform's own lists, asked for rather than rebuilt. Units come from the
     # table the Units of Measure admin screen manages, gated by the project's
     # property type; growth sources from this project's sets plus the global ones.
-    from .picklists import growth_source_options, measure_options
+    from .picklists import (
+        growth_rate_options,
+        growth_source_options,
+        measure_options,
+        project_growth_default,
+    )
 
     return {
         'project_name': project_name,
         'rows': rows,
         'growth_sets': growth_sets,
-        'uom_options': measure_options(
-            project_id,
-            also_allow=[r.get('unit_of_measure') for r in rows],
-        ),
+        'uom_options': measure_options(project_id),
         'growth_options': growth_source_options(project_id),
+        'growth_rate_choices': growth_rate_options(project_id),
+        'growth_default': project_growth_default(project_id),
     }
 
 
@@ -225,7 +231,7 @@ def annotate_curve_breaks(rows: List[Dict[str, Any]]) -> None:
         price = _num(row.get('price_per_unit'))
         if width is None or not price:
             continue
-        if (row.get('unit_of_measure') or '') not in _FRONT_FOOT_UOMS:
+        if normalize_measure_code(row.get('unit_of_measure')) not in _FRONT_FOOT_UOMS:
             continue
         by_type.setdefault(str(row.get('lu_type_code') or ''), []).append(row)
 
@@ -260,6 +266,8 @@ def build_pricing_register_schema(
     growth_sets: List[Dict[str, Any]],
     uom_options: Optional[List[Dict[str, Any]]] = None,
     growth_options: Optional[List[Dict[str, Any]]] = None,
+    growth_rate_choices: Optional[List[Dict[str, Any]]] = None,
+    growth_default: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """The BLOCK SCHEMA: one row per product, carrying the write pointers.
 
@@ -280,6 +288,7 @@ def build_pricing_register_schema(
             for s in growth_sets
         ]
     unit_options = list(uom_options or [])
+    rate_options = list(growth_rate_choices or [])
 
     columns: List[Dict[str, Any]] = [
         {'key': 'use_type', 'label': 'Use', 'align': 'left', 'editable': False},
@@ -287,14 +296,22 @@ def build_pricing_register_schema(
         {'key': 'width', 'label': 'Width (ft)', 'align': 'right', 'editable': False},
         {'key': 'uom', 'label': 'Unit', 'align': 'left', 'editable': True,
          **({'options': unit_options} if unit_options else {})},
-        {'key': 'price', 'label': 'Price', 'align': 'right', 'editable': True},
-        {'key': 'price_per_lot', 'label': 'Per Lot', 'align': 'right', 'editable': False},
+        # Headed by what the number IS. Gregg, 2026-09-14: the rate column is
+        # dollars per whatever the Unit column says; the derived column is
+        # dollars for the whole lot. "Price" and "Per Lot" left both of those to
+        # be inferred.
+        {'key': 'price', 'label': '$ / Unit', 'align': 'right', 'editable': True},
+        {'key': 'price_per_lot', 'label': '$ / Lot', 'align': 'right', 'editable': False},
         {'key': 'growth_set', 'label': 'Growth Source', 'align': 'left',
          'editable': True, 'options': set_options},
         # Stored as a decimal fraction, shown and typed as a percent. The column
         # says so; the renderer must not guess from the column name.
+        # ``allow_custom`` means the list is a set of published rates to pick
+        # from AND the field stays typeable — a rate nobody has published is
+        # still a legitimate rate.
         {'key': 'growth_rate', 'label': 'Growth', 'align': 'right', 'editable': True,
-         'format': 'percent'},
+         'format': 'percent',
+         **({'options': rate_options, 'allow_custom': True} if rate_options else {})},
         {'key': 'as_of', 'label': 'Priced As Of', 'align': 'right', 'editable': True},
     ]
 
@@ -303,12 +320,23 @@ def build_pricing_register_schema(
         refs = _cell_source_refs(r, captured_at)
         width = parse_lot_width(r.get('product_code'))
         price = _num(r.get('price_per_unit'))
-        uom = r.get('unit_of_measure') or ''
+        # Resolved to the administered code, so an older spelling lands on a real
+        # option instead of dragging an off-list entry into the dropdown.
+        uom = normalize_measure_code(r.get('unit_of_measure'))
         # Only front-foot products have a whole-lot price. Everything else is
         # already priced in the unit it sells in, and multiplying it by anything
         # would be an invented figure.
         per_lot = (price * width) if (price and width and uom in _FRONT_FOOT_UOMS) else None
         growth = _num(r.get('growth_rate'))
+        # A row that names no rate and points at no set takes the project's own
+        # growth assumption. Gregg, 2026-09-14: *"if a global growth rate is
+        # adopted, then all lines in the column will contain the global growth
+        # rate but can be overwritten."* Inherited, not stored — typing over it
+        # writes that product's own rate and the inheritance stops for that row.
+        inherited = False
+        if growth is None and not r.get('growth_rate_set_id') and growth_default:
+            growth = growth_default['rate']
+            inherited = True
         as_of = r.get('price_effective_date')
         cells: Dict[str, Any] = {
             'use_type': r.get('lu_type_code') or '',
@@ -329,11 +357,15 @@ def build_pricing_register_schema(
             **({'editable': True, 'cell_source_refs': refs} if refs else {}),
             'cells': cells,
             **({'curve_break': True} if r.get('curve_break') else {}),
+            **({'growth_inherited': True} if inherited else {}),
         })
 
     priced = [r for r in ordered if _num(r.get('price_per_unit'))]
     dated = [r for r in ordered if r.get('price_effective_date')]
-    escalating = [r for r in ordered if _num(r.get('growth_rate'))]
+    # Counted on the EFFECTIVE rate, inheritance included: a row escalating at
+    # the project's rate is escalating, and a count that said otherwise would
+    # contradict the column beside it.
+    escalating = [d for d in data_rows if _num(d['cells'].get('growth_rate'))]
 
     return {
         'blocks': [
@@ -375,12 +407,14 @@ def build_pricing_register_refresh(project_id: int) -> Optional[Dict[str, Any]]:
     schema = build_pricing_register_schema(
         data['rows'], data['growth_sets'],
         data.get('uom_options'), data.get('growth_options'),
+        data.get('growth_rate_choices'), data.get('growth_default'),
     )
     view_config = build_pricing_register_view_config(
         project_id=project_id,
         project_name=data['project_name'],
         schema=schema,
         growth_sets=data['growth_sets'],
+        growth_default=data.get('growth_default'),
     )
     return {'schema': schema, 'view_config': view_config}
 

@@ -52,13 +52,61 @@ def _project_property_type(project_id: int) -> Optional[str]:
     }.get(code)
 
 
-def measure_options(project_id: int, also_allow: Optional[List[str]] = None) -> List[Dict[str, str]]:
+# The older price-prefixed spellings still sitting in stored data, mapped to the
+# administered code they mean. Gregg, 2026-09-14: the Unit column must not offer
+# "(not on the platform list)" entries. Resolving a legacy spelling to its real
+# code is how the cell shows the right list item without a stored value being
+# silently dropped — the row then writes the administered code the next time it
+# is touched, so the data migrates as it is edited.
+LEGACY_MEASURE_ALIASES: Dict[str, str] = {
+    '$/FF': 'FF',
+    '$/LF': 'LF',
+    '$/SF': 'SF',
+    '$/SY': 'SY',
+    '$/CY': 'CY',
+    '$/Acre': 'AC',
+    '$/AC': 'AC',
+    '$/Unit': 'UNIT',
+    '$/EA': 'EA',
+    '$/Door': 'DOOR',
+    '$/Stall': 'STALL',
+    '$$$': 'LS',
+    '% of': '%',
+}
+
+
+def normalize_measure_code(code: Optional[str]) -> str:
+    """The administered code a stored unit means. Unknown values pass through.
+
+    Case-insensitive on the second pass: ``Unit`` and ``UNIT`` are the same unit
+    typed by different hands, and only one of them is on the list.
+    """
+    if not code:
+        return ''
+    stripped = str(code).strip()
+    if stripped in LEGACY_MEASURE_ALIASES:
+        return LEGACY_MEASURE_ALIASES[stripped]
+    folded = stripped.casefold()
+    for legacy, administered in LEGACY_MEASURE_ALIASES.items():
+        if legacy.casefold() == folded:
+            return administered
+    return _CASE_ONLY_CODES.get(folded, stripped)
+
+
+# Administered codes whose only problem is how they were typed.
+_CASE_ONLY_CODES: Dict[str, str] = {
+    'unit': 'UNIT', 'ff': 'FF', 'ac': 'AC', 'acre': 'AC', 'sf': 'SF',
+    'lf': 'LF', 'sy': 'SY', 'cy': 'CY', 'ea': 'EA', 'ls': 'LS',
+    'door': 'DOOR', 'stall': 'STALL',
+}
+
+
+def measure_options(project_id: int) -> List[Dict[str, str]]:
     """The units this project may use, as picklist options.
 
-    ``also_allow`` keeps values already stored on the rows being rendered even
-    when they are not on the administered list — a card must never open offering
-    to change a unit just because the list moved on. Those are labelled so the
-    difference is visible rather than silent.
+    Only the administered list. A value stored in an older spelling is resolved
+    by ``normalize_measure_code`` before the cell is drawn, so it lands on a real
+    option rather than forcing an off-list entry into the dropdown.
     """
     property_type = _project_property_type(project_id)
 
@@ -87,11 +135,45 @@ def measure_options(project_id: int, also_allow: Optional[List[str]] = None) -> 
         options.append({'value': code, 'label': f'{code} — {name}' if name else code})
         seen.add(code)
 
-    for stored in sorted({s for s in (also_allow or []) if s}):
-        if stored not in seen:
-            options.append({'value': stored, 'label': f'{stored} (not on the platform list)'})
-
     return options
+
+
+def project_growth_default(project_id: int) -> Optional[Dict[str, Any]]:
+    """The project's own price-growth assumption, if one is set.
+
+    Lives in ``tbl_project_settings`` — ``price_inflation_set_id`` first, falling
+    back to the flat ``global_inflation_rate``. Not invented here: those columns
+    already existed, which is why the register reads them rather than adding a
+    second place a growth assumption could live.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT s.price_inflation_set_id,
+                   s.global_inflation_rate,
+                   g.set_name,
+                   (SELECT st.rate FROM landscape.core_fin_growth_rate_steps st
+                     WHERE st.set_id = g.set_id
+                     ORDER BY st.step_number LIMIT 1)
+            FROM landscape.tbl_project_settings s
+            LEFT JOIN landscape.core_fin_growth_rate_sets g
+                   ON g.set_id = s.price_inflation_set_id
+            WHERE s.project_id = %s
+            """,
+            [project_id],
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        return None
+    set_id, flat_rate, set_name, set_rate = row
+    if set_id and set_rate is not None:
+        return {'set_id': int(set_id), 'label': set_name or f'Set {set_id}',
+                'rate': float(set_rate), 'source': 'set'}
+    if flat_rate is not None:
+        return {'set_id': None, 'label': 'the project inflation rate',
+                'rate': float(flat_rate), 'source': 'flat'}
+    return None
 
 
 def growth_source_options(project_id: int) -> List[Dict[str, str]]:
@@ -117,3 +199,56 @@ def growth_source_options(project_id: int) -> List[Dict[str, str]]:
     return [{'value': '', 'label': 'Custom rate'}] + [
         {'value': str(sid), 'label': name or f'Set {sid}'} for sid, name, _ in rows
     ]
+
+
+def growth_rate_options(project_id: int) -> List[Dict[str, str]]:
+    """The RATES those sets stand for, as a picklist for a rate field.
+
+    Gregg, 2026-09-14: *"growth rates should have dropdowns from benchmarks."*
+    Pointing at a set is one thing; choosing the number it implies is another,
+    and a rate field that offers only free text is how a project ends up with
+    2.95% typed where every other line says 3%. Each option is a decimal
+    fraction, the same as the stored value. The first entry leaves the field
+    typeable so a rate nobody has published can still be entered.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT s.set_name, COALESCE(s.is_global, FALSE),
+                   (SELECT st.rate FROM landscape.core_fin_growth_rate_steps st
+                     WHERE st.set_id = s.set_id
+                     ORDER BY st.step_number LIMIT 1)
+            FROM landscape.core_fin_growth_rate_sets s
+            WHERE (s.project_id = %s OR COALESCE(s.is_global, FALSE))
+              AND COALESCE(s.card_type, '') IN ('revenue', 'custom', '')
+            ORDER BY COALESCE(s.is_global, FALSE), s.set_name
+            """,
+            [project_id],
+        )
+        rows = cursor.fetchall()
+
+    options: List[Dict[str, str]] = []
+    seen = set()
+    for name, is_global, rate in rows:
+        if rate is None:
+            continue
+        value = str(float(rate))
+        if value in seen:
+            continue
+        seen.add(value)
+        scope = 'platform' if is_global else 'this project'
+        options.append({
+            'value': value,
+            'label': f'{float(rate) * 100:.1f}% — {name or "unnamed"} ({scope})',
+        })
+
+    default = project_growth_default(project_id)
+    if default:
+        value = str(default['rate'])
+        if value not in seen:
+            options.insert(0, {
+                'value': value,
+                'label': f'{default["rate"] * 100:.1f}% — {default["label"]} (project default)',
+            })
+
+    return [{'value': '', 'label': 'Type a rate…'}] + options
