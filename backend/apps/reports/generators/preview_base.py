@@ -676,8 +676,16 @@ class PreviewBaseGenerator:
             return None
 
     def get_today_str(self) -> str:
-        """Return today's date as 'Mon DD, YYYY' string for PDF subtitles."""
-        return datetime.now().strftime('%b %d, %Y')
+        """Today's date as 'Mon DD, YYYY', read through Django's conversion.
+
+        ``datetime.now()`` is the server process's naive clock, which Django
+        sets to ``settings.TIME_ZONE`` — UTC. For seven hours of every Phoenix
+        day that is tomorrow's date on the document. See ``_generated_stamp`` in
+        ``pdf_base`` for the same fix on the footer timestamp.
+        """
+        from django.utils import timezone as dj_timezone
+
+        return dj_timezone.localtime(dj_timezone.now()).strftime('%b %d, %Y')
 
     # ─── Helper: formatting ──────────────────────────────────────────────
 

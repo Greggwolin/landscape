@@ -312,6 +312,29 @@ def add_header(elements, title, subtitle=None):
     elements.append(Spacer(1, 4))
 
 
+def _generated_stamp() -> str:
+    """When this document was produced, WITH the zone it is stated in.
+
+    Fixed 2026-09-14, found by rendering a report and reading its footer. It
+    said "Generated Sep 14, 2026 09:17 PM" on a document produced at 2:17pm in
+    Phoenix. ``datetime.now()`` is the server process's naive clock, and Django
+    sets that process to ``settings.TIME_ZONE``, which is UTC — so every report
+    this platform has ever produced has carried a timestamp up to seven hours
+    ahead of the person holding it, with nothing on the page to say so.
+
+    Two things change. The time is read through Django's own conversion, so it
+    follows configuration instead of ignoring it; and the zone is NAMED, because
+    an unlabelled time on a document that leaves the building is a number a
+    reader cannot check. Setting TIME_ZONE away from UTC is a platform-wide
+    decision and is deliberately not taken here.
+    """
+    from django.utils import timezone as dj_timezone
+
+    now = dj_timezone.localtime(dj_timezone.now())
+    zone = now.strftime('%Z') or 'UTC'
+    return f"{now.strftime('%b %d, %Y %I:%M %p')} {zone}"
+
+
 def _footer_func(canvas, doc):
     """Draw page number + timestamp in footer."""
     canvas.saveState()
@@ -325,7 +348,7 @@ def _footer_func(canvas, doc):
     canvas.drawString(
         doc.leftMargin,
         doc.bottomMargin - 14,
-        f"Generated {datetime.now().strftime('%b %d, %Y %I:%M %p')}",
+        f"Generated {_generated_stamp()}",
     )
     canvas.restoreState()
 

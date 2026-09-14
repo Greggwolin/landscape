@@ -306,7 +306,8 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
         elements = []
 
         # Title block with subtitle including unit count
-        date_str = datetime.now().strftime('%b %d, %Y')
+        # Through the base helper, not datetime.now() — see get_today_str.
+        date_str = self.get_today_str()
         subtitle = (
             f"{project.get('project_name', 'Project')} | {total_units} Units | {date_str} | RPT-09 | Multifamily | "
             f"Basis: Market-Rent Pro Forma (expenses: {discriminator})"
@@ -324,7 +325,13 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
             hp(col_labels[3], styles, right=True),
             hp(col_labels[4], styles, right=True),
         ]]
-        row_styles_list = ['header']
+        # row_styles is parallel to the rows AFTER the header (make_table adds
+        # the offset itself), so the column-label row must NOT be listed here.
+        # Seeding it with 'header' shifted every style down one row, which
+        # painted the row after each section heading in the dark header colour
+        # with black text on it — unreadable, and found by rendering the PDF and
+        # looking at it on 2026-09-14 rather than by reading the payload.
+        row_styles_list = []
 
         # ─── REVENUE SECTION ───────────────────────────────────────────────────────
         # Section header: "REVENUE"

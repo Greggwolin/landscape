@@ -180,7 +180,13 @@ class UnitMixGenerator(PreviewBaseGenerator):
         ]
 
         tbl_data = [[hp(label, styles, right=(i > 0)) for i, label in enumerate(col_labels)]]
-        row_styles_list = ['header']
+        # row_styles is parallel to the rows AFTER the header (make_table adds
+        # the offset itself), so the column-label row must NOT be listed here.
+        # Seeding it with 'header' shifted every style down one row, which
+        # painted the row after each section heading in the dark header colour
+        # with black text on it — unreadable, and found by rendering the PDF and
+        # looking at it on 2026-09-14 rather than by reading the payload.
+        row_styles_list = []
 
         for row in data_rows:
             tbl_data.append([
