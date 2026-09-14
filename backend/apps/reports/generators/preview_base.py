@@ -324,6 +324,13 @@ class PreviewBaseGenerator:
                 num = float(value)
                 if num == 0:
                     return '—'
+                # Parentheses, not a minus sign. A deduction on a statement
+                # reads "($262,493)"; "$-262,493" is a spreadsheet artefact
+                # that reached a lender-facing operating statement on
+                # 2026-09-14. The artifact panel already renders it this way,
+                # so this also stops the same figure looking like two.
+                if num < 0:
+                    return f"(${abs(num):,.0f})"
                 return f"${num:,.0f}"
             except (ValueError, TypeError):
                 return str(value)
@@ -332,6 +339,8 @@ class PreviewBaseGenerator:
                 num = float(value)
                 if num == 0:
                     return '—'
+                if num < 0:
+                    return f"({abs(num):,.0f})"
                 return f"{num:,.0f}"
             except (ValueError, TypeError):
                 return str(value)
