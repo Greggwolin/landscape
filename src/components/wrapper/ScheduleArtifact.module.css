@@ -364,25 +364,77 @@
   color: var(--cui-warning);
 }
 
-/* ─── Derivation popover ──────────────────────────────────────────────── */
+/* ─── Derivation panel (option 4d, 2026-09-13) ────────────────────────────
+   It sits BESIDE the schedule, not over it. What was here was a 262px box
+   positioned absolutely over the table with a full-bleed shade behind it —
+   which covered the very rows a reader opens a derivation to compare against.
+   That modal shape is what 4d was chosen instead of, and both `.pop` and
+   `.popShade` are gone with it. The panel is now a column in a flex row with
+   the table, so the table narrows and stays readable beside it.
+   `.popTitle`, `.popList`, `.popRule` and `.popFoot` keep their names — they
+   describe the contents, which did not change. */
 
-.popShade {
-  position: absolute;
-  inset: 0;
-  z-index: 9;
+.tableRow {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
 }
 
-.pop {
-  position: absolute;
-  right: 16px;
-  width: 262px;
+.tableRow > .scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.detailPanel {
+  flex: 0 0 288px;
+  max-width: 288px;
   background: var(--cui-body-bg);
-  border: 1px solid var(--cui-primary);
-  border-radius: 6px;
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  border-left: 1px solid var(--cui-border-color);
   padding: 11px 13px;
   font-size: 12.5px;
-  z-index: 10;
+  overflow-y: auto;
+}
+
+.detailHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.detailHead .popTitle {
+  margin-bottom: 0;
+}
+
+.detailClose {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.detailClose:hover {
+  color: var(--cui-body-color);
+}
+
+/* Narrow: the panel drops beneath the table rather than squeezing it to
+   nothing. Still beside-then-below, never on top. */
+@media (max-width: 760px) {
+  .tableRow {
+    flex-wrap: wrap;
+  }
+
+  .detailPanel {
+    flex: 1 1 100%;
+    max-width: none;
+    border-left: 0;
+    border-top: 1px solid var(--cui-border-color);
+  }
 }
 
 .popTitle {
