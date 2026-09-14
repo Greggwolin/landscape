@@ -1,102 +1,191 @@
-"""RPT_13: DCF / Returns Summary generator."""
+"""RPT_13 — DCF Returns, read from the CALCULATION ENGINE.
+
+Rewritten 2026-09-14. This report was written against
+``landscape.tbl_income_dcf``, a results table that has never existed — the one
+of the six 2026-09-14 defects that was a genuine absence rather than a rename.
+Results are not stored anywhere: ``DCFCalculationService`` produces the present
+value, the IRR, the terminal value and the year-by-year NOI on demand, and
+``tbl_dcf_analysis`` holds only the assumptions. So the fix was never a query
+correction; it was pointing the report at the thing that computes the numbers,
+which is what D-2026-09-14-SURFACE-ARCH means one level down from a surface.
+
+TWO RULES THIS REPORT FOLLOWS THAT THE OLD ONE DID NOT
+------------------------------------------------------
+* **A figure the engine did not produce is not printed.** The old code wrapped
+  every read in ``COALESCE(..., 0)``, so an NPV that does not exist would have
+  been reported as $0 — a number a reader would act on. On Chadron Terrace the
+  engine returns an IRR and a present value but no NPV and no equity multiple;
+  those cards are absent rather than zero.
+
+* **An assumption the user never entered is labelled as the engine's, not
+  theirs.** ``DcfAnalysis`` records only what a person supplied and leaves the
+  rest NULL, deliberately, so that opening a screen cannot manufacture a
+  decision. The calculation still needs a number and substitutes its own. This
+  report shows which is which, in its own column, rather than presenting a
+  platform default as the deal's terms.
+"""
 
 from .preview_base import PreviewBaseGenerator
+
+# (label, engine assumption key, the tbl_dcf_analysis column that would hold a
+# user-entered value, how to render it). Only the four the record actually owns
+# can be attributed; the rest are the engine's by construction.
+_ASSUMPTIONS = [
+    ('Hold Period', 'hold_period_years', 'hold_period_years', 'years'),
+    ('Discount Rate', 'discount_rate', 'discount_rate', 'pct'),
+    ('Terminal Cap Rate', 'terminal_cap_rate', 'exit_cap_rate', 'pct'),
+    ('Selling Costs', 'selling_costs_pct', 'selling_costs_pct', 'pct'),
+    ('Income Growth', 'income_growth_rate', None, 'pct'),
+    ('Expense Growth', 'expense_growth_rate', None, 'pct'),
+    ('Vacancy', 'vacancy_rate', None, 'pct'),
+    ('Credit Loss', 'credit_loss_rate', None, 'pct'),
+    ('Management Fee', 'management_fee_pct', None, 'pct'),
+]
 
 
 class DCFReturnsGenerator(PreviewBaseGenerator):
     report_code = 'RPT_13'
     report_name = 'DCF Returns Summary'
 
+    def _entered_columns(self) -> set:
+        """Which of the four owned assumptions this project actually carries."""
+        from apps.financial.models_valuation import DcfAnalysis
+        from apps.projects.models import Project
+
+        try:
+            record = DcfAnalysis.get_for_project(
+                Project.objects.get(pk=self.project_id)
+            )
+        except Exception:  # noqa: BLE001 — provenance must never fail the report
+            return set()
+        if record is None:
+            return set()
+        return {
+            column for column in
+            ('hold_period_years', 'discount_rate', 'exit_cap_rate', 'selling_costs_pct')
+            if getattr(record, column, None) is not None
+        }
+
     def generate_preview(self) -> dict:
+        from apps.financial.services.dcf_calculation_service import (
+            DCFCalculationService,
+        )
+
         project = self.get_project()
-        sections = []
+        title = 'DCF Returns Summary'
+        subtitle = project.get('project_name', '')
 
-        # Check for DCF results
-        dcf = self.execute_query("""
-            SELECT
-                COALESCE(discount_rate, 0) AS discount_rate,
-                COALESCE(terminal_cap_rate, 0) AS terminal_cap,
-                COALESCE(holding_period_years, 10) AS hold_years,
-                COALESCE(npv, 0) AS npv,
-                COALESCE(irr, 0) AS irr,
-                COALESCE(terminal_value, 0) AS terminal_value,
-                COALESCE(present_value, 0) AS present_value
-            FROM landscape.tbl_income_dcf
-            WHERE project_id = %s
-            ORDER BY id DESC
-            LIMIT 1
-        """, [self.project_id])
-
-        if not dcf:
-            # NOT a rename, unlike the other four fixed on 2026-09-14.
-            # landscape.tbl_income_dcf has never existed: this report was written
-            # against a RESULTS table, and results are not stored — the
-            # calculation engine (apps.calculations) produces IRR, NPV and
-            # terminal value on demand, which is where the cash-flow reports get
-            # theirs. tbl_dcf_analysis holds the ASSUMPTIONS only.
-            #
-            # Repointing this at the engine is the 2a work (one definition, two
-            # outputs), not a query fix. Until then the message says what is
-            # actually true rather than sending someone to a tab that will not
-            # help.
+        try:
+            result = DCFCalculationService(self.project_id).calculate()
+        except Exception as exc:  # noqa: BLE001
+            # Said plainly. The previous version of this report answered a
+            # failure with an empty page, which reads as "no returns" rather
+            # than "could not be computed".
             return {
-                'title': 'DCF Returns Summary',
-                'subtitle': project.get('project_name', ''),
-                'message': (
-                    'This report is not connected to the calculation engine yet, so it '
-                    'has no returns to show. The same figures appear on the cash-flow '
-                    'reports, which read the engine directly.'
-                ),
-                'sections': [],
+                'title': title, 'subtitle': subtitle, 'sections': [],
+                'message': f'The DCF could not be calculated for this project: {exc}',
             }
 
-        d = dcf[0]
+        metrics = result.get('metrics') or {}
+        assumptions = result.get('assumptions') or {}
+        exit_analysis = result.get('exit_analysis') or {}
+        projections = result.get('projections') or []
 
-        # KPIs
-        sections.append(self.make_kpi_section('Return Metrics', [
-            # A fraction from the engine, not a percent-unit figure.
-            self.make_kpi_card('IRR', self.fmt_fraction_as_pct(d['irr'])),
-            self.make_kpi_card('NPV', self.fmt_currency(d['npv'])),
-            self.make_kpi_card('Terminal Value', self.fmt_currency(d['terminal_value'])),
-            self.make_kpi_card('Present Value', self.fmt_currency(d['present_value'])),
-        ]))
+        if not projections:
+            return {
+                'title': title, 'subtitle': subtitle, 'sections': [],
+                'message': (
+                    'The engine produced no projection for this project — it has '
+                    'no units, rents or operating expenses to project from.'
+                ),
+            }
 
-        # Assumptions table
-        assumptions_cols = [
-            {'key': 'param', 'label': 'Parameter', 'align': 'left'},
-            {'key': 'value', 'label': 'Value', 'align': 'right'},
-        ]
-        assumptions_rows = [
-            {'param': 'Discount Rate', 'value': self.fmt_pct(d['discount_rate'])},
-            {'param': 'Terminal Cap Rate', 'value': self.fmt_pct(d['terminal_cap'])},
-            {'param': 'Holding Period', 'value': f"{int(d['hold_years'])} years"},
-        ]
-        sections.append(self.make_table_section('DCF Assumptions', assumptions_cols, assumptions_rows))
+        sections = []
 
-        # NOI projection if available
-        cf_data = self.execute_query("""
-            SELECT
-                period_year,
-                COALESCE(noi, 0) AS noi
-            FROM landscape.tbl_cash_flow_projection
-            WHERE project_id = %s
-            ORDER BY period_year
-            LIMIT 15
-        """, [self.project_id])
+        # ── Return metrics. Only what the engine actually returned. ─────────
+        cards = []
+        if metrics.get('irr') is not None:
+            # A fraction from the engine, never a percent-unit figure. Passing
+            # it to fmt_pct printed 0.5% for a 45.7% project on 2026-09-14.
+            cards.append(self.make_kpi_card('IRR', self.fmt_fraction_as_pct(metrics['irr'])))
+        if metrics.get('present_value') is not None:
+            cards.append(self.make_kpi_card('Present Value', self.fmt_currency(metrics['present_value'])))
+        if metrics.get('npv') is not None:
+            cards.append(self.make_kpi_card('NPV', self.fmt_currency(metrics['npv'])))
+        if metrics.get('equity_multiple') is not None:
+            cards.append(self.make_kpi_card(
+                'Equity Multiple', f"{float(metrics['equity_multiple']):.2f}x",
+            ))
+        if exit_analysis.get('net_reversion') is not None:
+            cards.append(self.make_kpi_card(
+                'Net Reversion', self.fmt_currency(exit_analysis['net_reversion']),
+            ))
+        if cards:
+            sections.append(self.make_kpi_section('Return Metrics', cards))
 
-        if cf_data:
-            noi_cols = [
+        # An exit floored at zero says why, rather than showing $0 in silence.
+        if exit_analysis.get('exit_not_meaningful'):
+            sections.append({
+                'heading': '', 'type': 'text',
+                'content': (
+                    'Terminal NOI is negative, so the reversion is floored at $0 '
+                    'rather than capitalised into a negative sale price.'
+                ),
+            })
+
+        # ── Assumptions, with where each one came from. ─────────────────────
+        entered = self._entered_columns()
+        assumption_rows = []
+        for label, key, column, kind in _ASSUMPTIONS:
+            value = assumptions.get(key)
+            if value is None:
+                continue
+            if kind == 'pct':
+                shown = self.fmt_fraction_as_pct(value)
+            else:
+                shown = f'{int(value)} years'
+            assumption_rows.append({
+                'param': label,
+                'value': shown,
+                'source': 'Entered' if column in entered else 'Engine default',
+            })
+        if assumption_rows:
+            sections.append(self.make_table_section(
+                'DCF Assumptions',
+                [
+                    {'key': 'param', 'label': 'Parameter', 'align': 'left'},
+                    {'key': 'value', 'label': 'Value', 'align': 'right'},
+                    # The column that stops a platform default being read as the
+                    # deal's terms.
+                    {'key': 'source', 'label': 'Source', 'align': 'left'},
+                ],
+                assumption_rows,
+            ))
+
+        # ── The projection the returns were computed from. ──────────────────
+        sections.append(self.make_table_section(
+            'NOI Projection',
+            [
                 {'key': 'year', 'label': 'Year', 'align': 'left'},
+                {'key': 'egi', 'label': 'EGI', 'align': 'right', 'format': 'currency'},
+                {'key': 'total_opex', 'label': 'Operating Expenses', 'align': 'right', 'format': 'currency'},
                 {'key': 'noi', 'label': 'NOI', 'align': 'right', 'format': 'currency'},
-            ]
-            noi_rows = [
-                {'year': f"Year {r['period_year']}", 'noi': float(r['noi'])}
-                for r in cf_data
-            ]
-            sections.append(self.make_table_section('NOI Projection', noi_cols, noi_rows))
+                {'key': 'pv_noi', 'label': 'PV of NOI', 'align': 'right', 'format': 'currency'},
+            ],
+            [
+                {
+                    'year': f"Year {row.get('year')}",
+                    'egi': row.get('egi'),
+                    'total_opex': row.get('total_opex'),
+                    'noi': row.get('noi'),
+                    'pv_noi': row.get('pv_noi'),
+                }
+                for row in projections
+            ],
+            {
+                'noi': sum(float(r.get('noi') or 0) for r in projections),
+                'pv_noi': sum(float(r.get('pv_noi') or 0) for r in projections),
+            },
+        ))
 
-        return {
-            'title': 'DCF Returns Summary',
-            'subtitle': project.get('project_name', ''),
-            'sections': sections,
-        }
+        return {'title': title, 'subtitle': subtitle, 'sections': sections}

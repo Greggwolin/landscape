@@ -85,7 +85,8 @@ export function budgetCellTarget(
 /**
  * The picklist choices a block-schema column carries, if any.
  *
- * The UOM column is FK-constrained to `core_fin_uom`, so the builder rides the
+ * The UOM column is FK-constrained to `tbl_measures` (repointed 2026-09-14 from
+ * the superseded `core_fin_uom`), so the builder rides the
  * allowed codes on the block schema's column (CB10) and the renderer offers a
  * dropdown rather than letting someone type into a foreign key. The view
  * specification describes UOM as `kind: 'picklist'` but does not carry the

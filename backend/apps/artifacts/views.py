@@ -1044,7 +1044,7 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
     Reuses ``handle_update_budget_item`` in commit mode — no parallel writer.
     ``qty``/``rate`` are decimal-coerced (the DB trigger recomputes
     ``amount = qty × rate``); ``uom_code`` (CB10) is a picklist FK code, written
-    as a string. An invalid code is rejected by the ``core_fin_uom`` foreign key
+    as a string. An invalid code is rejected by the ``tbl_measures`` foreign key
     and the rejection surfaces inline. Returns the standard field-writer
     envelope.
     """
@@ -1073,7 +1073,7 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
         }
     # UOM (CB10) is a picklist FK code, not a number — write the string straight
     # through. An empty selection is a client error; an invalid (non-existent)
-    # code is caught by the core_fin_uom foreign key inside the writer and comes
+    # code is caught by the tbl_measures foreign key inside the writer and comes
     # back as a db_error envelope, surfaced inline rather than silently reverted.
     if column == 'uom_code':
         code = '' if raw_value is None else str(raw_value).strip()

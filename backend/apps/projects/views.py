@@ -10,9 +10,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, F, DecimalField, Count, Subquery, IntegerField, OuterRef
 from django.db.models.functions import Coalesce
-from django.db import connection
+from django.db import connection, transaction
 from decimal import Decimal
 import logging
+from collections import defaultdict
 import math
 
 logger = logging.getLogger(__name__)
@@ -43,170 +44,114 @@ from apps.multifamily.serializers import ValueAddAssumptionsSerializer
 # ---------------------------------------------------------------------------
 
 
-def _get_fk_dependents(cur, target_schema: str, target_table: str) -> list:
+# Deeper than any chain in this schema; a cap so a cycle the path guard
+# somehow misses fails fast instead of recursing forever.
+_MAX_FK_DEPTH = 10
+
+
+def _fk_children_map(cur) -> dict:
+    """Every foreign key in the database, as parent table -> its children.
+
+    One query, read once. The walk below only issues DELETEs, which is what
+    keeps a deep delete to a handful of round trips rather than one per level
+    per table.
+
+    Restricted to ``relkind = 'r'`` — real tables. Several models in this
+    codebase are ``managed=False`` and point at tables that do not exist; those
+    produce no constraint rows, so they cannot appear here and no longer need
+    an exception handler to skip them.
     """
-    Return [(schema.table, fk_column)] for every FK that references
-    target_schema.target_table, ordered so that leaf tables come first
-    (reverse topological sort by FK depth).
-    """
-    # Step 1: Find all FKs referencing the target table
     cur.execute("""
-        SELECT
-            cn.nspname  AS child_schema,
-            cc.relname  AS child_table,
-            a.attname   AS child_column
+        SELECT pn.nspname, parent.relname, n.nspname, child.relname,
+               (SELECT array_agg(a.attname ORDER BY x.ord)
+                  FROM unnest(c.conkey) WITH ORDINALITY x(att, ord)
+                  JOIN pg_attribute a ON a.attrelid = c.conrelid
+                                     AND a.attnum = x.att) AS child_cols,
+               (SELECT array_agg(a.attname ORDER BY x.ord)
+                  FROM unnest(c.confkey) WITH ORDINALITY x(att, ord)
+                  JOIN pg_attribute a ON a.attrelid = c.confrelid
+                                     AND a.attnum = x.att) AS parent_cols
         FROM pg_constraint c
-        JOIN pg_class      cc ON cc.oid = c.conrelid
-        JOIN pg_namespace  cn ON cn.oid = cc.relnamespace
-        JOIN pg_class      pc ON pc.oid = c.confrelid
-        JOIN pg_namespace  pn ON pn.oid = pc.relnamespace
-        JOIN pg_attribute  a  ON a.attrelid = c.conrelid
-                              AND a.attnum = ANY(c.conkey)
-        WHERE c.contype   = 'f'
-          AND pn.nspname  = %s
-          AND pc.relname  = %s
-        ORDER BY cn.nspname, cc.relname
-    """, [target_schema, target_table])
-
-    direct_fks = []
-    for row in cur.fetchall():
-        schema_table = f'{row[0]}.{row[1]}'
-        fk_col = row[2]
-        direct_fks.append((schema_table, fk_col))
-
-    # Step 2: For each direct dependent, find ITS dependents (one level deep
-    # is enough — the pattern is: grandchild → child → tbl_project).
-    # We collect grandchildren so we can delete them before their parents.
-    grandchildren = []
-    for schema_table, _ in direct_fks:
-        parts = schema_table.split('.')
-        if len(parts) == 2:
-            cur.execute("""
-                SELECT
-                    cn.nspname  AS child_schema,
-                    cc.relname  AS child_table,
-                    a.attname   AS child_column,
-                    pc.relname  AS parent_table
-                FROM pg_constraint c
-                JOIN pg_class      cc ON cc.oid = c.conrelid
-                JOIN pg_namespace  cn ON cn.oid = cc.relnamespace
-                JOIN pg_class      pc ON pc.oid = c.confrelid
-                JOIN pg_namespace  pn ON pn.oid = pc.relnamespace
-                JOIN pg_attribute  a  ON a.attrelid = c.conrelid
-                                      AND a.attnum = ANY(c.conkey)
-                WHERE c.contype   = 'f'
-                  AND pn.nspname  = %s
-                  AND pc.relname  = %s
-            """, [parts[0], parts[1]])
-
-            for gc_row in cur.fetchall():
-                gc_schema_table = f'{gc_row[0]}.{gc_row[1]}'
-                gc_fk_col = gc_row[2]
-                parent_table = gc_row[3]
-                # Store the grandchild with its FK info and which parent it
-                # depends on, so we can delete via a subquery
-                grandchildren.append((
-                    gc_schema_table,
-                    gc_fk_col,
-                    f'{parts[0]}.{parent_table}',
-                ))
-
-    return grandchildren, direct_fks
-
-
-def _pre_delete_dependents(project_id: int) -> None:
-    """
-    Delete all rows that reference the given project, across all FK chains.
-
-    Queries pg_constraint to discover dependencies at runtime — no static
-    table list to maintain.
-    """
-    with connection.cursor() as cur:
-        grandchildren, direct_fks = _get_fk_dependents(
-            cur, 'landscape', 'tbl_project'
+        JOIN pg_class child  ON child.oid  = c.conrelid
+        JOIN pg_class parent ON parent.oid = c.confrelid
+        JOIN pg_namespace n  ON n.oid  = child.relnamespace
+        JOIN pg_namespace pn ON pn.oid = parent.relnamespace
+        WHERE c.contype = 'f' AND child.relkind = 'r' AND parent.relkind = 'r'
+    """)
+    children = defaultdict(list)
+    for pschema, ptable, cschema, ctable, ccols, pcols in cur.fetchall():
+        if not ccols or not pcols:
+            continue
+        children[f'{pschema}.{ptable}'].append(
+            (f'{cschema}.{ctable}', list(ccols), list(pcols))
         )
+    return children
 
-        # Phase 1: Delete grandchildren (rows that FK into direct children
-        # of tbl_project, not directly into tbl_project itself).
-        # E.g., thread_message → chat_thread → tbl_project
-        #        core_doc_text → core_doc → tbl_project
-        seen_gc = set()
-        for gc_table, gc_fk_col, parent_table in grandchildren:
-            # Skip self-referencing or already-processed
-            key = (gc_table, gc_fk_col)
-            if key in seen_gc or gc_table == parent_table:
+
+def _delete_subtree(cur, key, where_sql, params, children, depth, path, removed):
+    """Delete a table's rows and everything beneath them, deepest first."""
+    if depth > _MAX_FK_DEPTH:
+        raise RuntimeError(
+            f'foreign-key chain deeper than {_MAX_FK_DEPTH} levels at {key}'
+        )
+    schema, table = key.split('.', 1)
+    for child_key, child_cols, parent_cols in children.get(key, ()):
+        if child_key == key or child_key in path:
+            continue
+        cc = ', '.join(f'"{c}"' for c in child_cols)
+        pc = ', '.join(f'"{c}"' for c in parent_cols)
+        subquery = f'SELECT {pc} FROM {schema}."{table}" WHERE {where_sql}'
+        _delete_subtree(
+            cur, child_key, f'({cc}) IN ({subquery})', params,
+            children, depth + 1, path | {child_key}, removed,
+        )
+    cur.execute(f'DELETE FROM {schema}."{table}" WHERE {where_sql}', params)
+    if cur.rowcount:
+        removed[key] = removed.get(key, 0) + cur.rowcount
+
+
+def _pre_delete_dependents(project_id: int) -> dict:
+    """Delete everything that references a project, to FULL depth.
+
+    Rewritten 2026-09-14 under D-2026-09-14-DELETE-DEPTH. What was here walked
+    two levels: the children of tbl_project and their children. The land
+    hierarchy is three — ``tbl_parcel -> tbl_phase -> tbl_area -> tbl_project``
+    — so the phase delete hit a RESTRICT constraint, raised, and was swallowed
+    by an ``except: continue``. The transaction then aborted, every later
+    statement failed with "current transaction is aborted", and the project row
+    survived. **The caller was told nothing.**
+
+    It looked intermittent because it was not: EVERY land project failed and
+    every multifamily project succeeded, multifamily deals having no areas or
+    phases. Thirteen of the forty-one projects deleted on 2026-09-14 refused on
+    the first pass and all thirteen were land.
+
+    This walks the graph downward to full depth and deletes deepest-first, which
+    is the algorithm the standalone script used to clear those thirteen. It
+    returns a count per table and, unlike its predecessor, it RAISES rather than
+    continuing: a delete that cannot complete must fail loudly, because a
+    project that silently stays is the defect this replaces.
+    """
+    removed: dict = {}
+    root = 'landscape.tbl_project'
+    with connection.cursor() as cur:
+        children = _fk_children_map(cur)
+        # The project ROW is left for the caller to delete — this function is
+        # its dependents, as its name says. Starting the walk at the children
+        # rather than at the root is what keeps that true.
+        for child_key, child_cols, parent_cols in children.get(root, ()):
+            if child_key == root:
                 continue
-            seen_gc.add(key)
-
-            # Find the parent's FK column to tbl_project
-            parent_fk = None
-            for dt, dc in direct_fks:
-                if dt == parent_table:
-                    parent_fk = dc
-                    break
-
-            if not parent_fk:
-                continue
-
-            # Find the parent's PK column (what the grandchild FK references)
-            parent_parts = parent_table.split('.')
-            try:
-                cur.execute("""
-                    SELECT a.attname
-                    FROM pg_index i
-                    JOIN pg_attribute a ON a.attrelid = i.indrelid
-                                        AND a.attnum = ANY(i.indkey)
-                    JOIN pg_class c ON c.oid = i.indrelid
-                    JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE i.indisprimary
-                      AND n.nspname = %s
-                      AND c.relname = %s
-                    LIMIT 1
-                """, [parent_parts[0], parent_parts[1]])
-                pk_row = cur.fetchone()
-                if not pk_row:
-                    continue
-                parent_pk = pk_row[0]
-            except Exception:
-                continue
-
-            try:
-                cur.execute(
-                    f'DELETE FROM {gc_table} '
-                    f'WHERE {gc_fk_col} IN ('
-                    f'  SELECT {parent_pk} FROM {parent_table} '
-                    f'  WHERE {parent_fk} = %s'
-                    f')',
-                    [project_id],
-                )
-                if cur.rowcount > 0:
-                    logger.debug(
-                        'Pre-delete: removed %d rows from %s (via %s) for project %s',
-                        cur.rowcount, gc_table, parent_table, project_id,
-                    )
-            except Exception as exc:
-                logger.warning(
-                    'Pre-delete: grandchild %s via %s failed: %s',
-                    gc_table, parent_table, exc,
-                )
-
-        # Phase 2: Delete direct children of tbl_project
-        for table, fk_col in direct_fks:
-            try:
-                cur.execute(
-                    f'DELETE FROM {table} WHERE {fk_col} = %s',
-                    [project_id],
-                )
-                if cur.rowcount > 0:
-                    logger.debug(
-                        'Pre-delete: removed %d rows from %s for project %s',
-                        cur.rowcount, table, project_id,
-                    )
-            except Exception as exc:
-                logger.warning(
-                    'Pre-delete: skipped %s for project %s: %s',
-                    table, project_id, exc,
-                )
+            cc = ', '.join(f'"{c}"' for c in child_cols)
+            pc = ', '.join(f'"{c}"' for c in parent_cols)
+            subquery = (
+                f'SELECT {pc} FROM landscape."tbl_project" WHERE project_id = %s'
+            )
+            _delete_subtree(
+                cur, child_key, f'({cc}) IN ({subquery})', [project_id],
+                children, 1, {root, child_key}, removed,
+            )
+    return removed
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -456,17 +401,34 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-        # Pre-delete rows from managed=False tables whose DB-level CASCADE
-        # constraints may be missing.  This mirrors the FK_CHAIN logic in
-        # cleanup_test_projects management command.  Order: children first.
-        _pre_delete_dependents(project_id)
-
-        # Raw SQL delete — bypasses ORM cascade which fails on managed=False
-        # models pointing at non-existent tables (e.g. tbl_container).
-        with connection.cursor() as cur:
-            cur.execute(
-                'DELETE FROM landscape.tbl_project WHERE project_id = %s',
-                [project_id],
+        # Dependents first, to full FK depth, then the project row — both
+        # inside ONE transaction so the outcome can only be "gone" or
+        # "untouched". Before 2026-09-14 a failure part-way through left the
+        # project in place and reported success; see _pre_delete_dependents.
+        try:
+            with transaction.atomic():
+                _pre_delete_dependents(project_id)
+                # Raw SQL — the ORM cascade fails on managed=False models
+                # pointing at tables that do not exist (e.g. tbl_container).
+                with connection.cursor() as cur:
+                    cur.execute(
+                        'DELETE FROM landscape.tbl_project WHERE project_id = %s',
+                        [project_id],
+                    )
+        except Exception as exc:
+            logger.exception(
+                'Delete failed for project %s (%s); nothing was removed',
+                project_name, project_id,
+            )
+            return Response(
+                {
+                    'error': (
+                        f'Project could not be deleted: {exc}. '
+                        'Nothing was removed.'
+                    ),
+                    'project_id': project_id,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         logger.info('Project "%s" (id=%s) permanently deleted.', project_name, project_id)

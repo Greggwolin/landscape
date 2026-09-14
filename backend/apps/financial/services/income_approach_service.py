@@ -13,9 +13,12 @@ Source Tables:
 Session: QK-16
 """
 
+import logging
 from decimal import Decimal
 from typing import Any, Dict, Optional
 from django.db import connection
+
+logger = logging.getLogger(__name__)
 
 
 class IncomeApproachDataService:
@@ -498,37 +501,46 @@ class IncomeApproachDataService:
             'selling_costs_pct': 'selling_costs_pct',
         }
 
-        set_clauses = []
-        values = []
-        for key, col in field_mapping.items():
-            if key in updates:
-                set_clauses.append(f"{col} = %s")
-                values.append(updates[key])
-
-        if not set_clauses:
+        if not any(key in updates for key in field_mapping):
             return False
 
-        with connection.cursor() as cursor:
-            # 1. Write to tbl_dcf_analysis (primary)
-            try:
-                cursor.execute(f"""
-                    UPDATE landscape.tbl_dcf_analysis
-                    SET {', '.join(set_clauses)}, updated_at = NOW()
-                    WHERE project_id = %s
-                    RETURNING dcf_analysis_id
-                """, values + [self.project_id])
+        # Written through the MODEL, not raw SQL. Changed 2026-09-14 under
+        # D-2026-09-14-DCFDUP, which found two live defects in the SQL that was
+        # here and a third in how it reported itself:
+        #
+        #   * the UPDATE matched on project_id alone. tbl_dcf_analysis is unique
+        #     on (project_id, property_type) and Chadron Terrace carries two
+        #     rows, so an income-approach save wrote the land-development record
+        #     as well — measured: that statement hit 2 rows.
+        #
+        #   * the INSERT omitted property_type, which is NOT NULL with no
+        #     default. Tested in a rolled-back transaction: "null value in
+        #     column property_type violates not-null constraint." So on any
+        #     project with no DCF row, the save could only ever fail.
+        #
+        #   * both sat inside `except Exception: pass`, and the method went on
+        #     to `return True`. A save that could not succeed reported success.
+        #
+        # The model derives property_type once, in one place
+        # (get_property_type_for_project), which is what stops a second writer
+        # from disagreeing with the first. A failure is now logged and returned
+        # rather than swallowed.
+        from apps.financial.models_valuation import DcfAnalysis
+        from apps.projects.models import Project
 
-                if cursor.fetchone() is None:
-                    # No existing record — insert
-                    columns = [field_mapping[k] for k in updates.keys() if k in field_mapping]
-                    placeholders = ', '.join(['%s'] * len(columns))
-                    cursor.execute(f"""
-                        INSERT INTO landscape.tbl_dcf_analysis
-                        (project_id, {', '.join(columns)}, created_at, updated_at)
-                        VALUES (%s, {placeholders}, NOW(), NOW())
-                    """, [self.project_id] + [updates[k] for k in updates.keys() if k in field_mapping])
-            except Exception:
-                pass
+        try:
+            project = Project.objects.get(pk=self.project_id)
+            record, _ = DcfAnalysis.get_or_create_for_project(project)
+            for key, column in field_mapping.items():
+                if key in updates:
+                    setattr(record, column, updates[key])
+            record.save()
+        except Exception:
+            logger.exception(
+                'update_dcf_parameters: tbl_dcf_analysis write failed for '
+                'project %s', self.project_id,
+            )
+            return False
 
         # 2. Also write to tbl_project_assumption (for legacy reads)
         assumption_mapping = {

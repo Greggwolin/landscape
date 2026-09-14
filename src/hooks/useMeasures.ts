@@ -26,7 +26,13 @@ interface MeasureOption {
  * Fetch all measures from the API
  */
 async function fetchMeasures(systemOnly = true, context?: string): Promise<Measure[]> {
-  // For budget/pricing contexts, use financial UOMs (core_fin_uom) to satisfy FKs.
+  // Budget and pricing contexts go through /api/fin/uoms, which since
+  // 2026-09-14 reads landscape.tbl_measures — the administered list Gregg
+  // settled is THE unit list, and now the one the budget's foreign key
+  // points at. The route keeps its uom_code / name / uom_type shape, so the
+  // mapping below is unchanged; the "dollars" strip is now a no-op, since
+  // the administered names are 'Front Foot' and 'Unit' rather than 'Dollars
+  // per Front Foot'. Left in place for any legacy name still in flight.
   if (context) {
     const res = await fetch('/api/fin/uoms', { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch measures');

@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     // Expand UoM names
     const distinctUoms = Array.from(new Set(categories.flatMap(r => r.uom_codes ?? [])))
     const uomRows = distinctUoms.length > 0 ? await sql`
-      SELECT uom_code, name FROM landscape.core_fin_uom WHERE uom_code = ANY(${distinctUoms})
+      SELECT measure_code AS uom_code, measure_name AS name FROM landscape.tbl_measures WHERE measure_code = ANY(${distinctUoms})
     ` : []
     const uomMap = new Map<string, string>((uomRows as unknown as { uom_code: string; name: string }[]).map((r) => [r.uom_code, r.name]))
 

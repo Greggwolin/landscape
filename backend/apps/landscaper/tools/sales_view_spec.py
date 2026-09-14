@@ -81,6 +81,7 @@ def build_sales_view_config(
     blocks = {b.get('id'): b for b in schema.get('blocks', [])}
     pricing = blocks.get('sales_pricing_ratecard', {})
     schedule = blocks.get('sales_parcel_schedule', {})
+    kpis = blocks.get('sales_kpis', {})
 
     schedule_keys = {c['key'] for c in schedule.get('columns', [])}
     rows = [
@@ -121,6 +122,17 @@ def build_sales_view_config(
         'title': title,
         'source_label': 'the parcel sale schedule and the pricing rate card',
         'binding': {'state': 'live', 'label': 'live'},
+        # The header figures, carried on the SPECIFICATION rather than left on
+        # the schema alone. Added 2026-09-14 when the report renderer was built
+        # against this specification and found it could not state the project's
+        # total proceeds — the screen had them and the specification did not,
+        # which means the specification was not yet the whole definition of the
+        # surface. Read off the schema, like every other block here, so there is
+        # still one source of the numbers.
+        'kpis': [
+            {'label': p.get('label'), 'value': p.get('value')}
+            for p in kpis.get('pairs', [])
+        ],
         'columns': columns,
         'rung_columns': rung_columns,
         'default_rung': 'standard',

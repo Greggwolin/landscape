@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
       rows = (await sql`
         SELECT v.fact_id, v.budget_id,
                v.category_id, c.code AS category_code,
-               v.uom_code, u.name AS uom_name,
+               v.uom_code, u.measure_name AS uom_name,
                v.qty, v.rate, v.amount, v.amount_base,
                v.contingency_mode::text AS contingency_mode,
                v.confidence_code,
@@ -140,7 +140,10 @@ export async function GET(request: NextRequest) {
                v.amount_with_contingency
         FROM landscape.vw_fin_budget_effective v
         JOIN landscape.core_fin_category c ON c.category_id = v.category_id
-        JOIN landscape.core_fin_uom u ON u.uom_code = v.uom_code
+        -- LEFT, and onto tbl_measures (Gregg, 2026-09-14: THE unit list).
+        -- An INNER JOIN to a lookup table is how every budget line
+        -- disappears the moment a unit code is relabelled.
+        LEFT JOIN landscape.tbl_measures u ON u.measure_code = v.uom_code
         WHERE v.budget_id = ${budgetId}::bigint
           ${filterForView}
         ORDER BY v.fact_id DESC
@@ -149,14 +152,17 @@ export async function GET(request: NextRequest) {
       rows = (await sql`
         SELECT f.fact_id, f.budget_id,
                f.category_id, c.code AS category_code,
-               f.uom_code, u.name AS uom_name,
+               f.uom_code, u.measure_name AS uom_name,
                f.qty, f.rate, f.amount,
                f.contingency_mode::text AS contingency_mode,
                f.confidence_code,
                f.contingency_pct AS line_contingency_pct
         FROM landscape.core_fin_fact_budget f
         JOIN landscape.core_fin_category c ON c.category_id = f.category_id
-        JOIN landscape.core_fin_uom u ON u.uom_code = f.uom_code
+        -- LEFT, and onto tbl_measures (Gregg, 2026-09-14: THE unit list).
+        -- An INNER JOIN to a lookup table is how every budget line
+        -- disappears the moment a unit code is relabelled.
+        LEFT JOIN landscape.tbl_measures u ON u.measure_code = f.uom_code
         WHERE f.budget_id = ${budgetId}::bigint
           ${filterForBase}
         ORDER BY f.fact_id DESC

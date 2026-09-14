@@ -963,8 +963,9 @@ export function ScheduleArtifact({
       )}
 
 
-      {/* ── The schedule ── */}
-      <div className={styles.scroll}>
+      {/* ── The schedule, with the derivation panel beside it (4d) ── */}
+      <div className={styles.tableRow}>
+        <div className={styles.scroll}>
         {visibleRows.length === 0 ? (
           <div className={styles.emptyState}>
             Nothing budgeted under {scopeLabel || 'this scope'} yet.
@@ -1074,9 +1075,123 @@ export function ScheduleArtifact({
             </tbody>
           </table>
         )}
+        </div>
+          {/* ── Derivation (4d). A panel BESIDE the schedule, not a modal
+            * over it — Gregg, 2026-09-13. The shaded overlay this replaces
+            * covered the very rows a reader is comparing the working against,
+            * which is the whole reason 4d was chosen instead. It refuses the
+            * edit AND shows the working. ── */}
+        {derivationRow && (
+          <aside className={styles.detailPanel} aria-label="Derivation">
+            <div className={styles.detailHead}>
+              <div className={styles.popTitle}>
+                {formatText(derivationRow.cells.description)}
+              </div>
+              <button
+                type="button"
+                className={styles.detailClose}
+                onClick={() => setDerivationRow(null)}
+                aria-label="Close derivation"
+              >
+                ×
+              </button>
+            </div>
+              <dl className={styles.popList}>
+                <dt>Quantity</dt>
+                <dd>
+                  {/* Quantity is edited HERE, not in the table: slice 1 rev 4
+                    * removed the quantity columns from the table and moved the
+                    * number into this popover, which is where it is actually
+                    * wanted. It stages into the same shared store as every table
+                    * cell and lands in the same batch. */}
+                  {(() => {
+                    const target = canEdit
+                      ? budgetCellTarget(schema, derivationRow.id, 'qty')
+                      : null;
+                    const qty = derivationRow.derivation?.quantity ?? null;
+                    if (!target) return formatNumber(qty);
+                    const key = stagedKey(target.cellPath);
+                    const entry = staging.staged[key];
+                    if (editingKey === key) {
+                      return (
+                        <input
+                          className={styles.cellInput}
+                          autoFocus
+                          inputMode="numeric"
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onBlur={() => {
+                            staging.stageEdit(target.cellPath, draft, qty, target.expectedRef);
+                            setEditingKey(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              staging.stageEdit(target.cellPath, draft, qty, target.expectedRef);
+                              setEditingKey(null);
+                            }
+                            if (e.key === 'Escape') setEditingKey(null);
+                          }}
+                        />
+                      );
+                    }
+                    return (
+                      <>
+                        <span
+                          className={entry ? styles.stagedCell : styles.editable}
+                          role="button"
+                          tabIndex={0}
+                          title={entry ? 'Staged — commit to save' : 'Double-click to edit'}
+                          onDoubleClick={() => {
+                            setDraft(entry ? entry.value : String(qty ?? ''));
+                            setEditingKey(key);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setDraft(entry ? entry.value : String(qty ?? ''));
+                              setEditingKey(key);
+                            }
+                          }}
+                        >
+                          {entry ? entry.value : formatNumber(qty)}
+                        </span>
+                        {entry && (
+                          <span className={styles.priorValue}>was {formatNumber(qty)}</span>
+                        )}
+                      </>
+                    );
+                  })()}
+                  {derivationRow.derivation?.uom
+                    ? ` ${String(derivationRow.derivation.uom).replace('$/', '')}` : ''}
+                </dd>
+                <dt>Rate</dt>
+                <dd>
+                  {formatMoney(derivationRow.derivation?.rate ?? null)}
+                  {derivationRow.derivation?.uom
+                    ? ` ${String(derivationRow.derivation.uom).replace('$', '')}` : ''}
+                </dd>
+              </dl>
+              <div className={styles.popRule} />
+              <dl className={styles.popList}>
+                <dt><b>Total</b></dt>
+                <dd><b>{formatMoney(derivationRow.derivation?.total ?? null)}</b></dd>
+              </dl>
+              {derivationRow.derivation?.basis && (
+                <>
+                  <div className={styles.popRule} />
+                  <dl className={styles.popList}>
+                    <dt>Basis</dt>
+                    <dd>{derivationRow.derivation.basis}</dd>
+                  </dl>
+                </>
+              )}
+              <div className={styles.popFoot}>
+                The amount is quantity × rate, recomputed by the database — it is
+                never typed directly. Change the quantity, the rate or the unit of
+                measure to move it.
+              </div>
+          </aside>
+        )}
       </div>
-
-
 
       {rung === 'summary' && summary.droppedZero > 0 && (
         <div className={styles.excluded}>
@@ -1092,114 +1207,6 @@ export function ScheduleArtifact({
         <span>values trace: read</span>
       </div>
 
-      {/* ── Derivation. It refuses AND shows the working. ── */}
-      {derivationRow && (
-        <>
-          <div
-            className={styles.popShade}
-            onClick={() => setDerivationRow(null)}
-            role="presentation"
-          />
-          <div className={styles.pop} style={{ top: 210 }}>
-            <div className={styles.popTitle}>
-              {formatText(derivationRow.cells.description)}
-            </div>
-            <dl className={styles.popList}>
-              <dt>Quantity</dt>
-              <dd>
-                {/* Quantity is edited HERE, not in the table: slice 1 rev 4
-                  * removed the quantity columns from the table and moved the
-                  * number into this popover, which is where it is actually
-                  * wanted. It stages into the same shared store as every table
-                  * cell and lands in the same batch. */}
-                {(() => {
-                  const target = canEdit
-                    ? budgetCellTarget(schema, derivationRow.id, 'qty')
-                    : null;
-                  const qty = derivationRow.derivation?.quantity ?? null;
-                  if (!target) return formatNumber(qty);
-                  const key = stagedKey(target.cellPath);
-                  const entry = staging.staged[key];
-                  if (editingKey === key) {
-                    return (
-                      <input
-                        className={styles.cellInput}
-                        autoFocus
-                        inputMode="numeric"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onBlur={() => {
-                          staging.stageEdit(target.cellPath, draft, qty, target.expectedRef);
-                          setEditingKey(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            staging.stageEdit(target.cellPath, draft, qty, target.expectedRef);
-                            setEditingKey(null);
-                          }
-                          if (e.key === 'Escape') setEditingKey(null);
-                        }}
-                      />
-                    );
-                  }
-                  return (
-                    <>
-                      <span
-                        className={entry ? styles.stagedCell : styles.editable}
-                        role="button"
-                        tabIndex={0}
-                        title={entry ? 'Staged — commit to save' : 'Double-click to edit'}
-                        onDoubleClick={() => {
-                          setDraft(entry ? entry.value : String(qty ?? ''));
-                          setEditingKey(key);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            setDraft(entry ? entry.value : String(qty ?? ''));
-                            setEditingKey(key);
-                          }
-                        }}
-                      >
-                        {entry ? entry.value : formatNumber(qty)}
-                      </span>
-                      {entry && (
-                        <span className={styles.priorValue}>was {formatNumber(qty)}</span>
-                      )}
-                    </>
-                  );
-                })()}
-                {derivationRow.derivation?.uom
-                  ? ` ${String(derivationRow.derivation.uom).replace('$/', '')}` : ''}
-              </dd>
-              <dt>Rate</dt>
-              <dd>
-                {formatMoney(derivationRow.derivation?.rate ?? null)}
-                {derivationRow.derivation?.uom
-                  ? ` ${String(derivationRow.derivation.uom).replace('$', '')}` : ''}
-              </dd>
-            </dl>
-            <div className={styles.popRule} />
-            <dl className={styles.popList}>
-              <dt><b>Total</b></dt>
-              <dd><b>{formatMoney(derivationRow.derivation?.total ?? null)}</b></dd>
-            </dl>
-            {derivationRow.derivation?.basis && (
-              <>
-                <div className={styles.popRule} />
-                <dl className={styles.popList}>
-                  <dt>Basis</dt>
-                  <dd>{derivationRow.derivation.basis}</dd>
-                </dl>
-              </>
-            )}
-            <div className={styles.popFoot}>
-              The amount is quantity × rate, recomputed by the database — it is
-              never typed directly. Change the quantity, the rate or the unit of
-              measure to move it.
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

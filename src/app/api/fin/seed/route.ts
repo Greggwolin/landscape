@@ -18,6 +18,10 @@ export async function POST() {
       ['$/SF', 'Dollars per Square Foot', 'area']
     ] as const
     for (const [code, name, type] of uoms) {
+      // DEPRECATED 2026-09-14: core_fin_uom is superseded by
+      // landscape.tbl_measures and no longer backs any foreign key. This
+      // seed is left working for existing environments; new unit codes
+      // belong in tbl_measures, via Admin -> Units of Measure.
       await sql`INSERT INTO landscape.core_fin_uom (uom_code, name, uom_type) VALUES (${code}, ${name}, ${type}) ON CONFLICT (uom_code) DO UPDATE SET name = EXCLUDED.name, uom_type = EXCLUDED.uom_type`
     }
 
