@@ -15,10 +15,13 @@ WHICH UNITS TABLE
 ``landscape.tbl_measures`` is the one the Units of Measure admin screen manages
 (``/api/admin/measures``) and the one carrying ``property_types``, so a land deal
 is offered Front Foot and Acre while a multifamily deal is offered Unit and
-Parking Stall. ``core_fin_uom`` is a SECOND, older list with price-prefixed codes
-($/FF, $/Acre) that the budget still draws from; the two disagree and reconciling
-them is Gregg's call, not something to paper over here. The pricing register asks
-for the administered list — the one he can see and change.
+Parking Stall. ``core_fin_uom`` WAS a second, older list with price-prefixed codes
+($/FF, $/Acre). Gregg settled it on 2026-09-14 — ``tbl_measures`` is THE list —
+and migration 0052 repointed every foreign key off ``core_fin_uom``, which now
+backs nothing and is marked deprecated on the table itself. Migration 0053 then
+removed the last three price expressions ($/MO, $/QTR, $/YR) from the
+administered list and added ``QTR``, which had never existed. **Every surface
+asks this module; no surface queries either table directly.**
 """
 
 from __future__ import annotations
@@ -72,6 +75,16 @@ LEGACY_MEASURE_ALIASES: Dict[str, str] = {
     '$/Stall': 'STALL',
     '$$$': 'LS',
     '% of': '%',
+    # The three time codes retired from tbl_measures by migration 0053. Nothing
+    # in the database carried them, but a value typed before the retirement, or
+    # arriving from an import, must still land on a real option rather than
+    # forcing an off-list entry. D-2026-09-14-MQR: time is the measure.
+    '$/MO': 'MO',
+    '$/QTR': 'QTR',
+    '$/YR': 'YR',
+    '$/Month': 'MO',
+    '$/Quarter': 'QTR',
+    '$/Year': 'YR',
 }
 
 
@@ -98,6 +111,8 @@ _CASE_ONLY_CODES: Dict[str, str] = {
     'unit': 'UNIT', 'ff': 'FF', 'ac': 'AC', 'acre': 'AC', 'sf': 'SF',
     'lf': 'LF', 'sy': 'SY', 'cy': 'CY', 'ea': 'EA', 'ls': 'LS',
     'door': 'DOOR', 'stall': 'STALL',
+    'mo': 'MO', 'month': 'MO', 'qtr': 'QTR', 'quarter': 'QTR',
+    'yr': 'YR', 'year': 'YR', 'wk': 'WK', 'week': 'WK', 'day': 'DAY',
 }
 
 

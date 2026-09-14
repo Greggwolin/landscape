@@ -123,6 +123,40 @@ def test_a_legacy_unit_spelling_resolves_to_the_administered_code():
     assert normalize_measure_code(None) == ''
 
 
+def test_the_retired_time_expressions_resolve_to_the_measure():
+    """Migration 0053 removed $/MO, $/QTR and $/YR from the administered list.
+
+    D-2026-09-14-MQR: time is the measure, so a quarter is QTR and the rate is
+    dollars per quarter. Nothing in the database carried the retired codes, but
+    a value typed before the retirement — or arriving from an import — must land
+    on a real option rather than forcing an off-list entry.
+    """
+    from apps.landscaper.tools.picklists import normalize_measure_code
+
+    assert normalize_measure_code('$/MO') == 'MO'
+    assert normalize_measure_code('$/QTR') == 'QTR'
+    assert normalize_measure_code('$/YR') == 'YR'
+    assert normalize_measure_code('$/Month') == 'MO'
+    assert normalize_measure_code('quarter') == 'QTR'
+    assert normalize_measure_code('yr') == 'YR'
+
+
+def test_no_alias_resolves_to_a_price_expression():
+    """The point of the whole exercise: a unit code never carries money.
+
+    Every value this module can produce must be a measure. If someone adds an
+    alias mapping onto a $/x code, this fails rather than quietly reintroducing
+    the defect that took two migrations to remove.
+    """
+    from apps.landscaper.tools.picklists import (
+        LEGACY_MEASURE_ALIASES, _CASE_ONLY_CODES,
+    )
+
+    for administered in list(LEGACY_MEASURE_ALIASES.values()) + list(_CASE_ONLY_CODES.values()):
+        assert '/' not in administered, f'{administered} is money per something'
+        assert '$' not in administered, f'{administered} carries a currency sign'
+
+
 def test_the_curve_and_the_lot_price_see_through_a_legacy_spelling():
     """A row stored as $/FF is a front-foot row. Before normalisation it was
     excluded from both the curve check and the per-lot price."""
