@@ -158,17 +158,6 @@ def fetch_pricing_register_data(project_id: int) -> Dict[str, Any]:
         # anything published platform-wide. Gregg, 7a: a picklist of saved
         # benchmarks OR a custom rate — "custom" is the absence of a set, not a
         # thirteenth option in the list.
-        # The established UOM picklist. `core_fin_uom` is the platform's list and
-        # the budget already draws its Unit column from it — a second, hand-kept
-        # list of units would be the drift this codebase keeps paying for.
-        cursor.execute(
-            """
-            SELECT uom_code, uom_type FROM landscape.core_fin_uom
-            WHERE is_active ORDER BY uom_type, uom_code
-            """
-        )
-        uom_options = [{'value': r[0], 'label': r[0]} for r in cursor.fetchall()]
-
         cursor.execute(
             """
             SELECT s.set_id, s.set_name, s.is_global,
@@ -186,11 +175,20 @@ def fetch_pricing_register_data(project_id: int) -> Dict[str, Any]:
         set_cols = [c[0] for c in cursor.description]
         growth_sets = [dict(zip(set_cols, r)) for r in cursor.fetchall()]
 
+    # The platform's own lists, asked for rather than rebuilt. Units come from the
+    # table the Units of Measure admin screen manages, gated by the project's
+    # property type; growth sources from this project's sets plus the global ones.
+    from .picklists import growth_source_options, measure_options
+
     return {
         'project_name': project_name,
         'rows': rows,
         'growth_sets': growth_sets,
-        'uom_options': uom_options,
+        'uom_options': measure_options(
+            project_id,
+            also_allow=[r.get('unit_of_measure') for r in rows],
+        ),
+        'growth_options': growth_source_options(project_id),
     }
 
 
@@ -261,6 +259,7 @@ def build_pricing_register_schema(
     rows: List[Dict[str, Any]],
     growth_sets: List[Dict[str, Any]],
     uom_options: Optional[List[Dict[str, Any]]] = None,
+    growth_options: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """The BLOCK SCHEMA: one row per product, carrying the write pointers.
 
@@ -272,24 +271,15 @@ def build_pricing_register_schema(
     ordered = sorted(rows, key=_sort_key)
     annotate_curve_breaks(ordered)
 
-    set_options = [
-        {'value': str(s['set_id']),
-         'label': s['set_name'] or f"Set {s['set_id']}"}
-        for s in growth_sets
-    ]
-    # "Custom" is the absence of a set, so it is the empty choice rather than a
-    # thirteenth set that does not exist in the database.
-    set_options = [{'value': '', 'label': 'Custom rate'}] + set_options
-
-    # A unit already stored that is not on the platform list still has to be
-    # SHOWN and still has to be selectable, or opening the card would silently
-    # offer to change it. 'FF' and 'Unit' are both live in the data and neither
-    # is in core_fin_uom.
+    # Both lists come from the platform, via tools/picklists.py. Built here only
+    # as a fallback so a direct caller in a test still gets a usable schema.
+    set_options = list(growth_options or [])
+    if not set_options:
+        set_options = [{'value': '', 'label': 'Custom rate'}] + [
+            {'value': str(s['set_id']), 'label': s['set_name'] or f"Set {s['set_id']}"}
+            for s in growth_sets
+        ]
     unit_options = list(uom_options or [])
-    known = {o['value'] for o in unit_options}
-    for stored in sorted({(r.get('unit_of_measure') or '') for r in ordered}):
-        if stored and stored not in known:
-            unit_options.append({'value': stored, 'label': f'{stored} (not on the list)'})
 
     columns: List[Dict[str, Any]] = [
         {'key': 'use_type', 'label': 'Use', 'align': 'left', 'editable': False},
@@ -383,7 +373,8 @@ def build_pricing_register_refresh(project_id: int) -> Optional[Dict[str, Any]]:
     if not data['rows']:
         return None
     schema = build_pricing_register_schema(
-        data['rows'], data['growth_sets'], data.get('uom_options')
+        data['rows'], data['growth_sets'],
+        data.get('uom_options'), data.get('growth_options'),
     )
     view_config = build_pricing_register_view_config(
         project_id=project_id,
