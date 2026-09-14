@@ -33,6 +33,8 @@ export interface FieldDefinition {
 
   autoCalc?: (values: Record<string, string | number | boolean | null>) => string | number | boolean | null; // Auto-calculation function
   dependsOn?: string[];                 // Other fields this depends on
+  /** Project types this field applies to. Absent = every type. See ProjectTypeCode. */
+  propertyTypes?: ProjectTypeCode[];
 
   // For dropdown types
   options?: Array<{ value: string | number; label: string }>;
@@ -46,6 +48,18 @@ export interface FieldDefinition {
   };
 }
 
+/**
+ * The project types a field or group belongs to. Absent means every type.
+ *
+ * Gregg, 2026-09-14: *"for land projects, the direct capitalization shouldn't be
+ * visible (either for assumptions or outputs)."* A land development sells
+ * parcels; it has no exit cap rate, and the cash-flow engine never reads one for
+ * a land deal. Offering the field anyway invited a number nothing consumes —
+ * every land project in the database now carries an exit cap rate, one of them
+ * 1.00%, none of which mean anything.
+ */
+export type ProjectTypeCode = 'LAND' | 'MF' | 'OFF' | 'RET' | 'IND' | 'HTL' | 'MXU';
+
 export interface FieldGroup {
   id: string;
   label: string;
@@ -54,6 +68,7 @@ export interface FieldGroup {
   fields: string[];                     // Array of field keys
   collapsible?: boolean;                // Can user collapse this group?
   defaultCollapsed?: boolean;           // Start collapsed?
+  propertyTypes?: ProjectTypeCode[];    // Absent = shown for every project type
 }
 
 export interface BasketConfig {

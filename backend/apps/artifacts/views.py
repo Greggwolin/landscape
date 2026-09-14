@@ -260,6 +260,27 @@ class ArtifactViewSet(viewsets.ViewSet):
             artifact.save(update_fields=['is_archived'])
         return Response(ArtifactDetailSerializer(artifact).data)
 
+    @action(detail=False, methods=['get'], url_path='catalog')
+    def catalog(self, request):
+        """The standard surfaces this project can produce (5a).
+
+        Pinned and Recent can only show what already exists, so a surface nobody
+        has opened is invisible and the panel can never say what the app is able
+        to produce. This lists them whether or not a card exists yet, gated by
+        project type through tool_registry rather than by a second copy of that
+        judgement here.
+        """
+        from .catalog import catalog_for_project
+
+        try:
+            project_id = int(request.query_params.get('project_id') or 0)
+        except (TypeError, ValueError):
+            project_id = 0
+        if not project_id:
+            return Response({'detail': 'project_id is required'}, status=400)
+
+        return Response({'entries': catalog_for_project(project_id)})
+
     @action(detail=True, methods=['get'], url_path='versions')
     def versions(self, request, pk=None):
         try:
@@ -2654,6 +2675,44 @@ def _refresh_artifact_after_write(*, artifact, user_id):
                 import logging as _logging
                 _logging.getLogger(__name__).exception(
                     'cash-flow view specification refresh failed after write'
+                )
+        elif artifact.tool_name == 'get_pricing_register':
+            # The pricing REGISTER (PR1). Both halves rebuilt from one read — the
+            # screen draws from the view specification, so refreshing the schema
+            # alone would show the price from before the edit.
+            from apps.landscaper.tools.pricing_register_builder import (
+                build_pricing_register_refresh,
+            )
+            from apps.landscaper.tools.pricing_register_view_spec import (
+                PRICING_CONFIG_KEY,
+            )
+            project_id = artifact.project_id
+            if project_id is None:
+                return {
+                    'success': False,
+                    'error': 'project_required',
+                    'detail': 'pricing register artifact missing project_id',
+                }
+            payload = build_pricing_register_refresh(project_id)
+            if payload is None:
+                return {
+                    'success': False,
+                    'error': 'no_pricing_rows',
+                    'detail': (
+                        f'project {project_id} has no land-use pricing rows to '
+                        're-render after the write'
+                    ),
+                }
+            new_schema = payload['schema']
+            try:
+                params = dict(artifact.params_json or {})
+                params[PRICING_CONFIG_KEY] = payload['view_config']
+                artifact.params_json = params
+                artifact.save(update_fields=['params_json'])
+            except Exception:
+                import logging as _logging
+                _logging.getLogger(__name__).exception(
+                    'pricing register view specification refresh failed after write'
                 )
         else:
             return {

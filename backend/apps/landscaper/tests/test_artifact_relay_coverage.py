@@ -37,6 +37,10 @@ ARTIFACT_TOOLS = [
     # test_every_artifact_tool_is_covered_by_this_list, which is the point of
     # that test — it calls create_parcels_artifact, so it is one of these.
     'open_parcels',
+    # The pricing REGISTER (PR1, 2026-09-13). Also caught by the coverage test
+    # rather than remembered — which is twice now that the test has earned its
+    # keep by refusing a new artifact tool that had not been listed.
+    'get_pricing_register',
 ]
 
 # Three ways an exit may direct the model, all acceptable:

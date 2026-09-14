@@ -703,10 +703,30 @@ class PreviewBaseGenerator:
 
     @staticmethod
     def fmt_pct(value, decimals: int = 1) -> str:
-        """Format as percentage string."""
+        """Format a value ALREADY IN PERCENT UNITS. 4.5 renders as "4.5%".
+
+        Occupancy, loan-to-value and interest rates are stored this way. A
+        DECIMAL FRACTION must not come through here — 0.457 would render as
+        "0.5%". Use ``fmt_fraction_as_pct`` for those.
+        """
         if value is None:
             return '—'
         return f"{float(value):.{decimals}f}%"
+
+    @staticmethod
+    def fmt_fraction_as_pct(value, decimals: int = 1) -> str:
+        """Format a DECIMAL FRACTION as a percentage. 0.457 renders as "45.7%".
+
+        The calculation engine returns IRR as a fraction. On 2026-09-14 both
+        IRR call sites were passing it to ``fmt_pct``, which prints the fraction
+        itself with a percent sign — a project returning 45.7% was reported on a
+        lender-facing PDF as **0.5%**. Found by running this system and the
+        artifact side over the same project and comparing; neither looks wrong
+        on its own.
+        """
+        if value is None:
+            return '—'
+        return f"{float(value) * 100:.{decimals}f}%"
 
     @staticmethod
     def safe_div(numerator, denominator, default=0):

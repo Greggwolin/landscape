@@ -48,15 +48,17 @@ class AssumptionsSummaryGenerator(PreviewBaseGenerator):
     def _land_use_section(self) -> dict:
         rows = self.execute_query("""
             SELECT
-                COALESCE(p.land_use_label, p.land_use, 'Unassigned') AS use_type,
+                -- landuse_type / acres_gross: the columns were renamed and this
+                -- query was not, so the whole section came back empty.
+                COALESCE(p.landuse_type, p.landuse_code, 'Unassigned') AS use_type,
                 COUNT(*) AS units,
-                COALESCE(SUM(p.acres), 0) AS acres,
+                COALESCE(SUM(p.acres_gross), 0) AS acres,
                 ROUND(COUNT(*)::numeric / NULLIF(
                     (SELECT COUNT(*) FROM landscape.tbl_parcel WHERE project_id = %s), 0
                 ) * 100, 1) AS pct_total
             FROM landscape.tbl_parcel p
             WHERE p.project_id = %s
-            GROUP BY COALESCE(p.land_use_label, p.land_use, 'Unassigned')
+            GROUP BY COALESCE(p.landuse_type, p.landuse_code, 'Unassigned')
             ORDER BY units DESC
         """, [self.project_id, self.project_id])
 

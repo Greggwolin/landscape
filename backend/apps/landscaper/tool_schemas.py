@@ -1906,6 +1906,28 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_pricing_register",
+        "description": (
+            "Render the PRICING REGISTER — the place where land-use prices, "
+            "their escalation and the date a price is stated in are SET — as a "
+            "DETERMINISTIC artifact in the right panel. Call it whenever the user "
+            "wants to SET or CHANGE pricing, or asks where pricing is set: 'set "
+            "the lot prices', 'change the price for 50x125', 'where do I set "
+            "prices', 'the rate card', 'lot pricing', 'price escalation', "
+            "'inflation on prices', 'open pricing'. This is a REGISTER: every "
+            "price, unit, growth source, growth rate and as-of date on it is "
+            "writable. It is NOT the sales schedule — that is a report of what "
+            "each parcel will bring and nothing on it can be set. The artifact is "
+            "built server-side and returned already-created — do NOT call "
+            "create_artifact and do NOT compose the table yourself; just announce "
+            "it in one sentence using its product_count field."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "get_capitalization_schedule",
         "description": (
             "Render the capitalization schedule — the capital stack plus the equity "

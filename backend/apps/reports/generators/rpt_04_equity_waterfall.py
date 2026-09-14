@@ -12,17 +12,23 @@ class EquityWaterfallGenerator(PreviewBaseGenerator):
         sections = []
 
         # Equity investors
+        # landscape.tbl_equity, not tbl_equity_investor — the table was renamed
+        # and this query was never moved with it, so the report reported "no
+        # equity investors configured" for projects that have them. Gregg,
+        # 2026-09-14: this worked earlier in the year in the tabbed interface.
+        # (tbl_equity_partner also exists and is empty; tbl_equity is the live one.)
         investors = self.execute_query("""
             SELECT
-                COALESCE(investor_label, investor_type, 'Investor') AS investor,
-                investor_type,
-                COALESCE(commitment_amount, 0) AS commitment,
+                COALESCE(partner_name, equity_name, partner_type, equity_class,
+                         'Investor') AS investor,
+                COALESCE(partner_type, equity_class, '') AS investor_type,
+                COALESCE(commitment_amount, capital_contributed, 0) AS commitment,
                 COALESCE(ownership_pct, 0) AS ownership_pct,
                 COALESCE(preferred_return_pct, 0) AS pref_return,
                 COALESCE(promote_pct, 0) AS promote_pct
-            FROM landscape.tbl_equity_investor
+            FROM landscape.tbl_equity
             WHERE project_id = %s
-            ORDER BY sort_order, investor_type
+            ORDER BY COALESCE(distribution_priority, equity_tier, 0), equity_id
         """, [self.project_id])
 
         if not investors:
@@ -70,13 +76,15 @@ class EquityWaterfallGenerator(PreviewBaseGenerator):
         tiers = self.execute_query("""
             SELECT
                 tier_number,
-                tier_label,
-                COALESCE(hurdle_rate, 0) AS hurdle_rate,
+                -- tbl_waterfall_tier, and the column is tier_name. Same rename
+                -- as the investor query above.
+                COALESCE(tier_name, tier_description) AS tier_label,
+                COALESCE(hurdle_rate, irr_threshold_pct, 0) AS hurdle_rate,
                 COALESCE(gp_split_pct, 0) AS gp_split,
                 COALESCE(lp_split_pct, 0) AS lp_split
-            FROM landscape.tbl_equity_waterfall_tier
-            WHERE project_id = %s
-            ORDER BY tier_number
+            FROM landscape.tbl_waterfall_tier
+            WHERE project_id = %s AND COALESCE(is_active, TRUE)
+            ORDER BY COALESCE(display_order, tier_number), tier_number
         """, [self.project_id])
 
         if tiers:
