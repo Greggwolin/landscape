@@ -55,6 +55,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from .picklists import measure_options, normalize_measure_code
+
 logger = logging.getLogger(__name__)
 
 # What the budget surface OFFERS for editing, as a named contract rather than a
@@ -441,7 +443,12 @@ def build_budget_view_config(
         qty = _num(record.get('qty'))
         rate = _num(record.get('rate'))
         amount = _num(record.get('amount'))
-        uom = record.get('uom_code') or ''
+        # Resolved to the ADMINISTERED code before it is drawn. A cell whose
+        # stored value is an older spelling ($/FF) must land on a real option
+        # in the picklist above, not force an off-list entry — the same rule
+        # the pricing register follows. Migration 0052 relabels the stored
+        # rows; this makes the screen correct whichever order they land in.
+        uom = normalize_measure_code(record.get('uom_code'))
         escalation_ref = _escalation_ref(record, escalation_sets)
         start_date_cell, end_date_cell, dates_derived = _derived_dates(
             record, period_zero)
@@ -760,11 +767,17 @@ def fetch_budget_picklists(project_id: int) -> Dict[str, Any]:
         # cryptically ($$$, "% of") are price expressions the UOM taxonomy
         # decision of 2026-08-21 retires anyway. Spending a display-label/
         # option-label split on codes that are being removed would be waste.
+        #
+        # 2026-09-14: this list now comes from ``tbl_measures`` via
+        # picklists.measure_options, which Gregg settled is THE unit list. The
+        # two codes named above as "being removed" — $$$ and "% of" — belonged
+        # to core_fin_uom and are not offered any more; the budget column holds
+        # how a thing is MEASURED, and money per that measure is the rate beside
+        # it. Must stay identical to the same list in
+        # budget_artifact_builder.fetch_budget_schedule_data, or the after-write
+        # refresh silently relabels the column.
         try:
-            cursor.execute(
-                "SELECT uom_code FROM landscape.core_fin_uom "
-                "WHERE is_active ORDER BY uom_code")
-            out['uom'] = [_opt(r[0], r[0]) for r in cursor.fetchall()]
+            out['uom'] = measure_options(project_id)
         except Exception:  # noqa: BLE001
             logger.exception('budget picklists: uom unavailable')
 

@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
       // Get default UOM
       const defaultUom = await sql`
-        SELECT uom_code FROM landscape.core_fin_uom ORDER BY uom_code LIMIT 1
+        SELECT measure_code AS uom_code FROM landscape.tbl_measures ORDER BY sort_order NULLS LAST, measure_code LIMIT 1
       `;
 
       // Add/update budget fact

@@ -38,7 +38,7 @@ export interface PricingColumn {
   /** input = typed by a person, computed = derived, context = neither. */
   kind: 'input' | 'computed' | 'context';
   /** An established picklist for this field, read from the platform's own table
-   *  (units from core_fin_uom, growth sources from the growth-rate sets). Where
+   *  (units from tbl_measures, growth sources from the growth-rate sets). Where
    *  one exists the field offers it instead of free text. */
   options?: Array<{ value: string; label: string; description?: string }>;
   /** The list is a set of published values to pick from AND the field stays

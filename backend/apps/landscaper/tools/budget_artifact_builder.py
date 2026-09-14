@@ -30,6 +30,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from .picklists import measure_options, normalize_measure_code
+
 logger = logging.getLogger(__name__)
 
 
@@ -232,7 +234,9 @@ def build_budget_artifact_schema(
             'cells': {
                 'category': r.get('category_name') or '(uncategorized)',
                 'description': r.get('notes') or '(no description)',
-                'uom': r.get('uom_code') or '',
+                # The administered code, not the stored spelling — see the
+                # same resolution in schedule_view_spec.
+                'uom': normalize_measure_code(r.get('uom_code')),
                 'qty': _num(r.get('qty')),
                 'rate': _num(r.get('rate')),
                 'amount': _num(r.get('amount')),
@@ -372,28 +376,22 @@ def fetch_budget_schedule_data(project_id: int) -> Dict[str, Any]:
         pn = cursor.fetchone()
         project_name = pn[0] if pn else None
 
-        # UOM picklist (CB10). `uom_code` is FK-constrained to core_fin_uom, so
-        # the artifact carries the allowed codes and the renderer offers a
-        # dropdown — typing into a foreign key only earns a database rejection.
-        # Read here (not in the tool) so the after-write refresh rebuilds the
-        # identical schema, options included.
-        # The label is the code and nothing else — the renderer shows an
-        # option's label in the CELL as well as in the dropdown, so a
-        # description here puts a sentence in every row of a two-character
-        # column. Kept identical to the same list in
-        # schedule_view_spec.build_budget_view_config; if one grows a
-        # description the other must too, or the after-write refresh will
-        # silently relabel the column.
-        cursor.execute(
-            """
-            SELECT uom_code FROM landscape.core_fin_uom
-            WHERE is_active ORDER BY uom_code
-            """
-        )
-        uom_options = [
-            {'value': row[0], 'label': row[0]}
-            for row in cursor.fetchall()
-        ]
+        # UOM picklist (CB10), now from the ADMINISTERED list.
+        #
+        # Gregg settled it on 2026-09-14: ``landscape.tbl_measures`` is THE unit
+        # list and ``core_fin_uom`` is superseded. This read used to be the
+        # second table, which is why the budget offered $/FF and $/Unit — money
+        # per something, in a column that holds how a thing is measured — while
+        # the Units of Measure admin screen he can see offered FF and UNIT. Two
+        # lists, no note saying which was authoritative, and the same mistake
+        # made twice in three weeks.
+        #
+        # Asked of picklists.measure_options rather than queried here, so the
+        # list is gated by the project's type (a land deal is offered Front Foot
+        # and Acre, a multifamily deal Unit and Parking Stall) and there is one
+        # place to change it. The label is still the code alone; the full name
+        # rides along as a description the cell shows on hover.
+        uom_options = measure_options(project_id)
 
     for r in records:
         for k in ('qty', 'rate', 'amount'):
