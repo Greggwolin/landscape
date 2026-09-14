@@ -37,7 +37,13 @@ export interface PricingColumn {
   align?: 'left' | 'right' | 'center';
   /** input = typed by a person, computed = derived, context = neither. */
   kind: 'input' | 'computed' | 'context';
+  /** An established picklist for this field, read from the platform's own table
+   *  (units from core_fin_uom, growth sources from the growth-rate sets). Where
+   *  one exists the field offers it instead of free text. */
   options?: Array<{ value: string; label: string }>;
+  /** 'percent' means the value is STORED as a decimal fraction and both shown
+   *  and typed as a percent. Declared on the column, never guessed from a name. */
+  format?: 'percent';
 }
 export interface PricingRow {
   id: string;
@@ -96,11 +102,27 @@ function pct(value: unknown): string {
   return `${(n * 100).toFixed(1)}%`;
 }
 
-function cellText(key: string, value: unknown): string {
-  if (key === 'growth_rate') return pct(value);
-  if (key === 'price' || key === 'price_per_lot') return fmt(value);
-  if (key === 'width') return value === null || value === undefined ? '—' : String(value);
+/** A percent typed as "3", "3.0" or "3%" is the same three percent, and it is
+ *  stored as 0.03. Returns null when the text is not a number, so a typo stages
+ *  nothing rather than writing a figure nobody meant. */
+function percentToFraction(text: string): string | null {
+  const cleaned = text.replace('%', '').trim();
+  if (cleaned === '') return '';
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return null;
+  return String(n / 100);
+}
+
+function cellText(c: PricingColumn, value: unknown): string {
+  if (c.format === 'percent') return pct(value);
+  if (c.key === 'price' || c.key === 'price_per_lot') return fmt(value);
+  if (c.key === 'width') return value === null || value === undefined ? '—' : String(value);
   if (value === null || value === undefined || value === '') return '—';
+  // A picklist cell holds the option's value; the reader wants its label.
+  if (c.options?.length) {
+    const match = c.options.find((o) => o.value === String(value));
+    if (match) return match.label;
+  }
   return String(value);
 }
 
@@ -143,14 +165,22 @@ export function PricingRegisterArtifact({
     const key = target ? stagedKey(target.cellPath) : null;
     const staged = key ? edits.staged[key] : undefined;
     const committed = row.cells[c.key] ?? null;
-    const shown = staged ? staged.value : cellText(c.key, committed);
+    const shown = staged
+      ? (c.format === 'percent' ? pct(staged.value) : staged.value)
+      : cellText(c, committed);
 
     if (target && editing === key) {
       const common = {
         className: styles.cellInput,
         autoFocus: true,
         onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-          edits.stageEdit(target.cellPath, e.target.value, committed, target.expectedRef);
+          const raw = e.target.value;
+          const value = c.format === 'percent' ? percentToFraction(raw) : raw;
+          // null means it did not parse as a number. Staging nothing is the
+          // honest outcome — a typo must never become a stored rate.
+          if (value !== null) {
+            edits.stageEdit(target.cellPath, value, committed, target.expectedRef);
+          }
           setEditing(null);
         },
       };
@@ -174,9 +204,18 @@ export function PricingRegisterArtifact({
           <input
             {...common}
             type={c.key === 'as_of' ? 'date' : 'text'}
+            inputMode={c.format === 'percent' ? 'decimal' : undefined}
+            // A percent field is TYPED as a percent: 3 means 3%, not 300%.
             defaultValue={
-              staged ? staged.value
-                : (committed === null || committed === undefined ? '' : String(committed))
+              (() => {
+                const v = staged ? staged.value : committed;
+                if (v === null || v === undefined || v === '') return '';
+                if (c.format === 'percent') {
+                  const n = Number(v);
+                  return Number.isFinite(n) ? String(Number((n * 100).toFixed(4))) : String(v);
+                }
+                return String(v);
+              })()
             }
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -248,6 +287,10 @@ export function PricingRegisterArtifact({
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <div className={styles.hint}>{config.lede}</div>
+        <div className={styles.hint}>
+          Rates are typed as percentages — enter 3 for 3%. Units and growth sources
+          offer the platform&rsquo;s own lists.
+        </div>
         {config.notices.map((n) => (
           <div className={styles.hint} key={n}>{n}</div>
         ))}

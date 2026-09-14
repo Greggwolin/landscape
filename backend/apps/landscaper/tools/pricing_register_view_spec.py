@@ -68,7 +68,11 @@ def build_pricing_register_view_config(
             'label': c.get('label'),
             'align': c.get('align', 'left'),
             'kind': _COLUMN_KIND.get(c['key'], 'context'),
+            # The picklist and the number format both ride on the column, read
+            # off the schema, so the renderer never infers either from a key
+            # name. Any field with an established list carries that list here.
             **({'options': c['options']} if c.get('options') else {}),
+            **({'format': c['format']} if c.get('format') else {}),
         }
         for c in table.get('columns', [])
     ]

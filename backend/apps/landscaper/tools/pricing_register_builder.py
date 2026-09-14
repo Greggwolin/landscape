@@ -158,6 +158,17 @@ def fetch_pricing_register_data(project_id: int) -> Dict[str, Any]:
         # anything published platform-wide. Gregg, 7a: a picklist of saved
         # benchmarks OR a custom rate — "custom" is the absence of a set, not a
         # thirteenth option in the list.
+        # The established UOM picklist. `core_fin_uom` is the platform's list and
+        # the budget already draws its Unit column from it — a second, hand-kept
+        # list of units would be the drift this codebase keeps paying for.
+        cursor.execute(
+            """
+            SELECT uom_code, uom_type FROM landscape.core_fin_uom
+            WHERE is_active ORDER BY uom_type, uom_code
+            """
+        )
+        uom_options = [{'value': r[0], 'label': r[0]} for r in cursor.fetchall()]
+
         cursor.execute(
             """
             SELECT s.set_id, s.set_name, s.is_global,
@@ -179,6 +190,7 @@ def fetch_pricing_register_data(project_id: int) -> Dict[str, Any]:
         'project_name': project_name,
         'rows': rows,
         'growth_sets': growth_sets,
+        'uom_options': uom_options,
     }
 
 
@@ -248,6 +260,7 @@ def annotate_curve_breaks(rows: List[Dict[str, Any]]) -> None:
 def build_pricing_register_schema(
     rows: List[Dict[str, Any]],
     growth_sets: List[Dict[str, Any]],
+    uom_options: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """The BLOCK SCHEMA: one row per product, carrying the write pointers.
 
@@ -268,16 +281,30 @@ def build_pricing_register_schema(
     # thirteenth set that does not exist in the database.
     set_options = [{'value': '', 'label': 'Custom rate'}] + set_options
 
+    # A unit already stored that is not on the platform list still has to be
+    # SHOWN and still has to be selectable, or opening the card would silently
+    # offer to change it. 'FF' and 'Unit' are both live in the data and neither
+    # is in core_fin_uom.
+    unit_options = list(uom_options or [])
+    known = {o['value'] for o in unit_options}
+    for stored in sorted({(r.get('unit_of_measure') or '') for r in ordered}):
+        if stored and stored not in known:
+            unit_options.append({'value': stored, 'label': f'{stored} (not on the list)'})
+
     columns: List[Dict[str, Any]] = [
         {'key': 'use_type', 'label': 'Use', 'align': 'left', 'editable': False},
         {'key': 'product', 'label': 'Product', 'align': 'left', 'editable': False},
         {'key': 'width', 'label': 'Width (ft)', 'align': 'right', 'editable': False},
-        {'key': 'uom', 'label': 'Unit', 'align': 'left', 'editable': True},
+        {'key': 'uom', 'label': 'Unit', 'align': 'left', 'editable': True,
+         **({'options': unit_options} if unit_options else {})},
         {'key': 'price', 'label': 'Price', 'align': 'right', 'editable': True},
         {'key': 'price_per_lot', 'label': 'Per Lot', 'align': 'right', 'editable': False},
         {'key': 'growth_set', 'label': 'Growth Source', 'align': 'left',
          'editable': True, 'options': set_options},
-        {'key': 'growth_rate', 'label': 'Growth', 'align': 'right', 'editable': True},
+        # Stored as a decimal fraction, shown and typed as a percent. The column
+        # says so; the renderer must not guess from the column name.
+        {'key': 'growth_rate', 'label': 'Growth', 'align': 'right', 'editable': True,
+         'format': 'percent'},
         {'key': 'as_of', 'label': 'Priced As Of', 'align': 'right', 'editable': True},
     ]
 
@@ -300,7 +327,10 @@ def build_pricing_register_schema(
             'uom': uom,
             'price': price,
             'price_per_lot': per_lot,
-            'growth_set': (r.get('set_name') or '') if r.get('growth_rate_set_id') else '',
+            # The option's VALUE, not its label: a picklist cell holds what would
+            # be written, and the renderer shows the matching label. Holding the
+            # name here made the select open with nothing chosen.
+            'growth_set': str(r['growth_rate_set_id']) if r.get('growth_rate_set_id') else '',
             'growth_rate': growth,
             'as_of': as_of.isoformat()[:10] if hasattr(as_of, 'isoformat') else (as_of or None),
         }
@@ -352,7 +382,9 @@ def build_pricing_register_refresh(project_id: int) -> Optional[Dict[str, Any]]:
     data = fetch_pricing_register_data(project_id)
     if not data['rows']:
         return None
-    schema = build_pricing_register_schema(data['rows'], data['growth_sets'])
+    schema = build_pricing_register_schema(
+        data['rows'], data['growth_sets'], data.get('uom_options')
+    )
     view_config = build_pricing_register_view_config(
         project_id=project_id,
         project_name=data['project_name'],
