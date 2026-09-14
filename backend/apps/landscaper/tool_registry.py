@@ -253,7 +253,11 @@ INCOME_PROPERTY_TOOLS = [
     "review_budget_variance",
     "get_cashflow_schedule",
     "get_capitalization_schedule",
-    "get_pricing_register",
+    # get_pricing_register is deliberately NOT here. Land-use pricing is a land
+    # development concept — a multifamily deal has no rate card of lot products —
+    # so the register is gated LAND only, in LAND_ONLY_TOOLS above. It was in both
+    # lists briefly on 2026-09-13 and would have been offered on income deals it
+    # cannot serve.
     # Expense comparables for income-approach analysis (LSCMD-TOOLGATE-0712-VP1 —
     # had executors but were ungated; income-property scoped, not land dev).
     "get_expense_comparables", "update_expense_comparable", "delete_expense_comparable",
