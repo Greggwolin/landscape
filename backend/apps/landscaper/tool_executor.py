@@ -3010,7 +3010,10 @@ ASSUMPTION_FIELD_TYPES = {
 INCOME_PROPERTY_TYPE_CODES = ('MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU')
 
 
-def _fetch_cashflow_schedule(project_id: int) -> Dict[str, Any]:
+def _fetch_cashflow_schedule(
+    project_id: int,
+    container_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
     """
     Fetch cash flow schedule for a project, routing by project_type_code.
 
@@ -3020,9 +3023,17 @@ def _fetch_cashflow_schedule(project_id: int) -> Dict[str, Any]:
     point's historical behavior: financing is NOT included (the Landscaper
     cash-flow tool reports the operating schedule), unknown/missing type
     returns an empty envelope, and engine errors raise RuntimeError.
+
+    ``container_ids`` narrows the run to specific areas or phases. The engine
+    has accepted this since it was written; nothing above it ever passed one, so
+    the only cash flow anyone could get was the whole project.
     """
     from apps.financial.services.cashflow_routing import fetch_cashflow_schedule
-    return fetch_cashflow_schedule(project_id, include_financing=False)
+    return fetch_cashflow_schedule(
+        project_id,
+        include_financing=False,
+        container_ids=container_ids or None,
+    )
 
 
 def _filter_numeric_assumptions(values: Dict[str, Any]) -> Dict[str, Any]:
@@ -9046,6 +9057,27 @@ def handle_get_sales_schedule(
         return {'success': False, 'error': str(e)}
 
 
+def _coerce_container_ids(value: Any) -> List[int]:
+    """Whatever the model sent, as a clean list of container ids.
+
+    The model can send a single id, a list, or strings. Anything that is not a
+    whole number is dropped rather than guessed at — a filter that silently
+    included the wrong phase would produce a confident wrong cash flow.
+    """
+    if value in (None, '', []):
+        return []
+    raw = value if isinstance(value, (list, tuple, set)) else [value]
+    out: List[int] = []
+    for item in raw:
+        try:
+            number = float(str(item).strip())
+        except (TypeError, ValueError):
+            continue
+        if number.is_integer():
+            out.append(int(number))
+    return sorted(set(out))
+
+
 @register_tool('get_cashflow_schedule')
 def handle_get_cashflow_schedule(
     tool_input: Dict[str, Any],
@@ -9075,7 +9107,10 @@ def handle_get_cashflow_schedule(
             create_cashflow_artifact,
             fetch_cashflow_schedule_data,
         )
-        data = fetch_cashflow_schedule_data(int(project_id))
+        container_ids = _coerce_container_ids(tool_input.get('container_ids'))
+        data = fetch_cashflow_schedule_data(
+            int(project_id), container_ids=container_ids or None
+        )
         rows = data['rows']
 
         # No dated cash flow (e.g. an un-modeled project) → clean, no artifact.
@@ -9083,7 +9118,11 @@ def handle_get_cashflow_schedule(
             return {
                 'success': True, 'artifact_created': False,
                 'period_count': 0,
-                'message': 'No cash flow schedule exists for this project yet.',
+                'message': (
+                    'No cash flow falls inside the areas or phases requested.'
+                    if container_ids else
+                    'No cash flow schedule exists for this project yet.'
+                ),
                 'instruction': _EMPTY_ARTIFACT_RELAY,
             }
 
@@ -9102,8 +9141,26 @@ def handle_get_cashflow_schedule(
             dcf_row=data['dcf_row'],
             growth_set_names=data['growth_set_names'],
             exit_note=data.get('exit_note'),  # PD15 Fix 6
+            container_ids=container_ids or None,
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
+        )
+
+        # What this cash flow could be narrowed to, and what it is. Read from the
+        # view specification's own helper so the list the model is told to pick
+        # from is the same list the card shows.
+        try:
+            from .tools.cashflow_view_spec import fetch_cashflow_containers
+            available_containers = [
+                {'id': c['id'], 'label': c['label'], 'level': c['tier_label']}
+                for c in fetch_cashflow_containers(int(project_id))
+            ]
+        except Exception:  # noqa: BLE001
+            available_containers = []
+        _by_id = {c['id']: c['label'] for c in available_containers}
+        scope_label = (
+            ' · '.join(_by_id.get(i, f'Container {i}') for i in container_ids)
+            if container_ids else 'Whole project'
         )
 
         npv = results.get('npv')
@@ -9119,11 +9176,20 @@ def handle_get_cashflow_schedule(
                 'irr': irr,
                 'period_count': len(rows),
                 'total_net_cash_flow': total_net,
+                # The ids a follow-up 'just phase 2' can be answered with. Named
+                # here because they come from the container ledger and are NOT
+                # the phase_id / area_id other tools return.
+                'available_containers': available_containers,
+                'container_ids': container_ids or None,
+                'scope': scope_label,
                 'instruction': (
                     'The cash-flow schedule artifact has ALREADY been created and '
                     'is open in the right panel. Do NOT call create_artifact. Reply '
                     'with one short sentence stating npv and period_count from these '
-                    'fields — do NOT restate the tables.'
+                    'fields, and say which scope it covers — do NOT restate the '
+                    'tables. To narrow it to an area or phase, call this tool again '
+                    'with container_ids taken from available_containers; that makes '
+                    'a second card and leaves this one alone.'
                 ),
             }
 

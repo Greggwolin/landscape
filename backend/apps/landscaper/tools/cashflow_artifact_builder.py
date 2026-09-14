@@ -337,8 +337,16 @@ def _fetch_growth_set_names(set_ids: List[int]) -> Dict[int, str]:
         return {r[0]: r[1] for r in cursor.fetchall()}
 
 
-def fetch_cashflow_schedule_data(project_id: int) -> Dict[str, Any]:
+def fetch_cashflow_schedule_data(
+    project_id: int,
+    container_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
     """Everything the cash-flow artifact needs, read once.
+
+    ``container_ids`` narrows the engine run to specific areas or phases. It is
+    carried on the returned dict so every later step — the dedup key, the title,
+    the view specification, the rebuild after a write — uses the same scope the
+    numbers were produced under, rather than each deciding for itself.
 
     Kept in the builder (not the tool handler) so ``commit_field_edit`` →
     ``_refresh_artifact_after_write`` rebuilds a schema identical to a fresh
@@ -363,7 +371,7 @@ def fetch_cashflow_schedule_data(project_id: int) -> Dict[str, Any]:
     project_type_code = (prow[1] if prow else '') or ''
     property_type = property_type_for_code(project_type_code)
 
-    envelope = _fetch_cashflow_schedule(project_id)
+    envelope = _fetch_cashflow_schedule(project_id, container_ids=container_ids)
     summary_reduced = leveraged_cashflow_summary(envelope)
     rows = summary_reduced.get('rows') or []
 
@@ -394,6 +402,7 @@ def fetch_cashflow_schedule_data(project_id: int) -> Dict[str, Any]:
     return {
         'project_name': project_name,
         'project_type_code': project_type_code,
+        'container_ids': [int(i) for i in (container_ids or [])],
         'property_type': property_type,
         'exit_note': exit_note,
         'rows': rows,
@@ -625,18 +634,29 @@ def build_cashflow_artifact_schema(
     }
 
 
-def build_cashflow_schema_for_project(project_id: int) -> Optional[Dict[str, Any]]:
-    """Rebuild the cash-flow schema from the source of truth.
+def build_cashflow_refresh_payload(
+    project_id: int,
+    container_ids: Optional[List[int]] = None,
+) -> Optional[Dict[str, Any]]:
+    """The schema AND the view specification, from one engine run.
 
-    Used by the tool AND by ``_refresh_artifact_after_write`` so the panel after
-    an edit is produced by exactly the same code as the panel before it. Returns
-    None when the project has no cash-flow periods (caller degrades; never an
-    empty artifact).
+    The refresh after a write used to rebuild the schema alone. The screen does
+    not draw from the schema — it draws from the view specification, which holds
+    its own copy of the rows — so an edited assumption re-ran the engine and then
+    displayed the numbers from before the edit. Both halves move together or the
+    artifact lies about itself.
+
+    One function rather than two because the cash-flow engine run is the
+    expensive part, and calling it twice to produce two halves of the same
+    artifact is how the two halves get a chance to disagree.
     """
-    data = fetch_cashflow_schedule_data(project_id)
+    from .cashflow_view_spec import build_cashflow_view_config
+
+    data = fetch_cashflow_schedule_data(project_id, container_ids=container_ids)
     if not data['rows']:
         return None
-    return build_cashflow_artifact_schema(
+
+    schema = build_cashflow_artifact_schema(
         data['rows'],
         data['assumptions'],
         data['results'],
@@ -648,6 +668,30 @@ def build_cashflow_schema_for_project(project_id: int) -> Optional[Dict[str, Any
         growth_set_names=data['growth_set_names'],
         exit_note=data.get('exit_note'),
     )
+    view_config = build_cashflow_view_config(
+        project_id=project_id,
+        project_name=data['project_name'],
+        schema=schema,
+        period_type=data['period_type'],
+        total_periods=data['total_periods'],
+        container_ids=data['container_ids'],
+    )
+    return {'schema': schema, 'view_config': view_config}
+
+
+def cashflow_dedup_key(container_ids: Optional[List[int]] = None) -> str:
+    """One canonical cash flow per project, plus one per container selection.
+
+    The canonical key is unchanged, so the project-wide cash flow every existing
+    artifact was stored under keeps updating in place. A filtered run gets its
+    own key built from the SORTED ids, so asking for the same two phases twice
+    updates one artifact rather than stacking duplicates, and never touches the
+    project-wide one.
+    """
+    ids = sorted({int(i) for i in (container_ids or [])})
+    if not ids:
+        return 'cashflow:schedule_detail'
+    return 'cashflow:schedule_detail:containers:' + '-'.join(str(i) for i in ids)
 
 
 def create_cashflow_artifact(
@@ -664,6 +708,7 @@ def create_cashflow_artifact(
     dcf_row: Optional[Dict[str, Any]] = None,
     growth_set_names: Optional[Dict[int, str]] = None,
     exit_note: Optional[str] = None,
+    container_ids: Optional[List[int]] = None,
     user_id: Any = None,
     thread_id: Any = None,
 ) -> Dict[str, Any]:
@@ -672,8 +717,10 @@ def create_cashflow_artifact(
     Returns the artifact service envelope on success, or
     ``{'success': False, 'error': ...}``. Dedup: one canonical cash-flow artifact
     per project — re-running updates in place (mirrors the budget / sales / OS
-    tools). No ``artifact_subtype`` — this is not an operating statement, so the
-    OS guard does not apply (its title carries no operating-statement keywords).
+    tools) — plus one per container selection, so a cash flow for two phases is a
+    separate card and the project-wide one is never overwritten by it. No
+    ``artifact_subtype`` — this is not an operating statement, so the OS guard
+    does not apply (its title carries no operating-statement keywords).
     """
     if not rows:
         return {'success': False, 'error': 'no cash-flow periods to render'}
@@ -696,9 +743,21 @@ def create_cashflow_artifact(
         growth_set_names=growth_set_names,
         exit_note=exit_note,
     )
-    title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
-
     from .cashflow_view_spec import CASHFLOW_CONFIG_KEY, build_cashflow_view_config
+
+    view_config = build_cashflow_view_config(
+        project_id=project_id,
+        project_name=project_name,
+        schema=schema,
+        period_type=period_type,
+        total_periods=total_periods,
+        container_ids=container_ids,
+    )
+    # The view specification resolves the container names, so the card's title
+    # comes from it rather than being spelled a second way here.
+    title = view_config.get('title') or (
+        f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
+    )
 
     try:
         return create_artifact_record(
@@ -714,15 +773,13 @@ def create_cashflow_artifact(
             params_json={
                 'server_rendered': True,
                 'kind': 'cashflow',
-                CASHFLOW_CONFIG_KEY: build_cashflow_view_config(
-                    project_id=project_id,
-                    project_name=project_name,
-                    schema=schema,
-                    period_type=period_type,
-                    total_periods=total_periods,
-                ),
+                # The scope this artifact was built under, so the rebuild after a
+                # write re-runs the engine for the same containers instead of
+                # silently widening a filtered cash flow back to the project.
+                'container_ids': [int(i) for i in (container_ids or [])],
+                CASHFLOW_CONFIG_KEY: view_config,
             },
-            dedup_key='cashflow:schedule_detail',
+            dedup_key=cashflow_dedup_key(container_ids),
             prior_tool_calls=['get_cashflow_schedule'],
         )
     except Exception as exc:  # noqa: BLE001

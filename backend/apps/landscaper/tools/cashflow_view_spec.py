@@ -90,6 +90,47 @@ def resolve_period_zero(project_id: int) -> Dict[str, Any]:
     return {'date': None, 'source': None}
 
 
+def fetch_cashflow_containers(project_id: int) -> List[Dict[str, Any]]:
+    """The areas and phases this project's cash flow can be narrowed to.
+
+    The engine has always accepted a ``container_ids`` filter
+    (``LandDevCashFlowService.calculate``); nothing ever offered the list, so the
+    screen said filtering was unavailable. It is available — it just cannot be
+    done by regrouping rows already on screen, because the engine emits one
+    aggregated figure per period. It has to be re-run.
+
+    ``landscape.tbl_division`` is the container ledger, read off
+    ``apps.containers.models.Division`` (``managed = False``) rather than guessed.
+    Tier 1 is the area/village, tier 2 the phase; tier 3 is unit-level and too
+    fine to offer as a cash-flow filter.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT division_id, display_name, division_code, tier, parent_division_id
+            FROM landscape.tbl_division
+            WHERE project_id = %s AND COALESCE(is_active, TRUE) AND tier IN (1, 2)
+            ORDER BY tier, COALESCE(sort_order, 2147483647), division_id
+            """,
+            [project_id],
+        )
+        rows = cursor.fetchall()
+
+    return [
+        {
+            'id': r[0],
+            'label': r[1] or r[2] or f'Container {r[0]}',
+            'code': r[2],
+            'tier': r[3],
+            'tier_label': 'Area' if r[3] == 1 else 'Phase',
+            'parent_id': r[4],
+        }
+        for r in rows
+    ]
+
+
 def build_cashflow_view_config(
     *,
     project_id: int,
@@ -97,6 +138,7 @@ def build_cashflow_view_config(
     schema: Dict[str, Any],
     period_type: Optional[str] = None,
     total_periods: Optional[int] = None,
+    container_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     """The specification the renderer draws from, read off the schema."""
     blocks = {b.get('id'): b for b in schema.get('blocks', [])}
@@ -139,7 +181,22 @@ def build_cashflow_view_config(
     except Exception:  # noqa: BLE001 — a missing date must never fail the artifact
         period_zero = {'date': None, 'source': None}
 
+    # What this cash flow can be narrowed to, and what it IS narrowed to. A
+    # failure here must never take the artifact with it.
+    try:
+        containers = fetch_cashflow_containers(project_id)
+    except Exception:  # noqa: BLE001
+        containers = []
+
+    active_ids = [int(i) for i in (container_ids or [])]
+    by_id = {c['id']: c for c in containers}
+    active_labels = [
+        (by_id[i]['label'] if i in by_id else f'Container {i}') for i in active_ids
+    ]
+
     title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
+    if active_labels:
+        title = f'{title} — {", ".join(active_labels)}'
     return {
         'topic': 'cashflow',
         'kicker': 'Cash flow',
@@ -172,14 +229,26 @@ def build_cashflow_view_config(
             'income stream — the land value — and the periods are counted from the '
             'start of that stream.'
         ),
-        # Said on the screen rather than left as a silent absence. Two of the
-        # three controls the retired screen carried cannot be done here from the
-        # rows the engine emits, and doing them anyway would produce confident
-        # wrong totals — see next_actions.md 2026-09-11.
+        # Every area and phase this cash flow can be narrowed to, and which of
+        # them this one IS. A filtered cash flow is a SEPARATE artifact built by
+        # re-running the engine — not the same rows regrouped — so the canonical
+        # project-wide cash flow is never overwritten by a filtered view.
+        'containers': containers,
+        'container_filter': (
+            {'ids': active_ids, 'labels': active_labels} if active_ids else None
+        ),
+        'scope_label': (
+            ' · '.join(active_labels) if active_labels else 'Whole project'
+        ),
+        # Said on the screen rather than left as a silent absence. Cost detail is
+        # the one control the retired screen carried that still cannot be
+        # produced from what the engine emits — one aggregated figure per period,
+        # so a breakdown would be an invented split. Filtering by area or phase
+        # IS available, by re-running the engine for those containers.
         'unavailable_controls': (
-            'Cost detail and filtering by area or phase are not offered here: the '
-            'engine emits one aggregated figure per period, so both would have to '
-            'be recomputed server-side rather than regrouped on screen.'
+            'Cost detail is not offered here: the engine emits one aggregated '
+            'figure per period, so a breakdown would have to come from the engine '
+            'rather than be split on screen.'
         ),
         'truncate_at': 36,
         'generated_at': datetime.now(timezone.utc).isoformat(),

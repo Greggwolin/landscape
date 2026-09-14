@@ -1878,11 +1878,31 @@ LANDSCAPER_TOOLS = [
             "tables yourself; just announce it in one sentence using its npv and "
             "period_count fields. Use get_cashflow_results for a text/values read; "
             "this tool is for SHOWING the schedule. A generic ask with no cash-flow "
-            "noun may route to navigate_to_screen instead."
+            "noun may route to navigate_to_screen instead. To see the cash flow "
+            "for particular areas or phases rather than the whole project, pass "
+            "container_ids — that produces a SEPARATE card alongside the "
+            "project-wide one, which is left untouched. Use "
+            "the available_containers list this tool returns to turn a name "
+            "like 'Phase 2' into an id; never guess an id, and never use a "
+            "phase_id from get_phases or an area_id from get_areas — those are "
+            "a different set of ids and would silently filter to the wrong "
+            "thing."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "container_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": (
+                        "Optional. Division ids (areas or phases) to run the cash "
+                        "flow for. Omit for the whole project. The engine is "
+                        "re-run for these containers — this is not the same rows "
+                        "regrouped — so costs, sales and financing are all scoped "
+                        "to them."
+                    ),
+                },
+            },
         },
     },
     {
