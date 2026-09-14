@@ -173,7 +173,11 @@ export function SalesArtifact({
     }));
   }, [rows, groupKeyOf]);
 
-  const columnKeys = config.rung_columns[rung] ?? config.rung_columns[config.default_rung] ?? [];
+  // The column you grouped by is dropped: the group heading already says which
+  // area or phase every row under it belongs to, so repeating it once per row
+  // is a column of the same word (Gregg, 2026-09-11).
+  const columnKeys = (config.rung_columns[rung] ?? config.rung_columns[config.default_rung] ?? [])
+    .filter((key) => key !== grouping);
   const columns = columnKeys
     .map((key) => config.columns.find((c) => c.key === key))
     .filter((c): c is SalesColumn => Boolean(c));

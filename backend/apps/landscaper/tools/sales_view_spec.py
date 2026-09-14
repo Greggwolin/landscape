@@ -37,10 +37,14 @@ from typing import Any, Dict, List, Optional
 
 SALES_CONFIG_KEY = 'sales_view_config'
 
+# Ordered largest container first: area (level 1), phase (level 2), parcel
+# (level 3). Gregg, 2026-09-11 — a schedule reads down the hierarchy, and
+# leading with the parcel made the reader assemble the location backwards.
+# Dict order IS column order.
 _SCHEDULE_META: Dict[str, Dict[str, Any]] = {
-    'parcel':       {'label': 'Parcel',       'align': 'left'},
     'area':         {'label': 'Area',         'align': 'left'},
     'phase':        {'label': 'Phase',        'align': 'left'},
+    'parcel':       {'label': 'Parcel',       'align': 'left'},
     'sale_date':    {'label': 'Sale Date',    'align': 'right'},
     'gross':        {'label': 'Gross',        'align': 'right'},
     'commission':   {'label': 'Commission',   'align': 'right'},
@@ -51,8 +55,8 @@ _SCHEDULE_META: Dict[str, Dict[str, Any]] = {
 
 _RUNGS: Dict[str, List[str]] = {
     'summary':  ['parcel', 'sale_date', 'net'],
-    'standard': ['parcel', 'area', 'phase', 'sale_date', 'gross', 'commission', 'net'],
-    'detail':   ['parcel', 'area', 'phase', 'sale_date', 'gross', 'commission',
+    'standard': ['area', 'phase', 'parcel', 'sale_date', 'gross', 'commission', 'net'],
+    'detail':   ['area', 'phase', 'parcel', 'sale_date', 'gross', 'commission',
                  'cost_of_sale', 'net', 'evidence'],
 }
 
