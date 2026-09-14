@@ -260,6 +260,27 @@ class ArtifactViewSet(viewsets.ViewSet):
             artifact.save(update_fields=['is_archived'])
         return Response(ArtifactDetailSerializer(artifact).data)
 
+    @action(detail=False, methods=['get'], url_path='catalog')
+    def catalog(self, request):
+        """The standard surfaces this project can produce (5a).
+
+        Pinned and Recent can only show what already exists, so a surface nobody
+        has opened is invisible and the panel can never say what the app is able
+        to produce. This lists them whether or not a card exists yet, gated by
+        project type through tool_registry rather than by a second copy of that
+        judgement here.
+        """
+        from .catalog import catalog_for_project
+
+        try:
+            project_id = int(request.query_params.get('project_id') or 0)
+        except (TypeError, ValueError):
+            project_id = 0
+        if not project_id:
+            return Response({'detail': 'project_id is required'}, status=400)
+
+        return Response({'entries': catalog_for_project(project_id)})
+
     @action(detail=True, methods=['get'], url_path='versions')
     def versions(self, request, pk=None):
         try:

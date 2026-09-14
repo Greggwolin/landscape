@@ -131,6 +131,33 @@ export function useArtifactList(filters: ArtifactListFilters = {}) {
   });
 }
 
+/** The STANDARD REPORTS catalogue (5a) — what this project type can produce,
+ *  whether or not a card exists yet. Pinned and Recent can only show what has
+ *  already been built, so without this the panel cannot say what the app offers.
+ *  Gated server-side by project type; the client shows what it is given. */
+export interface CatalogEntry {
+  tool: string;
+  label: string;
+  kind: 'register' | 'report' | 'workspace';
+  blurb: string;
+  artifact_id: number | null;
+}
+
+export function useArtifactCatalog(projectId: number | null) {
+  return useQuery<{ entries: CatalogEntry[] }>({
+    queryKey: ['artifacts', 'catalog', projectId],
+    enabled: projectId != null,
+    queryFn: async () => {
+      const res = await fetch(
+        `${DJANGO_API_URL}/api/artifacts/catalog/?project_id=${projectId}`,
+        { headers: getAuthHeaders() },
+      );
+      if (!res.ok) throw new Error(`Failed to fetch artifact catalog: ${res.status}`);
+      return res.json();
+    },
+  });
+}
+
 export function useArtifact(artifactId: number | null) {
   return useQuery<ArtifactDetail>({
     queryKey: ['artifacts', 'detail', artifactId],

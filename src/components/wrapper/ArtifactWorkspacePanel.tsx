@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database, Pencil, Trash2, LayoutList } from 'lucide-react';
 import { useWrapperUI, type LocationBriefArtifactConfig, type MapArtifactConfig } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
@@ -14,6 +14,8 @@ import {
   useArtifactPatch,
   useArtifactRestore,
   useArtifactUpdateState,
+  useArtifactCatalog,
+  type CatalogEntry,
 } from '@/hooks/useArtifact';
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
@@ -185,6 +187,9 @@ export function ArtifactWorkspacePanel({
     include_unassigned: wantUnassigned,
     limit: 10,
   });
+
+  const catalogQuery = useArtifactCatalog(projectId ?? null);
+  const catalogEntries: CatalogEntry[] = catalogQuery.data?.entries ?? [];
 
   const pinnedArtifacts: ArtifactSummary[] = pinnedQuery.data?.results ?? [];
   const pinnedIds = useMemo(
@@ -358,6 +363,7 @@ export function ArtifactWorkspacePanel({
 
   // Section collapsed state — all collapsed by default to keep the panel
   // compact; expand on demand.
+  const [catalogCollapsed, setCatalogCollapsed] = useState(false);
   const [pinnedCollapsed, setPinnedCollapsed] = useState(true);
   const [recentCollapsed, setRecentCollapsed] = useState(true);
   const [pointersCollapsed, setPointersCollapsed] = useState(true);
@@ -442,6 +448,58 @@ export function ArtifactWorkspacePanel({
                 />
               ))
             )}
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ── Standard Reports (5a) ── (suppressed in takeover mode).
+          Listed whether or not a card exists yet: Pinned and Recent can only
+          show what has already been built, so a surface nobody has opened was
+          invisible and the panel could never say what the app can produce.
+          Expanded by default for the same reason. */}
+      {!takeoverMode && catalogEntries.length > 0 && (
+        <div className="w-rail-card">
+          <CollapsibleSection
+            title="Standard Reports"
+            icon={<LayoutList size={15} />}
+            count={catalogEntries.length}
+            collapsed={catalogCollapsed}
+            onToggle={() => setCatalogCollapsed((v) => !v)}
+          >
+            {catalogEntries.map((e) => (
+              <button
+                key={e.tool}
+                type="button"
+                className={`w-rail-row${e.artifact_id === activeArtifactId ? ' w-rail-row--active' : ''}`}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  border: 0, background: 'transparent',
+                  cursor: e.artifact_id ? 'pointer' : 'default',
+                  padding: '6px 8px',
+                }}
+                // Built: open it. Not built: there is nothing to open, and the
+                // row says how to get one rather than pretending to be a button
+                // that does nothing.
+                onClick={e.artifact_id ? () => setActiveArtifactId(e.artifact_id!) : undefined}
+                title={e.blurb}
+              >
+                <span style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontWeight: e.artifact_id ? 600 : 400 }}>{e.label}</span>
+                  <span style={{
+                    fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em',
+                    opacity: 0.55,
+                  }}>{e.kind}</span>
+                  {!e.artifact_id && (
+                    <span style={{ fontSize: 11, opacity: 0.55, marginLeft: 'auto' }}>
+                      ask to build
+                    </span>
+                  )}
+                </span>
+                <span style={{ display: 'block', fontSize: 11, opacity: 0.6, lineHeight: 1.35 }}>
+                  {e.blurb}
+                </span>
+              </button>
+            ))}
           </CollapsibleSection>
         </div>
       )}
