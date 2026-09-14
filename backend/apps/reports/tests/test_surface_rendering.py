@@ -42,6 +42,21 @@ def test_every_report_code_is_mapped_or_explicitly_unmapped():
     assert accounted - routed == set(), 'mapped codes the router does not know'
 
 
+def test_the_counts_are_what_the_prose_says():
+    """The numbers in surface_map's docstring, asserted.
+
+    Prose drifts from code silently. The first draft said eight surfaces carried
+    twelve report codes; they carry thirteen, and the set-equality test above
+    passed anyway because it never counted.
+    """
+    assert len(SURFACES) == 9
+    assert sum(1 for e in SURFACES.values() if e['definition'] == 'view_spec') == 7
+    assert sum(1 for e in SURFACES.values() if e['reports']) == 8
+    assert len(mapped_reports()) == 13
+    assert len(UNMAPPED_REPORTS) == 9
+    assert len(GENERATOR_REGISTRY) == 13 + 9
+
+
 def test_no_report_is_both_mapped_and_unmapped():
     assert set(mapped_reports()).isdisjoint(UNMAPPED_REPORTS)
 

@@ -23,8 +23,11 @@ are recorded here rather than worked around silently:
 
 * **One surface has no report at all.** Pricing is a register — nobody has ever
   asked for a PDF of it — so its ``reports`` list is empty. Eight surfaces carry
-  twelve report codes between them; the remaining nine report codes have no
-  surface and keep their own generators, which is what 2a said would happen.
+  **thirteen** report codes between them; the remaining **nine** have no surface
+  and keep their own generators, which is what 2a said would happen. Thirteen
+  and nine are the router's twenty-two, and ``test_the_counts_are_what_the_prose_says``
+  fails if that stops being true — the first draft of this paragraph said
+  twelve, which nothing would have caught.
 """
 
 from __future__ import annotations
