@@ -40,7 +40,7 @@ export interface PricingColumn {
   /** An established picklist for this field, read from the platform's own table
    *  (units from core_fin_uom, growth sources from the growth-rate sets). Where
    *  one exists the field offers it instead of free text. */
-  options?: Array<{ value: string; label: string }>;
+  options?: Array<{ value: string; label: string; description?: string }>;
   /** The list is a set of published values to pick from AND the field stays
    *  typeable. A growth rate nobody has published is still a legitimate rate,
    *  so the picklist must not become a cage. */
@@ -136,6 +136,14 @@ function optionValueFor(c: PricingColumn, value: unknown): string {
     if (numeric) return numeric.value;
   }
   return '';
+}
+
+/** What the code in a picklist cell stands for, for the hover. The grid shows
+ *  the code; the words live here. */
+function optionDescription(c: PricingColumn, value: unknown): string | undefined {
+  if (!c.options?.length) return undefined;
+  const match = c.options.find((o) => o.value === String(value ?? ''));
+  return match?.description;
 }
 
 function cellText(c: PricingColumn, value: unknown): string {
@@ -234,8 +242,12 @@ export function PricingRegisterArtifact({
               }}
               onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null); }}
             >
+              {/* Open, the list spells the unit out; closed, the grid shows
+                  the code alone. Choosing stays informed either way. */}
               {c.options.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.description ? `${o.label} — ${o.description}` : o.label}
+                </option>
               ))}
             </select>
           </td>
@@ -288,7 +300,10 @@ export function PricingRegisterArtifact({
             : undefined
         }
         title={
-          target && c.key === 'growth_rate' && row.growth_inherited
+          // A code the column shows on its own says what it means here.
+          optionDescription(c, committed)
+            ? `${optionDescription(c, committed)}${target ? ' — click to change' : ''}`
+            : target && c.key === 'growth_rate' && row.growth_inherited
             ? "From the project's growth assumption — type here to give this product its own rate"
             : target ? 'Click to change — this is an input'
             : c.kind === 'computed' ? 'Worked out from the price and the lot width'

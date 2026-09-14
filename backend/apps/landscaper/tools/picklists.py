@@ -132,7 +132,15 @@ def measure_options(project_id: int) -> List[Dict[str, str]]:
         # A measure with no property list is universal (%, DAY, MO, WK, YR).
         if property_type and isinstance(allowed, list) and property_type not in allowed:
             continue
-        options.append({'value': code, 'label': f'{code} — {name}' if name else code})
+        # The label is the CODE alone — Gregg, 2026-09-14: the column just needs
+        # the code. The full name rides along as a description, which the cell
+        # shows on hover and the open dropdown spells out, so choosing a unit is
+        # still informed without the grid carrying the same words 21 times.
+        options.append({
+            'value': code,
+            'label': code,
+            **({'description': name} if name else {}),
+        })
         seen.add(code)
 
     return options

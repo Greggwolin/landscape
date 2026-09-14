@@ -294,7 +294,7 @@ def build_pricing_register_schema(
         {'key': 'use_type', 'label': 'Use', 'align': 'left', 'editable': False},
         {'key': 'product', 'label': 'Product', 'align': 'left', 'editable': False},
         {'key': 'width', 'label': 'Width (ft)', 'align': 'right', 'editable': False},
-        {'key': 'uom', 'label': 'Unit', 'align': 'left', 'editable': True,
+        {'key': 'uom', 'label': 'Unit', 'align': 'center', 'editable': True,
          **({'options': unit_options} if unit_options else {})},
         # Headed by what the number IS. Gregg, 2026-09-14: the rate column is
         # dollars per whatever the Unit column says; the derived column is
