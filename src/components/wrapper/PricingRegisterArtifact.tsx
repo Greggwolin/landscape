@@ -90,9 +90,14 @@ interface Props {
 }
 
 /** Thousands separators, em dash for absent. No currency symbol — the Unit
- *  column already says what the number is in. */
-function fmt(value: unknown, decimals = 0): string {
+ *  column already says what the number is in.
+ *
+ *  ``zeroAsDash``: a price of zero is not a price. It was already how the lot
+ *  column read, because a lot price is only worked out where there is a rate to
+ *  work it out from; Gregg asked on 2026-09-14 for the rate column to match. */
+function fmt(value: unknown, decimals = 0, zeroAsDash = false): string {
   if (value === null || value === undefined || value === '') return '—';
+  if (zeroAsDash && Number(value) === 0) return '—';
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return String(value);
   const body = Math.abs(n).toLocaleString('en-US', {
@@ -101,12 +106,18 @@ function fmt(value: unknown, decimals = 0): string {
   return n < 0 ? `(${body})` : body;
 }
 
-/** A growth rate is stored as a decimal fraction; 0.03 reads as 3.0%. A rate of
- *  zero is shown as 0.0%, not an em dash: flat is a decision, not an absence. */
-function pct(value: unknown): string {
+/** A growth rate is stored as a decimal fraction; 0.03 reads as 3.0%.
+ *
+ *  ``zeroAsDash`` is for the GRID. Gregg, 2026-09-14: a zero reads as a dash
+ *  there, the same as a zero price does — twenty-one rows of "0.0%" is a wall of
+ *  figures saying nothing, and a blank column is the honest picture of a
+ *  register where no rate has been set. The growth-sources table below keeps its
+ *  zeroes, because "No Inflation" really is a rate of zero. */
+function pct(value: unknown, zeroAsDash = false): string {
   if (value === null || value === undefined || value === '') return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return String(value);
+  if (zeroAsDash && n === 0) return '—';
   return `${(n * 100).toFixed(1)}%`;
 }
 
@@ -147,8 +158,8 @@ function optionDescription(c: PricingColumn, value: unknown): string | undefined
 }
 
 function cellText(c: PricingColumn, value: unknown): string {
-  if (c.format === 'percent') return pct(value);
-  if (c.key === 'price' || c.key === 'price_per_lot') return fmt(value);
+  if (c.format === 'percent') return pct(value, true);
+  if (c.key === 'price' || c.key === 'price_per_lot') return fmt(value, 0, true);
   if (c.key === 'width') return value === null || value === undefined ? '—' : String(value);
   if (value === null || value === undefined || value === '') return '—';
   // A picklist cell holds the option's value; the reader wants its label.
@@ -203,7 +214,7 @@ export function PricingRegisterArtifact({
     const staged = key ? edits.staged[key] : undefined;
     const committed = row.cells[c.key] ?? null;
     const shown = staged
-      ? (c.format === 'percent' ? pct(staged.value) : staged.value)
+      ? (c.format === 'percent' ? pct(staged.value, true) : staged.value)
       : cellText(c, committed);
 
     if (target && editing === key) {
