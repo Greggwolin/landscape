@@ -568,7 +568,8 @@ class ProformaReportBase(PreviewBaseGenerator):
         ]
         eng = envelope.get('summary') or {}
         if eng.get('irr') is not None:
-            cards.append(self.make_kpi_card('IRR', self.fmt_pct(eng['irr'])))
+            # The engine returns a fraction. fmt_pct would print 0.5% for 45.7%.
+            cards.append(self.make_kpi_card('IRR', self.fmt_fraction_as_pct(eng['irr'])))
         if eng.get('equityMultiple') is not None:
             cards.append(self.make_kpi_card('Equity Multiple', f"{float(eng['equityMultiple']):.2f}x"))
         if eng.get('npv') is not None:

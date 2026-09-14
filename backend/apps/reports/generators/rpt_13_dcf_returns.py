@@ -28,10 +28,25 @@ class DCFReturnsGenerator(PreviewBaseGenerator):
         """, [self.project_id])
 
         if not dcf:
+            # NOT a rename, unlike the other four fixed on 2026-09-14.
+            # landscape.tbl_income_dcf has never existed: this report was written
+            # against a RESULTS table, and results are not stored — the
+            # calculation engine (apps.calculations) produces IRR, NPV and
+            # terminal value on demand, which is where the cash-flow reports get
+            # theirs. tbl_dcf_analysis holds the ASSUMPTIONS only.
+            #
+            # Repointing this at the engine is the 2a work (one definition, two
+            # outputs), not a query fix. Until then the message says what is
+            # actually true rather than sending someone to a tab that will not
+            # help.
             return {
                 'title': 'DCF Returns Summary',
                 'subtitle': project.get('project_name', ''),
-                'message': 'No DCF analysis available. Run a DCF valuation in the Valuation tab.',
+                'message': (
+                    'This report is not connected to the calculation engine yet, so it '
+                    'has no returns to show. The same figures appear on the cash-flow '
+                    'reports, which read the engine directly.'
+                ),
                 'sections': [],
             }
 
@@ -39,7 +54,8 @@ class DCFReturnsGenerator(PreviewBaseGenerator):
 
         # KPIs
         sections.append(self.make_kpi_section('Return Metrics', [
-            self.make_kpi_card('IRR', self.fmt_pct(d['irr'])),
+            # A fraction from the engine, not a percent-unit figure.
+            self.make_kpi_card('IRR', self.fmt_fraction_as_pct(d['irr'])),
             self.make_kpi_card('NPV', self.fmt_currency(d['npv'])),
             self.make_kpi_card('Terminal Value', self.fmt_currency(d['terminal_value'])),
             self.make_kpi_card('Present Value', self.fmt_currency(d['present_value'])),

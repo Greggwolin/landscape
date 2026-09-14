@@ -123,6 +123,11 @@ export const basket1Config: BasketConfig = {
       label: 'Exit Cap Rate',
       type: 'percentage',
       tier: 'napkin',
+      // Income property only. A land development exits through the parcel
+      // sell-out, and the land cash-flow engine never reads this column — so on
+      // a land deal the field asked for a number nothing consumes. Gregg,
+      // 2026-09-14.
+      propertyTypes: ['MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
       required: true,
       format: { suffix: '%', decimals: 2 },
       validation: { min: 2, max: 15 },

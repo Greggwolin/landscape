@@ -45,6 +45,24 @@ export default function AssumptionsPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // The project's type, used to hide fields that do not apply to it — a land
+  // development is not asked for an exit cap rate. Null until it arrives, and
+  // null shows everything, so a slow or failed fetch never blanks the page.
+  const [projectType, setProjectType] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
+      .then(r => (r.ok ? r.json() : null))
+      .then(p => {
+        if (!cancelled && p) {
+          setProjectType(p.project_type_code ?? p.project_type ?? null);
+        }
+      })
+      .catch(() => { /* leave null: every field stays visible */ });
+    return () => { cancelled = true; };
+  }, [projectId]);
+
   // Which baskets a PERSON has edited since this page loaded. Nothing is saved
   // for a basket that is not in here.
   //
@@ -227,23 +245,23 @@ export default function AssumptionsPage() {
   // Calculate total field counts across all baskets
   const fieldCounts = {
     napkin:
-      getFieldsForTier(1, 'napkin').length +
-      getFieldsForTier(2, 'napkin').length +
-      getFieldsForTier(3, 'napkin').length +
-      getFieldsForTier(4, 'napkin').length +
-      getFieldsForTier(5, 'napkin').length,
+      getFieldsForTier(1, 'napkin', projectType).length +
+      getFieldsForTier(2, 'napkin', projectType).length +
+      getFieldsForTier(3, 'napkin', projectType).length +
+      getFieldsForTier(4, 'napkin', projectType).length +
+      getFieldsForTier(5, 'napkin', projectType).length,
     mid:
-      getFieldsForTier(1, 'mid').length +
-      getFieldsForTier(2, 'mid').length +
-      getFieldsForTier(3, 'mid').length +
-      getFieldsForTier(4, 'mid').length +
-      getFieldsForTier(5, 'mid').length,
+      getFieldsForTier(1, 'mid', projectType).length +
+      getFieldsForTier(2, 'mid', projectType).length +
+      getFieldsForTier(3, 'mid', projectType).length +
+      getFieldsForTier(4, 'mid', projectType).length +
+      getFieldsForTier(5, 'mid', projectType).length,
     pro:
-      getFieldsForTier(1, 'pro').length +
-      getFieldsForTier(2, 'pro').length +
-      getFieldsForTier(3, 'pro').length +
-      getFieldsForTier(4, 'pro').length +
-      getFieldsForTier(5, 'pro').length
+      getFieldsForTier(1, 'pro', projectType).length +
+      getFieldsForTier(2, 'pro', projectType).length +
+      getFieldsForTier(3, 'pro', projectType).length +
+      getFieldsForTier(4, 'pro', projectType).length +
+      getFieldsForTier(5, 'pro', projectType).length
   };
 
   if (isLoading) {
@@ -320,6 +338,7 @@ export default function AssumptionsPage() {
         onChange={recordChange('acquisition', setAcquisitionData)}
         onModeChange={setGlobalMode}
         showModeToggle={false}
+        projectType={projectType}
       />
 
       {/* Basket 2: The Cash In (Revenue) */}
@@ -329,6 +348,7 @@ export default function AssumptionsPage() {
         currentMode={globalMode}
         onChange={recordChange('revenue', setRevenueData)}
         showModeToggle={false}
+        projectType={projectType}
       />
 
       {/* Basket 3: The Cash Out (Expenses) */}
@@ -338,6 +358,7 @@ export default function AssumptionsPage() {
         currentMode={globalMode}
         onChange={recordChange('expenses', setExpenseData)}
         showModeToggle={false}
+        projectType={projectType}
       />
 
       {/* Basket 4: The Financing */}
@@ -347,6 +368,7 @@ export default function AssumptionsPage() {
         currentMode={globalMode}
         onChange={recordChange('financing', setFinancingData)}
         showModeToggle={false}
+        projectType={projectType}
       />
 
       {/* Basket 5: The Split (Equity) */}
@@ -356,6 +378,7 @@ export default function AssumptionsPage() {
         currentMode={globalMode}
         onChange={recordChange('equity', setEquityData)}
         showModeToggle={false}
+        projectType={projectType}
       />
 
       {/* Footer with info */}

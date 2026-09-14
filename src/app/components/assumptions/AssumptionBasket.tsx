@@ -18,6 +18,12 @@ interface AssumptionBasketProps {
   onChange: (key: string, value: any, origin: ChangeOrigin) => void;
   onModeChange?: (mode: ComplexityTier) => void;
   showModeToggle?: boolean;
+  /**
+   * The project's type code. Fields and groups that declare a property-type
+   * list are hidden when this is not on it — a land deal is not asked for an
+   * exit cap rate. Undefined shows everything, which is the safe direction.
+   */
+  projectType?: string | null;
 }
 
 export function AssumptionBasket({
@@ -26,7 +32,8 @@ export function AssumptionBasket({
   currentMode,
   onChange,
   onModeChange,
-  showModeToggle = true
+  showModeToggle = true,
+  projectType
 }: AssumptionBasketProps) {
   const [localMode, setLocalMode] = useState<ComplexityTier>(currentMode);
 
@@ -41,8 +48,8 @@ export function AssumptionBasket({
     }
   };
 
-  const visibleFields = getFieldsForTier(basket.basketId, localMode);
-  const visibleGroups = getGroupsForTier(basket.basketId, localMode);
+  const visibleFields = getFieldsForTier(basket.basketId, localMode, projectType);
+  const visibleGroups = getGroupsForTier(basket.basketId, localMode, projectType);
 
   return (
     <div className="assumption-basket">

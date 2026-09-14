@@ -58,7 +58,7 @@ class ProjectSummaryGenerator(PreviewBaseGenerator):
 
         # Total acreage
         total_acres = self.execute_scalar("""
-            SELECT COALESCE(SUM(acres), 0) FROM landscape.tbl_parcel
+            SELECT COALESCE(SUM(acres_gross), 0) FROM landscape.tbl_parcel
             WHERE project_id = %s
         """, [self.project_id]) or 0
 
@@ -113,13 +113,18 @@ class ProjectSummaryGenerator(PreviewBaseGenerator):
     def _land_use_section(self) -> dict:
         rows = self.execute_query("""
             SELECT
-                COALESCE(p.land_use_label, p.land_use, 'Unassigned') AS land_use,
+                -- landuse_type / acres_gross: renamed columns this query never
+                -- followed, which blanked the section entirely.
+                COALESCE(p.landuse_type, p.landuse_code, 'Unassigned') AS land_use,
                 COUNT(*) AS parcel_count,
-                COALESCE(SUM(p.acres), 0) AS total_acres,
-                COALESCE(AVG(p.price_per_unit), 0) AS avg_price
+                COALESCE(SUM(p.acres_gross), 0) AS total_acres,
+                -- saleprice, not price_per_unit: another column this query did
+                -- not follow. Divided by units where there are any, so the
+                -- heading "Avg $/Unit" stays true.
+                COALESCE(AVG(NULLIF(p.saleprice, 0) / NULLIF(p.units_total, 0)), 0) AS avg_price
             FROM landscape.tbl_parcel p
             WHERE p.project_id = %s
-            GROUP BY COALESCE(p.land_use_label, p.land_use, 'Unassigned')
+            GROUP BY COALESCE(p.landuse_type, p.landuse_code, 'Unassigned')
             ORDER BY parcel_count DESC
         """, [self.project_id])
 
