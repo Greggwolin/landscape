@@ -277,9 +277,27 @@ def test_an_unresolvable_surface_says_so_instead_of_rendering_empty():
     class _Unbuilt(SurfacePreviewGenerator):
         report_code = 'RPT_XX'
         report_name = 'Unbuilt'
-        surface_tool = 'get_operating_statement'
+        # Was get_operating_statement until 2026-09-14, when
+        # build_os_payload_for_project made that one resolvable. Any surface
+        # still in UNRESOLVED proves the same behaviour.
+        surface_tool = 'get_rent_roll_schedule'
 
     preview = _Unbuilt(project_id=1).generate_preview()
     assert preview['sections'] == []
-    assert 'get_operating_statement' in preview['message']
-    assert 'no view specification' in preview['message']
+    assert 'get_rent_roll_schedule' in preview['message']
+    assert 'no function fetches them' in preview['message']
+
+
+def test_the_operating_statement_is_resolvable_and_the_rest_are_listed():
+    """Six of nine resolve; the three that do not each say what they need."""
+    from apps.reports.surface_spec import RESOLVERS, UNRESOLVED
+
+    assert 'get_operating_statement' in RESOLVERS
+    assert 'get_operating_statement' not in UNRESOLVED
+    assert len(RESOLVERS) == 6
+    assert set(UNRESOLVED) == {
+        'get_capitalization_schedule',
+        'get_rent_roll_schedule',
+        'review_budget_variance',
+    }
+    assert set(RESOLVERS) | set(UNRESOLVED) == set(SURFACES)
