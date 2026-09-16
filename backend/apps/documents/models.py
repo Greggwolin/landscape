@@ -82,6 +82,10 @@ class Document(models.Model):
     updated_by = models.BigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # How much of the document text the last extraction actually read.
+    # used < total means it was read in part (migration 20260916).
+    text_chars_used = models.IntegerField(null=True, blank=True)
+    text_chars_total = models.IntegerField(null=True, blank=True)
     # Media scan fields
     media_scan_status = models.CharField(max_length=20, default='unscanned')
     media_scan_json = models.JSONField(null=True, blank=True)

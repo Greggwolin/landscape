@@ -759,9 +759,10 @@ class DocumentClassifier:
             # If no embeddings, try to get from raw text
             if not content:
                 cursor.execute("""
-                    SELECT COALESCE(extracted_text, ''), storage_uri, mime_type
-                    FROM landscape.core_doc
-                    WHERE doc_id = %s
+                    SELECT COALESCE(t.extracted_text, ''), d.storage_uri, d.mime_type
+                    FROM landscape.core_doc d
+                    LEFT JOIN landscape.core_doc_text t ON t.doc_id = d.doc_id
+                    WHERE d.doc_id = %s
                 """, [doc_id])
                 row = cursor.fetchone()
                 content = row[0] if row and row[0] else ''
@@ -776,10 +777,17 @@ class DocumentClassifier:
                             content = extracted_text
                             # Cache in core_doc.extracted_text for subsequent calls
                             cursor.execute("""
-                                UPDATE landscape.core_doc
-                                SET extracted_text = %s
-                                WHERE doc_id = %s AND (extracted_text IS NULL OR extracted_text = '')
-                            """, [extracted_text[:100000], doc_id])
+                                INSERT INTO landscape.core_doc_text
+                                    (doc_id, extracted_text, word_count,
+                                     extraction_method, extracted_at, updated_at)
+                                VALUES (%s, %s, %s, 'classifier_direct', NOW(), NOW())
+                                ON CONFLICT (doc_id) DO UPDATE
+                                SET extracted_text = EXCLUDED.extracted_text,
+                                    word_count = EXCLUDED.word_count,
+                                    updated_at = NOW()
+                                WHERE landscape.core_doc_text.extracted_text IS NULL
+                                   OR landscape.core_doc_text.extracted_text = ''
+                            """, [doc_id, extracted_text, len(extracted_text.split())])
                     except Exception as e:
                         logger.warning(f"Direct extraction fallback failed for doc {doc_id}: {e}")
 

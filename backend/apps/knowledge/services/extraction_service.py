@@ -19,6 +19,40 @@ from .opex_utils import upsert_opex_entry
 
 logger = logging.getLogger(__name__)
 
+# How much document text one extraction may read.
+#
+# WHY 180,000
+# -----------
+# Measured 2026-09-16 across 14 real land-development documents on disk
+# (PADs, plats, CMPs, broker inventory reports, surveys): median 2,355
+# characters per page, 90th percentile 3,522, densest 5,227. 180,000 therefore
+# reads a 50-page document end to end for all but the densest formats.
+#
+# The previous value was 60,000 — about 25 pages at the median. 24 of the 218
+# documents with chunked text in the database exceed it, and every one of them
+# was being read in part with nothing recorded and nobody told.
+#
+# This is now the ONLY cap on the read path. `_get_document_content` used to
+# take at most 100 chunks as well, which cut two documents by 78% and 55%
+# before this ceiling ever applied. Two caps in series cannot both be reasoned
+# about; there is one, it is stated here, and what it costs is recorded on the
+# document.
+MAX_EXTRACTION_TEXT_CHARS = 180_000
+
+
+def trim_for_extraction(text, max_chars=MAX_EXTRACTION_TEXT_CHARS):
+    """Trim document text to the extraction ceiling.
+
+    Returns (trimmed_text, chars_used, chars_total). A caller that finds
+    chars_used < chars_total has been handed a partial document and must say
+    so rather than presenting the result as complete.
+    """
+    total = len(text or '')
+    if total <= max_chars:
+        return text or '', total, total
+    return (text or '')[:max_chars], max_chars, total
+
+
 
 # =============================================================================
 # Rent Roll Extraction Helpers
@@ -1458,8 +1492,18 @@ class RegistryBasedExtractor:
             )
 
         # Step 4: Build extraction prompt from registry
+        extraction_text, chars_used, chars_total = trim_for_extraction(
+            doc_content['text']
+        )
+        if chars_used < chars_total:
+            logger.warning(
+                f"Doc {doc_id} read in part: {chars_used:,} of {chars_total:,} "
+                f"characters. Downstream answers must say so."
+            )
+        self._record_text_read(doc_id, chars_used, chars_total)
+
         prompt = self._build_registry_extraction_prompt(
-            fields, doc_content['text'],
+            fields, extraction_text,
             evidence_type=classification.evidence_type
         )
 
@@ -1630,6 +1674,25 @@ Never guess or make up values - only extract what is explicitly stated."""
             for f in fields
         ]
 
+    def _record_text_read(self, doc_id: int, chars_used: int, chars_total: int) -> None:
+        """Record how much of the document this extraction actually read.
+
+        Two numbers, no derived flag: a flag would go stale the moment the
+        ceiling moves. chars_used < chars_total means the document was read in
+        part, and anything answering from it owes the user that sentence.
+        """
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE landscape.core_doc
+                    SET text_chars_used = %s,
+                        text_chars_total = %s
+                    WHERE doc_id = %s
+                """, [chars_used, chars_total, doc_id])
+        except Exception as e:
+            # Never let bookkeeping take down an extraction that worked.
+            logger.warning(f"Could not record read extent for doc {doc_id}: {e}")
+
     def _get_document_content(self, doc_id: int) -> Optional[Dict]:
         """Get document info and content text."""
         with connection.cursor() as cursor:
@@ -1650,12 +1713,13 @@ Never guess or make up values - only extract what is explicitly stated."""
             }
 
             # Get content from embeddings (ordered chunks)
+            # No LIMIT. The character ceiling below is the only cap on this
+            # path; a chunk count is not a meaningful unit of document.
             cursor.execute("""
                 SELECT content_text
                 FROM landscape.knowledge_embeddings
                 WHERE source_id = %s AND source_type = 'document_chunk'
                 ORDER BY embedding_id
-                LIMIT 100
             """, [doc_id])
 
             chunks = cursor.fetchall()
@@ -1663,10 +1727,16 @@ Never guess or make up values - only extract what is explicitly stated."""
 
             # Fallback to extracted_text if no embeddings
             if not content:
+                # extracted_text lives on core_doc_text, NOT on core_doc.
+                # Querying it as a core_doc column raised UndefinedColumn and
+                # took the whole extraction down with it — measured 2026-09-16:
+                # 21 of 74 live documents have no chunks and reached this path,
+                # 17 of them with their text already sitting in core_doc_text.
                 cursor.execute("""
-                    SELECT COALESCE(extracted_text, ''), storage_uri, mime_type
-                    FROM landscape.core_doc
-                    WHERE doc_id = %s
+                    SELECT COALESCE(t.extracted_text, ''), d.storage_uri, d.mime_type
+                    FROM landscape.core_doc d
+                    LEFT JOIN landscape.core_doc_text t ON t.doc_id = d.doc_id
+                    WHERE d.doc_id = %s
                 """, [doc_id])
                 row = cursor.fetchone()
                 content = row[0] if row and row[0] else ''
@@ -1680,15 +1750,26 @@ Never guess or make up values - only extract what is explicitly stated."""
                         if extracted_text:
                             content = extracted_text
                             # Cache in core_doc.extracted_text for subsequent calls
+                            # Cache the WHOLE text. The old write clipped at
+                            # 100,000 characters into the wrong table, so the
+                            # cache silently became a third truncation.
                             cursor.execute("""
-                                UPDATE landscape.core_doc
-                                SET extracted_text = %s
-                                WHERE doc_id = %s AND (extracted_text IS NULL OR extracted_text = '')
-                            """, [extracted_text[:100000], doc_id])
+                                INSERT INTO landscape.core_doc_text
+                                    (doc_id, extracted_text, word_count,
+                                     extraction_method, extracted_at, updated_at)
+                                VALUES (%s, %s, %s, 'fallback_direct', NOW(), NOW())
+                                ON CONFLICT (doc_id) DO UPDATE
+                                SET extracted_text = EXCLUDED.extracted_text,
+                                    word_count = EXCLUDED.word_count,
+                                    updated_at = NOW()
+                                WHERE landscape.core_doc_text.extracted_text IS NULL
+                                   OR landscape.core_doc_text.extracted_text = ''
+                            """, [doc_id, extracted_text, len(extracted_text.split())])
                     except Exception as e:
                         logger.warning(f"Direct extraction fallback failed for doc {doc_id}: {e}")
 
             doc_info['text'] = content
+            doc_info['text_chars_total'] = len(content or '')
             return doc_info
 
     def _get_project_document_ids(self) -> List[int]:
@@ -1988,10 +2069,8 @@ Extract each expense category found:
         if evidence_type == 'appraisal':
             doc_type_hints = self._build_appraisal_extraction_hints()
 
-        # Truncate document text if too long
-        max_text_length = 60000
-        if len(document_text) > max_text_length:
-            document_text = document_text[:max_text_length] + "\n... [truncated]"
+        # Text arrives pre-trimmed by trim_for_extraction(); this builder does
+        # not cap it. A second cap here is how the first one stayed invisible.
 
         prompt = f"""Extract the following fields from this document.
 {doc_type_hints}
