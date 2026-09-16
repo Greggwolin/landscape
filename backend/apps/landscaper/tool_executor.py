@@ -4177,6 +4177,60 @@ def handle_get_operating_statement(
         logger.exception('get_operating_statement: source_pointers build failed')
         source_pointers = []
 
+    # ── Projection (TV63, 2026-09-16) ────────────────────────────────────
+    # `projection_years` turns the resolved statement into a forward one.
+    # The derivation grows the PAYLOAD and hands it to the same builder that
+    # renders the historical statement, so no row can be added, dropped,
+    # renamed or re-aggregated on the way. That is deliberate: composing this
+    # in the model produced, on this exact property, collapsed expense
+    # granularity, a phantom "Pest Control" line and re-tallied unit counts.
+    #
+    # Two refusals rather than two guesses: an unsupported horizon states the
+    # range it supports, and a project with no growth assumptions on file asks
+    # which rates to use. Neither invents a rate.
+    projection = None
+    projection_years = tool_input.get('projection_years')
+    if projection_years not in (None, ''):
+        from .tools import proforma_derivation as _pfd
+        try:
+            steps = _pfd.load_growth_steps(int(project_id))
+            payload, projection = _pfd.project_payload(
+                payload,
+                years=int(projection_years) if str(projection_years).strip().lstrip('-').isdigit() else projection_years,
+                income_steps=steps['revenue'],
+                expense_steps=steps['cost'],
+            )
+            rendering_label = _pfd.projection_title(
+                project_name, rendering_label, projection
+            )
+        except _pfd.HorizonOutOfRange as exc:
+            return {
+                'success': False,
+                'code': 'horizon_out_of_range',
+                'requested': exc.requested,
+                'supported_min_years': exc.min_years,
+                'supported_max_years': exc.max_years,
+                'instruction': (
+                    f'Tell the user this tool projects {exc.min_years} to '
+                    f'{exc.max_years} years forward and ask which they want. '
+                    f'DO NOT compose a projection yourself and DO NOT offer to '
+                    f'— every figure must come from this tool.'
+                ),
+            }
+        except _pfd.MissingGrowthAssumptions as exc:
+            return {
+                'success': False,
+                'code': 'no_growth_assumptions',
+                'missing': exc.missing,
+                'instruction': (
+                    f'This project has no growth assumptions on file for '
+                    f'{", ".join(exc.missing)}. ASK the user which rates to use '
+                    f'and where they should be saved. DO NOT assume a rate, do '
+                    f'not use a market convention, and do not offer to compose '
+                    f'the projection yourself.'
+                ),
+            }
+
     # ── Server-side artifact render (perceived-speed fix #1, RF 2026-07-19) ──
     # Previously the model received `data` and hand-composed the entire
     # artifact table inside a create_artifact call — 60–83s turns in
