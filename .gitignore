@@ -249,3 +249,6 @@ docs/UX/health-reports/
 
 # Screenshot captures — local-only chat/artifact UI shots, regenerable (LSCMD-CW-WTSAVE-0613-GV)
 reference/images/screenshots/capture-*/
+
+# Local database backups — never committed, never synced
+backups/
