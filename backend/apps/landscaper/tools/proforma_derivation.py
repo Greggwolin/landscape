@@ -180,14 +180,20 @@ def load_growth_steps(project_id: int) -> Dict[str, List[Dict[str, Any]]]:
         SELECT s.card_type, st.from_period, st.thru_period, st.periods, st.rate
         FROM landscape.core_fin_growth_rate_sets s
         JOIN landscape.core_fin_growth_rate_steps st ON st.set_id = s.set_id
-        WHERE s.project_id = %s::text AND s.is_default IS TRUE
+        WHERE s.project_id = %s AND s.is_default IS TRUE
         ORDER BY s.card_type, st.step_number
     """
     out: Dict[str, List[Dict[str, Any]]] = {
         _INCOME_CARD_TYPE: [], _EXPENSE_CARD_TYPE: []
     }
     with connection.cursor() as cursor:
-        cursor.execute(sql, [str(int(project_id))])
+        # `project_id` is a bigint. An earlier version cast the parameter to
+        # text, which Postgres rejects outright -- "operator does not exist:
+        # bigint = text" -- and the tool crashed before printing a figure. No
+        # unit test caught it because none of them open a connection, and a
+        # quoted literal in a hand-written query DOES work (an unknown-typed
+        # literal coerces), which is what made the wrong version look verified.
+        cursor.execute(sql, [int(project_id)])
         for card_type, from_period, thru_period, periods, rate in cursor.fetchall():
             if card_type not in out:
                 continue

@@ -4248,6 +4248,7 @@ def handle_get_operating_statement(
             scenario=resolved_scenario,
             user_id=user_id,
             thread_id=kwargs.get('thread_id'),
+            projection_years=projection['years'] if projection else None,
         )
         if candidate and candidate.get('success') is not False:
             artifact_envelope = candidate

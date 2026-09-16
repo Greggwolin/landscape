@@ -256,3 +256,53 @@ def test_a_stepped_rate_is_flagged_in_the_title_rather_than_shown_as_flat():
     _out, prov = _project(3, income=steps)
     title = projection_title('Chadron Terrace', 'Default (untagged)', prov)
     assert 'stepped' in title
+
+
+# ── regressions from the first live run, 2026-09-16 ─────────────────────────
+# Both were found by running the tool against the real database for the first
+# time. Everything above passed throughout; neither could have been caught by
+# a test that never opens a connection or writes a record.
+
+def test_the_growth_query_does_not_cast_the_project_id():
+    """`project_id` is a bigint. Casting the parameter to text makes Postgres
+    refuse outright -- "operator does not exist: bigint = text" -- and the tool
+    crashes before printing a figure.
+
+    This asserts on the SQL text rather than on behaviour, deliberately: the
+    behavioural version needs a database, and the absence of one is precisely
+    how the defect shipped. A string check that runs everywhere beats a real
+    check that runs nowhere.
+    """
+    import inspect
+
+    from apps.landscaper.tools import proforma_derivation
+
+    sql = inspect.getsource(proforma_derivation.load_growth_steps)
+    assert '%s::text' not in sql
+    assert 'project_id = %s' in sql
+
+
+def test_a_projection_does_not_take_the_historical_statements_save_slot():
+    """Sharing one slot meant asking for a projection silently REPLACED the
+    saved historical statement. It did that to Chadron Terrace's real record on
+    2026-09-16 -- artifact 126, created 2026-07-20, overwritten at 23:06 and
+    restored from its own version history.
+    """
+    import inspect
+
+    from apps.landscaper.tools import os_artifact_builder
+
+    src = inspect.getsource(os_artifact_builder.create_os_artifact)
+    assert 'projection_years' in src
+    assert ':y{int(projection_years)}' in src
+    assert 'f\'os:{scenario or "default"}\'' in src
+
+
+def test_create_os_artifact_accepts_a_horizon():
+    import inspect
+
+    from apps.landscaper.tools.os_artifact_builder import create_os_artifact
+
+    params = inspect.signature(create_os_artifact).parameters
+    assert 'projection_years' in params
+    assert params['projection_years'].default is None

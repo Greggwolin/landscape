@@ -216,6 +216,7 @@ def create_os_artifact(
     scenario: Optional[str],
     user_id: Any = None,
     thread_id: Any = None,
+    projection_years: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Build + register the operating-statement artifact server-side.
 
@@ -232,6 +233,18 @@ def create_os_artifact(
     schema, _unit_count = build_os_artifact_schema(payload)
     subtype = _subtype_for(scenario)
 
+    # A projection is a DIFFERENT statement from the history it came from, so
+    # it gets its own save slot. Sharing one meant asking for a projection
+    # silently REPLACED the saved historical statement -- which happened to
+    # Chadron Terrace's real record on 2026-09-16, artifact 126, created
+    # 2026-07-20 and overwritten at 23:06. Each horizon keeps its own slot
+    # too, so a year-3 projection does not overwrite a year-1.
+    if projection_years:
+        subtype = 'f12_proforma'
+        dedup = f'os:{scenario or "default"}:y{int(projection_years)}'
+    else:
+        dedup = f'os:{scenario or "default"}'
+
     try:
         return create_artifact_record(
             title=rendering_label,
@@ -242,8 +255,9 @@ def create_os_artifact(
             thread_id=thread_id,
             tool_name='get_operating_statement',
             artifact_subtype=subtype,
-            params_json={'scenario': scenario, 'server_rendered': True},
-            dedup_key=f'os:{scenario or "default"}',
+            params_json={'scenario': scenario, 'server_rendered': True,
+                         'projection_years': projection_years},
+            dedup_key=dedup,
             prior_tool_calls=['get_operating_statement'],
         )
     except Exception as exc:  # noqa: BLE001
