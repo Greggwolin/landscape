@@ -459,6 +459,22 @@
   text-align: right;
 }
 
+/* `.table th` sets text-align:left at specificity (0,1,1) and outranks a bare
+   `.alignRight` at (0,1,0), so until now EVERY header in this renderer was
+   forced left no matter what its column declared. Data cells were unaffected
+   -- `.table td` sets no text-align -- which is why a table could show
+   right-justified numbers under a left-justified heading and look like the
+   column had been ignored.
+   Reported by Gregg 2026-09-16 on a Chadron Terrace year-over-year comparison:
+   he asked for the year headings to line up with the figures, the request was
+   recorded correctly (the stored column reads align:"right") and the screen
+   did not change.
+   ScheduleArtifact.module.css already carries this same fix, with a comment
+   describing the same trap. It was solved once and never propagated. */
+.table th.alignRight { text-align: right; }
+.table th.alignCenter { text-align: center; }
+.table th.alignLeft { text-align: left; }
+
 .alignCenter {
   text-align: center;
 }
