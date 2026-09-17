@@ -294,7 +294,12 @@
   letter-spacing: 0;
   background: var(--cui-tertiary-bg);
   border-bottom: 1px solid var(--cui-body-color);
-  white-space: normal;
+  /* ONE LINE. A heading that wraps ("Line / Item") reads as two headings and
+     breaks the line the eye follows across the row. Gregg, 2026-09-17: "the
+     header row should have a single line of text". This supersedes the older
+     "multi-word headers wrap" convention for every artifact table; the column
+     widens to fit its heading instead. */
+  white-space: nowrap;
   vertical-align: bottom;
   line-height: 1.3;
 }

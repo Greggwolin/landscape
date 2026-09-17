@@ -225,8 +225,9 @@ MXU  - Mixed Use
 
 All table and grid components must follow:
 
-1. **Size columns to cell content only** — Column width is driven by the widest cell value, never by the header text. Headers wrap to fit whatever width the content dictates.
-2. **Multi-word headers wrap** — headers with 2+ words render on multiple lines; the header never forces a column wider than its content requires.
+1. **Size columns to cell content only** — Column width is driven by the widest cell value, never by the header text — EXCEPT that a heading may not wrap (rule 2), so a long heading widens its own column.
+2. **A heading is ONE LINE** (Gregg, 2026-09-17 — supersedes the earlier "multi-word headers wrap"). A wrapped heading ("Line / Item") reads as two headings and breaks the line the eye follows across the row. Implemented today in the two artifact renderers (`ArtifactRenderer.module.css`, `ScheduleArtifact.module.css`, `white-space: nowrap` on the header cell). The AG-Grid and TanStack grids still carry the old wrap settings below; bring each into line the next time it is touched, and verify the layout rather than flipping the flag blind.
+2a. **A heading takes the alignment of the column under it** — numbers right, words left. `.table th` sets `text-align: left` at a specificity a bare alignment class cannot beat, so the alignment has to be stated at the same specificity in each stylesheet or every heading sits left over right-aligned figures.
 3. **Implementation by library:**
    - **AG-Grid:** `autoSizeStrategy={{ type: 'fitCellContents', skipHeader: true }}`, `wrapHeaderText: true`, `autoHeaderHeight: true`, no fixed `width` (use `minWidth` only). CSS: `.ag-header-cell-label { white-space: normal }`
    - **TanStack Table:** column `size` = `undefined`, CSS `white-space: normal` on `<th>`, browser layout algorithm sizes to content.

@@ -255,7 +255,9 @@
   background: var(--cui-tertiary-bg);
   border-top: 2px solid var(--cui-primary);
   border-bottom: 1px solid var(--cui-border-color);
-  white-space: normal;
+  /* ONE LINE — see ArtifactRenderer.module.css .table th. A wrapped heading
+     reads as two headings. */
+  white-space: nowrap;
 }
 
 .table td {

@@ -17,6 +17,7 @@ import type {
   SourcePointersMap,
   SourceRef,
   TableBlock,
+  TableColumn,
   TableRow,
   TextBlock,
 } from '@/types/artifact';
@@ -115,12 +116,19 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
   // (FB-295). Tables become tab-separated rows so they paste cleanly into
   // Excel/Sheets; kv-grids and text become readable lines.
   const copyText = useMemo(() => serializeArtifact(title, schema.blocks), [title, schema.blocks]);
+  // ...and the same content as real HTML, so a paste into a document lands as
+  // a table rather than a run of loose numbers.
+  const copyHtml = useMemo(
+    () => serializeArtifactHtml(title, schema.blocks),
+    [title, schema.blocks],
+  );
 
   return (
     <div className={styles.root}>
       <ArtifactHeader
         title={title}
         copyText={copyText}
+        copyHtml={copyHtml}
         pinnedLabel={pinnedLabel}
         editTarget={editTarget}
         driftSummary={driftSummary}
@@ -232,8 +240,14 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
  * emitted as tab-separated values (header row + data rows) so they paste
  * into spreadsheets cleanly; key-value grids become `label<TAB>value` lines;
  * text blocks and section titles pass through as plain lines.
+ *
+ * Values are formatted the way the SCREEN formats them — thousands
+ * separators, parentheses for negatives, em dash for nothing. It used to copy
+ * the raw stored number, so a statement that reads 2,696,514 pasted as
+ * 2696514 (Gregg, 2026-09-17). Spreadsheets still read the formatted string
+ * as a number, and the HTML flavour below is what most targets take anyway.
  */
-function serializeArtifact(title: string, blocks: Block[]): string {
+export function serializeArtifact(title: string, blocks: Block[]): string {
   const lines: string[] = [];
   if (title) {
     lines.push(title);
@@ -253,12 +267,7 @@ function serializeArtifact(title: string, blocks: Block[]): string {
           lines.push(b.columns.map((c) => c.label).join('\t'));
           for (const row of b.rows) {
             lines.push(
-              b.columns
-                .map((c) => {
-                  const v = row.cells[c.key];
-                  return v === null || v === undefined ? '' : String(v);
-                })
-                .join('\t'),
+              b.columns.map((c) => cellText(c, row)).join('\t'),
             );
           }
           lines.push('');
@@ -266,7 +275,7 @@ function serializeArtifact(title: string, blocks: Block[]): string {
         case 'key_value_grid':
           if (b.title) lines.push(b.title);
           for (const p of b.pairs) {
-            lines.push(`${p.label}\t${p.value ?? ''}`);
+            lines.push(`${p.label}\t${formatCellValue(p.value, p.format)}`);
           }
           lines.push('');
           break;
@@ -282,11 +291,106 @@ function serializeArtifact(title: string, blocks: Block[]): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** One cell, formatted as the screen formats it. */
+function cellText(column: TableColumn, row: TableRow): string {
+  // Straight through formatCellValue -- the same call the table cell makes, so
+  // a copied figure reads exactly as the one on screen, down to the em dash
+  // standing in for nothing and the parentheses standing in for a minus sign.
+  const format = row.cell_formats?.[column.key] ?? column.format;
+  return formatCellValue(row.cells[column.key], format,
+                         (column.align ?? 'left') === 'left');
+}
+
+/** Escape the four characters that would otherwise close a tag or an entity. */
+function esc(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * The same artifact as real HTML — tables as `<table>`, not as text.
+ *
+ * Written to the clipboard alongside the plain text so Word, Docs, Outlook,
+ * Excel and Sheets all receive a STRUCTURED TABLE. Copying used to offer only
+ * tab-separated text, which lands in a document as one run-on paragraph of
+ * unformatted numbers (Gregg, 2026-09-17).
+ *
+ * Styling is inline because a pasted fragment carries no stylesheet with it:
+ * alignment follows each column, and subtotal / grand-total rows keep the
+ * weight and rules they have on screen, so the pasted copy reads like the one
+ * that was copied.
+ */
+export function serializeArtifactHtml(title: string, blocks: Block[]): string {
+  const out: string[] = [];
+  if (title) out.push(`<h3 style="font-family:inherit;margin:0 0 8px">${esc(title)}</h3>`);
+
+  const alignOf = (column: TableColumn) => column.align ?? 'left';
+
+  const walk = (bs: Block[]): void => {
+    for (const b of bs) {
+      switch (b.type) {
+        case 'section':
+          if (b.title) out.push(`<h4 style="margin:12px 0 4px">${esc(b.title)}</h4>`);
+          walk(b.children);
+          break;
+        case 'table': {
+          if (b.title) out.push(`<h4 style="margin:12px 0 4px">${esc(b.title)}</h4>`);
+          const head = b.columns
+            .map((c) => `<th style="text-align:${alignOf(c)};white-space:nowrap;`
+              + `border-bottom:1px solid #000;padding:4px 10px">${esc(c.label)}</th>`)
+            .join('');
+          const body = b.rows.map((row) => {
+            const role = detectRowRole(row, b.columns);
+            const weight = role ? 'font-weight:700;' : '';
+            const rule = role === 'subtotal' || role === 'grand_total'
+              ? 'border-top:1px solid #000;' : '';
+            const under = role === 'grand_total' ? 'border-bottom:1px solid #000;' : '';
+            const cells = b.columns
+              .map((c) => `<td style="text-align:${alignOf(c)};padding:2px 10px;`
+                + `${weight}${rule}${under}">${esc(cellText(c, row))}</td>`)
+              .join('');
+            return `<tr>${cells}</tr>`;
+          }).join('');
+          out.push(
+            '<table style="border-collapse:collapse;font-family:inherit;font-size:13px">'
+            + `<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`,
+          );
+          break;
+        }
+        case 'key_value_grid': {
+          if (b.title) out.push(`<h4 style="margin:12px 0 4px">${esc(b.title)}</h4>`);
+          const rows = b.pairs.map((pair) => {
+            const bold = detectPairRole(pair.label) ? 'font-weight:700;' : '';
+            return `<tr><td style="padding:2px 10px;${bold}">${esc(pair.label)}</td>`
+              + `<td style="padding:2px 10px;text-align:right;${bold}">`
+              + `${esc(formatCellValue(pair.value, pair.format))}</td></tr>`;
+          }).join('');
+          out.push(
+            '<table style="border-collapse:collapse;font-family:inherit;font-size:13px">'
+            + `<tbody>${rows}</tbody></table>`,
+          );
+          break;
+        }
+        case 'text':
+          out.push(`<p style="margin:8px 0">${esc(b.content)}</p>`);
+          break;
+      }
+    }
+  };
+
+  walk(blocks);
+  return out.join('\n');
+}
+
 /* ─── Header ──────────────────────────────────────────────────────────── */
 
 interface ArtifactHeaderProps {
   title: string;
   copyText: string;
+  copyHtml: string;
   pinnedLabel?: string | null;
   editTarget?: EditTarget;
   driftSummary: { stale: number; removed: number };
@@ -302,6 +406,7 @@ interface ArtifactHeaderProps {
 function ArtifactHeader({
   title,
   copyText,
+  copyHtml,
   pinnedLabel,
   editTarget,
   driftSummary,
@@ -318,12 +423,38 @@ function ArtifactHeader({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
+    // TWO FLAVOURS, one copy. The receiving application picks: a document or
+    // a spreadsheet takes the HTML and gets a real table; a plain-text target
+    // (chat, code editor, terminal) takes the tab-separated text. Writing only
+    // text is why a paste used to arrive as unformatted numbers.
     try {
-      await navigator.clipboard.writeText(copyText);
+      const ClipboardItemCtor = (window as unknown as {
+        ClipboardItem?: typeof ClipboardItem;
+      }).ClipboardItem;
+      if (ClipboardItemCtor && navigator.clipboard?.write) {
+        await navigator.clipboard.write([
+          new ClipboardItemCtor({
+            'text/html': new Blob([copyHtml], { type: 'text/html' }),
+            'text/plain': new Blob([copyText], { type: 'text/plain' }),
+          }),
+        ]);
+      } else {
+        // Firefox without dom.events.asyncClipboard.clipboardItem, or any
+        // browser too old for the richer API: the text still copies.
+        await navigator.clipboard.writeText(copyText);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard API unavailable (e.g. insecure context) — no-op.
+      // A rejected write must not leave the button silently dead: fall back to
+      // text, and only then give up (insecure context, no clipboard at all).
+      try {
+        await navigator.clipboard.writeText(copyText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        // Clipboard API unavailable — no-op.
+      }
     }
   };
 
