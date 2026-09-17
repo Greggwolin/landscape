@@ -16,8 +16,8 @@ demand, from the same builder the screen calls, or it is not used.
 
 WHAT IS RESOLVABLE TODAY, AND WHAT IS NOT
 -----------------------------------------
-Five of the nine surfaces already have a project-level builder, because the
-after-write refresh path needed one. Four do not: their builders are handed
+Six of the nine surfaces now have a project-level builder, because the
+after-write refresh path needed one. Three do not: their builders are handed
 pre-fetched data by the tool that calls them, and there is no function that
 takes a project id and returns the surface. Writing those four fetchers is real
 work with real query cost and it is NOT smuggled in here — ``resolve`` returns
@@ -85,6 +85,33 @@ def _sales(project_id: int) -> Optional[Dict[str, Any]]:
     )
 
 
+def _operating_statement(project_id: int) -> Optional[Dict[str, Any]]:
+    """The operating statement, as an artifact schema.
+
+    This surface has no view specification — its definition is the schema the
+    artifact panel already draws, which is why the renderer accepts both shapes.
+    Resolvable since 2026-09-14, when ``build_os_payload_for_project`` gave the
+    operations payload a project-level entry point.
+
+    It is the statement Gregg reads on screen, not a second reading of the same
+    property: one payload, one schema, rendered twice.
+    """
+    from apps.landscaper.tools.os_artifact_builder import (
+        build_os_artifact_schema,
+        build_os_payload_for_project,
+    )
+
+    payload = build_os_payload_for_project(project_id)
+    if not payload:
+        return None
+    schema, unit_count = build_os_artifact_schema(payload)
+    if not unit_count:
+        # No units is not an empty statement — it is a project that cannot have
+        # one. The caller says so in words rather than drawing a table of zeros.
+        return None
+    return schema
+
+
 def _cashflow(project_id: int) -> Optional[Dict[str, Any]]:
     from apps.landscaper.tools.cashflow_artifact_builder import (
         build_cashflow_refresh_payload,
@@ -100,6 +127,7 @@ RESOLVERS: Dict[str, Callable[[int], Optional[Dict[str, Any]]]] = {
     'open_parcels': _parcels,
     'get_sales_schedule': _sales,
     'get_cashflow_schedule': _cashflow,
+    'get_operating_statement': _operating_statement,
 }
 
 # The four with no project-level builder, and what each one actually needs. Read
@@ -114,10 +142,6 @@ UNRESOLVED: Dict[str, str] = {
     'get_rent_roll_schedule': (
         'create_rent_roll_artifact is handed unit_rows and five totals by its '
         'tool; no function fetches them from a project id.'
-    ),
-    'get_operating_statement': (
-        'build_os_artifact_schema takes an operations_data payload, and it has '
-        'no view specification either — its definition is the schema.'
     ),
     'review_budget_variance': (
         'build_variance_artifact_schema takes a computed variance result, and '

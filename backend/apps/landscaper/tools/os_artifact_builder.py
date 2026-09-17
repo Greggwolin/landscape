@@ -135,13 +135,77 @@ def build_os_artifact_schema(
             'type': 'table',
             'columns': [
                 {'key': 'line', 'label': 'Line Item', 'align': 'left'},
-                {'key': 'annual', 'label': 'Annual', 'align': 'right'},
-                {'key': 'per_unit', 'label': '$/Unit', 'align': 'right'},
+                # `format` added 2026-09-14: the report renderer draws this same
+                # schema, and a column that does not declare itself gets a
+                # keyword guess. "Annual" matches no money word, so it printed
+                # without a dollar sign. The schema says what it holds.
+                {'key': 'annual', 'label': 'Annual', 'align': 'right',
+                 'format': 'currency'},
+                {'key': 'per_unit', 'label': '$/Unit', 'align': 'right',
+                 'format': 'currency'},
             ],
             'rows': rows,
         }],
     }
     return schema, unit_count
+
+
+def build_os_payload_for_project(project_id: int) -> Dict[str, Any]:
+    """The operations payload for a project, with no HTTP request to hand.
+
+    Added 2026-09-14 so the operating-statement SURFACE can be resolved from a
+    project id alone — the thing ``apps/reports/surface_spec`` needs and could
+    not do, and the reason RPT_09 carried its own parallel arithmetic.
+
+    ``operations_data`` is a DRF view behind IsAuthenticated, and the only way
+    to reach the numbers is to call it. Rather than reimplement eight hundred
+    lines of P&L assembly — which is exactly how three disagreeing operating
+    statements came about — this calls the ONE implementation in-process,
+    authenticated as the project's own creator: the same pattern
+    ``tool_executor`` already uses for ``get_operating_statement``.
+
+    Gregg, 2026-09-14 (Q5a): the operating statement states the property as it
+    trades today. This payload is that statement — in-place rents, actual
+    physical vacancy — and it carries no loss-to-lease line, because loss to
+    lease is a market-versus-in-place measure and belongs on the rent roll.
+
+    Raises RuntimeError, with the reason, when the payload cannot be produced.
+    """
+    from django.contrib.auth import get_user_model
+    from django.db import connection
+    from django.test import RequestFactory
+
+    from apps.financial.views_operations import operations_data
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT created_by_id FROM landscape.tbl_project WHERE project_id = %s',
+            [int(project_id)],
+        )
+        row = cursor.fetchone()
+    if row is None:
+        raise RuntimeError(f'no project {project_id}')
+
+    headers = {}
+    user_model = get_user_model()
+    user = user_model.objects.filter(id=row[0]).first() if row[0] else None
+    if user is None:
+        # Any active user satisfies IsAuthenticated; the view scopes its reads
+        # by project_id, not by who asked. Falling back keeps a project whose
+        # creator has been removed renderable rather than silently empty.
+        user = user_model.objects.filter(is_active=True).order_by('id').first()
+    if user is not None:
+        from rest_framework_simplejwt.tokens import AccessToken
+        headers['HTTP_AUTHORIZATION'] = f'Bearer {AccessToken.for_user(user)}'
+
+    request = RequestFactory().get(
+        f'/api/projects/{int(project_id)}/operations/', **headers
+    )
+    response = operations_data(request, int(project_id))
+    status_code = getattr(response, 'status_code', 500)
+    if status_code != 200:
+        raise RuntimeError(f'operations endpoint returned HTTP {status_code}')
+    return getattr(response, 'data', None) or {}
 
 
 def create_os_artifact(

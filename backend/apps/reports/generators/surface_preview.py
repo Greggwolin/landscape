@@ -340,7 +340,20 @@ def sections_from_spec(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
                     block['rows'],
                 )
                 if section:
-                    sections.append(_add_totals(section))
+                    # NO totals row on a schema block. A builder-composed block
+                    # is a STATEMENT — its rows are a running derivation and it
+                    # carries its own subtotals. Adding the column up produced
+                    # "Total $8,356,461" under the operating statement on
+                    # 2026-09-14: gross rent, plus its own deductions, plus
+                    # effective gross income, plus every expense, plus total
+                    # expenses, plus net operating income. A number that means
+                    # nothing, printed in bold, on a lender-facing page.
+                    #
+                    # Totals belong to view-spec DETAIL tables, where the rows
+                    # are independent things — parcels in a sales schedule.
+                    # That is a structural distinction, not a guess about what
+                    # a row is called.
+                    sections.append(section)
             elif block.get('pairs'):
                 cards = [_kpi_card(p) for p in block['pairs']]
                 sections.append({'heading': block.get('title') or '',
@@ -436,9 +449,13 @@ class SurfacePreviewGenerator(PreviewBaseGenerator):
                 'sections': [],
             }
 
+        # A schema carries no title or source label — those belong to a view
+        # specification. Fall back to the project, so a statement never goes out
+        # without saying which property it is about.
+        project = self.get_project() or {}
         return {
             'title': spec.get('title') or self.report_name,
-            'subtitle': spec.get('source_label') or None,
+            'subtitle': spec.get('source_label') or project.get('project_name') or None,
             'as_of_date': spec.get('generated_at'),
             'message': None,
             'sections': sections_from_spec(spec),
