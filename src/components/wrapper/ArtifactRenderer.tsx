@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useContext, useRef } from 'react';
-import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, Printer, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
 import type {
   ArtifactRendererProps,
   Block,
@@ -21,6 +21,7 @@ import type {
   TableRow,
   TextBlock,
 } from '@/types/artifact';
+import { printArtifact } from './printArtifact';
 import { useStagedEdits, stagedKey, type StagedEdit } from './useStagedEdits';
 import styles from './ArtifactRenderer.module.css';
 
@@ -581,6 +582,19 @@ function ArtifactHeader({
           aria-label="Copy artifact content"
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
+        </button>
+
+        {/* Print / save as PDF — the artifact alone, on a light sheet.
+            Reuses the same HTML the copy button puts on the clipboard, so the
+            paper copy and the pasted copy cannot drift apart. */}
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnIcon}`}
+          onClick={() => printArtifact(title, copyHtml)}
+          title="Print (or save as PDF)"
+          aria-label="Print artifact"
+        >
+          <Printer size={12} />
         </button>
 
         {/* Save as new version — icon-only with tooltip */}

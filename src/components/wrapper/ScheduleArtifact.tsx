@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
 import type { BlockDocument } from '@/types/artifact';
+import { printArtifact } from './printArtifact';
 import styles from './ScheduleArtifact.module.css';
 import { useArtifactWidthRequest, widthForColumns } from './artifactWidthRequest';
 import { hierCellText, hierHeaderLabels } from './hierPath';
@@ -611,6 +612,39 @@ export function ScheduleArtifact({
     }
   };
 
+  /* The paper copy is WHAT IS ON SCREEN — the rows the filter left, the
+   * columns the rung and the chips left, the same formatting. Not the whole
+   * dataset: printing something the screen is not showing is how a filtered
+   * view turns into a misleading handout. */
+  const printThis = () => {
+    const esc = (t: string) => t
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const head = activeColumns.map((c) => {
+      const align = c.key === HIER_KEY ? 'left' : (c.align ?? 'left');
+      const wrap = align === 'left' ? 'nowrap' : 'normal';
+      const label = c.key === HIER_KEY ? hierHeader : (c.label ?? '');
+      return `<th style="text-align:${align};white-space:${wrap}">${esc(String(label))}</th>`;
+    }).join('');
+    const body = visibleRows.map((row) => {
+      const cells = activeColumns.map((c) => {
+        if (c.key === HIER_KEY) {
+          return `<td style="text-align:left">${esc(hierPath(row))}</td>`;
+        }
+        const numeric = c.kind === 'number' || c.kind === 'computed';
+        const align = c.align ?? (numeric ? 'right' : 'left');
+        const text = numeric ? formatNumber(row.cells[c.key]) : formatText(row.cells[c.key]);
+        return `<td style="text-align:${align}">${esc(text)}</td>`;
+      }).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    const scope = `${config.kicker} · ${config.basis.label}`;
+    printArtifact(
+      title,
+      `<p>${esc(scope)}</p><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`,
+      `${visibleRows.length} of ${config.rows.length} lines shown.`,
+    );
+  };
+
   const renderCell = (row: ScheduleRow, column: ScheduleColumn) => {
     if (column.key === HIER_KEY) {
       return <td key={column.key} className={styles.hier}>{hierPath(row)}</td>;
@@ -806,13 +840,22 @@ export function ScheduleArtifact({
       <div className={styles.head}>
         <div className={styles.kicker}>
           <span>{config.kicker}</span>
-          {onClose && (
-            <span className={styles.headActions}>
+          <span className={styles.headActions}>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={printThis}
+              title="Print (or save as PDF)"
+              aria-label="Print"
+            >
+              <Printer size={14} />
+            </button>
+            {onClose && (
               <button type="button" className={styles.iconBtn} onClick={onClose} title="Close">
                 <X size={14} />
               </button>
-            </span>
-          )}
+            )}
+          </span>
         </div>
         <div className={styles.titleRow}>
           <div className={styles.title}>{title}</div>
