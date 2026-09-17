@@ -1,0 +1,32 @@
+/* Reconstructed Nocturne token stub — anchors from mockup literals (#101120 bg,
+   #0d1420 deep, #4a90c2 steel accent, #f5f6fa text). Replace with the real
+   _ds styles.css when available. */
+:root {
+  --color-bg: #101120;
+  --color-surface: #171930;
+  --color-text: #f0f1f7;
+  --color-neutral-100: #e8eaf2;
+  --color-neutral-200: #cdd1e0;
+  --color-neutral-300: #a9aec5;
+  --color-neutral-400: #8b91ad;
+  --color-neutral-500: #6a7190;
+  --color-neutral-600: #454b6b;
+  --color-neutral-700: #333854;
+  --color-neutral-800: #252940;
+  --color-neutral-900: #1a1d30;
+  --color-accent: #4a90c2;
+  --color-accent-100: #d7eafa;
+  --color-accent-200: #9fcbe8;
+  --color-accent-300: #7db4dd;
+  --color-accent-400: #5fa0cf;
+  --color-accent-600: #3d7aa8;
+  --color-accent-700: #31628a;
+  --color-accent-800: #264b6b;
+  --color-accent-900: #1a3450;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.45);
+  --font-body: Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+body { font-family: var(--font-body); color: var(--color-text); }
