@@ -869,9 +869,16 @@ function TableBlockRenderer({
               <th
                 key={col.key}
                 className={alignClass(col.align)}
+                // The label goes in AS WRITTEN. Whether it takes one line or
+                // two is the stylesheet's call, made per column from its
+                // alignment -- see .table th.alignLeft in the module CSS.
+                // It used to be forced here: every two-word label was split
+                // with a <br> whatever the width, so "Line Item" stacked on a
+                // stub column with room to spare and no amount of CSS could
+                // unstack it (Gregg, 2026-09-17, twice).
                 // size: undefined per CLAUDE.md tabular formatting rules
               >
-                {_renderTwoLineHeader(col.label)}
+                {col.label}
               </th>
             ))}
           </tr>
@@ -2148,48 +2155,6 @@ function alignClass(align?: 'left' | 'right' | 'center'): string {
   if (align === 'right') return styles.alignRight;
   if (align === 'center') return styles.alignCenter;
   return styles.alignLeft;
-}
-
-/**
- * Render a column header label across two lines when it contains
- * multiple words — keeps the column width driven by the data, not by
- * a wide header. Single-token labels render as-is. Two-word labels
- * split on the space. Three-or-more-word labels split at the midpoint
- * so both lines are roughly balanced.
- *
- * Examples:
- *   'Unit'          → 'Unit'
- *   'Unit Type'     → 'Unit' / 'Type'
- *   'Lease Start'   → 'Lease' / 'Start'
- *   'Loss to Lease' → 'Loss to' / 'Lease'
- *   'Rent $/SF'     → 'Rent' / '$/SF'
- *   'Beds/Bath'     → 'Beds/Bath'  (no space — single token)
- *
- * (LSCMD-RENT-ROLL-AZURE-STYLE-0520)
- */
-function _renderTwoLineHeader(label: string): React.ReactNode {
-  const trimmed = (label ?? '').trim();
-  const words = trimmed.split(/\s+/);
-  if (words.length < 2) return trimmed;
-  if (words.length === 2) {
-    return (
-      <>
-        {words[0]}
-        <br />
-        {words[1]}
-      </>
-    );
-  }
-  const half = Math.ceil(words.length / 2);
-  const first = words.slice(0, half).join(' ');
-  const second = words.slice(half).join(' ');
-  return (
-    <>
-      {first}
-      <br />
-      {second}
-    </>
-  );
 }
 
 function escapeJsonPointer(token: string): string {
