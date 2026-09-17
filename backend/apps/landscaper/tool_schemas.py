@@ -713,6 +713,31 @@ LANDSCAPER_TOOLS = [
                         "available: [...]} for the model to surface to the user."
                     ),
                 },
+                "projection_years": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": (
+                        "Optional — project the resolved statement this many years "
+                        "forward using the project's stored income and expense growth "
+                        "assumptions. Pass it whenever the user asks for a projected, "
+                        "trended, proforma or future-year statement: 'the projected "
+                        "year 3 operating statement' is projection_years=3; 'the "
+                        "proforma' with no year named is 1.\n\n"
+                        "THE SERVER DOES THE ARITHMETIC. Every figure comes back "
+                        "derived from the statement on file. NEVER compute a projected "
+                        "statement yourself and NEVER offer to — a composed projection "
+                        "on this codebase's record collapsed four utility lines into "
+                        "one, dropped legal, marketing and office entirely, invented a "
+                        "'Pest Control' line that existed in no document, and re-tallied "
+                        "the unit mix wrong, with every total still looking plausible.\n\n"
+                        "Two refusals you must relay rather than work around: "
+                        "{code: 'horizon_out_of_range'} means say which horizons ARE "
+                        "supported and ask; {code: 'no_growth_assumptions'} means ask "
+                        "the user which rates to use. In neither case may you supply a "
+                        "rate, apply a market convention, or compose the statement."
+                    ),
+                },
             },
         },
     },
@@ -5555,9 +5580,13 @@ LANDSCAPER_TOOLS = [
                         "income statement artifacts. Declares the kind of operating statement: "
                         "'t12' = pure historical trailing 12 months (actuals only — NO market rent "
                         "columns, NO Value-Add or Loss-to-Lease sections, NO unit-mix tables). "
-                        "'f12_proforma' = T-12 trended forward via the project's income/expense "
-                        "growth assumptions (this is what users mean ~90% of the time when they "
-                        "ask for a 'proforma'). "
+                        "'f12_proforma' = a statement trended forward via the project's "
+                        "income/expense growth assumptions (what users mean ~90% of the time "
+                        "when they ask for a 'proforma'). DO NOT COMPOSE THIS YOURSELF — pass "
+                        "`projection_years` to get_operating_statement and the server derives "
+                        "every figure. A projection you compose is a fabrication: the recorded "
+                        "attempt collapsed expense categories, dropped three of them and "
+                        "invented a line item, while every total still looked plausible. "
                         "'current_proforma' = operating statement at current asking/market rents "
                         "(use ONLY when the user explicitly asks for current/market rents, e.g., "
                         "'show me the current proforma'). "
