@@ -255,6 +255,8 @@
   background: var(--cui-tertiary-bg);
   border-top: 2px solid var(--cui-primary);
   border-bottom: 1px solid var(--cui-border-color);
+  /* Wrapping is decided per column — see the header rules below and the long
+     note in ArtifactRenderer.module.css. */
   white-space: normal;
 }
 
@@ -275,6 +277,14 @@
    sits left regardless of the data under it. */
 .table thead th.right { text-align: right; }
 .table thead th.center { text-align: center; }
+
+/* Which headings may wrap — decided by the column's own alignment, the same
+   rule the other renderer states in full. A left-aligned column holds words and
+   is already the widest in the table, so a stacked heading there is stacking
+   for nothing; a numeric column is narrow and its heading is often the widest
+   thing in it, so it stacks rather than widening the column past its data.
+   Gregg, 2026-09-17. */
+.table thead th:not(.right):not(.center) { white-space: nowrap; }
 
 .sectionRow td {
   background: var(--cui-secondary-bg);
