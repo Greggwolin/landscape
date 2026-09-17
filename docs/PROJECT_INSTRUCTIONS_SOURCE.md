@@ -1,3 +1,7 @@
+> **RETIRED 2026-09-17 — do not read, do not regenerate.** Output of `scripts/build-instructions.py`,
+> which last ran 2026-05-16 and was then bypassed by hand edits. The authoritative project
+> instructions are the copy pasted into the Cowork project; see `CLAUDE.md`.
+
 # Landscape Project Instructions — Canonical Source
 
 > **This is the canonical source.** Both flavor outputs (Cowork and Claude.ai) are generated from this file by `scripts/build-instructions.py`. Never edit the generated `.docx` files in `_Landscape/` or any flavor-specific `.md` mirrors directly — edit this file and regenerate.

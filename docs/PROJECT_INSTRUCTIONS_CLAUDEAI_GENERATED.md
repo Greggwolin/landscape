@@ -1,3 +1,7 @@
+> **RETIRED 2026-09-17 — do not read, do not regenerate.** Output of `scripts/build-instructions.py`,
+> which last ran 2026-05-16 and was then bypassed by hand edits. The authoritative project
+> instructions are the copy pasted into the Cowork project; see `CLAUDE.md`.
+
 # Landscape Project Instructions
 **Generated from:** `docs/PROJECT_INSTRUCTIONS_SOURCE.md`
 **Edit the source, then re-run `scripts/build-instructions.py` to regenerate.**

@@ -1,3 +1,7 @@
+# RETIRED 2026-09-17 — do not run.
+# This built the repo's copies of the project instructions. There is no longer a repo copy:
+# the authoritative instructions are the file pasted into the Cowork project (see CLAUDE.md).
+# Running this would recreate the second copy that drifted a month behind across v5.2-v5.6.
 #!/usr/bin/env python3
 """
 build-instructions.py — Generate flavor outputs from PROJECT_INSTRUCTIONS_SOURCE.md

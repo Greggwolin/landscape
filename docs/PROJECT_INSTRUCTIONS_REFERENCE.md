@@ -1,3 +1,7 @@
+> **RETIRED 2026-09-17 — do not read, do not regenerate.** Output of `scripts/build-instructions.py`,
+> which last ran 2026-05-16 and was then bypassed by hand edits. The authoritative project
+> instructions are the copy pasted into the Cowork project; see `CLAUDE.md`.
+
 # Project Instructions — Reference Templates
 
 > **Purpose.** Long-form templates and example blocks extracted from `PROJECT_INSTRUCTIONS.md` to keep the canonical rules file lean. The behavioral rules in PROJECT_INSTRUCTIONS.md still govern when each template fires; the literal template bodies live here.

@@ -8,16 +8,16 @@
 
 > **Read at session start, alongside this file.** Behavioral rules — communication style, CC prompt structure, anti-patterns, dual-output spec delivery, downstream-impact analysis, token economy, tool verification, PDF/OCR protocol — live in a single canonical file shared across all Claude systems (Claude Code, Cowork, Claude.ai, Claude Design):
 >
-> **`/landscape/docs/PROJECT_INSTRUCTIONS.md`**
+> **`~/Library/CloudStorage/OneDrive-CrescentBayHoldings/1Active/_Landscape/_cowork/PROJECT-INSTRUCTIONS-v5.6-PASTE-2026-09-16.md`** — the file pasted into the Cowork project. **This is the only authoritative copy.** The repo no longer keeps one; `docs/PROJECT_INSTRUCTIONS.md` is a stub pointing here.
 >
 > **Division of responsibility:**
 >
 > - **This file (`CLAUDE.md`)** — codebase facts: architecture, schema, alpha status, current Landscaper tool count, recent decisions. Updated session-by-session.
-> - **`PROJECT_INSTRUCTIONS.md`** — behavioral rules and cross-system policy. Updated when policy changes.
+> - **The pasted project instructions** (path above) — behavioral rules and cross-system policy. Updated when policy changes, in Cowork, by Gregg.
 >
-> When the two files disagree on a behavioral rule, `PROJECT_INSTRUCTIONS.md` wins. When they disagree on a codebase fact (file path, table name, tool count, alpha status), `CLAUDE.md` wins.
+> When the two disagree on a behavioral rule, the pasted project instructions win. When they disagree on a codebase fact (file path, table name, tool count, alpha status), `CLAUDE.md` wins.
 >
-> **Editing discipline.** When `PROJECT_INSTRUCTIONS.md` is edited, the editor must also mirror the change into Cowork project settings and Claude.ai project knowledge. The repo file is the source of truth; the other two are mirrors.
+> **Editing discipline.** Never copy these rules into the repo. They are edited in one place — the Cowork project settings — and read from the file above. The old arrangement kept a repo copy that had to be mirrored by hand; it drifted a month behind across five versions (v5.1 in-repo against v5.6 live, 2026-09-17) and the whole recording section was missing from it. One home, no mirrors.
 
 ---
 
