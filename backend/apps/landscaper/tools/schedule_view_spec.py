@@ -51,9 +51,15 @@ engine or it waits.
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from apps.containers.ancestry import (
+    DEFAULT_TIER_LABELS as _DEFAULT_TIER_LABELS,
+    compose_member_label as division_option_label,
+    member_number as _member_number,
+    natural_key as _natural_key,
+)
 
 from .picklists import measure_options, normalize_measure_code
 
@@ -223,9 +229,6 @@ def _derived_dates(record: Dict[str, Any], period_zero):
             pass
     return start_out, end_out, derived
 
-_DEFAULT_TIER_LABELS = {1: 'Level 1', 2: 'Level 2', 3: 'Level 3'}
-
-
 def _num(value: Any) -> Optional[float]:
     if value is None:
         return None
@@ -234,9 +237,6 @@ def _num(value: Any) -> Optional[float]:
     except (TypeError, ValueError):
         return None
 
-
-
-_LEADING_WORDS = re.compile(r'^[A-Za-z][A-Za-z\s&/\-]*?\s*(?=[\d])')
 
 
 def _date_str(value: Any) -> Optional[str]:
@@ -276,22 +276,6 @@ def _escalation_ref(record: Dict[str, Any],
                 'rate': rate, 'usable': True}
     return {'mode': 'none', 'set_id': None, 'set_name': None,
             'rate': None, 'usable': True}
-
-
-def _member_number(display_name: Optional[str], code: Optional[str],
-                   division_id: int) -> str:
-    """The member's identifier, with any baked-in level name removed.
-
-    ``Area 1`` -> ``1`` · ``Parcel 1.101`` -> ``1.101`` · ``1.1`` -> ``1.1``
-
-    A name with no digits at all is a genuine name rather than a numbered
-    member (someone called a village "Riverbend"), and is returned untouched.
-    """
-    raw = (display_name or '').strip()
-    if raw:
-        stripped = _LEADING_WORDS.sub('', raw).strip()
-        return stripped or raw
-    return (code or f'#{division_id}').strip()
 
 
 def fetch_project_levels(project_id: int) -> List[Dict[str, Any]]:
@@ -682,27 +666,6 @@ _TIMING_METHODS = ['distributed', 'curve', 'end_loaded']
 # The heading of the budget's "which member is this line on" column. See
 # build_budget_view_config for why it names no level.
 ASSIGNED_TO_LABEL = 'Assigned to'
-
-
-def _natural_key(text: str):
-    """Sort ``1.10`` after ``1.9`` and ``Area 10`` after ``Area 9``."""
-    return [(0, int(tok), '') if tok.isdigit() else (1, 0, tok.lower())
-            for tok in re.split(r'(\d+)', text or '') if tok]
-
-
-def division_option_label(level_label: str, display_name: Optional[str],
-                          code: Optional[str], division_id: int) -> str:
-    """A member's name as the screen shows it: its level's label plus its number.
-
-    Same rule as the renderer's ``composeMember``: the stored display name may
-    carry a stale baked-in word ("Area 1" under a level now called Village), so
-    the number is kept and the CURRENT level label is put in front of it. A
-    member with no digits is a genuine name and is shown as-is.
-    """
-    number = _member_number(display_name, code, division_id)
-    if re.search(r'\d', number) and level_label:
-        return f'{level_label} {number}'
-    return number
 
 
 def _opt(value, label=None):
