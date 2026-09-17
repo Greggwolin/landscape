@@ -460,6 +460,37 @@
   padding-left: 32px;
 }
 
+/* A group opened by a subtotal (Gross Potential Rent) pushes its own lines in
+   one more step, and a subsection inside it one further again. Same ladder as
+   Gregg's models. */
+.depth3 td:first-child:not(.driftCell),
+.depth3 td.driftCell + td {
+  padding-left: 48px;
+}
+
+/* SPACING VARIES BY WHAT THE ROW IS — the statement reads as groups, not as an
+   even stack of lines (Gregg, 2026-09-17, pointing at the Peoria Lakes model).
+   Line items stay tight; a section heading takes the air that separates one
+   group from the next; a total gets a little of its own. The first section in
+   a table takes no lead, or the table would start with a gap. */
+.sectionDividerRow + tr td,
+.table tbody tr:first-child.sectionDividerRow td {
+  padding-top: 2px;
+}
+
+.table tbody tr.sectionDividerRow td {
+  padding-top: 16px;
+}
+
+.table tbody tr:first-child.sectionDividerRow td {
+  padding-top: 2px;
+}
+
+.table tbody tr.grandTotalRow td {
+  padding-top: 8px;
+  padding-bottom: 6px;
+}
+
 .alignRight {
   text-align: right;
 }
