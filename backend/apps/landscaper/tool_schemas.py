@@ -1760,18 +1760,44 @@ LANDSCAPER_TOOLS = [
     {
         "name": "get_budget_rollup",
         "description": (
-            "Get a project-scoped budget category rollup: category names, row "
-            "counts, summed amounts, percent of total, top-two concentration, "
-            "and grand total from core_fin_fact_budget joined to "
-            "core_unit_cost_category. Call this for asks like 'break down the "
-            "budget', 'budget by category', 'biggest budget categories', "
-            "'biggest line items' in a high-level budget summary, or 'cost "
-            "buckets'. Only state percentage shares returned by this tool. For "
-            "raw individual line items, call get_budget_items."
+            "Get a project-scoped budget rollup: names, row counts, summed "
+            "amounts, percent of total, top-two concentration and grand total. "
+            "Two groupings. group_by='category' (the default) rolls up by cost "
+            "category -- 'break down the budget', 'budget by category', "
+            "'biggest budget categories', 'cost buckets'. group_by='level' with "
+            "level 1, 2 or 3 rolls up by the project's OWN hierarchy levels "
+            "(whatever it calls them -- village / phase / parcel on a land "
+            "deal) -- 'budget by phase', 'cost by village', 'what is parcel "
+            "1.201 carrying', or any report variant grouped by where the money "
+            "sits rather than what it buys. A level rollup rolls deeper lines "
+            "UP: a line assigned to one parcel is counted inside its phase, so "
+            "the phase totals are complete. A line sitting ABOVE the requested "
+            "level keeps its own row and is flagged above_level -- say so "
+            "rather than folding it into a member below it. Only state "
+            "percentage shares returned by this tool. For raw individual line "
+            "items, call get_budget_items."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "group_by": {
+                    "type": "string",
+                    "enum": ["category", "level"],
+                    "description": (
+                        "What to group by. Defaults to category."
+                    ),
+                },
+                "level": {
+                    "type": "integer",
+                    "enum": [1, 2, 3],
+                    "description": (
+                        "Which hierarchy level to roll up to when "
+                        "group_by='level'. 1 is the project's top level, 3 the "
+                        "deepest. Defaults to 2. The response carries "
+                        "level_label, the project's own name for it."
+                    ),
+                },
+            },
         },
     },
     {

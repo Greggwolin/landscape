@@ -22,6 +22,8 @@ from dateutil.relativedelta import relativedelta
 from typing import Any, Dict, List, Optional, Tuple
 from django.db import connection
 
+from apps.containers.ancestry import expand_division_scope
+
 import numpy_financial as npf
 import numpy as np
 
@@ -111,6 +113,13 @@ class LandDevCashFlowService:
                 'discountRate': float,
             }
         """
+        # Step 0: widen the filter to everything underneath what was picked.
+        # A budget line can hang off a member below the chosen one (a cost that
+        # belongs to a single parcel inside the chosen phase); matching only the
+        # chosen ids drops it, and a filtered cash flow that quietly omits real
+        # money is worse than no filter at all.
+        container_ids = expand_division_scope(self.project_id, container_ids)
+
         # Step 1: Load project configuration and DCF assumptions
         project_config = self._get_project_config()
         dcf_assumptions = self._get_dcf_assumptions()

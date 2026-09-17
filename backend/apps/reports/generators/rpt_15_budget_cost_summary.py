@@ -1,5 +1,10 @@
 """RPT_15: Budget Cost Summary generator."""
 
+from apps.containers.ancestry import (
+    DIVISION_ANCESTRY_CTE,
+    fetch_budget_rollup_by_level,
+)
+
 from .preview_base import PreviewBaseGenerator
 from .pdf_base import (
     scale_cw, make_styles, make_table, add_header, build_pdf,
@@ -83,33 +88,32 @@ class BudgetCostSummaryGenerator(PreviewBaseGenerator):
         totals = {'budget_amount': total_budget, 'pct': 100.0}
         sections.append(self.make_table_section('Budget by Category', columns, rows, totals))
 
-        # Budget by phase
-        phase_budget = self.execute_query("""
-            SELECT
-                COALESCE(d.display_name, d.division_code, 'Unassigned') AS phase_name,
-                COALESCE(SUM(b.amount), 0) AS budget_amount
-            FROM landscape.core_fin_fact_budget b
-            LEFT JOIN landscape.tbl_division d ON b.division_id = d.division_id
-            WHERE b.project_id = %s AND b.division_id IS NOT NULL
-            GROUP BY COALESCE(d.display_name, d.division_code, 'Unassigned')
-            ORDER BY budget_amount DESC
-        """, [self.project_id])
+        # Budget by the project's level 2 -- whatever it calls that level.
+        #
+        # Rolled up through the hierarchy, NOT grouped by the division each line
+        # names: a line assigned to one parcel belongs inside its phase's total,
+        # and grouping by the named division listed that parcel as a peer of the
+        # phases (reported 2026-09-17). Lines sitting ABOVE the level keep their
+        # own row -- pushing them down would mean inventing an allocation.
+        rollup = fetch_budget_rollup_by_level(self.project_id, 2)
+        phase_budget = rollup['records']
 
         if phase_budget:
             phase_cols = [
-                {'key': 'phase_name', 'label': 'Phase / Area', 'align': 'left'},
+                {'key': 'phase_name', 'label': rollup['level_label'], 'align': 'left'},
                 {'key': 'budget_amount', 'label': 'Budget', 'align': 'right', 'format': 'currency'},
                 {'key': 'pct', 'label': '% of Total', 'align': 'right', 'format': 'percentage'},
             ]
             phase_rows = [
                 {
-                    'phase_name': r['phase_name'],
-                    'budget_amount': float(r['budget_amount']),
-                    'pct': self.safe_div(float(r['budget_amount']), total_budget) * 100,
+                    'phase_name': r['group_label'],
+                    'budget_amount': float(r['total_amount']),
+                    'pct': self.safe_div(float(r['total_amount']), total_budget) * 100,
                 }
                 for r in phase_budget
             ]
-            sections.append(self.make_table_section('Budget by Phase', phase_cols, phase_rows))
+            sections.append(self.make_table_section(
+                f"Budget by {rollup['level_label']}", phase_cols, phase_rows))
 
         return {
             'title': 'Budget Cost Summary',
@@ -163,13 +167,18 @@ class BudgetCostSummaryGenerator(PreviewBaseGenerator):
                 }
 
             # Get budget totals by phase and category
+            # The phase record is reached through the line's ANCESTRY, not
+            # through the division it names: a parcel-level line carries no
+            # phase_id of its own and used to land in 'Unphased'.
             budget_by_phase = self.execute_query("""
+                WITH """ + DIVISION_ANCESTRY_CTE + """
                 SELECT
                     COALESCE(ph.phase_name, 'Unphased') AS phase_name,
                     COALESCE(pcat.category_name, 'Other') AS category_name,
                     COALESCE(SUM(b.amount), 0) AS amount
                 FROM landscape.core_fin_fact_budget b
-                LEFT JOIN landscape.tbl_division d ON b.division_id = d.division_id
+                LEFT JOIN division_ancestry a ON a.division_id = b.division_id
+                LEFT JOIN landscape.tbl_division d ON d.division_id = a.tier2_id
                 LEFT JOIN landscape.tbl_phase ph ON (d.attributes->>'phase_id')::int = ph.phase_id
                 LEFT JOIN landscape.core_unit_cost_category cat ON b.category_id = cat.category_id
                 LEFT JOIN landscape.core_unit_cost_category pcat ON cat.parent_id = pcat.category_id

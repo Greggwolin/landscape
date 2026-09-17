@@ -51,9 +51,15 @@ engine or it waits.
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from apps.containers.ancestry import (
+    DEFAULT_TIER_LABELS as _DEFAULT_TIER_LABELS,
+    compose_member_label as division_option_label,
+    member_number as _member_number,
+    natural_key as _natural_key,
+)
 
 from .picklists import measure_options, normalize_measure_code
 
@@ -223,9 +229,6 @@ def _derived_dates(record: Dict[str, Any], period_zero):
             pass
     return start_out, end_out, derived
 
-_DEFAULT_TIER_LABELS = {1: 'Level 1', 2: 'Level 2', 3: 'Level 3'}
-
-
 def _num(value: Any) -> Optional[float]:
     if value is None:
         return None
@@ -234,9 +237,6 @@ def _num(value: Any) -> Optional[float]:
     except (TypeError, ValueError):
         return None
 
-
-
-_LEADING_WORDS = re.compile(r'^[A-Za-z][A-Za-z\s&/\-]*?\s*(?=[\d])')
 
 
 def _date_str(value: Any) -> Optional[str]:
@@ -276,22 +276,6 @@ def _escalation_ref(record: Dict[str, Any],
                 'rate': rate, 'usable': True}
     return {'mode': 'none', 'set_id': None, 'set_name': None,
             'rate': None, 'usable': True}
-
-
-def _member_number(display_name: Optional[str], code: Optional[str],
-                   division_id: int) -> str:
-    """The member's identifier, with any baked-in level name removed.
-
-    ``Area 1`` -> ``1`` · ``Parcel 1.101`` -> ``1.101`` · ``1.1`` -> ``1.1``
-
-    A name with no digits at all is a genuine name rather than a numbered
-    member (someone called a village "Riverbend"), and is returned untouched.
-    """
-    raw = (display_name or '').strip()
-    if raw:
-        stripped = _LEADING_WORDS.sub('', raw).strip()
-        return stripped or raw
-    return (code or f'#{division_id}').strip()
 
 
 def fetch_project_levels(project_id: int) -> List[Dict[str, Any]]:
@@ -432,9 +416,13 @@ def build_budget_view_config(
     # The month period 1 lands in. None when the project has no analysis start
     # date, which leaves every derived date empty rather than invented.
     period_zero = _period_zero(project_id)
-    # "Division" is not a real word either -- the deepest configured level's
-    # own label is. Falls back only when the project has no levels configured.
-    division_label = (levels[-1]['label'] if levels else 'Division')
+    # The column says what a line is ASSIGNED TO, and a line can hang off a
+    # member of ANY level. It used to borrow the deepest level's label, so on
+    # Peoria Meadows -- where every line sits on a phase -- a column headed
+    # "Parcel" showed "1.2", which reads as a malformed parcel number (the
+    # parcels are 1.201..4.206). Each option now carries its own level name
+    # ("Phase 1.2", "Parcel 1.201"), so the heading must not name a level.
+    division_label = ASSIGNED_TO_LABEL
 
     rows: List[Dict[str, Any]] = []
     for idx, record in enumerate(records, start=1):
@@ -675,6 +663,11 @@ _ESCALATION_METHODS = ['to_start', 'through_duration']
 _TIMING_METHODS = ['distributed', 'curve', 'end_loaded']
 
 
+# The heading of the budget's "which member is this line on" column. See
+# build_budget_view_config for why it names no level.
+ASSIGNED_TO_LABEL = 'Assigned to'
+
+
 def _opt(value, label=None):
     return {'value': value, 'label': label if label is not None else value}
 
@@ -717,15 +710,29 @@ def fetch_budget_picklists(project_id: int) -> Dict[str, Any]:
         try:
             cursor.execute(
                 """
+                SELECT tier_1_label, tier_2_label, tier_3_label
+                FROM landscape.tbl_project_config
+                WHERE project_id = %s
+                """, [project_id])
+            cfg = cursor.fetchone()
+            tier_labels = dict(_DEFAULT_TIER_LABELS)
+            for idx, tier in enumerate((1, 2, 3)):
+                if cfg and cfg[idx]:
+                    tier_labels[tier] = cfg[idx]
+            cursor.execute(
+                """
                 SELECT d.division_id, d.display_name, d.division_code, d.tier
                 FROM landscape.tbl_division d
                 WHERE d.project_id = %s
-                ORDER BY d.tier, d.division_code, d.division_id
                 """, [project_id])
-            out['division'] = [
-                _opt(r[0], (r[1] or r[2] or f'Division {r[0]}'))
-                for r in cursor.fetchall()
-            ]
+            divisions = []
+            for division_id, display_name, code, tier in cursor.fetchall():
+                label = division_option_label(
+                    tier_labels.get(tier, ''), display_name, code, division_id)
+                divisions.append((tier or 0, _natural_key(label), division_id,
+                                  label))
+            divisions.sort()
+            out['division'] = [_opt(d[2], d[3]) for d in divisions]
         except Exception:  # noqa: BLE001
             logger.exception('budget picklists: divisions unavailable')
 

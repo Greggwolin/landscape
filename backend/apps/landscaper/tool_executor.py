@@ -8760,9 +8760,60 @@ def handle_get_budget_rollup(
     project_id: int,
     **kwargs
 ) -> Dict[str, Any]:
-    """Get project budget totals rolled up by category."""
+    """Project budget totals rolled up by category, or by a hierarchy level.
+
+    `group_by='level'` rolls UP THROUGH THE HIERARCHY rather than grouping by
+    the division each line names: a line assigned to one parcel is counted
+    inside its phase, which is what makes the occasional parcel-level line
+    usable in a phase report instead of a stray row beside the phases.
+    """
     if not project_id:
         return {'success': False, 'error': 'project_id is required'}
+
+    group_by = (tool_input or {}).get('group_by') or 'category'
+
+    if group_by == 'level':
+        try:
+            level = int((tool_input or {}).get('level') or 2)
+        except (TypeError, ValueError):
+            return {'success': False, 'error': "level must be 1, 2 or 3"}
+        try:
+            from apps.containers.ancestry import fetch_budget_rollup_by_level
+            rollup = fetch_budget_rollup_by_level(project_id, level)
+        except ValueError as exc:
+            return {'success': False, 'error': str(exc)}
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Error fetching budget rollup by level: {e}")
+            return {'success': False, 'error': str(e)}
+
+        records = rollup['records']
+        return {
+            'success': True,
+            'project_id': project_id,
+            'group_by': 'level',
+            'level': rollup['level'],
+            'level_label': rollup['level_label'],
+            'group_count': len(records),
+            'line_item_count': rollup['line_item_count'],
+            'grand_total': rollup['grand_total'],
+            'total_budget': rollup['grand_total'],
+            'top_two_total': rollup['top_two_total'],
+            'top_two_percent_of_total': rollup['top_two_percent_of_total'],
+            'rollup': records,
+            'records': records,
+            'source': (
+                'landscape.core_fin_fact_budget.division_id -> '
+                'landscape.tbl_division ancestry at tier '
+                f"{rollup['level']}"
+            ),
+            'instruction': (
+                f"These are budget totals by {rollup['level_label']}. Lines "
+                "assigned below that level are INCLUDED in their parent's "
+                "total (rolled_up_row_count says how many). A record flagged "
+                "above_level sits higher in the hierarchy and is shown on its "
+                "own row, not allocated down. Quote only these figures."
+            ),
+        }
 
     try:
         with connection.cursor() as cursor:
@@ -8781,34 +8832,21 @@ def handle_get_budget_rollup(
             """, [project_id])
 
             columns = [col[0] for col in cursor.description]
-            records = []
-            grand_total = 0.0
-            line_item_count = 0
+            records = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-            for row in cursor.fetchall():
-                record = dict(zip(columns, row))
-                record['row_count'] = int(record.get('row_count') or 0)
-                record['total_amount'] = float(record.get('total_amount') or 0)
-                grand_total += record['total_amount']
-                line_item_count += record['row_count']
-                records.append(record)
-
-            for record in records:
-                share = (record['total_amount'] / grand_total * 100) if grand_total else 0.0
-                record['percent_of_total'] = round(share, 1)
-
-            top_two_total = sum(record['total_amount'] for record in records[:2])
-            top_two_percent = round((top_two_total / grand_total * 100) if grand_total else 0.0, 1)
+            from apps.containers.ancestry import summarize_rollup
+            summary = summarize_rollup(records)
 
             return {
                 'success': True,
                 'project_id': project_id,
+                'group_by': 'category',
                 'category_count': len(records),
-                'line_item_count': line_item_count,
-                'grand_total': grand_total,
-                'total_budget': grand_total,
-                'top_two_total': top_two_total,
-                'top_two_percent_of_total': top_two_percent,
+                'line_item_count': summary['line_item_count'],
+                'grand_total': summary['grand_total'],
+                'total_budget': summary['grand_total'],
+                'top_two_total': summary['top_two_total'],
+                'top_two_percent_of_total': summary['top_two_percent_of_total'],
                 'rollup': records,
                 'records': records,
                 'source': (
