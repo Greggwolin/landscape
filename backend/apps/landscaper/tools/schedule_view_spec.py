@@ -432,9 +432,13 @@ def build_budget_view_config(
     # The month period 1 lands in. None when the project has no analysis start
     # date, which leaves every derived date empty rather than invented.
     period_zero = _period_zero(project_id)
-    # "Division" is not a real word either -- the deepest configured level's
-    # own label is. Falls back only when the project has no levels configured.
-    division_label = (levels[-1]['label'] if levels else 'Division')
+    # The column says what a line is ASSIGNED TO, and a line can hang off a
+    # member of ANY level. It used to borrow the deepest level's label, so on
+    # Peoria Meadows -- where every line sits on a phase -- a column headed
+    # "Parcel" showed "1.2", which reads as a malformed parcel number (the
+    # parcels are 1.201..4.206). Each option now carries its own level name
+    # ("Phase 1.2", "Parcel 1.201"), so the heading must not name a level.
+    division_label = ASSIGNED_TO_LABEL
 
     rows: List[Dict[str, Any]] = []
     for idx, record in enumerate(records, start=1):
@@ -675,6 +679,32 @@ _ESCALATION_METHODS = ['to_start', 'through_duration']
 _TIMING_METHODS = ['distributed', 'curve', 'end_loaded']
 
 
+# The heading of the budget's "which member is this line on" column. See
+# build_budget_view_config for why it names no level.
+ASSIGNED_TO_LABEL = 'Assigned to'
+
+
+def _natural_key(text: str):
+    """Sort ``1.10`` after ``1.9`` and ``Area 10`` after ``Area 9``."""
+    return [(0, int(tok), '') if tok.isdigit() else (1, 0, tok.lower())
+            for tok in re.split(r'(\d+)', text or '') if tok]
+
+
+def division_option_label(level_label: str, display_name: Optional[str],
+                          code: Optional[str], division_id: int) -> str:
+    """A member's name as the screen shows it: its level's label plus its number.
+
+    Same rule as the renderer's ``composeMember``: the stored display name may
+    carry a stale baked-in word ("Area 1" under a level now called Village), so
+    the number is kept and the CURRENT level label is put in front of it. A
+    member with no digits is a genuine name and is shown as-is.
+    """
+    number = _member_number(display_name, code, division_id)
+    if re.search(r'\d', number) and level_label:
+        return f'{level_label} {number}'
+    return number
+
+
 def _opt(value, label=None):
     return {'value': value, 'label': label if label is not None else value}
 
@@ -717,15 +747,29 @@ def fetch_budget_picklists(project_id: int) -> Dict[str, Any]:
         try:
             cursor.execute(
                 """
+                SELECT tier_1_label, tier_2_label, tier_3_label
+                FROM landscape.tbl_project_config
+                WHERE project_id = %s
+                """, [project_id])
+            cfg = cursor.fetchone()
+            tier_labels = dict(_DEFAULT_TIER_LABELS)
+            for idx, tier in enumerate((1, 2, 3)):
+                if cfg and cfg[idx]:
+                    tier_labels[tier] = cfg[idx]
+            cursor.execute(
+                """
                 SELECT d.division_id, d.display_name, d.division_code, d.tier
                 FROM landscape.tbl_division d
                 WHERE d.project_id = %s
-                ORDER BY d.tier, d.division_code, d.division_id
                 """, [project_id])
-            out['division'] = [
-                _opt(r[0], (r[1] or r[2] or f'Division {r[0]}'))
-                for r in cursor.fetchall()
-            ]
+            divisions = []
+            for division_id, display_name, code, tier in cursor.fetchall():
+                label = division_option_label(
+                    tier_labels.get(tier, ''), display_name, code, division_id)
+                divisions.append((tier or 0, _natural_key(label), division_id,
+                                  label))
+            divisions.sort()
+            out['division'] = [_opt(d[2], d[3]) for d in divisions]
         except Exception:  # noqa: BLE001
             logger.exception('budget picklists: divisions unavailable')
 
