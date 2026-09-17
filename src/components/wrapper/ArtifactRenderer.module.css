@@ -294,12 +294,12 @@
   letter-spacing: 0;
   background: var(--cui-tertiary-bg);
   border-bottom: 1px solid var(--cui-body-color);
-  /* ONE LINE. A heading that wraps ("Line / Item") reads as two headings and
-     breaks the line the eye follows across the row. Gregg, 2026-09-17: "the
-     header row should have a single line of text". This supersedes the older
-     "multi-word headers wrap" convention for every artifact table; the column
-     widens to fit its heading instead. */
-  white-space: nowrap;
+  /* Wrapping is decided per column, by what the column holds -- see the
+     .alignLeft / .alignRight rules further down. A numeric column is narrow and
+     its heading is often the widest thing in it, so it may stack; the label
+     column is wide already and a stacked heading there ("Line / Item") reads as
+     two headings. */
+  white-space: normal;
   vertical-align: bottom;
   line-height: 1.3;
 }
@@ -479,6 +479,26 @@
 .table th.alignRight { text-align: right; }
 .table th.alignCenter { text-align: center; }
 .table th.alignLeft { text-align: left; }
+
+/* WHICH HEADINGS MAY WRAP, and why it is decided by alignment.
+   Settled with Gregg 2026-09-17, after a blanket no-wrap was tried and taken
+   back: "i take back the 2 line thing. its necessary in many cases, just not
+   the operating statement."
+   A LEFT-aligned column holds words -- it is the stub column, the widest in the
+   table, and its own data already forces it wider than its heading. A heading
+   that stacks there is stacking for no reason and costs the row its reading
+   line. It stays on one line.
+   A RIGHT or CENTER aligned column holds figures. It is narrow by nature, and
+   its heading ("Mo to Complete", "Cost / RGA") is routinely the widest thing in
+   it; forcing that onto one line would widen the column past its own data and
+   push the table into a horizontal scroll. It wraps -- and only when it must,
+   which is what `normal` already means.
+   Alignment is the signal that is already there and already correct: a column
+   declaring align:'left' has said it holds words. Same reasoning as the
+   textColumn flag in formatCellValue. */
+.table th.alignLeft { white-space: nowrap; }
+.table th.alignRight,
+.table th.alignCenter { white-space: normal; }
 
 .alignCenter {
   text-align: center;

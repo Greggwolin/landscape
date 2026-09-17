@@ -65,12 +65,15 @@ describe('the HTML flavour', () => {
   });
 
   it('gives every heading the alignment of the column under it', () => {
-    expect(html).toContain('<th style="text-align:right;white-space:nowrap;');
-    expect(html).toContain('<th style="text-align:left;white-space:nowrap;');
+    expect(html).toContain('<th style="text-align:right;');
+    expect(html).toContain('<th style="text-align:left;');
   });
 
-  it('keeps headings on one line', () => {
-    expect(html).toContain('white-space:nowrap');
+  it('keeps a label heading on one line and lets a numeric heading wrap', () => {
+    // Same rule the screen follows: the stub column never stacks; a narrow
+    // numeric column may. See ArtifactRenderer.module.css.
+    expect(html).toContain('<th style="text-align:left;white-space:nowrap;');
+    expect(html).toContain('<th style="text-align:right;white-space:normal;');
   });
 
   it('keeps the weight and the rule on a total row', () => {

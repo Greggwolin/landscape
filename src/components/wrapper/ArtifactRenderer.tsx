@@ -338,9 +338,15 @@ export function serializeArtifactHtml(title: string, blocks: Block[]): string {
           break;
         case 'table': {
           if (b.title) out.push(`<h4 style="margin:12px 0 4px">${esc(b.title)}</h4>`);
+          // Headings follow the screen's rule: a label column's heading stays on
+          // one line, a numeric column's may wrap rather than widen the column
+          // past its own figures.
           const head = b.columns
-            .map((c) => `<th style="text-align:${alignOf(c)};white-space:nowrap;`
-              + `border-bottom:1px solid #000;padding:4px 10px">${esc(c.label)}</th>`)
+            .map((c) => {
+              const wrap = alignOf(c) === 'left' ? 'nowrap' : 'normal';
+              return `<th style="text-align:${alignOf(c)};white-space:${wrap};`
+                + `border-bottom:1px solid #000;padding:4px 10px">${esc(c.label)}</th>`;
+            })
             .join('');
           const body = b.rows.map((row) => {
             const role = detectRowRole(row, b.columns);
