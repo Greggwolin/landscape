@@ -91,9 +91,26 @@ describe('the HTML flavour', () => {
     expect(out).not.toContain('<script>');
   });
 
-  it('renders an empty cell as the em dash the screen shows', () => {
-    const other = html.slice(html.indexOf('Other Income'));
-    expect(other).toContain('—');
+  it('a line that is missing one figure shows the em dash the screen shows', () => {
+    const partial: Block[] = [{
+      type: 'table', id: 't',
+      columns: [
+        { key: 'line', label: 'Line Item', align: 'left' },
+        { key: 'a', label: 'Annual', align: 'right' },
+        { key: 'b', label: '$/Unit', align: 'right' },
+      ],
+      rows: [{ id: 'r', cells: { line: 'Other Income', a: 12000, b: null } }],
+    }];
+    expect(serializeArtifactHtml('', partial)).toContain('—');
+  });
+
+  it('a row carrying no figure at all is a heading, and prints blank', () => {
+    // Not a defect: a label-only row IS a section heading, and a heading that
+    // prints an em dash claims "nothing here" on a row making no claim
+    // (Gregg, 2026-09-17). STATEMENT's "Other Income" row has no values.
+    const other = html.slice(html.indexOf('Other Income'),
+                             html.indexOf('</tr>', html.indexOf('Other Income')));
+    expect(other).not.toContain('—');
   });
 });
 
@@ -158,7 +175,7 @@ describe('statement shape', () => {
     expect(indentOf('Effective Gross Income'))
       .toBe(indentOf('Gross Potential Rent'));
     expect(indentOf('Total Operating Expenses'))
-      .toBe(indentOf('Taxes & Insurance'));
+      .toBe(indentOf('Taxes &amp; Insurance'));
   });
 
   it('the grand total returns to flush left, ruled above and below', () => {
