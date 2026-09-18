@@ -191,7 +191,9 @@ export interface ExcelAuditArtifactConfig {
 // included — so once it opened there was no way back to Artifacts or
 // Documents. It is now a third view of the same panel; the route still works
 // and is still what chat-driven navigation targets.
-export type ProjectRightPanelView = 'artifacts' | 'documents' | 'map';
+// 'screen' added 2026-09-18 (chat VW, D-2026-09-18-TARGET): the classic screen
+// tree becomes a view of this panel, beside artifacts, documents and the map.
+export type ProjectRightPanelView = 'artifacts' | 'documents' | 'map' | 'screen';
 
 interface WrapperUIContextValue {
   chatOpen: boolean;

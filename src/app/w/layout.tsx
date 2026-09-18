@@ -36,7 +36,8 @@ import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLandscapeCommand, emitLandscapeCommand } from '@/lib/landscape-command-bus';
-import { navigateScreenTarget } from '@/lib/navigateScreenTarget';
+import { useProjectContext } from '@/app/components/ProjectProvider';
+import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { redirectToLoginExpired } from '@/lib/authHeaders';
 import '@/styles/wrapper.css';
 
@@ -77,6 +78,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     activeExcelAudit,
     activeArtifactId,
     projectRightPanelView,
+    setProjectRightPanelView,
     setActiveLocationBrief,
     setActiveMapArtifact,
     setActiveExcelAudit,
@@ -270,57 +272,29 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   );
   useLandscapeCommand('navigate', handleNavigateCommand);
 
-  // navigate_to_screen targets the studio in-panel folder/sub-tab surface, which
-  // the /w/ shell doesn't have. Bridge the screens that have a registered form
-  // to that form here, so "open the budget" and "show me the parcels" work in
-  // /w/ the same way they work in studio.
+  // navigate_to_screen — Landscaper opening a project screen.
   //
-  // THE TAB WAS BEING IGNORED, AND THAT MADE THE FAILURE SILENT.
+  // WHAT THIS USED TO DO, AND WHY IT WAS WRONG. The chat surface had no screen
+  // tree, so this handler translated the four screens that happened to have a
+  // registered form into a modal and logged a warning for everything else.
+  // Landscaper would say "opening the parcels screen now", the tool would fire
+  // correctly, and nothing would happen — the failure was written to a console
+  // nobody reads. Four screens worked out of twenty-six.
   //
-  // The map was keyed on FOLDER alone and held two entries. Everything else fell
-  // through to `undefined` and returned — no command, no error, no log. Landscaper
-  // would say "Opening the parcels screen now", the tool would fire correctly with
-  // { folder: 'property', tab: 'parcels' }, the command would reach this handler,
-  // and nothing would happen. Verified from the stored thread on 2026-08-25: the
-  // tool call and its result are both there, correct, and the screen never opened.
-  //
-  // Nearly every screen worth opening lives under the `property` folder, so keying
-  // on the folder alone could not tell parcels from land use from the rent roll in
-  // the first place. The tab has always been carried on the command
-  // (landscape-command-bus: `navigate_screen: { folder, tab? }`); this handler
-  // simply threw it away.
-  //
-  // The map, and the rule for adding to it, live in ./lib/navigateScreenTarget.
+  // Now the panel hosts the real screen tree (PanelScreenView), so every screen
+  // opens: put folder and tab in the URL, which is where the tree reads them
+  // from, and switch the panel to the screen view. Settled 2026-09-18,
+  // D-2026-09-18-TARGET.
   const handleNavigateScreen = useCallback(
     (payload: { folder?: string; tab?: string }) => {
       const folder = payload?.folder;
-      const tab = payload?.tab;
-      // The mapping lives in ./lib/navigateScreenTarget so it is a plain
-      // function with a test, rather than a lookup buried in a callback that
-      // only a running browser can exercise — which is how it stayed broken.
-      const modal = navigateScreenTarget(folder, tab);
-
-      if (modal) {
-        emitLandscapeCommand('open_modal', { modal_name: modal });
-        return;
-      }
-
-      // NEVER FAIL SILENTLY HERE AGAIN. Landscaper has already told the user it
-      // is opening the screen by the time this runs, so a quiet return leaves
-      // them looking at an unchanged panel with no way to tell what went wrong.
-      // Several screens that ARE registered forms — the rent roll, the cost and
-      // income approaches, reconciliation, acquisition, renovation, the sales
-      // comparables, loan inputs, equity structure — still have no entry above
-      // and will land here. Adding them is a deliberate decision, not a tidy-up:
-      // each needs the same two-way check as the entries above.
-      console.warn(
-        '[WrapperLayout] navigate_screen: no form registered for '
-        + `"${folder}${tab ? '/' + tab : ''}" — the chat panel announced a screen `
-        + 'that will not open. Add a verified entry to the maps in this handler.',
-        payload,
-      );
+      if (!folder || !projectId) return;
+      const qs = new URLSearchParams({ folder });
+      if (payload?.tab) qs.set('tab', payload.tab);
+      setProjectRightPanelView('screen');
+      router.push(`/w/projects/${projectId}?${qs.toString()}`);
     },
-    [],
+    [router, projectId, setProjectRightPanelView],
   );
   useLandscapeCommand('navigate_screen', handleNavigateScreen);
 
@@ -696,6 +670,44 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     { id: 's3', emoji: '🏠', name: 'Redfin comp tracker', status: 'paused' as const },
   ];
 
+  // ── The project's screen tree, for the sidebar (D-2026-09-18-TARGET) ──
+  // The studio has shown the folder tree down the left since June; the chat
+  // surface has always had the tree available — WrapperSidebar takes it as
+  // `projectNav` — and simply never passed one. This passes it.
+  //
+  // The project record comes from ProjectProvider (mounted in the root layout,
+  // so it is in scope here) rather than WrapperProjectProvider, which is mounted
+  // in the project route BELOW this shell and cannot be read from up here.
+  const { projects: allProjects, activeProject } = useProjectContext();
+  const navProject = projectId
+    ? allProjects.find((p) => p.project_id === projectId) ||
+      (activeProject?.project_id === projectId ? activeProject : null)
+    : null;
+  const { folderConfig: navFolderConfig } = useFolderNavigation({
+    propertyType:
+      navProject?.project_type_code ||
+      navProject?.project_type ||
+      navProject?.property_subtype ||
+      undefined,
+    analysisType: navProject?.analysis_type ?? undefined,
+    analysisPerspective: navProject?.analysis_perspective,
+    analysisPurpose: navProject?.analysis_purpose,
+    valueAddEnabled: navProject?.value_add_enabled ?? false,
+    tileConfig: navProject?.tile_config,
+  });
+  const navFolder = searchParams.get('folder') || '';
+  const navTab = searchParams.get('tab') || '';
+  const openScreen = useCallback(
+    (folder: string, tab?: string) => {
+      if (!projectId) return;
+      const qs = new URLSearchParams({ folder });
+      if (tab) qs.set('tab', tab);
+      setProjectRightPanelView('screen');
+      router.push(`/w/projects/${projectId}?${qs.toString()}`);
+    },
+    [projectId, router, setProjectRightPanelView],
+  );
+
   const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
     fetch('/api/projects', { headers: getAuthHeaders() })
@@ -752,6 +764,18 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         onRestoreThread={handleRestoreThread}
         onDeleteThreadPermanently={handleDeleteThreadPermanently}
         scheduledAgents={mockScheduled}
+        projectNav={
+          projectId && navProject
+            ? {
+                projectName: navProject.project_name,
+                folders: navFolderConfig.folders,
+                activeFolder: navFolder,
+                activeTab: navTab,
+                onSelectFolder: (folderId: string) => openScreen(folderId),
+                onSelectTab: (folderId: string, tabId: string) => openScreen(folderId, tabId),
+              }
+            : undefined
+        }
         recentProjects={recentProjects.map((p) => ({
           ...p,
           onClick: () => router.push(`/w/projects/${p.id}`),
