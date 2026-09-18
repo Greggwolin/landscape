@@ -1,15 +1,31 @@
-/* Header text wraps on word boundaries to keep columns narrow */
+/* HEADINGS — the same rule the artifact tables follow, settled 2026-09-17.
+   A heading takes the alignment of the column under it, and wrapping is decided
+   by what the column holds:
+     · a text column is the wide one and its data already forces it wider than
+       its heading, so a stacked heading there stacks for nothing — ONE LINE;
+     · a numeric column is narrow and its heading is often the widest thing in
+       it, so it wraps rather than widening the column past its own figures.
+   AG-Grid marks a numericColumn's header with .ag-right-aligned-header, which
+   is how the two cases are told apart without tagging every column by hand. */
 .ag-theme-alpine .ag-header-cell-label,
 .ag-theme-alpine-dark .ag-header-cell-label {
-  white-space: normal !important;
+  white-space: nowrap !important;
   line-height: 1.25;
-  text-align: center;
+  text-align: left;
 }
 
-/* Center the header text container */
+.ag-theme-alpine .ag-right-aligned-header .ag-header-cell-label,
+.ag-theme-alpine-dark .ag-right-aligned-header .ag-header-cell-label {
+  white-space: normal !important;
+  text-align: right;
+  justify-content: flex-end;
+}
+
+/* The header text container follows the same split: bottom-aligned so a
+   wrapped numeric heading sits on the same baseline as the single-line ones. */
 .ag-theme-alpine .ag-header-cell-comp-wrapper,
 .ag-theme-alpine-dark .ag-header-cell-comp-wrapper {
-  align-items: center;
+  align-items: flex-end;
 }
 
 /* Cell text stays on one line — columns size to this, headers wrap to fit */

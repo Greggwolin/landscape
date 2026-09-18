@@ -91,8 +91,105 @@ describe('the HTML flavour', () => {
     expect(out).not.toContain('<script>');
   });
 
-  it('renders an empty cell as the em dash the screen shows', () => {
-    const other = html.slice(html.indexOf('Other Income'));
-    expect(other).toContain('—');
+  it('a line that is missing one figure shows the em dash the screen shows', () => {
+    const partial: Block[] = [{
+      type: 'table', id: 't',
+      columns: [
+        { key: 'line', label: 'Line Item', align: 'left' },
+        { key: 'a', label: 'Annual', align: 'right' },
+        { key: 'b', label: '$/Unit', align: 'right' },
+      ],
+      rows: [{ id: 'r', cells: { line: 'Other Income', a: 12000, b: null } }],
+    }];
+    expect(serializeArtifactHtml('', partial)).toContain('—');
+  });
+
+  it('a row carrying no figure at all is a heading, and prints blank', () => {
+    // Not a defect: a label-only row IS a section heading, and a heading that
+    // prints an em dash claims "nothing here" on a row making no claim
+    // (Gregg, 2026-09-17). STATEMENT's "Other Income" row has no values.
+    const other = html.slice(html.indexOf('Other Income'),
+                             html.indexOf('</tr>', html.indexOf('Other Income')));
+    expect(other).not.toContain('—');
+  });
+});
+
+/**
+ * The statement's shape — what is bold, what is indented, what is blank.
+ *
+ * From Gregg's markup of a printed operating statement, 2026-09-17: section
+ * headings bold and flush left, each level indented a step further, a total
+ * level with the line it totals, and NO em dashes on a section heading, which
+ * states no figure.
+ */
+const STATEMENT_SHAPE: Block[] = [
+  {
+    type: 'table',
+    id: 'os2',
+    columns: [
+      { key: 'line', label: 'Line Item', align: 'left' },
+      { key: 'y3', label: 'Year 3', align: 'right' },
+    ],
+    rows: [
+      { id: 's1', cells: { line: 'Income', y3: null } },
+      { id: 'r1', cells: { line: 'Gross Potential Rent', y3: 2861562 } },
+      { id: 'r2', cells: { line: 'Less: Physical Vacancy (9.7%)', y3: -278559 } },
+      { id: 'r3', cells: { line: 'Effective Gross Income', y3: 2540080 } },
+      { id: 's2', cells: { line: 'Operating Expenses', y3: null } },
+      { id: 'r4', cells: { line: 'Taxes & Insurance', y3: 845901 } },
+      { id: 'r5', cells: { line: 'Total Operating Expenses', y3: 1284762 } },
+      { id: 'r6', cells: { line: 'Net Operating Income', y3: 1255317 } },
+    ],
+  },
+];
+
+describe('statement shape', () => {
+  const html = serializeArtifactHtml('', STATEMENT_SHAPE);
+  const rowOf = (label: string) => {
+    const at = html.indexOf(label);
+    const start = html.lastIndexOf('<tr>', at);
+    return html.slice(start, html.indexOf('</tr>', at));
+  };
+  const indentOf = (label: string) => {
+    const m = rowOf(label).match(/padding-left:(\d+)pt/);
+    return m ? Number(m[1]) : 0;
+  };
+
+  it('a section heading is bold and flush left', () => {
+    expect(rowOf('Income')).toContain('font-weight:700');
+    expect(indentOf('Income')).toBe(0);
+  });
+
+  it('a section heading states no figure — blank, never an em dash', () => {
+    const row = rowOf('>Income<');
+    expect(row).not.toContain('—');
+  });
+
+  it('the opening subtotal sits one level in, and its lines one further', () => {
+    expect(indentOf('Gross Potential Rent')).toBeGreaterThan(0);
+    expect(indentOf('Less: Physical Vacancy'))
+      .toBeGreaterThan(indentOf('Gross Potential Rent'));
+  });
+
+  it('a closing total lines up with the line it totals', () => {
+    expect(indentOf('Effective Gross Income'))
+      .toBe(indentOf('Gross Potential Rent'));
+    // ...and a group that opened with no subtotal of its own lines its total
+    // up with the SECTION heading (Gregg, 2026-09-18).
+    expect(indentOf('Total Operating Expenses'))
+      .toBe(indentOf('Operating Expenses'));
+    expect(indentOf('Taxes &amp; Insurance'))
+      .toBeGreaterThan(indentOf('Total Operating Expenses'));
+  });
+
+  it('the grand total returns to flush left, ruled above and below', () => {
+    expect(indentOf('Net Operating Income')).toBe(0);
+    expect(rowOf('Net Operating Income')).toContain('border-top');
+    expect(rowOf('Net Operating Income')).toContain('border-bottom');
+  });
+
+  it('a section heading takes the air that separates one group from the next', () => {
+    expect(rowOf('Operating Expenses')).toContain('padding-top:10pt');
+    expect(rowOf('Taxes & Insurance')).not.toContain('padding-top:10pt');
   });
 });

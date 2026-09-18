@@ -21,6 +21,7 @@ from apps.landscaper.tools.proforma_derivation import (
     MissingGrowthAssumptions,
     compound_factor,
     project_payload,
+    projection_note,
     projection_title,
 )
 from apps.landscaper.tools.os_artifact_builder import build_os_artifact_schema
@@ -238,24 +239,55 @@ def test_missing_growth_assumptions_name_what_is_missing():
     assert 'income' in str(err)
 
 
-# ── the title cannot be read as actuals ─────────────────────────────────────
+# ── the title says what it is; the note says where it came from ─────────────
+# Gregg, 2026-09-18: the header carries the statement's name and nothing else,
+# and the derivation goes under the schedule in small plain type. Both halves
+# still have to be on the face of the artifact -- a projection that reads as
+# actuals is the expensive failure, and its figures are entirely plausible.
 
-def test_the_title_states_horizon_base_and_both_rates():
+def test_the_title_is_the_property_the_horizon_and_the_word_proforma():
     _out, prov = _project(3)
     title = projection_title('Chadron Terrace', 'Default (untagged)', prov)
-    assert 'Year 3 Projected' in title
-    assert 'Default (untagged)' in title
-    assert '+2.0%' in title and '+3.0%' in title
+    assert title == 'Chadron Terrace — Year 3 Proforma'
 
 
-def test_a_stepped_rate_is_flagged_in_the_title_rather_than_shown_as_flat():
+def test_the_title_carries_no_derivation():
+    _out, prov = _project(3)
+    title = projection_title('Chadron Terrace', 'Default (untagged)', prov)
+    for noise in ('Default (untagged)', '+2.0%', '+3.0%', 'from '):
+        assert noise not in title
+
+
+def test_the_note_states_the_base_the_horizon_and_both_rates():
+    _out, prov = _project(3)
+    note = projection_note('Default (untagged)', prov)
+    assert 'Default (untagged)' in note
+    assert '3 years' in note
+    assert '+2.0%' in note and '+3.0%' in note
+    assert 'Not actuals' in note
+
+
+def test_a_one_year_horizon_reads_as_one_year():
+    _out, prov = _project(1)
+    assert '1 year ' in projection_note('Default (untagged)', prov)
+    assert '1 years' not in projection_note('Default (untagged)', prov)
+
+
+def test_the_note_drops_the_property_name_the_title_already_carries():
+    _out, prov = _project(3)
+    note = projection_note(
+        'Chadron Terrace — Default (untagged) Operating Statement', prov)
+    assert 'Chadron Terrace' not in note
+    assert 'Default (untagged) Operating Statement' in note
+
+
+def test_a_stepped_rate_is_flagged_in_the_note_rather_than_shown_as_flat():
     steps = [
         {'from_period': 1, 'thru_period': 2, 'periods': None, 'rate': 0.02},
         {'from_period': 3, 'thru_period': None, 'periods': None, 'rate': 0.05},
     ]
     _out, prov = _project(3, income=steps)
-    title = projection_title('Chadron Terrace', 'Default (untagged)', prov)
-    assert 'stepped' in title
+    assert 'stepped' in projection_note('Default (untagged)', prov)
 
 
 # ── regressions from the first live run, 2026-09-16 ─────────────────────────

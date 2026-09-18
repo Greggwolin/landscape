@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useContext, useRef } from 'react';
-import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, Printer, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
 import type {
   ArtifactRendererProps,
   Block,
@@ -21,6 +21,7 @@ import type {
   TableRow,
   TextBlock,
 } from '@/types/artifact';
+import { printArtifact } from './printArtifact';
 import { useStagedEdits, stagedKey, type StagedEdit } from './useStagedEdits';
 import styles from './ArtifactRenderer.module.css';
 
@@ -122,6 +123,13 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     () => serializeArtifactHtml(title, schema.blocks),
     [title, schema.blocks],
   );
+  // The printed sheet prints its own title, so the body must not carry one as
+  // well -- it did, and every printed artifact came out with the title twice
+  // (Gregg, 2026-09-17).
+  const printHtml = useMemo(
+    () => serializeArtifactHtml('', schema.blocks),
+    [schema.blocks],
+  );
 
   return (
     <div className={styles.root}>
@@ -129,6 +137,7 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
         title={title}
         copyText={copyText}
         copyHtml={copyHtml}
+        printHtml={printHtml}
         pinnedLabel={pinnedLabel}
         editTarget={editTarget}
         driftSummary={driftSummary}
@@ -291,6 +300,81 @@ export function serializeArtifact(title: string, blocks: Block[]): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/**
+ * How deep each row sits, and therefore how it reads.
+ *
+ * The scheme is the one Gregg's own models use (Peoria Lakes, 2026-09-17):
+ *
+ *   Income                          <- section, flush left, bold
+ *     Gross Potential Rent          <- the group's opening subtotal, bold
+ *       Less: Physical Vacancy      <- the lines that work on it
+ *     Effective Gross Income        <- the closing subtotal, LEVEL WITH the
+ *                                      line that opened the group
+ *   Net Operating Income            <- grand total, back to flush left
+ *
+ * A subtotal therefore sits one level in from its section and the line items
+ * under it one level further, so a total always lines up with the figure it
+ * totals rather than with the detail it swallowed. A section whose lines open
+ * with no subtotal (Operating Expenses) keeps its lines at the subtotal's
+ * level, and its total lands level with them.
+ *
+ * Returned as a plain function over the row list so the printed sheet and the
+ * screen cannot drift: both call this.
+ */
+export function statementDepths(
+  rows: TableRow[],
+  columns: { key: string }[],
+): Array<{ kind: ReturnType<typeof classifyRow>; depth: number }> {
+  let inSubsection = false;
+  // Did a subtotal open the current section (Gross Potential Rent) — i.e. did
+  // it arrive before any line item? Only then do the line items step in again.
+  let groupOpenedBySubtotal = false;
+  let sawLineItem = false;
+
+  return rows.map((row) => {
+    const kind = classifyRow(row, columns);
+    let depth = 0;
+    switch (kind) {
+      case 'section_divider':
+        inSubsection = false;
+        groupOpenedBySubtotal = false;
+        sawLineItem = false;
+        depth = 0;
+        break;
+      case 'grand_total':
+        inSubsection = false;
+        groupOpenedBySubtotal = false;
+        sawLineItem = false;
+        depth = 0;
+        break;
+      case 'subtotal':
+        inSubsection = false;
+        if (!sawLineItem) {
+          // The subtotal that OPENS a group (Gross Potential Rent) sits under
+          // its section heading.
+          groupOpenedBySubtotal = true;
+          depth = 1;
+        } else {
+          // A closing total lines up with the first row of its group: the
+          // opening subtotal where there was one, and otherwise the section
+          // heading itself -- Total Operating Expenses level with Operating
+          // Expenses (Gregg, 2026-09-18).
+          depth = groupOpenedBySubtotal ? 1 : 0;
+        }
+        break;
+      case 'subsection':
+        inSubsection = true;
+        depth = groupOpenedBySubtotal ? 2 : 1;
+        break;
+      case 'line_item':
+        sawLineItem = true;
+        depth = (groupOpenedBySubtotal ? 2 : 1) + (inSubsection ? 1 : 0);
+        break;
+    }
+    return { kind, depth };
+  });
+}
+
 /** One cell, formatted as the screen formats it. */
 function cellText(column: TableColumn, row: TableRow): string {
   // Straight through formatCellValue -- the same call the table cell makes, so
@@ -338,6 +422,7 @@ export function serializeArtifactHtml(title: string, blocks: Block[]): string {
           break;
         case 'table': {
           if (b.title) out.push(`<h4 style="margin:12px 0 4px">${esc(b.title)}</h4>`);
+          const shape = statementDepths(b.rows, b.columns);
           // Headings follow the screen's rule: a label column's heading stays on
           // one line, a numeric column's may wrap rather than widen the column
           // past its own figures.
@@ -348,16 +433,28 @@ export function serializeArtifactHtml(title: string, blocks: Block[]): string {
                 + `border-bottom:1px solid #000;padding:4px 10px">${esc(c.label)}</th>`;
             })
             .join('');
-          const body = b.rows.map((row) => {
-            const role = detectRowRole(row, b.columns);
-            const weight = role ? 'font-weight:700;' : '';
-            const rule = role === 'subtotal' || role === 'grand_total'
-              ? 'border-top:1px solid #000;' : '';
-            const under = role === 'grand_total' ? 'border-bottom:1px solid #000;' : '';
-            const cells = b.columns
-              .map((c) => `<td style="text-align:${alignOf(c)};padding:2px 10px;`
-                + `${weight}${rule}${under}">${esc(cellText(c, row))}</td>`)
-              .join('');
+          const body = b.rows.map((row, i) => {
+            const { kind, depth } = shape[i];
+            const isSection = kind === 'section_divider';
+            const isTotal = kind === 'subtotal' || kind === 'grand_total';
+            const weight = isSection || isTotal ? 'font-weight:700;' : '';
+            const rule = isTotal ? 'border-top:0.7pt solid #000;' : '';
+            const under = kind === 'grand_total' ? 'border-bottom:0.7pt solid #000;' : '';
+            // Space is what separates one group from the next -- a section
+            // heading gets air above it, everything else stays tight.
+            const lead = isSection ? 'padding-top:10pt;' : '';
+            const indent = depth > 0 ? `padding-left:${10 + depth * 12}pt;` : '';
+            const cells = b.columns.map((c, ci) => {
+              // A section heading names the section and states no figure. Its
+              // numeric cells are BLANK, never an em dash -- an em dash reads
+              // as "nothing here", which is a claim about a row that is not
+              // making one (Gregg, 2026-09-17).
+              const blank = isSection && ci > 0;
+              const pad = ci === 0 ? `padding:2pt 6pt;${indent}` : 'padding:2pt 6pt;';
+              return `<td style="text-align:${alignOf(c)};${pad}`
+                + `${weight}${rule}${under}${lead}">`
+                + `${blank ? '' : esc(cellText(c, row))}</td>`;
+            }).join('');
             return `<tr>${cells}</tr>`;
           }).join('');
           out.push(
@@ -397,6 +494,7 @@ interface ArtifactHeaderProps {
   title: string;
   copyText: string;
   copyHtml: string;
+  printHtml: string;
   pinnedLabel?: string | null;
   editTarget?: EditTarget;
   driftSummary: { stale: number; removed: number };
@@ -413,6 +511,7 @@ function ArtifactHeader({
   title,
   copyText,
   copyHtml,
+  printHtml,
   pinnedLabel,
   editTarget,
   driftSummary,
@@ -581,6 +680,19 @@ function ArtifactHeader({
           aria-label="Copy artifact content"
         >
           {copied ? <Check size={12} /> : <Copy size={12} />}
+        </button>
+
+        {/* Print / save as PDF — the artifact alone, on a light sheet.
+            Reuses the same HTML the copy button puts on the clipboard, so the
+            paper copy and the pasted copy cannot drift apart. */}
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnIcon}`}
+          onClick={() => printArtifact(title, printHtml)}
+          title="Print (or save as PDF)"
+          aria-label="Print artifact"
+        >
+          <Printer size={12} />
         </button>
 
         {/* Save as new version — icon-only with tooltip */}
@@ -894,7 +1006,7 @@ function TableBlockRenderer({
             // blank numeric cells. The old first-divider-is-special branch is
             // gone; nothing about a divider's appearance depends on its
             // position in the table any more.
-            let inSubsection = false;
+            const shape = statementDepths(block.rows, block.columns);
             return block.rows.map((row, rIdx) => {
               const rowPath = [...blockPath, 'rows', String(rIdx)];
               const rowPathStr = rowPath.join('/');
@@ -903,23 +1015,7 @@ function TableBlockRenderer({
                 ? 'removed'
                 : computeRowDriftState(row, sourcePointers, currentValues, rowPath);
 
-              const kind = classifyRow(row, block.columns);
-              let depth = 0;
-              switch (kind) {
-                case 'section_divider':
-                case 'subtotal':
-                case 'grand_total':
-                  inSubsection = false;
-                  depth = 0;
-                  break;
-                case 'subsection':
-                  inSubsection = true;
-                  depth = 1;
-                  break;
-                case 'line_item':
-                  depth = inSubsection ? 2 : 1;
-                  break;
-              }
+              const { kind, depth } = shape[rIdx];
               const rowClass = [
                 // Every divider gets both classes: sectionDividerNoHeader is
                 // what blanks the numeric cells and drops the underline, and
@@ -931,6 +1027,7 @@ function TableBlockRenderer({
                 kind === 'grand_total' ? styles.grandTotalRow : '',
                 depth === 1 ? styles.depth1
                   : depth === 2 ? styles.depth2
+                  : depth >= 3 ? styles.depth3
                   : '',
               ].filter(Boolean).join(' ');
 

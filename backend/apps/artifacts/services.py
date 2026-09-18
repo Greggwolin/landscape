@@ -179,6 +179,52 @@ def _affected_rows(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+# ── A column always has a heading ────────────────────────────────────────────
+#
+# A table column whose label is blank renders a headless column: the figures
+# sit under nothing, and on a statement the stub column loses the words "Line
+# Item" (Gregg, 2026-09-18, on a comparison the model composed with
+# `{'key': 'line', 'label': ''}`). Rejecting the artifact over a missing
+# heading would throw away a correct table; naming the column from its own key
+# cannot invent anything, because the key is what the rows are already filed
+# under.
+
+_STUB_COLUMN_KEYS = {'line', 'line_item', 'label', 'item', 'name'}
+
+
+def _fill_blank_column_labels(schema: Any) -> None:
+    """Give every table column a heading, in place. Never overwrites one."""
+    if not isinstance(schema, dict):
+        return
+
+    def walk(blocks: Any) -> None:
+        if not isinstance(blocks, list):
+            return
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            if block.get('type') == 'section':
+                walk(block.get('children'))
+                continue
+            if block.get('type') != 'table':
+                continue
+            for column in block.get('columns') or []:
+                if not isinstance(column, dict):
+                    continue
+                label = column.get('label')
+                if isinstance(label, str) and label.strip():
+                    continue
+                key = str(column.get('key') or column.get('field') or '').strip()
+                if not key:
+                    continue
+                column['label'] = (
+                    'Line Item' if key.lower() in _STUB_COLUMN_KEYS
+                    else key.replace('_', ' ').title()
+                )
+
+    walk(schema.get('blocks'))
+
+
 @transaction.atomic
 def create_artifact_record(
     *,
@@ -222,6 +268,7 @@ def create_artifact_record(
     """
     if not isinstance(title, str) or not title.strip():
         return {'success': False, 'error': 'title is required (non-empty string)'}
+    _fill_blank_column_labels(schema)
     try:
         validate_block_document(schema)
     except SchemaValidationError as exc:
@@ -454,6 +501,7 @@ def update_artifact_record(
         except SchemaValidationError as exc:
             return {'success': False, 'error': f'schema_diff invalid: {exc}'}
 
+    _fill_blank_column_labels(new_state)
     try:
         validate_block_document(new_state)
     except SchemaValidationError as exc:

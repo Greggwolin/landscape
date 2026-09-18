@@ -142,14 +142,24 @@
   background: var(--cui-tertiary-bg);
 }
 
-/* Size columns to widest cell content; headers wrap to fit */
+/* Size columns to widest cell content. Headings follow the 2026-09-17 rule:
+   a text heading stays on one line, a heading over figures may wrap. */
 .rent-roll table {
   table-layout: auto;
 }
 
 .rent-roll table th {
-  white-space: normal;
+  white-space: nowrap;
   min-width: 50px;
+}
+
+.rent-roll table th[style*="text-align: right"],
+.rent-roll table th[style*="text-align:right"],
+.rent-roll table th[style*="text-align: center"],
+.rent-roll table th[style*="text-align:center"],
+.rent-roll table th.text-right,
+.rent-roll table th.text-center {
+  white-space: normal;
 }
 
 .rent-roll table td {

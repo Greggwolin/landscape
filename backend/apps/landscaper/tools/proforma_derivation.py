@@ -57,6 +57,8 @@ data is a question, never a silent default.
 
 from __future__ import annotations
 
+import re
+
 import copy
 import logging
 from decimal import Decimal
@@ -290,23 +292,41 @@ def project_payload(
 
 def projection_title(
     property_name: str,
+    base_scenario_label: str,  # noqa: ARG001 -- kept for call compatibility
+    provenance: Dict[str, Any],
+) -> str:
+    """What the statement IS, and nothing else.
+
+    "Chadron Terrace — Year 3 Proforma". The word proforma is what stops it
+    being read as actuals; the derivation -- which statement it grew from and
+    at what rates -- goes UNDER the schedule as a note, where Gregg put it on
+    2026-09-18: "the header should only say ... you can add the other comments
+    as a note below the schedule in smaller, plain font."
+    """
+    return f'{property_name} — Year {provenance["years"]} Proforma'
+
+
+def projection_note(
     base_scenario_label: str,
     provenance: Dict[str, Any],
 ) -> str:
-    """A title that cannot be mistaken for actuals.
+    """The derivation, for the note under the schedule.
 
-    States the horizon, the statement it was derived from, and the rates --
-    on the face of the artifact, not in a tooltip. A projected statement that
-    reads like a historical one is the expensive failure here, because the
-    figures are entirely plausible.
+    Still on the face of the artifact, never in a tooltip: a projected
+    statement that reads like a historical one is the expensive failure here,
+    because the figures are entirely plausible.
     """
     inc = provenance['income_rate_year_1'] * 100
     exp = provenance['expense_rate_year_1'] * 100
     multi_income = len(provenance.get('income_steps') or []) > 1
     multi_expense = len(provenance.get('expense_steps') or []) > 1
-    inc_txt = f'Income +{inc:.1f}%' + (' (stepped)' if multi_income else '')
-    exp_txt = f'Expenses +{exp:.1f}%' + (' (stepped)' if multi_expense else '')
+    inc_txt = f'income +{inc:.1f}%' + (' stepped' if multi_income else '')
+    exp_txt = f'expenses +{exp:.1f}%' + (' stepped' if multi_expense else '')
+    years = int(provenance['years'])
+    horizon = '1 year' if years == 1 else f'{years} years'
+    # The base label repeats the property name the title already carries.
+    base = re.sub(r'^.*\s+—\s+', '', base_scenario_label).strip() or base_scenario_label
     return (
-        f'{property_name} — Year {provenance["years"]} Projected · '
-        f'from {base_scenario_label} · {inc_txt}, {exp_txt}'
+        f'Projected {horizon} from the {base}, '
+        f'grown at {inc_txt} and {exp_txt} a year. Not actuals.'
     )

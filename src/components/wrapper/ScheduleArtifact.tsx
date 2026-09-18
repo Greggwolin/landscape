@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
 import type { BlockDocument } from '@/types/artifact';
+import { printArtifact } from './printArtifact';
 import styles from './ScheduleArtifact.module.css';
 import { useArtifactWidthRequest, widthForColumns } from './artifactWidthRequest';
 import { hierCellText, hierHeaderLabels } from './hierPath';
@@ -611,6 +612,89 @@ export function ScheduleArtifact({
     }
   };
 
+  /* The paper copy is WHAT IS ON SCREEN — the rows the filter left, the
+   * columns the rung and the chips left, the grouping it is grouped by, the
+   * same formatting. Not the whole dataset: printing something the screen is
+   * not showing is how a filtered view turns into a misleading handout.
+   *
+   * Shape follows the statement convention settled 2026-09-17: a group heading
+   * bold and flush left stating no figure of its own beyond its subtotal, its
+   * lines indented under it, the subtotal level with them, the total flush
+   * left and ruled. */
+  const printThis = () => {
+    const esc = (t: string) => t
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const alignOf = (c: ScheduleColumn) =>
+      c.key === HIER_KEY ? 'left'
+        : (c.align ?? ((c.kind === 'number' || c.kind === 'computed') ? 'right' : 'left'));
+    const cellOf = (row: ScheduleRow, c: ScheduleColumn) => {
+      if (c.key === HIER_KEY) return hierPath(row);
+      const numeric = c.kind === 'number' || c.kind === 'computed';
+      return numeric ? formatNumber(row.cells[c.key]) : formatText(row.cells[c.key]);
+    };
+    const amountIdx = Math.max(0, activeColumns.findIndex((c) => c.key === 'amount'));
+
+    const head = activeColumns.map((c) => {
+      const align = alignOf(c);
+      const label = c.key === HIER_KEY ? hierHeader : (c.label ?? '');
+      return `<th style="text-align:${align};white-space:${align === 'left' ? 'nowrap' : 'normal'}">`
+        + `${esc(String(label))}</th>`;
+    }).join('');
+
+    /* One row of the printed table. `indent` steps the label in; `weight` and
+     * `rule` mark a heading or a total. */
+    const line = (cells: string[], opts: { indent?: number; bold?: boolean;
+                                           rule?: boolean; lead?: boolean } = {}) =>
+      '<tr>' + cells.map((text, i) => {
+        const align = alignOf(activeColumns[i]);
+        const pad = i === 0 && opts.indent
+          ? `padding:2pt 6pt;padding-left:${6 + opts.indent * 12}pt;`
+          : 'padding:2pt 6pt;';
+        return `<td style="text-align:${align};${pad}`
+          + `${opts.bold ? 'font-weight:700;' : ''}`
+          + `${opts.rule ? 'border-top:0.7pt solid #000;' : ''}`
+          + `${opts.lead ? 'padding-top:10pt;' : ''}">${esc(text)}</td>`;
+      }).join('') + '</tr>';
+
+    const blankRow = () => activeColumns.map(() => '');
+    const amountRow = (label: string, amount: number) => {
+      const cells = blankRow();
+      cells[0] = label;
+      cells[amountIdx] = formatNumber(amount);
+      return cells;
+    };
+
+    const body = sections.map((section, si) => {
+      const grouped = Boolean(section.label);
+      const parts: string[] = [];
+      if (grouped) {
+        parts.push(line(amountRow(section.label, section.subtotal),
+                        { bold: true, lead: si > 0 }));
+      }
+      for (const row of section.rows) {
+        parts.push(line(activeColumns.map((c) => cellOf(row, c)),
+                        { indent: grouped ? 1 : 0 }));
+      }
+      if (grouped) {
+        parts.push(line(amountRow(`${section.label} subtotal`, section.subtotal),
+                        { indent: 1, bold: true, rule: true }));
+      }
+      return parts.join('');
+    }).join('');
+
+    const total = line(
+      amountRow(isScoped ? `${scopeLabel} total` : 'Total', scopeTotal),
+      { bold: true, rule: true, lead: true },
+    );
+
+    printArtifact(
+      title,
+      `<p>${esc(`${config.kicker} · ${config.basis.label}`)}</p>`
+      + `<table><thead><tr>${head}</tr></thead><tbody>${body}${total}</tbody></table>`,
+      `${visibleRows.length} of ${config.rows.length} lines shown.`,
+    );
+  };
+
   const renderCell = (row: ScheduleRow, column: ScheduleColumn) => {
     if (column.key === HIER_KEY) {
       return <td key={column.key} className={styles.hier}>{hierPath(row)}</td>;
@@ -806,13 +890,22 @@ export function ScheduleArtifact({
       <div className={styles.head}>
         <div className={styles.kicker}>
           <span>{config.kicker}</span>
-          {onClose && (
-            <span className={styles.headActions}>
+          <span className={styles.headActions}>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={printThis}
+              title="Print (or save as PDF)"
+              aria-label="Print"
+            >
+              <Printer size={14} />
+            </button>
+            {onClose && (
               <button type="button" className={styles.iconBtn} onClick={onClose} title="Close">
                 <X size={14} />
               </button>
-            </span>
-          )}
+            )}
+          </span>
         </div>
         <div className={styles.titleRow}>
           <div className={styles.title}>{title}</div>

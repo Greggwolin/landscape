@@ -4189,6 +4189,7 @@ def handle_get_operating_statement(
     # range it supports, and a project with no growth assumptions on file asks
     # which rates to use. Neither invents a rate.
     projection = None
+    projection_note = None
     projection_years = tool_input.get('projection_years')
     if projection_years not in (None, ''):
         from .tools import proforma_derivation as _pfd
@@ -4200,6 +4201,7 @@ def handle_get_operating_statement(
                 income_steps=steps['revenue'],
                 expense_steps=steps['cost'],
             )
+            projection_note = _pfd.projection_note(rendering_label, projection)
             rendering_label = _pfd.projection_title(
                 project_name, rendering_label, projection
             )
@@ -4249,6 +4251,7 @@ def handle_get_operating_statement(
             user_id=user_id,
             thread_id=kwargs.get('thread_id'),
             projection_years=projection['years'] if projection else None,
+            footnote=projection_note,
         )
         if candidate and candidate.get('success') is not False:
             artifact_envelope = candidate
