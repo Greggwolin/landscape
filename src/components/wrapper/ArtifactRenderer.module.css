@@ -839,13 +839,67 @@
   padding: 12px 16px;
 }
 
-/* Body cells — slightly bumped padding, normal body color, tabular
-   numerals so currency columns line up. */
+/* Body cells — normal body color, tabular numerals so currency columns line
+   up, and TIGHT rows.
+   This block is the one that actually governs, because an artifact in the rail
+   is nearly always the active one and `.w-rail-card.is-artifact-active .table
+   tbody td` outranks every rule in the statement section above. It used to set
+   `padding: 14px 16px`, which is why the rows read as an even, airy stack and
+   why no indent ever appeared however the row was classified: the 16px left
+   padding here beat the depth rules, and the 14px top made every line sit as
+   far from its neighbour as a section heading should
+   (Gregg, 2026-09-18: "no intents, no bold fixes, lines way to far apart").
+   So the statement's shape is restated here, at this specificity. */
 :global(.w-rail-card.is-artifact-active) .table tbody td {
-  padding: 14px 16px;
+  padding: 3px 16px;
   font-size: 14px;
   color: #1e293b;
   font-variant-numeric: tabular-nums;
+}
+
+/* The indent ladder. Section flush at 16px, then a step of 16px per level. */
+:global(.w-rail-card.is-artifact-active) .depth1 td:first-child:not(.driftCell),
+:global(.w-rail-card.is-artifact-active) .depth1 td.driftCell + td {
+  padding-left: 32px;
+}
+
+:global(.w-rail-card.is-artifact-active) .depth2 td:first-child:not(.driftCell),
+:global(.w-rail-card.is-artifact-active) .depth2 td.driftCell + td {
+  padding-left: 48px;
+}
+
+:global(.w-rail-card.is-artifact-active) .depth3 td:first-child:not(.driftCell),
+:global(.w-rail-card.is-artifact-active) .depth3 td.driftCell + td {
+  padding-left: 64px;
+}
+
+/* A section heading: BOLD, flush left, with the air that separates one group
+   from the next. The label cell has to be named explicitly — the statement
+   section above deliberately sets it to 400, from when the heading carried the
+   column labels. */
+:global(.w-rail-card.is-artifact-active) .sectionDividerRow td,
+:global(.w-rail-card.is-artifact-active) .sectionDividerRow td:first-child,
+:global(.w-rail-card.is-artifact-active) .sectionDividerRow td.driftCell + td {
+  padding-top: 18px;
+  padding-bottom: 3px;
+  font-weight: 700;
+}
+
+/* ...except the first row in the table, which would otherwise open with a gap. */
+:global(.w-rail-card.is-artifact-active) tbody tr:first-child.sectionDividerRow td {
+  padding-top: 4px;
+}
+
+/* Totals keep their weight and rules, and take a little space of their own. */
+:global(.w-rail-card.is-artifact-active) .subtotalRow td {
+  padding-top: 6px;
+  font-weight: 700;
+}
+
+:global(.w-rail-card.is-artifact-active) .grandTotalRow td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-weight: 700;
 }
 
 /* Status pill — generic. Renderer detects status-y text (Occupied /
