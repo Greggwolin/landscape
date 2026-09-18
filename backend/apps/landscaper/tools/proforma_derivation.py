@@ -57,6 +57,8 @@ data is a question, never a silent default.
 
 from __future__ import annotations
 
+import re
+
 import copy
 import logging
 from decimal import Decimal
@@ -320,7 +322,11 @@ def projection_note(
     multi_expense = len(provenance.get('expense_steps') or []) > 1
     inc_txt = f'income +{inc:.1f}%' + (' stepped' if multi_income else '')
     exp_txt = f'expenses +{exp:.1f}%' + (' stepped' if multi_expense else '')
+    years = int(provenance['years'])
+    horizon = '1 year' if years == 1 else f'{years} years'
+    # The base label repeats the property name the title already carries.
+    base = re.sub(r'^.*\s+—\s+', '', base_scenario_label).strip() or base_scenario_label
     return (
-        f'Projected {provenance["years"]} years from {base_scenario_label}, '
+        f'Projected {horizon} from the {base}, '
         f'grown at {inc_txt} and {exp_txt} a year. Not actuals.'
     )

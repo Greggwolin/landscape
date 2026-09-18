@@ -267,6 +267,20 @@ def test_the_note_states_the_base_the_horizon_and_both_rates():
     assert 'Not actuals' in note
 
 
+def test_a_one_year_horizon_reads_as_one_year():
+    _out, prov = _project(1)
+    assert '1 year ' in projection_note('Default (untagged)', prov)
+    assert '1 years' not in projection_note('Default (untagged)', prov)
+
+
+def test_the_note_drops_the_property_name_the_title_already_carries():
+    _out, prov = _project(3)
+    note = projection_note(
+        'Chadron Terrace — Default (untagged) Operating Statement', prov)
+    assert 'Chadron Terrace' not in note
+    assert 'Default (untagged) Operating Statement' in note
+
+
 def test_a_stepped_rate_is_flagged_in_the_note_rather_than_shown_as_flat():
     steps = [
         {'from_period': 1, 'thru_period': 2, 'periods': None, 'rate': 0.02},
