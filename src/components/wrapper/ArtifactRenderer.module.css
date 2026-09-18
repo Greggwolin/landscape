@@ -830,7 +830,9 @@
   background-color: #f1f5f9 !important;
 }
 :global(.w-rail-card.is-artifact-active) .table thead th {
-  color: #64748b !important;
+  /* Black, not slate: at 11px uppercase the grey washed out (Gregg,
+     2026-09-18). */
+  color: #111111 !important;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;

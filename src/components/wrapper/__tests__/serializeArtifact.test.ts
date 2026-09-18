@@ -174,8 +174,12 @@ describe('statement shape', () => {
   it('a closing total lines up with the line it totals', () => {
     expect(indentOf('Effective Gross Income'))
       .toBe(indentOf('Gross Potential Rent'));
+    // ...and a group that opened with no subtotal of its own lines its total
+    // up with the SECTION heading (Gregg, 2026-09-18).
     expect(indentOf('Total Operating Expenses'))
-      .toBe(indentOf('Taxes &amp; Insurance'));
+      .toBe(indentOf('Operating Expenses'));
+    expect(indentOf('Taxes &amp; Insurance'))
+      .toBeGreaterThan(indentOf('Total Operating Expenses'));
   });
 
   it('the grand total returns to flush left, ruled above and below', () => {

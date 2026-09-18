@@ -63,6 +63,7 @@ def _row(counter: Dict[str, int], line: str, annual: Optional[float],
 
 def build_os_artifact_schema(
     payload: Dict[str, Any],
+    footnote: Optional[str] = None,
 ) -> Tuple[Dict[str, Any], int]:
     """Convert an ``operations_data`` payload into the canonical artifact
     schema. Returns (schema, unit_count). Totals come from the payload's
@@ -147,6 +148,16 @@ def build_os_artifact_schema(
             'rows': rows,
         }],
     }
+    # Anything that qualifies the statement -- what it was derived from, at
+    # what rates -- sits UNDER the schedule in small plain type rather than in
+    # the title, which says only what the statement is (Gregg, 2026-09-18).
+    if footnote:
+        schema['blocks'].append({
+            'id': 'os_note',
+            'type': 'text',
+            'variant': 'caption',
+            'content': footnote,
+        })
     return schema, unit_count
 
 
@@ -217,6 +228,7 @@ def create_os_artifact(
     user_id: Any = None,
     thread_id: Any = None,
     projection_years: Optional[int] = None,
+    footnote: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Build + register the operating-statement artifact server-side.
 
@@ -230,7 +242,7 @@ def create_os_artifact(
         logger.exception('os_artifact_builder: artifact service unavailable')
         return {'success': False, 'error': f'artifact service unavailable: {exc}'}
 
-    schema, _unit_count = build_os_artifact_schema(payload)
+    schema, _unit_count = build_os_artifact_schema(payload, footnote=footnote)
     subtype = _subtype_for(scenario)
 
     # A projection is a DIFFERENT statement from the history it came from, so

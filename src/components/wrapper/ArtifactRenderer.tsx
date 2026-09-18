@@ -349,8 +349,18 @@ export function statementDepths(
         break;
       case 'subtotal':
         inSubsection = false;
-        if (!sawLineItem) groupOpenedBySubtotal = true;
-        depth = 1;
+        if (!sawLineItem) {
+          // The subtotal that OPENS a group (Gross Potential Rent) sits under
+          // its section heading.
+          groupOpenedBySubtotal = true;
+          depth = 1;
+        } else {
+          // A closing total lines up with the first row of its group: the
+          // opening subtotal where there was one, and otherwise the section
+          // heading itself -- Total Operating Expenses level with Operating
+          // Expenses (Gregg, 2026-09-18).
+          depth = groupOpenedBySubtotal ? 1 : 0;
+        }
         break;
       case 'subsection':
         inSubsection = true;
