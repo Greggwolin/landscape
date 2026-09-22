@@ -34,11 +34,21 @@ function extractArtifactCards(
     // and the Excel-audit chain all produce artifacts and should surface
     // chat cards the same way. Dedupe by id in case multiple executions in
     // one message reference the same artifact. LF-USERDASH-0514.
-    const artifactId = result.artifact_id;
+    // The deterministic schedule tools (budget, sales, cash flow,
+    // capitalization, rent roll) and open_clarification NEST the envelope
+    // under result.artifact. Without reading it, those artifacts produced no
+    // card — and under Rule 4 (2026-09-22) a card is how the user is told an
+    // artifact exists when it does not take the panel.
+    const nested =
+      result.artifact && typeof result.artifact === 'object'
+        ? (result.artifact as Record<string, unknown>)
+        : null;
+    const artifactId =
+      typeof result.artifact_id === 'number' ? result.artifact_id : nested?.artifact_id;
     if (typeof artifactId !== 'number') continue;
     if (seen.has(artifactId)) continue;
     seen.add(artifactId);
-    const title = result.title;
+    const title = typeof result.title === 'string' ? result.title : nested?.title;
     cards.push({
       artifactId,
       title: typeof title === 'string' ? title : `Artifact #${artifactId}`,

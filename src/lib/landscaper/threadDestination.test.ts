@@ -129,11 +129,14 @@ describe('deriveDestination — things the chat CHANGED', () => {
   it('honours an explicit navigate_to over the derived map route', () => {
     const d = deriveDestination(
       'control_map_overlay',
-      { action: 'control_map_overlay', overlay_command: {}, navigate_to: '/studio/9' },
+      // Chat-first project surface, Map tab (2026-09-22: the studio route this
+      // test used to encode is where Landscaper's navigation wrongly landed
+      // chat-first users — next-actions #LS-0918-10).
+      { action: 'control_map_overlay', overlay_command: {}, navigate_to: '/w/projects/9?view=map' },
       PROJECT,
       NOW,
     );
-    expect(d).toMatchObject({ kind: 'screen', route: '/studio/9' });
+    expect(d).toMatchObject({ kind: 'screen', route: '/w/projects/9?view=map' });
   });
 
   it('plan extraction points at the map', () => {

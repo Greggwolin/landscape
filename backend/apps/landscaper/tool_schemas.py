@@ -5674,13 +5674,25 @@ LANDSCAPER_TOOLS = [
                 "source_pointers": {
                     "description": "Optional per-row/cell DB row refs + capture timestamps. Required for drift detection and dependency tracking on rows derived from DB data.",
                 },
+                "open_in_panel": {
+                    "type": "boolean",
+                    "description": (
+                        "Whether the new artifact takes over the right panel. TRUE (default) when "
+                        "the user asked to SEE this artifact — named it or asked to be shown it "
+                        "('show me a Year 1 summary', 'make me a rent roll table'). FALSE when the "
+                        "artifact is a side effect of an edit or of a side question the user asked "
+                        "while looking at something else — the panel then stays where the user is "
+                        "and a card in the chat opens it. Either way say in the reply that the "
+                        "artifact exists."
+                    ),
+                },
             },
             "required": ["title", "schema"],
         },
     },
     {
         "name": "update_artifact",
-        "description": "Modify an existing artifact in place. Use for adding a section, replacing a block, or refreshing data. Pass schema_diff (JSON Patch RFC-6902 array) to surgically modify the artifact, or full_schema to replace it entirely. The version log captures the change for restore.",
+        "description": "Modify an existing artifact in place. Use for adding a section, replacing a block, or refreshing data — ONLY on the artifact the user is working on. NEVER use it to produce a VARIANT (a different cut of the same subject: a summary instead of detail, other years, other columns): a variant is always a NEW artifact via create_artifact, and the original is left exactly as it was, because it may carry the user's annotations. Pass schema_diff (JSON Patch RFC-6902 array) to surgically modify the artifact, or full_schema to replace it entirely. The version log captures the change for restore.",
         "input_schema": {
             "type": "object",
             "properties": {

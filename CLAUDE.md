@@ -612,6 +612,18 @@ The application has two coexisting navigation surfaces. Active development is on
 
 **Implication for new work:** new product surfaces should be built into the `/w/` shell (with right-panel artifacts and Landscaper as the primary navigation), not as new folders/tabs in the legacy layout.
 
+### Navigation rules on the chat-first surface (2026-09-22, chat MP)
+
+Gregg's twelve rules (decisions `D-2026-09-22-NAV-R1`…`R12`) are built on `feat/nav-rules`. The mechanism, in one place — `src/lib/wrapper/navMemory.ts`:
+
+- **The address is the source of truth** for the project surface: `/w/projects/{id}?thread={uuid|new}&view={screen|artifacts|documents|map}&folder=&tab=&artifact=&doctab=`. Every chat change and every panel change is a history entry, so browser Back and the in-app "← Back" retrace the same steps (R8). `thread=new` is a blank chat (R3).
+- **Remembered per browser (localStorage):** each chat's visible panel (R2) and each project's last chat (R1). A bare `/w/projects/{id}` redirects (replace) to the last chat with its panel; a first visit shows the start view. The server's "last productive" thread destination is now only the fallback for a chat never opened in this browser.
+- **Sync lives in `src/app/w/layout.tsx`:** address → panel, panel → address (push; replace when filling in or within 2.5 s of a chat change), R1 redirect, memory recording. `CenterChatPanel` puts the chat into the address and is keyed on the project so no chat survives a project switch.
+- **R11:** nothing moves the left sidebar except the user; the panel sizes itself against the real sidebar width (`sidebarWidthPx` in `WrapperUIContext`).
+- **R9:** Documents and Map are panel tabs, one full version each (`PanelDocumentsView` renders the classic document screen). `/w/projects/{id}/map` and `/documents` redirect to those tabs, carrying the chat. The rail Map icon goes to `/w/map` (own maps outside projects — unbuilt, says so).
+- **R4:** `create_artifact` takes `open_in_panel`; the client opens an artifact (and switches the panel to Artifacts) only when it is true/absent, otherwise the chat card announces it. **R5:** a dedup hit overwrites only when the title matches and the user has made no snapshot (annotation) edit — otherwise a new artifact (`_is_variant_of` in `apps/artifacts/services.py`). **R6:** the Artifacts view lists all artifacts (up to 200) grouped by title, older versions folded; no documents. Schedule-style artifacts share `StandardArtifactFrame` (pin/copy/print/close).
+- `navigate_to_project` targets `/w/projects/{id}` (was `/studio/{id}`).
+
 ### Landscaper Architecture
 
 - **Center panel in the chat-first UI** (`/w/` shell). Landscaper is the primary navigation surface — sidebar on the left, Landscaper chat in the center, artifacts/content on the right. In the legacy `/projects/[id]` layout, Landscaper still renders as a left flyout panel (320px, collapsible to a 64px strip), but new surfaces should target the chat-first layout.
