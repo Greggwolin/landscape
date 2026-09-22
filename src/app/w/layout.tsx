@@ -664,11 +664,6 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [DJANGO_API_URL]);
 
-  const mockScheduled = [
-    { id: 's1', emoji: '📊', name: 'FRED market data pull', status: 'active' as const },
-    { id: 's2', emoji: '🏗️', name: 'Bellflower permit monitor', status: 'active' as const },
-    { id: 's3', emoji: '🏠', name: 'Redfin comp tracker', status: 'paused' as const },
-  ];
 
   // ── The project's screen tree, for the sidebar (D-2026-09-18-TARGET) ──
   // The studio has shown the folder tree down the left since June; the chat
@@ -763,7 +758,6 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         onArchiveThread={handleArchiveThread}
         onRestoreThread={handleRestoreThread}
         onDeleteThreadPermanently={handleDeleteThreadPermanently}
-        scheduledAgents={mockScheduled}
         projectNav={
           projectId && navProject
             ? {
