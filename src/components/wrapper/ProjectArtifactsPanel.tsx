@@ -9,6 +9,7 @@ import { ArtifactWorkspacePanel } from './ArtifactWorkspacePanel';
 import { WrapperHeader } from './WrapperHeader';
 import { ProjectDocumentsBody } from './ProjectDocumentsBody';
 import { PanelMapView } from './PanelMapView';
+import { PanelScreenView } from './PanelScreenView';
 import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
 import {
   ArtifactWidthRequestProvider,
@@ -356,6 +357,23 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
       <WrapperHeader
         title={
           <div className="project-right-panel-toggle">
+            {/* Screens — the classic screen tree, hosted here since
+                2026-09-18. First in the row because under D-2026-09-18-TARGET
+                the screen is where you type and the artifact is what you read.
+                Gated like Map: PanelScreenView calls useWrapperProject, which
+                throws without a provider, and the dashboard has none. */}
+            {showViewToggle && (
+              <>
+                <button
+                  type="button"
+                  className={`prp-toggle-btn${projectRightPanelView === 'screen' ? ' is-active' : ''}`}
+                  onClick={() => setProjectRightPanelView('screen')}
+                >
+                  Screens
+                </button>
+                <span className="prp-toggle-sep" aria-hidden>|</span>
+              </>
+            )}
             <button
               type="button"
               className={`prp-toggle-btn${projectRightPanelView === 'artifacts' ? ' is-active' : ''}`}
@@ -419,7 +437,11 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
             flex-grow card.
           - Default artifacts view: ArtifactWorkspacePanel renders its
             own per-section card stack inside .artifacts-panel-body. */}
-      {projectRightPanelView === 'documents' ? (
+      {projectRightPanelView === 'screen' && showViewToggle ? (
+        <div className="project-right-panel-body project-right-panel-body--screen">
+          <PanelScreenView />
+        </div>
+      ) : projectRightPanelView === 'documents' ? (
         <div className="project-right-panel-body project-right-panel-body--documents">
           <ProjectDocumentsBody projectId={projectId} />
         </div>
