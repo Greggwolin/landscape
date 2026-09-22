@@ -248,6 +248,15 @@ interface WrapperUIContextValue {
    */
   cascadeNotification: CascadeNotificationPayload | null;
   setCascadeNotification: (n: CascadeNotificationPayload | null) => void;
+  /**
+   * Width of the left sidebar as it is on screen right now, in pixels.
+   * Rule 11 (D-2026-09-22-NAV-R11): the sidebar only moves when the user moves
+   * it, so the panel can no longer assume it is collapsed when it sizes itself.
+   * When the panel needs room, the chat gives way — and to know how much room
+   * the chat has, the panel needs the sidebar's real width. Set by the /w/ shell.
+   */
+  sidebarWidthPx: number;
+  setSidebarWidthPx: (px: number) => void;
 }
 
 /** Cascade notification payload returned by the backend dependency hook. */
@@ -308,6 +317,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   // Actual viewport-based value is applied in the useEffect below after mount.
   const [artifactsOpen, setArtifactsOpen] = useState(true);
   const [projectRightPanelView, setProjectRightPanelView] = useState<ProjectRightPanelView>('artifacts');
+  const [sidebarWidthPx, setSidebarWidthPx] = useState(260);
 
   // Sync to viewport after mount + auto-collapse/expand on resize
   useEffect(() => {
@@ -339,6 +349,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       searchOpen, openSearch, closeSearch,
       activeContentContext, setActiveContentContext,
       cascadeNotification, setCascadeNotification,
+      sidebarWidthPx, setSidebarWidthPx,
     }}>
       {children}
     </WrapperUIContext.Provider>

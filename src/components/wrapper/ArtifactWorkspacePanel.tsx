@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database, Pencil, Trash2, LayoutList } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pin, Clock, Database, Pencil, Trash2, LayoutList } from 'lucide-react';
 import { useWrapperUI, type LocationBriefArtifactConfig, type MapArtifactConfig } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
@@ -29,79 +29,13 @@ import { CapitalizationArtifact, type CapitalizationViewConfig } from './Capital
 import { CashflowArtifact, type CashflowViewConfig } from './CashflowArtifact';
 import { PricingRegisterArtifact, type PricingRegisterViewConfig } from './PricingRegisterArtifact';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
+import { StandardArtifactFrame } from './StandardArtifactFrame';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
 
-const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem('auth_tokens');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.access) return { Authorization: `Bearer ${parsed.access}` };
-    }
-  } catch { /* ignore */ }
-  return {};
-}
-
-interface ProjectDocument {
-  doc_id: number;
-  doc_name: string;
-  doc_type: string;
-  status: string;
-  created_at: string;
-}
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  general: 'General',
-  lease: 'Lease',
-  appraisal: 'Appraisal',
-  financial: 'Financial',
-  report: 'Report',
-  contract: 'Contract',
-  permit: 'Permit',
-  title: 'Title',
-  survey: 'Survey',
-  market: 'Market',
-  om: 'OM',
-  excel: 'Excel',
-  pdf: 'PDF',
-};
-
-/**
- * Newest-first, by whichever of updated_at / created_at is later (MK24 §4).
- *
- * "Recent" has to mean recently *touched*, not just recently uploaded — a
- * document renamed or reprocessed today belongs at the top alongside one added
- * today. Rows carrying neither timestamp sort last rather than jumping to the
- * front on an unparseable date.
- */
-function sortByMostRecent<T>(rows: T[]): T[] {
-  const stamp = (row: T): number => {
-    const record = row as unknown as Record<string, unknown>;
-    let best = 0;
-    for (const key of ['updated_at', 'created_at'] as const) {
-      const value = record[key];
-      if (typeof value !== 'string') continue;
-      const parsed = Date.parse(value);
-      if (Number.isFinite(parsed) && parsed > best) best = parsed;
-    }
-    return best;
-  };
-  // Copy first — sort mutates, and the caller hands us the fetched array.
-  return [...rows].sort((a, b) => stamp(b) - stamp(a));
-}
-
-function docTypeLabel(docType: string): string {
-  return DOC_TYPE_LABELS[docType] ?? docType;
-}
-
-function formatDocDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+// (The project-documents list that used to sit at the top of this panel, and
+// its fetch and row helpers, were removed 2026-09-22 — Rule 6: the Artifacts
+// view shows artifacts only. The documents are the panel's Documents tab.)
 
 interface ArtifactWorkspacePanelProps {
   /** Project context — null for unassigned threads. */
@@ -180,12 +114,14 @@ export function ArtifactWorkspacePanel({
     limit: 50,
   });
 
-  // Recent artifacts (excluding pinned, top 10) — same query parameters but
-  // unfiltered for pinned. Frontend filters out pinned ids client-side.
+  // Every artifact (excluding pinned, which have their own section) — Rule 6
+  // (D-2026-09-22-NAV-R6): the Artifacts view shows ALL of them, not the latest
+  // ten. Chadron had 50 live artifacts and ten were reachable; fourteen T-12
+  // statements could not be found at all. 200 is the list endpoint's ceiling.
   const recentQuery = useArtifactList({
     project_id: projectId ?? undefined,
     include_unassigned: wantUnassigned,
-    limit: 10,
+    limit: 200,
   });
 
   const catalogQuery = useArtifactCatalog(projectId ?? null);
@@ -199,6 +135,31 @@ export function ArtifactWorkspacePanel({
   const recentArtifacts: ArtifactSummary[] = (recentQuery.data?.results ?? []).filter(
     (a) => !pinnedIds.has(a.artifact_id),
   );
+
+  // Rule 6, Q6 = "6c": grouped by subject — the newest of each subject on top,
+  // older versions folded underneath. A subject is the artifact's title (case
+  // and spacing ignored): the fourteen "Trailing 12 Operations" statements are
+  // one subject with thirteen older versions. The list arrives newest-first,
+  // so the first artifact seen for a subject is its newest and groups come out
+  // in order of their newest member.
+  const artifactGroups = useMemo(() => {
+    const bySubject = new Map<string, ArtifactSummary[]>();
+    for (const a of recentArtifacts) {
+      const key = (a.title || `artifact-${a.artifact_id}`).trim().toLowerCase().replace(/\s+/g, ' ');
+      const g = bySubject.get(key);
+      if (g) g.push(a);
+      else bySubject.set(key, [a]);
+    }
+    return Array.from(bySubject.entries()).map(([key, items]) => ({ key, items }));
+  }, [recentArtifacts]);
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Active artifact — full detail.
   const activeQuery = useArtifact(activeArtifactId);
@@ -367,91 +328,16 @@ export function ArtifactWorkspacePanel({
   const [pinnedCollapsed, setPinnedCollapsed] = useState(true);
   const [recentCollapsed, setRecentCollapsed] = useState(true);
   const [pointersCollapsed, setPointersCollapsed] = useState(true);
-  const [documentsCollapsed, setDocumentsCollapsed] = useState(true);
 
-  // Project documents — only fetched when projectId is set (unassigned threads
-  // have no project context, so the section is hidden in that case). Fetched
-  // on mount so the count badge is accurate; the list itself stays collapsed
-  // until the user opens it.
-  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
-  const [documentsLoading, setDocumentsLoading] = useState(false);
-
-  useEffect(() => {
-    if (projectId == null) {
-      setDocuments([]);
-      return;
-    }
-    let cancelled = false;
-    setDocumentsLoading(true);
-    fetch(`${DJANGO_API_URL}/api/dms/documents/?project_id=${projectId}`, {
-      headers: getAuthHeaders(),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled) return;
-        // MK24 §4 — the heading says "Recent Documents", so the list has to
-        // BE recent. The API returns them in its own order (no ordering is
-        // requested), and a heading promising recency over an arbitrary list
-        // is worse than the old heading. Sort newest-first on whichever of
-        // updated_at / created_at is later, so an edited document rises the
-        // same way a newly added one does.
-        const rows = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.results)
-            ? data.results
-            : Array.isArray(data?.documents)
-              ? data.documents
-              : null;
-        if (rows) setDocuments(sortByMostRecent(rows));
-      })
-      .catch(() => { /* swallow — empty state shows */ })
-      .finally(() => {
-        if (!cancelled) setDocumentsLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [projectId]);
+  // (Removed 2026-09-22, Rule 6: the Artifacts view no longer lists the
+  // project's documents — "each panel view shows only its own kind". The
+  // documents are the Documents tab.)
 
   return (
     <div
       className={`artifacts-panel-body${takeoverMode ? ' artifact-takeover' : ''}`}
       style={{ color: 'var(--cui-body-color)' }}
     >
-      {/* ── Project Documents ── (project-scoped only; hidden on unassigned
-          threads). Surfaced at the top of the panel so the project's source
-          files are the first thing visible — Pinned + Recent are derivative
-          views over those files.
-          On the home (user) project, callers pass documentsLabel="Documents"
-          since there's no project association to qualify. LF-USERDASH-0514.
-          Suppressed in takeover mode — the active artifact owns the full rail. */}
-      {!takeoverMode && projectId != null && (
-        <div className="w-rail-card">
-          <CollapsibleSection
-            title={documentsLabel}
-            icon={<Folder size={15} />}
-            count={documents.length}
-            collapsed={documentsCollapsed}
-            onToggle={() => setDocumentsCollapsed((v) => !v)}
-          >
-            {documentsLoading ? (
-              <EmptyRow text="Loading…" />
-            ) : documents.length === 0 ? (
-              <EmptyRow text="No documents yet. Switch to Documents in the panel header to upload." />
-            ) : (
-              documents.map((doc) => (
-                <DocumentListRow
-                  key={doc.doc_id}
-                  doc={doc}
-                  onClick={() => {
-                    setPreviewDocId(doc.doc_id);
-                    setPreviewDocName(doc.doc_name);
-                  }}
-                />
-              ))
-            )}
-          </CollapsibleSection>
-        </div>
-      )}
-
       {/* ── Standard Artifacts (5a) ── (suppressed in takeover mode).
           Named "artifacts", not "reports": the list holds registers and
           workspaces as well as reports, and calling the whole set reports
@@ -535,29 +421,61 @@ export function ArtifactWorkspacePanel({
         </div>
       )}
 
-      {/* ── Recent Artifacts ── (suppressed in takeover mode). */}
+      {/* ── All Artifacts, grouped by subject ── (Rule 6; suppressed in
+          takeover mode). */}
       {!takeoverMode && (
         <div className="w-rail-card">
           <CollapsibleSection
-            title="Recent Artifacts"
+            title="All Artifacts"
             icon={<Clock size={15} />}
             count={recentArtifacts.length}
             collapsed={recentCollapsed}
             onToggle={() => setRecentCollapsed((v) => !v)}
           >
             {recentArtifacts.length === 0 ? (
-              <EmptyRow text="No recent artifacts." />
+              <EmptyRow text="No artifacts yet." />
             ) : (
-              recentArtifacts.map((a) => (
-                <ArtifactListRow
-                  key={a.artifact_id}
-                  artifact={a}
-                  isActive={a.artifact_id === activeArtifactId}
-                  onClick={() => setActiveArtifactId(a.artifact_id)}
-                  onRename={handleRenameArtifact}
-                  onDelete={handleDeleteArtifact}
-                />
-              ))
+              artifactGroups.map(({ key, items }) => {
+                const [newest, ...older] = items;
+                const open = openGroups.has(key);
+                return (
+                  <React.Fragment key={key}>
+                    <ArtifactListRow
+                      artifact={newest}
+                      isActive={newest.artifact_id === activeArtifactId}
+                      onClick={() => setActiveArtifactId(newest.artifact_id)}
+                      onRename={handleRenameArtifact}
+                      onDelete={handleDeleteArtifact}
+                    />
+                    {older.length > 0 && (
+                      <button
+                        type="button"
+                        className="w-rail-row"
+                        onClick={() => toggleGroup(key)}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          border: 0, background: 'transparent', cursor: 'pointer',
+                          padding: '2px 8px 6px 24px', fontSize: 11, opacity: 0.7,
+                        }}
+                        aria-expanded={open}
+                      >
+                        {open ? '▾' : '▸'} {older.length} older {older.length === 1 ? 'version' : 'versions'}
+                      </button>
+                    )}
+                    {open && older.map((a) => (
+                      <div key={a.artifact_id} style={{ paddingLeft: 16 }}>
+                        <ArtifactListRow
+                          artifact={a}
+                          isActive={a.artifact_id === activeArtifactId}
+                          onClick={() => setActiveArtifactId(a.artifact_id)}
+                          onRename={handleRenameArtifact}
+                          onDelete={handleDeleteArtifact}
+                        />
+                      </div>
+                    ))}
+                  </React.Fragment>
+                );
+              })
             )}
           </CollapsibleSection>
         </div>
@@ -641,24 +559,32 @@ export function ArtifactWorkspacePanel({
           // SAME artifact record as the block schema, so there is one budget
           // surface: artifacts saved before this existed fall through to the
           // block renderer below and are unaffected.
-          <ScheduleArtifact
-            config={
-              (active.params_json as { budget_view_config: ScheduleViewConfig })
-                .budget_view_config
-            }
-            // Slice 2 editing. The BLOCK SCHEMA comes along because that is
-            // where the per-cell source refs live and where the server resolves
-            // a write — the view specification carries no refs of its own. The
-            // commit callback is the SAME panel-level batch helper the generic
-            // renderer uses, so there is one write path and one impact banner,
-            // not a budget-specific copy of either.
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+            hidePrint
+          >
+            <ScheduleArtifact
+              config={
+                (active.params_json as { budget_view_config: ScheduleViewConfig })
+                  .budget_view_config
+              }
+              // Slice 2 editing. The BLOCK SCHEMA comes along because that is
+              // where the per-cell source refs live and where the server resolves
+              // a write — the view specification carries no refs of its own. The
+              // commit callback is the SAME panel-level batch helper the generic
+              // renderer uses, so there is one write path and one impact banner,
+              // not a budget-specific copy of either.
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'open_parcels' &&
           active.params_json &&
           (active.params_json as { parcels_view_config?: unknown }).parcels_view_config ? (
@@ -666,23 +592,30 @@ export function ArtifactWorkspacePanel({
           // format the budget schedule uses, not the old screen in a frame.
           // Keyed on the artifact so switching workspaces remounts rather than
           // carrying one project's filters into another's data.
-          <ParcelsArtifact
-            key={active.artifact_id}
-            config={
-              (active.params_json as { parcels_view_config: ParcelsViewConfig })
-                .parcels_view_config
-            }
-            // The BLOCK SCHEMA carries the per-cell source refs and is what the
-            // server resolves a write against; the view specification carries
-            // none. Same three props, same batch helper, as the budget — one
-            // write path and one impact banner, not a second copy.
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+          >
+            <ParcelsArtifact
+              key={active.artifact_id}
+              config={
+                (active.params_json as { parcels_view_config: ParcelsViewConfig })
+                  .parcels_view_config
+              }
+              // The BLOCK SCHEMA carries the per-cell source refs and is what the
+              // server resolves a write against; the view specification carries
+              // none. Same three props, same batch helper, as the budget — one
+              // write path and one impact banner, not a second copy.
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'get_sales_schedule' &&
           active.params_json &&
           (active.params_json as { sales_view_config?: unknown }).sales_view_config ? (
@@ -693,19 +626,26 @@ export function ArtifactWorkspacePanel({
           // renderer below and are unaffected. Two tables — the parcel schedule
           // and the rate card — at different grains, which is why they are not
           // merged. Editing runs through the panel's shared batch helper.
-          <SalesArtifact
-            key={active.artifact_id}
-            config={
-              (active.params_json as { sales_view_config: SalesViewConfig })
-                .sales_view_config
-            }
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+          >
+            <SalesArtifact
+              key={active.artifact_id}
+              config={
+                (active.params_json as { sales_view_config: SalesViewConfig })
+                  .sales_view_config
+              }
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'get_pricing_register' &&
           active.params_json &&
           (active.params_json as { pricing_register_view_config?: unknown }).pricing_register_view_config ? (
@@ -714,19 +654,26 @@ export function ArtifactWorkspacePanel({
           // what differs is that the view specification says, per column, whether
           // a cell is an input, a computed value or neither, so the screen can
           // colour it by what it IS rather than by a flag that can lie.
-          <PricingRegisterArtifact
-            key={active.artifact_id}
-            config={
-              (active.params_json as { pricing_register_view_config: PricingRegisterViewConfig })
-                .pricing_register_view_config
-            }
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+          >
+            <PricingRegisterArtifact
+              key={active.artifact_id}
+              config={
+                (active.params_json as { pricing_register_view_config: PricingRegisterViewConfig })
+                  .pricing_register_view_config
+              }
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'get_rent_roll_schedule' &&
           active.params_json &&
           (active.params_json as { rent_roll_view_config?: unknown }).rent_roll_view_config ? (
@@ -738,19 +685,26 @@ export function ArtifactWorkspacePanel({
           // that is where the per-cell write pointers live, and the commit
           // callback is the panel's shared batch helper — one write path and
           // one impact banner, not a rent-roll copy of either.
-          <RentRollArtifact
-            key={active.artifact_id}
-            config={
-              (active.params_json as { rent_roll_view_config: RentRollViewConfig })
-                .rent_roll_view_config
-            }
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+          >
+            <RentRollArtifact
+              key={active.artifact_id}
+              config={
+                (active.params_json as { rent_roll_view_config: RentRollViewConfig })
+                  .rent_roll_view_config
+              }
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'get_capitalization_schedule' &&
           active.params_json &&
           (active.params_json as { capitalization_view_config?: unknown }).capitalization_view_config ? (
@@ -759,19 +713,26 @@ export function ArtifactWorkspacePanel({
           // stack put in. Nothing on it is writable yet — the engine does not
           // return the id of the row each tier came from — and the surface says
           // so rather than offering an edit that cannot land.
-          <CapitalizationArtifact
-            key={active.artifact_id}
-            config={
-              (active.params_json as { capitalization_view_config: CapitalizationViewConfig })
-                .capitalization_view_config
-            }
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+          >
+            <CapitalizationArtifact
+              key={active.artifact_id}
+              config={
+                (active.params_json as { capitalization_view_config: CapitalizationViewConfig })
+                  .capitalization_view_config
+              }
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'get_cashflow_schedule' &&
           active.params_json &&
           (active.params_json as { cashflow_view_config?: unknown }).cashflow_view_config ? (
@@ -781,19 +742,26 @@ export function ArtifactWorkspacePanel({
           // period grid is calculated end to end. Same carve-out shape as the
           // budget and parcels — cash flows stored before this existed fall
           // through to the block renderer below and are unaffected.
-          <CashflowArtifact
-            key={active.artifact_id}
-            config={
-              (active.params_json as { cashflow_view_config: CashflowViewConfig })
-                .cashflow_view_config
-            }
-            schema={active.current_state_json}
-            artifactId={active.artifact_id}
-            onCommitFieldEdits={(edits) =>
-              runCommitFieldEdits(active.artifact_id, edits)
-            }
+          <StandardArtifactFrame
+            title={active.title}
+            pinnedLabel={active.pinned_label}
+            onPin={(label) => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: label } })}
+            onUnpin={() => patchMutation.mutate({ artifactId: active.artifact_id, patch: { pinned_label: null } })}
             onClose={() => setActiveArtifactId(null)}
-          />
+          >
+            <CashflowArtifact
+              key={active.artifact_id}
+              config={
+                (active.params_json as { cashflow_view_config: CashflowViewConfig })
+                  .cashflow_view_config
+              }
+              schema={active.current_state_json}
+              artifactId={active.artifact_id}
+              onCommitFieldEdits={(edits) =>
+                runCommitFieldEdits(active.artifact_id, edits)
+              }
+            />
+          </StandardArtifactFrame>
         ) : active.tool_name === 'generate_location_brief' &&
           active.params_json &&
           (active.params_json as { location_brief_config?: unknown }).location_brief_config ? (
@@ -1267,75 +1235,6 @@ const iconButtonStyle: React.CSSProperties = {
   color: 'var(--w-text-muted)',
   cursor: 'pointer',
 };
-
-interface DocumentListRowProps {
-  doc: ProjectDocument;
-  onClick: () => void;
-}
-
-function DocumentListRow({ doc, onClick }: DocumentListRowProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        width: '100%',
-        padding: '7px 12px',
-        background: 'transparent',
-        border: 'none',
-        borderLeft: '3px solid transparent',
-        color: 'var(--cui-body-color)',
-        fontSize: 14,
-        textAlign: 'left',
-        cursor: 'pointer',
-      }}
-    >
-      <FileText size={15} style={{ flexShrink: 0, opacity: 0.6 }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontWeight: 500,
-          }}
-          title={doc.doc_name}
-        >
-          {doc.doc_name}
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: 'var(--cui-secondary-color)',
-            marginTop: 1,
-          }}
-        >
-          {docTypeLabel(doc.doc_type)} · {formatDocDate(doc.created_at)}
-        </div>
-      </div>
-      {doc.status && (
-        <span
-          style={{
-            fontSize: 10,
-            padding: '1px 5px',
-            borderRadius: 3,
-            background: 'var(--cui-secondary-bg)',
-            color: 'var(--cui-secondary-color)',
-            textTransform: 'uppercase',
-            fontWeight: 600,
-            letterSpacing: 0.3,
-            flexShrink: 0,
-          }}
-        >
-          {doc.status}
-        </span>
-      )}
-    </button>
-  );
-}
 
 function EmptyRow({ text }: { text: string }) {
   return (
