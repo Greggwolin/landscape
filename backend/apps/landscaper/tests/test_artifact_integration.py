@@ -604,24 +604,26 @@ class ArtifactVariantRuleTests(TestCase):
             title=title,
             schema=_minimal_doc(blocks),
             project_id=self.PROJECT_ID,
-            tool_name='get_operating_statement',
-            dedup_key='os:default:y1',
+            # A neutral report: an operating-statement title would trip the OS
+            # guard, which is not what these tests are about.
+            tool_name='render_report_as_artifact',
+            dedup_key='RPT_VARIANT',
         )
 
     def test_same_cut_refreshes_in_place(self):
-        first = self._create('Chadron Terrace — Year 1 Proforma')
+        first = self._create('Example Variant Report')
         again = self._create(
-            'Chadron Terrace — Year 1 Proforma',
+            'Example Variant Report',
             [{'type': 'text', 'id': 't1', 'content': 'refreshed figures'}],
         )
         self.assertTrue(again.get('dedup_hit'))
         self.assertEqual(again['artifact_id'], first['artifact_id'])
 
     def test_different_cut_is_a_new_artifact_and_original_is_untouched(self):
-        first = self._create('Chadron Terrace — Year 1 Proforma')
+        first = self._create('Example Variant Report')
         before = Artifact.objects.get(pk=first['artifact_id']).current_state_json
         variant = self._create(
-            'Chadron Terrace — Year 1 Summary',
+            'Example Variant Summary',
             [{'type': 'text', 'id': 't1', 'content': 'summary'}],
         )
         self.assertFalse(variant.get('dedup_hit', False))
@@ -631,14 +633,14 @@ class ArtifactVariantRuleTests(TestCase):
         )
 
     def test_annotated_artifact_is_never_overwritten(self):
-        first = self._create('Chadron Terrace — Year 1 Proforma')
+        first = self._create('Example Variant Report')
         # A snapshot-only edit (a typed note) is a JSON Patch in the log.
         update_artifact_record(
             artifact_id=first['artifact_id'],
             schema_diff=[{'op': 'replace', 'path': '/blocks/0/content', 'value': 'my note'}],
             edit_source='user_edit',
         )
-        again = self._create('Chadron Terrace — Year 1 Proforma')
+        again = self._create('Example Variant Report')
         self.assertNotEqual(again['artifact_id'], first['artifact_id'])
         self.assertEqual(
             Artifact.objects.get(pk=first['artifact_id']).current_state_json['blocks'][0]['content'],
@@ -646,13 +648,13 @@ class ArtifactVariantRuleTests(TestCase):
         )
 
     def test_write_back_cell_edit_is_not_an_annotation(self):
-        first = self._create('Chadron Terrace — Year 1 Proforma')
+        first = self._create('Example Variant Report')
         # A write-back cell edit refreshes the whole snapshot (full_schema).
         update_artifact_record(
             artifact_id=first['artifact_id'],
             full_schema=_minimal_doc([{'type': 'text', 'id': 't1', 'content': 'after cell edit'}]),
             edit_source='user_edit',
         )
-        again = self._create('Chadron Terrace — Year 1 Proforma')
+        again = self._create('Example Variant Report')
         self.assertTrue(again.get('dedup_hit'))
         self.assertEqual(again['artifact_id'], first['artifact_id'])
