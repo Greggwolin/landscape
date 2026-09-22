@@ -718,9 +718,10 @@ LANDSCAPER_TOOLS = [
                     "minimum": 1,
                     "maximum": 10,
                     "description": (
-                        "Optional — project the resolved statement this many years "
-                        "forward using the project's stored income and expense growth "
-                        "assumptions. Pass it whenever the user asks for a projected, "
+                        "Optional — the operating year to show, using the project's "
+                        "stored income and expense growth assumptions. Year 1 is the "
+                        "CURRENT run rate with no growth; Year N carries N-1 years of "
+                        "growth (Gregg, 2026-09-22). Pass it whenever the user asks for a projected, "
                         "trended, proforma or future-year statement: 'the projected "
                         "year 3 operating statement' is projection_years=3; 'the "
                         "proforma' with no year named is 1.\n\n"
