@@ -67,25 +67,30 @@ def _project(years=3, income=None, expense=None):
 # ── the number Gregg will look at ───────────────────────────────────────────
 
 def test_year_3_gross_potential_rent_matches_hand_arithmetic():
-    """2,696,514 x 1.02^3 = 2,861,562.23 -> 2,861,562.
+    """Year 3 carries TWO years of growth (Year 1 = today, D-2026-09-22-YEAR1):
+    2,696,514 x 1.02^2 = 2,696,514 x 1.0404 = 2,805,453.17 -> 2,805,453.
 
-    Checked three ways (float power, stepwise multiply, Decimal). My first
-    hand figure for this was 2,861,548 and it was wrong by 14 -- the test is
-    what caught it, which is the argument for writing the number down as an
-    assertion rather than as prose.
+    Before 2026-09-22 this asserted 1.02^3 (2,861,562) — the off-by-one the
+    Year 1 ruling corrected.
     """
     out, _ = _project(3)
-    assert round(out['totals']['gross_potential_rent']) == 2861562
+    assert round(out['totals']['gross_potential_rent']) == 2805453
 
 
-def test_year_1_is_a_single_period_not_the_base():
-    out, _ = _project(1)
-    assert round(out['totals']['gross_potential_rent']) == round(2696514 * 1.02)
+def test_year_1_is_todays_run_rate_not_grown():
+    """Gregg, 2026-09-22 ("5a"): Year 1 = the current figures, no growth.
+    Chadron's Year 1 NOI is therefore its current 1,217,834, not 1,230,433."""
+    out, prov = _project(1)
+    t = out['totals']
+    assert round(t['gross_potential_rent']) == 2696514
+    assert round(t['total_operating_expenses']) == 1175740
+    assert t['as_is_noi'] == 1217834  # the statement on file, figure for figure
+    assert prov['growth_years'] == 0
 
 
 def test_every_expense_category_grows_independently_at_the_expense_rate():
     out, _ = _project(3)
-    f = 1.03 ** 3
+    f = 1.03 ** 2  # Year 3 = two years of growth
     got = {r['label']: round(r['as_is']['total']) for r in out['operating_expenses']['rows']}
     for row in CHADRON_TERRACE['operating_expenses']['rows']:
         assert got[row['label']] == round(row['as_is']['total'] * f)
@@ -149,7 +154,7 @@ def test_a_deduction_with_no_rate_grows_with_the_rent():
     out, _ = project_payload(payload, years=3,
                              income_steps=INCOME_STEPS, expense_steps=EXPENSE_STEPS)
     assert round(abs(out['vacancy_deductions']['rows'][1]['as_is']['total'])) == \
-        round(13483 * 1.02 ** 3)
+        round(13483 * 1.02 ** 2)
 
 
 def test_a_rate_expressed_as_a_percent_is_read_the_same_way_the_label_is():
@@ -262,15 +267,22 @@ def test_the_note_states_the_base_the_horizon_and_both_rates():
     _out, prov = _project(3)
     note = projection_note('Default (untagged)', prov)
     assert 'Default (untagged)' in note
-    assert '3 years' in note
+    assert '2 years of growth' in note
     assert '+2.0%' in note and '+3.0%' in note
     assert 'Not actuals' in note
 
 
 def test_a_one_year_horizon_reads_as_one_year():
-    _out, prov = _project(1)
-    assert '1 year ' in projection_note('Default (untagged)', prov)
+    _out, prov = _project(2)
+    assert '1 year of growth' in projection_note('Default (untagged)', prov)
     assert '1 years' not in projection_note('Default (untagged)', prov)
+
+
+def test_the_year_1_note_says_no_growth_was_applied():
+    _out, prov = _project(1)
+    note = projection_note('Default (untagged)', prov)
+    assert 'current run rate' in note
+    assert 'no growth' in note
 
 
 def test_the_note_drops_the_property_name_the_title_already_carries():
