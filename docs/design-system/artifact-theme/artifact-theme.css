@@ -1,0 +1,73 @@
+/*
+ * Landscape artifact theme — layout layer
+ * Look: CoreUI free Bootstrap admin demo, light mode only
+ *   https://coreui.io/demos/bootstrap/latest/free/?theme=light
+ * Sits on top of coreui-light.min.css (CoreUI 5.5.0, dark rules removed).
+ * Scope: HTML artifacts produced by Claudine, scheduled tasks and skills.
+ * NOT used by the Landscape app itself, which has its own CoreUI bridge
+ * (src/styles/coreui-theme.css).
+ */
+
+:root { color-scheme: light; }
+
+/* Demo: grey canvas, white cards */
+body {
+  background-color: var(--cui-tertiary-bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Demo header: white bar, bottom border, 4rem tall */
+.header.artifact-header { position: sticky; top: 0; z-index: 1030; margin-bottom: 1.5rem; }
+.header > .container-fluid, .header > .container-lg { min-height: calc(4rem + 1px); }
+.artifact-header .artifact-title { font-size: 1.125rem; font-weight: 600; margin: 0; line-height: 1.2; }
+.artifact-header .artifact-subtitle { font-size: .8125rem; color: var(--cui-secondary-color); margin: 0; }
+.artifact-header .artifact-meta { font-size: .75rem; color: var(--cui-secondary-color); text-align: right; white-space: nowrap; }
+
+/* Dark brand strip — the demo's sidebar colour, used as a thin accent */
+.artifact-brandbar { height: 4px; background: var(--cui-sidebar-bg, #212631); }
+
+.artifact-main { flex: 1 0 auto; padding-bottom: 2rem; }
+
+/* Demo cards: card + mb-4, header on light grey */
+.card { margin-bottom: 1.5rem; }
+.card-header { font-weight: 600; }
+.card-header .small, .card-header small { font-weight: 400; color: var(--cui-secondary-color); }
+
+/* Demo tables: bordered, header row on secondary background */
+.table > thead th, .table > thead td {
+  background-color: var(--cui-secondary-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.card > .table, .card > .table-responsive > .table { margin-bottom: 0; }
+.table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Demo stat widgets (the four coloured tiles on the dashboard) */
+.artifact-stat .fs-4 { font-weight: 600; }
+.artifact-stat .card-body { padding: 1rem 1.25rem; }
+
+/* Code / prompts */
+pre.artifact-pre {
+  background: var(--cui-secondary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: var(--cui-border-radius);
+  padding: .75rem 1rem;
+  font-size: .8125rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Demo footer */
+.footer.artifact-footer { min-height: calc(3rem + 1px); font-size: .8125rem; color: var(--cui-secondary-color); }
+
+@media (max-width: 575.98px) {
+  .artifact-header .artifact-meta { display: none; }
+}
+
+@media print {
+  body { background: #fff; }
+  .header.artifact-header { position: static; }
+  .card { break-inside: avoid; }
+}
