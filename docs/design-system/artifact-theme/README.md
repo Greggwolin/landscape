@@ -42,8 +42,8 @@ stylesheets — the CSS is inlined, ~290 KB).
 ### Reading from `main`, not the checked-out branch
 
 `~/landscape` is a working copy that changes branch. When the script cannot
-find the CSS beside itself it reads it with `git show main:<this folder>/…`
-(then `origin/main`), so a feature-branch checkout never changes how the
+find the CSS beside itself it reads it with `git show origin/main:<this folder>/…`
+(then local `main`), so a feature-branch checkout never changes how the
 nightly reports look. Override with `THEME_REF` / `LANDSCAPE_REPO`. If the
 theme cannot be found it **raises** — it never falls back to a home-made look.
 

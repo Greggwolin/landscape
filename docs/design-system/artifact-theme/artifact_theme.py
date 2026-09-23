@@ -20,7 +20,7 @@ Output is a complete, self-contained document (CSS inlined) that opens off
 disk and publishes as an Artifact without external stylesheets. Light only.
 
 When run from outside the repo (e.g. Claudine), the CSS is read from git ref
-THEME_REF (default: main) of the repo at LANDSCAPE_REPO, so the checked-out
+THEME_REF (default: origin/main, then main) of the repo at LANDSCAPE_REPO, so the checked-out
 branch of the working copy never changes what artifacts look like.
 """
 from __future__ import annotations
@@ -38,8 +38,9 @@ VERSION = "1.0"
 
 _HERE = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else None
 LANDSCAPE_REPO = os.environ.get("LANDSCAPE_REPO", os.path.expanduser("~/landscape"))
-_REF_CANDIDATES = [r for r in (os.environ.get("THEME_REF"), "main", "origin/main",
-                               "origin/chore/artifact-theme") if r]
+# origin/main first: `git fetch` keeps it current, while the local main
+# branch only moves when someone pulls it.
+_REF_CANDIDATES = [r for r in (os.environ.get("THEME_REF"), "origin/main", "main") if r]
 
 
 def _read_from_disk(name: str) -> str | None:
