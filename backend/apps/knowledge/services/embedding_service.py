@@ -11,6 +11,27 @@ from django.conf import settings
 # Initialize OpenAI client - will be set lazily on first use
 _client: Optional[OpenAI] = None
 
+# The most recent embedding failure, kept so callers can report WHY a document
+# produced no embeddings instead of the bare "No embeddings created". Every
+# failure was previously printed and discarded, which let a revoked API key
+# fail every upload silently from 2026-04-27 to 2026-09-27 (FB-342/344).
+_last_error: Optional[str] = None
+
+
+def get_last_embedding_error() -> Optional[str]:
+    """Plain description of the last embedding failure, or None."""
+    return _last_error
+
+
+def _describe_error(e: Exception) -> str:
+    code = getattr(e, 'status_code', None)
+    name = type(e).__name__
+    if code == 401 or 'invalid_api_key' in str(e) or 'AuthenticationError' in name:
+        return 'Embedding service rejected the OpenAI API key (401 invalid_api_key)'
+    if code == 429 or 'RateLimit' in name or 'insufficient_quota' in str(e):
+        return 'Embedding service refused the request: rate limit or quota exhausted (429)'
+    return f'Embedding generation failed: {name}: {str(e)[:200]}'
+
 EMBEDDING_MODEL = "text-embedding-ada-002"
 EMBEDDING_DIMENSIONS = 1536
 MAX_TOKENS = 8191  # ada-002 token limit
@@ -65,14 +86,17 @@ def generate_embedding(text: str) -> Optional[List[float]]:
     if len(text) > MAX_CHARS:
         text = text[:MAX_CHARS]
 
+    global _last_error
     try:
         client = _get_client()
         response = client.embeddings.create(
             model=EMBEDDING_MODEL,
             input=text
         )
+        _last_error = None
         return response.data[0].embedding
     except Exception as e:
+        _last_error = _describe_error(e)
         print(f"Embedding generation error: {e}")
         return None
 

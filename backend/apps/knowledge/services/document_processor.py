@@ -15,6 +15,7 @@ from django.db import connection, transaction
 from .text_extraction import extract_text_from_url
 from .chunking import chunk_document_with_sections
 from .embedding_storage import store_embedding
+from .embedding_service import get_last_embedding_error
 from .plan_geometry.intake import AWAITING_OCR, apply_to_document, inspect_upload
 from ..models import KnowledgeEmbedding
 
@@ -241,8 +242,14 @@ class DocumentProcessor:
                 result['status'] = 'ready'
                 logger.info(f"[doc_id={doc_id}] Processing complete - ready for RAG")
             else:
-                self._update_status(doc_id, 'failed', 'No embeddings created')
-                result['error'] = 'No embeddings created'
+                cause = get_last_embedding_error()
+                error_msg = (
+                    f'No embeddings created — {cause}' if cause
+                    else 'No embeddings created'
+                )
+                logger.error(f"[doc_id={doc_id}] {error_msg}")
+                self._update_status(doc_id, 'failed', error_msg)
+                result['error'] = error_msg
 
             return result
 
