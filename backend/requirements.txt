@@ -30,6 +30,7 @@ anthropic==0.39.0
 PyMuPDF>=1.24.0
 pypdf>=3.0.0
 openpyxl>=3.0.0
+python-docx>=1.1.0  # Word (.docx) text extraction — imported by knowledge text_extraction + auto_classifier; was missing, so the server could not read Word uploads
 pdfplumber==0.10.4
 reportlab>=4.0.0
 Faker>=20.0.0
