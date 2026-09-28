@@ -17,6 +17,9 @@ interface Thread {
   onClick?: () => void;
   /** Optional project name shown beneath the title as a faint hint. */
   projectName?: string;
+  /** Rule 7: draw a divider above this row — it is the first chat that belongs
+   *  to another project, after the current project's own chats. */
+  dividerBefore?: boolean;
 }
 
 // Default visible-row caps for the sidebar's two scrollable lists.
@@ -639,8 +642,17 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 <span className="sb-section-chev">{threadsCollapsed ? '▸' : '▾'}</span>
               </div>
               {!threadsCollapsed && visibleThreads.map((t) => (
+                <React.Fragment key={t.id}>
+                {t.dividerBefore && (
+                  <div
+                    className="sb-divider"
+                    role="separator"
+                    aria-label="Other projects"
+                    title="Chats in other projects"
+                    style={{ margin: '4px 0' }}
+                  />
+                )}
                 <div
-                  key={t.id}
                   className={`sb-thread${t.isActive ? ' active' : ''}`}
                   onClick={t.onClick}
                   title={t.projectName ? `${t.name} — ${t.projectName}` : t.name}
@@ -683,6 +695,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                     </span>
                   )}
                 </div>
+                </React.Fragment>
               ))}
               {!threadsCollapsed && hiddenThreadCount > 0 && (
                 <div

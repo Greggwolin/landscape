@@ -168,7 +168,7 @@ def navigate_to_project_tool(
             {
                 'success': True,
                 'action': 'navigate',
-                'target_url': '/studio/<id>',
+                'target_url': '/w/projects/<id>',
                 'project_id': <id>,
                 'project_name': <name>,
                 'message': 'Opening <name>.'
@@ -235,9 +235,14 @@ def navigate_to_project_tool(
         }
 
     # --- Build navigation envelope -----------------------------------------
-    # Studio is the single project shell (LSCMD-STUDIO-PRIMARY-SHELL-0624-JB14);
-    # land directly there instead of /w/projects (which now funnels into studio).
-    target_url = f"/studio/{project['project_id']}"
+    # The chat-first project surface. This pointed at /studio/<id> from the
+    # June "studio is the single shell" decision, which was reverted on
+    # 2026-07-19 (PR #181) — the studio is now a parked fallback. Left behind,
+    # "open Peoria Meadows" dropped a chat-first user into the studio and off
+    # the chat that asked (walked 2026-09-22; next-actions #LS-0918-10).
+    # The bare project address opens the project's last chat with its panel
+    # as it was (navigation Rule 1, D-2026-09-22-NAV-R1).
+    target_url = f"/w/projects/{project['project_id']}"
     return {
         'success': True,
         'action': 'navigate',
@@ -273,8 +278,8 @@ def navigate_to_screen_tool(
     **kwargs,
 ) -> Dict[str, Any]:
     """
-    Switch the active screen inside the current project workspace (the studio
-    folder/sub-tab surface) without a full page change.
+    Switch the active screen inside the current project workspace (the
+    screen shown in the chat-first project panel) without a full page change.
 
     Fire ONLY on explicit navigation intent that names a screen — "take me to
     the budget", "open land use", "show the cost approach", "go to the map".
@@ -287,8 +292,9 @@ def navigate_to_screen_tool(
         tab: str (optional) — sub-tab id within the folder (e.g. market,
                        landuse, parcels, sales, cashflow, debt, equity)
     }
-    The studio shell applies this via setFolderTab; invalid ids degrade
-    gracefully (the current screen is kept).
+    The chat-first shell opens it in the panel's Screens view, keeping the
+    chat (documents and map open those panel tabs instead); the studio applies
+    it via setFolderTab. Invalid ids degrade gracefully.
     """
     ti = tool_input or {}
     folder = (ti.get('folder') or '').strip().lower()

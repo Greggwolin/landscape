@@ -10,6 +10,7 @@ import { WrapperHeader } from './WrapperHeader';
 import { ProjectDocumentsBody } from './ProjectDocumentsBody';
 import { PanelMapView } from './PanelMapView';
 import { PanelScreenView } from './PanelScreenView';
+import { PanelDocumentsView } from './PanelDocumentsView';
 import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
 import {
   ArtifactWidthRequestProvider,
@@ -81,11 +82,10 @@ function preferredShareForArtifact(_artifactId: number | null): number | null {
   return null;
 }
 
-// Left sidebar collapses to this width during artifact takeover. Mirrors
-// COLLAPSED_WIDTH in src/app/w/layout.tsx — when activeArtifactId becomes
-// truthy, layout.tsx auto-collapses the sidebar to 48px, so we use that
-// same number to compute the 50/50 split for chat + artifact.
-const SIDEBAR_COLLAPSED_WIDTH = 48;
+// Rule 11 (2026-09-22): the sidebar no longer collapses when an artifact
+// opens, so the panel sizes itself against the sidebar's REAL width, which the
+// /w/ shell publishes as `sidebarWidthPx`. When the panel needs room, the chat
+// gives way down to MIN_CHAT_WIDTH — the sidebar does not move.
 
 interface ProjectArtifactsPanelProps {
   projectId: number;
@@ -123,7 +123,9 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     activeArtifactId,
     projectRightPanelView,
     setProjectRightPanelView,
+    sidebarWidthPx,
   } = useWrapperUI();
+  const SIDEBAR_COLLAPSED_WIDTH = sidebarWidthPx;
 
   // Draggable width (LEFT-edge handle, dragging left widens the panel)
   // MK24 §6 — 25% of the viewport, not a fixed 420px.
@@ -257,7 +259,7 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
       setPanelWidth(widthForShare(share));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [takeoverMode, projectRightPanelView, showViewToggle]);
+  }, [takeoverMode, projectRightPanelView, showViewToggle, sidebarWidthPx]);
 
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -442,9 +444,18 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
           <PanelScreenView />
         </div>
       ) : projectRightPanelView === 'documents' ? (
-        <div className="project-right-panel-body project-right-panel-body--documents">
-          <ProjectDocumentsBody projectId={projectId} />
-        </div>
+        // Rule 9: on the project surface the tab is the one full Documents
+        // screen. The dashboard has no project provider, so it keeps the
+        // lighter home-documents body.
+        showViewToggle ? (
+          <div className="project-right-panel-body project-right-panel-body--screen">
+            <PanelDocumentsView />
+          </div>
+        ) : (
+          <div className="project-right-panel-body project-right-panel-body--documents">
+            <ProjectDocumentsBody projectId={projectId} />
+          </div>
+        )
       ) : projectRightPanelView === 'map' && showViewToggle ? (
         // MK22 — the live map, keeping the toggle above it. Guarded by
         // showViewToggle for the same reason the button is; if the view

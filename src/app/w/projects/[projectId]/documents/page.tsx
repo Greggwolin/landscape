@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 /**
  * Legacy per-project documents route — preserved as a redirect.
@@ -18,14 +17,19 @@ import { useWrapperUI } from '@/contexts/WrapperUIContext';
 export default function WrapperDocumentsRedirect() {
   const params = useParams();
   const router = useRouter();
-  const { setProjectRightPanelView } = useWrapperUI();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId as string | undefined;
 
+  // 2026-09-22: the panel view now lives in the address (see
+  // src/lib/wrapper/navMemory.ts), so the redirect says view=documents there
+  // and carries the chat along, instead of setting it in memory and landing
+  // on a bare project address.
   useEffect(() => {
     if (!projectId) return;
-    setProjectRightPanelView('documents');
-    router.replace(`/w/projects/${projectId}`);
-  }, [projectId, router, setProjectRightPanelView]);
+    const qs = new URLSearchParams(searchParams?.toString() ?? '');
+    qs.set('view', 'documents');
+    router.replace(`/w/projects/${projectId}?${qs.toString()}`);
+  }, [projectId, router, searchParams]);
 
   return null;
 }

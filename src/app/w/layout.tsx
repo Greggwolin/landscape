@@ -19,7 +19,7 @@
  * Four shells is deliberate, not drift — see the shell table in CLAUDE.md.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
@@ -39,6 +39,17 @@ import { useLandscapeCommand, emitLandscapeCommand } from '@/lib/landscape-comma
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { redirectToLoginExpired } from '@/lib/authHeaders';
+import {
+  NEW_THREAD,
+  buildProjectUrl,
+  isThreadUuid,
+  parsePanelState,
+  rememberPanel,
+  rememberProjectThread,
+  rememberedPanel,
+  rememberedProjectThread,
+  type PanelView,
+} from '@/lib/wrapper/navMemory';
 import '@/styles/wrapper.css';
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -86,6 +97,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     artifactsOpen,
     toggleArtifacts,
     closeChat,
+    setSidebarWidthPx,
   } = useWrapperUI();
   const { logout, user } = useAuth();
 
@@ -108,11 +120,6 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   // artifact closes (X click → activeArtifactId nulled), the panel
   // restores to whatever width the user had it at before.
   const preTakeoverWidth = useRef<number | null>(null);
-  // Pre-takeover sidebar state snapshot. The takeover also collapses the
-  // left nav so chat and artifact get equal real estate. On close we
-  // restore the sidebar to whatever the user had it at before.
-  const preTakeoverSidebarCollapsed = useRef<boolean | null>(null);
-  const preTakeoverSidebarWidth = useRef<number | null>(null);
   // Snap-back is a tri-state. We can't just key on `activeArtifactId !==
   // null` because the user can manually drag the panel during takeover —
   // we need to know whether the CURRENT width came from a takeover (so
@@ -130,56 +137,35 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     return Math.min(Math.max(half, MIN_RIGHT_PANEL_WIDTH), MAX_RIGHT_PANEL_WIDTH);
   }, []);
 
+  // Publish the sidebar's on-screen width so the right panel can size itself
+  // against the real row rather than assuming the sidebar is collapsed.
   useEffect(() => {
-    // MK24 §5 — selecting Map collapses the left sidebar for the same reason
-    // an artifact takeover does: the content wants the screen. It restores the
-    // sidebar to whatever he had on the way out, via the snapshot refs already
-    // here, so a sidebar he deliberately widened comes back that width. The
-    // sidebar can still be reopened by hand while the map is showing — that
-    // path already exists for artifact takeover and is untouched.
-    // MK28 §1 — only when the PANEL is actually on screen. projectRightPanelView
-    // is global state, so MK24 keyed the sidebar collapse on it alone and the
-    // takeover also fired on /w/projects/{id}/map, where ProjectArtifactsPanel
-    // is not rendered at all (the route supplies its own map through <main>).
-    // That is the half-width Gregg saw after reopening the panel: a takeover
-    // running for a panel that was not there.
+    setSidebarWidthPx(collapsed ? COLLAPSED_WIDTH : sidebarWidth);
+  }, [collapsed, sidebarWidth, setSidebarWidthPx]);
+
+  useEffect(() => {
+    // RULE 11 (D-2026-09-22-NAV-R11, Gregg "12b"): THE SIDEBAR ONLY MOVES WHEN
+    // THE USER MOVES IT. Opening or closing an artifact, opening a chat,
+    // switching projects or opening the map never collapses or expands it.
+    // When the panel needs room the chat gives way (D-2026-09-18-YIELD).
+    //
+    // This effect used to collapse the sidebar on artifact open and restore it
+    // on close — the 2026-05-19 "whole-panel takeover" (commit 5a152b0f, #14).
+    // Rule 11 supersedes its sidebar half. What remains is the width half for
+    // the chat routes' own artifact aside: widen on open, restore on close.
     const isProjectRootRoute = /^\/w\/projects\/\d+\/?$/.test(pathname);
     const inMapView = projectRightPanelView === 'map' && isProjectRootRoute;
     const hasActiveArtifact = activeArtifactId != null || inMapView;
 
     if (hasActiveArtifact && !inTakeoverMode.current) {
-      // Entering takeover. Snapshot current panel + sidebar state.
       preTakeoverWidth.current = rightPanelWidth;
-      preTakeoverSidebarCollapsed.current = collapsed;
-      preTakeoverSidebarWidth.current = sidebarWidth;
       inTakeoverMode.current = true;
-
-      // Auto-open the rail if it was collapsed — opening an artifact
-      // implies the user wants to see it. toggleArtifacts is a no-op
-      // when already open.
+      // Opening an artifact implies the user wants to see it.
       if (!artifactsOpen) toggleArtifacts();
-
-      // Auto-collapse the left sidebar so chat and artifact get the
-      // remaining viewport split 50/50 (Claude-style takeover). The
-      // user can manually expand the sidebar during takeover; that
-      // re-runs the width calc via handleResizeStart and compresses
-      // the artifact panel to make room.
-      setCollapsed(true);
-      setSidebarWidth(COLLAPSED_WIDTH);
-
-      setRightPanelWidth(computeTakeoverWidth(COLLAPSED_WIDTH));
+      setRightPanelWidth(computeTakeoverWidth(collapsed ? COLLAPSED_WIDTH : sidebarWidth));
     } else if (!hasActiveArtifact && inTakeoverMode.current) {
-      // Leaving takeover (X clicked). Restore the user's previous panel
-      // width AND sidebar state.
-      const prev = preTakeoverWidth.current ?? DEFAULT_RIGHT_PANEL_WIDTH;
-      setRightPanelWidth(prev);
-      if (preTakeoverSidebarCollapsed.current === false) {
-        setCollapsed(false);
-        setSidebarWidth(preTakeoverSidebarWidth.current ?? DEFAULT_SIDEBAR_WIDTH);
-      }
+      setRightPanelWidth(preTakeoverWidth.current ?? DEFAULT_RIGHT_PANEL_WIDTH);
       preTakeoverWidth.current = null;
-      preTakeoverSidebarCollapsed.current = null;
-      preTakeoverSidebarWidth.current = null;
       inTakeoverMode.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,10 +174,6 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.
   const [chatSessionKey, setChatSessionKey] = useState(0);
-  const handleNewChat = useCallback(() => {
-    setChatSessionKey((k) => k + 1);
-    router.push('/w/chat');
-  }, [router]);
 
   // On /w/chat routes, chat IS the content — hide the right <main> panel
   const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
@@ -216,21 +198,9 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     return 'dashboard';
   })();
 
-  // When the user opens the project Map, give it the full canvas BY DEFAULT:
-  // collapse the left sidebar and close the center chat panel. Fires only on
-  // entry to the map route (tracked via ref), so the user can re-open either
-  // one afterward without it snapping shut again.
-  const enteredMapRef = useRef(false);
-  useEffect(() => {
-    const isMapRoute = activePage === 'map';
-    if (isMapRoute && !enteredMapRef.current) {
-      closeChat();
-      setCollapsed(true);
-      setSidebarWidth(COLLAPSED_WIDTH);
-    }
-    enteredMapRef.current = isMapRoute;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage]);
+  // (Removed 2026-09-22, Rule 11: entering the map used to collapse the sidebar
+  // and close the chat. The map is now a view of the panel — Rule 9 — and the
+  // sidebar only moves when the user moves it.)
 
   // Extract current projectId from URL
   const projectIdMatch = pathname.match(/\/projects\/(\d+)/);
@@ -255,6 +225,80 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (projectId) setLastProjectId(projectId);
   }, [projectId]);
+
+  // ─── Navigation rules (chat MP, 2026-09-22) ──────────────────────────────
+  // The address is the source of truth for the project surface: which chat,
+  // and what the right panel shows. See src/lib/wrapper/navMemory.ts.
+  const isProjectRootRoute = /^\/w\/projects\/\d+\/?$/.test(pathname);
+  const searchKey = searchParams?.toString() ?? '';
+  const urlThread = searchParams?.get('thread') ?? null;
+  const urlPanel = useMemo(() => parsePanelState(searchParams), [searchKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Address of a project screen, keeping the chat and everything else in the
+  // current address. Documents and Map are panel tabs, not screens (Rule 9):
+  // one full version of each, reached the same way from the sidebar tree, the
+  // panel's own tabs and Landscaper.
+  const screenHref = (folder: string, tab?: string): string => {
+    const params = new URLSearchParams(searchKey);
+    if (folder === 'documents' || folder === 'map') {
+      params.set('view', folder);
+      if (folder === 'documents' && tab) params.set('doctab', tab);
+    } else {
+      params.set('view', 'screen');
+      params.set('folder', folder);
+      if (tab) params.set('tab', tab);
+      else params.delete('tab');
+    }
+    return `/w/projects/${projectId}?${params.toString()}`;
+  };
+
+  // RULE 3 (Gregg "3b"): inside a project, New chat is a blank chat IN THIS
+  // PROJECT and whatever the panel shows stays; it becomes the new chat's
+  // memory. On Home and the other non-project pages it is a chat with no
+  // project, as before.
+  const handleNewChat = useCallback(() => {
+    setChatSessionKey((k) => k + 1);
+    if (projectId && pathname.startsWith(`/w/projects/${projectId}`)) {
+      router.push(buildProjectUrl(projectId, { thread: NEW_THREAD, panel: urlPanel }));
+    } else {
+      router.push('/w/chat');
+    }
+  }, [router, projectId, pathname, urlPanel]);
+
+  // RULE 1 (Gregg "1c"): returning to a project opens its last active chat,
+  // with the panel exactly as that chat left it (Rule 2). An address that
+  // names no chat is the "entering a project" case — the sidebar's recent
+  // projects, Show All, a Landscaper "open X", a bare link. Replace, not push,
+  // so the bare address never becomes a Back step of its own. A project never
+  // visited in this browser opens its starting view.
+  useEffect(() => {
+    if (!isProjectRootRoute || !projectId) return;
+    if (urlThread) return;
+    const last = rememberedProjectThread(projectId);
+    if (!last) return;
+    // An address that already asks for something specific in the panel (a
+    // Landscaper tool opening the map, a link to a screen or an artifact)
+    // keeps it; only the chat is filled in. A plain view=artifacts is the
+    // default a start view writes for itself, not a request, so it does not
+    // override the chat's memory.
+    const explicit =
+      (urlPanel.view && urlPanel.view !== 'artifacts') || urlPanel.artifact != null;
+    router.replace(
+      buildProjectUrl(projectId, {
+        thread: last,
+        panel: explicit ? urlPanel : rememberedPanel(last) ?? undefined,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProjectRootRoute, projectId, urlThread, router]);
+
+  // Remember, per chat, what the panel shows (Rule 2) and, per project, which
+  // chat was last active (Rule 1). Written whenever the address changes.
+  useEffect(() => {
+    if (!isProjectRootRoute || !projectId || !isThreadUuid(urlThread)) return;
+    rememberProjectThread(projectId, urlThread);
+    if (urlPanel.view) rememberPanel(urlThread, urlPanel);
+  }, [isProjectRootRoute, projectId, urlThread, urlPanel]);
 
   // LF-USERDASH-0514 Phase 3: subscribe to the 'navigate' command emitted
   // by the chat panel when Landscaper calls navigate_to_project or
@@ -285,16 +329,19 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   // opens: put folder and tab in the URL, which is where the tree reads them
   // from, and switch the panel to the screen view. Settled 2026-09-18,
   // D-2026-09-18-TARGET.
+  //
+  // 2026-09-22: the address now also carries the chat and the panel view, so
+  // opening a screen keeps the chat it was opened from (it used to drop
+  // ?thread) and records view=screen. Documents and Map are panel TABS, not
+  // screens (Rule 9) — a request for either opens that tab.
   const handleNavigateScreen = useCallback(
     (payload: { folder?: string; tab?: string }) => {
       const folder = payload?.folder;
       if (!folder || !projectId) return;
-      const qs = new URLSearchParams({ folder });
-      if (payload?.tab) qs.set('tab', payload.tab);
-      setProjectRightPanelView('screen');
-      router.push(`/w/projects/${projectId}?${qs.toString()}`);
+      router.push(screenHref(folder, payload?.tab));
     },
-    [router, projectId, setProjectRightPanelView],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [router, projectId, searchKey, pathname],
   );
   useLandscapeCommand('navigate_screen', handleNavigateScreen);
 
@@ -322,6 +369,71 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [projectId, setActiveLocationBrief, setActiveMapArtifact, setActiveExcelAudit, setActiveArtifactId]);
 
+  // ── Address → panel ────────────────────────────────────────────────────
+  // When the address changes (a click, Back, a pasted link, a refresh), the
+  // panel follows it. An address that says nothing about the panel leaves it
+  // alone — EXCEPT across a project change, where nothing carries over from
+  // the project left behind (Rule 1): the view resets to Artifacts.
+  const syncedProjectRef = useRef<number | undefined>(undefined);
+  const threadChangedAtRef = useRef<number>(0);
+  const lastUrlThreadRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (urlThread !== lastUrlThreadRef.current) {
+      lastUrlThreadRef.current = urlThread;
+      threadChangedAtRef.current = Date.now();
+    }
+    if (!isProjectRootRoute) return;
+    const projectChanged = syncedProjectRef.current !== projectId;
+    syncedProjectRef.current = projectId;
+    if (urlPanel.view) {
+      if (urlPanel.view !== projectRightPanelView) setProjectRightPanelView(urlPanel.view);
+      const art = urlPanel.artifact ?? null;
+      if (art !== activeArtifactId) setActiveArtifactId(art);
+    } else if (projectChanged) {
+      setProjectRightPanelView('artifacts');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchKey, pathname]);
+
+  // ── Panel → address ────────────────────────────────────────────────────
+  // When the panel changes for any other reason (a view button, opening or
+  // closing an artifact, Landscaper producing one), write it into the address
+  // as a NEW history entry — that is what makes Back step back through panel
+  // states (Rule 8, "8e"). Two exceptions use replace instead of push, so they
+  // do not leave empty Back steps behind: an address that had no panel state
+  // yet (it is being filled in, not changed), and a restore that lands in the
+  // first moments after the chat itself changed (part of the same step).
+  const prevPanelCtxRef = useRef<{ view: PanelView; artifact: number | null } | null>(null);
+  useEffect(() => {
+    if (!isProjectRootRoute || !projectId) {
+      prevPanelCtxRef.current = null;
+      return;
+    }
+    const ctx = { view: projectRightPanelView as PanelView, artifact: activeArtifactId };
+    const prev = prevPanelCtxRef.current;
+    prevPanelCtxRef.current = ctx;
+    // Entering a project that has a last chat: Rule 1's redirect (above) is
+    // about to fill in the chat AND its panel. Writing this panel into the
+    // address now would race it and win.
+    if (!urlThread && rememberedProjectThread(projectId)) return;
+    const urlMatches =
+      urlPanel.view === ctx.view && (urlPanel.artifact ?? null) === ctx.artifact;
+    if (urlMatches) return;
+    const changedHere = !prev || prev.view !== ctx.view || prev.artifact !== ctx.artifact;
+    // The address moved and the panel has not caught up yet — the sync above
+    // is about to align it. Do not write the stale panel back.
+    if (!changedHere && urlPanel.view) return;
+    const params = new URLSearchParams(searchKey);
+    params.set('view', ctx.view);
+    if (ctx.artifact != null) params.set('artifact', String(ctx.artifact));
+    else params.delete('artifact');
+    const href = `${pathname}?${params.toString()}`;
+    const partOfSameStep = Date.now() - threadChangedAtRef.current < 2500;
+    if (urlPanel.view && !partOfSameStep) router.push(href);
+    else router.replace(href);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectRightPanelView, activeArtifactId, isProjectRootRoute, projectId, searchKey]);
+
   // Fetch project data when inside a project
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const lastFetchedId = useRef<number | undefined>(undefined);
@@ -330,6 +442,9 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     if (!projectId) return;
     if (lastFetchedId.current === projectId) return;
     lastFetchedId.current = projectId;
+    // Drop the previous project's name at once: until the fetch returns, the
+    // header must not go on showing the project just left (Rule 1).
+    setProjectData(null);
 
     fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
       .then((res) => (res.ok ? res.json() : null))
@@ -384,8 +499,12 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         // scoped to one) — so until it is built this goes to the project
         // picker, which at least states that a project is being chosen rather
         // than silently assuming one.
-        if (projectId) router.push(`/w/projects/${projectId}/map`);
-        else router.push('/w/projects?goto=map');
+        //
+        // RULE 9 (2026-09-22, Gregg "9a"): "the map icon in the left nav bar is
+        // for user maps OUTSIDE of projects." It never opens a project's map —
+        // not even the current one; that map is the panel's Map tab. The
+        // surface itself is still unbuilt, so this goes to a page that says so.
+        router.push('/w/map');
       } else if (projectScoped.includes(page)) {
         // FB-308: a project-scoped page (Reports, Map) needs a project. With one
         // active, go straight there; with none, send the user to the project
@@ -609,15 +728,36 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         // Project-scoped threads route into their project context so the
         // chat panel keeps the project's tools, artifacts, and side panels.
         // Unassigned threads still route to /w/chat/[threadId].
+        // Rule 2: the chat comes back with the panel it last had visible.
         if (t.projectId) {
-          router.push(`/w/projects/${t.projectId}?thread=${t.threadId}`);
+          router.push(
+            buildProjectUrl(t.projectId, {
+              thread: t.threadId,
+              panel: rememberedPanel(t.threadId) ?? undefined,
+            }),
+          );
         } else {
           router.push(`/w/chat/${t.threadId}`);
         }
       },
     };
   };
-  const sidebarThreadItems = sidebarThreads.map((t) => buildThreadItem(t, false));
+  // RULE 7 (Gregg "7c"): inside a project the Threads list leads with this
+  // project's chats, then a divider, then other projects' recent chats — each
+  // group keeps its own recency order. On Home (no project), all recent chats.
+  const orderedSidebarThreads = projectId
+    ? [
+        ...sidebarThreads.filter((t) => t.projectId === projectId),
+        ...sidebarThreads.filter((t) => t.projectId !== projectId),
+      ]
+    : sidebarThreads;
+  const firstOtherIndex = projectId
+    ? orderedSidebarThreads.findIndex((t) => t.projectId !== projectId)
+    : -1;
+  const sidebarThreadItems = orderedSidebarThreads.map((t, i) => ({
+    ...buildThreadItem(t, false),
+    dividerBefore: i > 0 && i === firstOtherIndex,
+  }));
   const archivedSidebarThreadItems = archivedSidebarThreads.map((t) => buildThreadItem(t, true));
 
   // ─── Archive lifecycle handlers (Universal Archive Pattern Phase 1a) ──
@@ -695,12 +835,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const openScreen = useCallback(
     (folder: string, tab?: string) => {
       if (!projectId) return;
-      const qs = new URLSearchParams({ folder });
-      if (tab) qs.set('tab', tab);
-      setProjectRightPanelView('screen');
-      router.push(`/w/projects/${projectId}?${qs.toString()}`);
+      router.push(screenHref(folder, tab));
     },
-    [projectId, router, setProjectRightPanelView],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projectId, router, searchKey, pathname],
   );
 
   const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string }>>([]);
@@ -763,8 +901,16 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
             ? {
                 projectName: navProject.project_name,
                 folders: navFolderConfig.folders,
-                activeFolder: navFolder,
-                activeTab: navTab,
+                // Highlight what the panel is actually showing: the screen when
+                // it is on Screens, Documents or Map when it is on those tabs,
+                // nothing when it is on Artifacts.
+                activeFolder:
+                  urlPanel.view === 'documents' || urlPanel.view === 'map'
+                    ? urlPanel.view
+                    : urlPanel.view === 'screen' || !urlPanel.view
+                      ? navFolder
+                      : '',
+                activeTab: urlPanel.view === 'screen' || !urlPanel.view ? navTab : '',
                 onSelectFolder: (folderId: string) => openScreen(folderId),
                 onSelectTab: (folderId: string, tabId: string) => openScreen(folderId, tabId),
               }
@@ -803,6 +949,8 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           }
           initialThreadId={initialThreadId}
           sessionKey={chatSessionKey}
+          // Rule 3: the chat header's + does what the sidebar's New chat does.
+          onNewChat={handleNewChat}
           projectName={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_name}
           projectLocation={isChatRoute || pathname === '/w/projects' ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
           projectTypeCode={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_type_code}

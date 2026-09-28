@@ -78,8 +78,14 @@ def create_artifact_tool(
     # the value through and let the guard reject if missing for an OS artifact.
     artifact_subtype = params.get('artifact_subtype')
 
+    # Rule 4 (D-2026-09-22-NAV-R4): the model says whether the user asked to
+    # see this artifact. The client opens it in the panel only when so; any
+    # other artifact shows as a card in the chat. Default: open (explicit ask).
+    open_in_panel = params.get('open_in_panel')
+    open_in_panel = True if open_in_panel is None else bool(open_in_panel)
+
     try:
-        return create_artifact_record(
+        result = create_artifact_record(
             title=title,
             schema=schema,
             edit_target=params.get('edit_target'),
@@ -96,6 +102,9 @@ def create_artifact_tool(
             # create-time fabrication guard can verify a numbers tool sourced the card.
             prior_tool_calls=kwargs.get('prior_tool_calls'),
         )
+        if isinstance(result, dict) and result.get('success'):
+            result['open_in_panel'] = open_in_panel
+        return result
     except Exception as exc:
         logger.exception('create_artifact_tool failed')
         return {'success': False, 'error': f'create_artifact failed: {exc}'}
