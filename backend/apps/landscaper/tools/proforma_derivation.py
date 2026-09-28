@@ -32,6 +32,8 @@ the same, only the numbers should change."
 
 Arithmetic
 ----------
+* Year 1 is today's run rate -- no growth. "Year N" carries N-1 years of
+  growth (Gregg, 2026-09-22, D-2026-09-22-YEAR1).
 * Gross potential rent, other income: grown at the income rate.
 * Vacancy / credit loss / concessions: these are percentages of gross
   potential rent, so they are RECOMPUTED from the grown rent rather than
@@ -234,11 +236,34 @@ def project_payload(
             or years < 1 or years > MAX_HORIZON_YEARS:
         raise HorizonOutOfRange(years)
 
-    income_factor = compound_factor(income_steps, years)
-    expense_factor = compound_factor(expense_steps, years)
+    # Year 1 IS today's run rate; growth starts in Year 2 (Gregg, 2026-09-22,
+    # D-2026-09-22-YEAR1, "5a"). So "Year N" carries N-1 years of growth. This
+    # used to compound N years, which put every stored "Year N Proforma" one
+    # year ahead of its label — Chadron's "Year 1" was current + one year.
+    growth_years = years - 1
+    income_factor = compound_factor(income_steps, growth_years)
+    expense_factor = compound_factor(expense_steps, growth_years)
 
     out = copy.deepcopy(payload)
     totals = out.setdefault('totals', {})
+
+    provenance = {
+        'years': years,
+        'growth_years': growth_years,
+        'income_factor': income_factor,
+        'expense_factor': expense_factor,
+        'income_rate_year_1': _rate_for_period(income_steps, 1),
+        'expense_rate_year_1': _rate_for_period(expense_steps, 1),
+        'income_steps': income_steps,
+        'expense_steps': expense_steps,
+        'base_gross_potential_rent': _f(totals.get('gross_potential_rent')),
+        'management_fee_basis': 'expense_growth',
+    }
+    if growth_years == 0:
+        # Year 1 is the statement on file, figure for figure. Recomputing the
+        # deductions from their (rounded) rates would move them by hundreds of
+        # dollars and make "today's run rate" disagree with today's screen.
+        return out, provenance
 
     base_gpr = _f(totals.get('gross_potential_rent'))
     gpr = base_gpr * income_factor
@@ -276,17 +301,6 @@ def project_payload(
     totals['total_operating_expenses'] = opex_total
     totals['as_is_noi'] = egi - opex_total
 
-    provenance = {
-        'years': years,
-        'income_factor': income_factor,
-        'expense_factor': expense_factor,
-        'income_rate_year_1': _rate_for_period(income_steps, 1),
-        'expense_rate_year_1': _rate_for_period(expense_steps, 1),
-        'income_steps': income_steps,
-        'expense_steps': expense_steps,
-        'base_gross_potential_rent': base_gpr,
-        'management_fee_basis': 'expense_growth',
-    }
     return out, provenance
 
 
@@ -323,10 +337,18 @@ def projection_note(
     inc_txt = f'income +{inc:.1f}%' + (' stepped' if multi_income else '')
     exp_txt = f'expenses +{exp:.1f}%' + (' stepped' if multi_expense else '')
     years = int(provenance['years'])
-    horizon = '1 year' if years == 1 else f'{years} years'
+    growth_years = int(provenance.get('growth_years', years - 1))
     # The base label repeats the property name the title already carries.
     base = re.sub(r'^.*\s+—\s+', '', base_scenario_label).strip() or base_scenario_label
+    if growth_years <= 0:
+        # Year 1 = today's run rate (D-2026-09-22-YEAR1): nothing is grown,
+        # and the note says so rather than quoting rates that were not applied.
+        return (
+            f'Year 1 is the current run rate from the {base}, with no growth '
+            f'applied; growth ({inc_txt}, {exp_txt} a year) starts in Year 2.'
+        )
+    horizon = '1 year' if growth_years == 1 else f'{growth_years} years'
     return (
-        f'Projected {horizon} from the {base}, '
-        f'grown at {inc_txt} and {exp_txt} a year. Not actuals.'
+        f'Year 1 is the current run rate from the {base}; this is {horizon} of '
+        f'growth on it, at {inc_txt} and {exp_txt} a year. Not actuals.'
     )
