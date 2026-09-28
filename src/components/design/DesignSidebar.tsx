@@ -254,11 +254,6 @@ export function DesignSidebar({
       .catch(() => {});
   }, [projectId]);
 
-  const mockScheduled = [
-    { id: 's1', emoji: '📊', name: 'FRED market data pull', status: 'active' as const },
-    { id: 's2', emoji: '🏗️', name: 'Bellflower permit monitor', status: 'active' as const },
-    { id: 's3', emoji: '🏠', name: 'Redfin comp tracker', status: 'paused' as const },
-  ];
 
   const handleNavigate = useCallback(
     (page: string) => {
@@ -352,7 +347,6 @@ export function DesignSidebar({
       onArchiveThread={onArchiveThread}
       onRestoreThread={onRestoreThread}
       onDeleteThreadPermanently={onDeleteThreadPermanently}
-      scheduledAgents={mockScheduled}
       recentProjects={recentProjects.map((p) => ({
         ...p,
         onClick: () => router.push(`/design/${p.id}`),

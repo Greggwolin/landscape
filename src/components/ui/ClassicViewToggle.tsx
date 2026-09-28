@@ -14,15 +14,16 @@ interface ClassicViewToggleProps {
 
 /**
  * Switches the active project between the classic tabbed shell (/projects/[id])
- * and the Studio shell (/studio/[id]).
+ * and the chat-first project view (/w/projects/[id]).
  *
- * The chat destination has been /studio/[id] since #135 made Studio THE project
- * shell; this comment said /w/projects/[id] until 2026-09-14, which is what a
- * reader checked it against while diagnosing Gregg's report that "Chat view"
- * lands on the classic home page. It does — but not because the route is wrong.
- * Studio's right panel opens on ProjectContentRouter (the classic screen tree)
- * whenever there is no active artifact, so arriving from this button puts the
- * classic project home in the panel. See D-2026-09-14-Q4.
+ * HISTORY, because this was wrong for three months. #135 (June) made Studio THE
+ * project shell and pointed the chat destination at /studio/[id]. PR #181
+ * (2026-07-19) reverted that funnel — /w/ became the working project surface —
+ * and nobody re-pointed this button, so "Chat view" kept landing users in the
+ * studio. Gregg reported it 2026-09-18; the 2026-09-14 Q4 diagnosis had read the
+ * symptom (studio's right panel opens on the classic screen tree, so it LOOKS
+ * like classic) without catching that the destination itself was stale.
+ * Studio remains reachable by direct URL; nothing routes to it automatically.
  *
  * Does a FULL navigation (not a client-side router push) to the destination
  * with `?setui=<mode>`. Middleware sets the `ui_mode` cookie server-side on the
@@ -42,7 +43,7 @@ export function ClassicViewToggle({
   const target: UiMode = current === 'classic' ? 'unified' : 'classic';
   const label = current === 'classic' ? 'Chat view' : 'Classic view';
   const destination =
-    target === 'classic' ? `/projects/${projectId}` : `/studio/${projectId}`;
+    target === 'classic' ? `/projects/${projectId}` : `/w/projects/${projectId}`;
 
   const handleClick = () => {
     // Server-authoritative: navigating with ?setui=<mode> lets middleware set

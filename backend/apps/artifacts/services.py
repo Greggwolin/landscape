@@ -363,8 +363,26 @@ def create_artifact_record(
                 is_archived=False,
             )
             .order_by('-last_edited_at')
-            .first()
         )
+        # Several artifacts can now share a dedup key (variants, Rule 5 below).
+        # Refresh the one with the SAME title if there is one — asking for the
+        # Proforma again refreshes the Proforma, not the Summary made after it.
+        _wanted = (title or '').strip()[:255].lower()
+        _candidates = list(existing[:20])
+        existing = next(
+            (a for a in _candidates if (a.title or '').strip().lower() == _wanted),
+            _candidates[0] if _candidates else None,
+        )
+        # RULE 5 (D-2026-09-22-NAV-R5, Gregg): "its NOT ok to reuse existing
+        # artifacts for variants. the original version should stay as it might
+        # include specific annotations or contents now present in the earlier
+        # version." A dedup hit used to overwrite the existing artifact in
+        # place whatever the new request was. Now only a refresh of the SAME
+        # cut (same title, never annotated by hand) updates in place; anything
+        # else is a variant and gets its own artifact, and the original is left
+        # exactly as it was. See _is_variant_of.
+        if existing is not None and _is_variant_of(existing, title=title, schema=schema):
+            existing = None
         if existing is not None:
             # Route through the versioned update path. Passes the new
             # schema as a full replacement (full_schema), not a diff —
@@ -746,3 +764,49 @@ def find_dependent_artifacts_records(
                 if artifact.last_edited_at else None,
             })
     return {'success': True, 'dependent_artifacts': dependents}
+
+
+# ── Rule 5: variants never overwrite ─────────────────────────────────────────
+
+def _has_user_annotations(artifact_id: int) -> bool:
+    """True when the user has changed this artifact's CONTENT by hand.
+
+    Two kinds of user edit reach the version log, and only one of them is an
+    annotation:
+      - a snapshot edit (typed text, a note, a figure with no source row) is
+        stored as a JSON Patch list — it lives ONLY in the artifact, and a
+        regeneration would erase it;
+      - a write-back cell edit (a budget cell, a sale price) writes the source
+        table and stores a full {'snapshot': ...} refresh — the source keeps it,
+        so regenerating loses nothing.
+    """
+    for diff in (
+        ArtifactVersion.objects
+        .filter(artifact_id=artifact_id, edit_source__in=('user_edit', 'modal_save'))
+        .values_list('state_diff_json', flat=True)
+    ):
+        if isinstance(diff, list) and diff:
+            return True
+    return False
+
+
+def _is_variant_of(existing: 'Artifact', *, title: str, schema: Any) -> bool:  # noqa: ARG001
+    """True when a dedup hit must NOT overwrite the existing artifact (Rule 5).
+
+    Either makes it a new artifact, leaving the original exactly as it was:
+      1. the request names a different artifact (the title differs) — a
+         different cut of the subject: a summary instead of detail, other
+         years, other columns;
+      2. the user has annotated the existing one (see _has_user_annotations) —
+         Gregg: "the original version should stay as it might include specific
+         annotations or contents now present in the earlier version."
+
+    Same title and no annotations is a refresh of the same cut with current
+    figures — the "live" behaviour Rule 5 leaves alone. Row counts are allowed
+    to change (a budget line added is not a variant).
+    """
+    old_title = (existing.title or '').strip().lower()
+    new_title = (title or '').strip()[:255].lower()
+    if old_title != new_title:
+        return True
+    return _has_user_annotations(existing.artifact_id)

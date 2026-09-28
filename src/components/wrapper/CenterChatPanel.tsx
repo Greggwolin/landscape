@@ -20,6 +20,14 @@ import { useChatAttachment } from '@/components/landscaper/useChatAttachment';
 import { ChatDragOverlay } from '@/components/landscaper/ChatDragOverlay';
 import { artifactHostRoute, deriveDestination } from '@/lib/landscaper/threadDestination';
 import { recordDestination, useThreadRestore } from '@/hooks/useThreadDestination';
+import {
+  NEW_THREAD,
+  buildProjectUrl,
+  forgetProjectThread,
+  isThreadUuid,
+  parsePanelState,
+  rememberedPanel,
+} from '@/lib/wrapper/navMemory';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -140,6 +148,48 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   // would remount chat internals. (LSCMD-THREADDEST-0728-TA)
   const activeThreadIdRef = useRef<string | null>(initialThreadId ?? null);
 
+  // RULE 4 (D-2026-09-22-NAV-R4, Gregg "4c"): an artifact takes the panel
+  // only when the user asked to see it. Landscaper says which by setting
+  // `open_in_panel` on the tool result: true (or absent) when the user asked
+  // for it by name, false when it was a side effect of an edit or a side
+  // question. When it does not open, the chat card under the reply is how the
+  // user is told it exists — it never lands hidden.
+  const wantsPanel = useCallback(
+    (result: Record<string, unknown>, env?: { open_in_panel?: unknown }) =>
+      result.open_in_panel !== false && env?.open_in_panel !== false,
+    [],
+  );
+  // Opening an artifact also brings the panel to the Artifacts view. Setting
+  // the id alone while the panel showed a screen is how an artifact used to be
+  // made and then stay hidden behind that screen (walked 2026-09-22).
+  const showArtifact = useCallback(
+    (artifactId: number) => {
+      setActiveArtifactId(artifactId);
+      setProjectRightPanelView('artifacts');
+      if (!artifactsOpen) toggleArtifacts();
+    },
+    [setActiveArtifactId, setProjectRightPanelView, artifactsOpen, toggleArtifacts],
+  );
+
+  // Rule 9: the project's one map is the panel's Map tab. On the project
+  // surface, switch the panel to it (the chat stays where it is); from
+  // anywhere else, go to the project with the Map tab open and this chat kept.
+  const openMapView = useCallback(() => {
+    if (!projectId) return;
+    if (/^\/w\/projects\/\d+\/?$/.test(pathname)) {
+      setProjectRightPanelView('map');
+      if (!artifactsOpen) toggleArtifacts();
+      return;
+    }
+    emitLandscapeCommand('navigate', {
+      target_url: buildProjectUrl(projectId, {
+        thread: activeThreadIdRef.current,
+        panel: { view: 'map' },
+      }),
+      context: { reason: 'open_map_view' },
+    });
+  }, [projectId, pathname, setProjectRightPanelView, artifactsOpen, toggleArtifacts]);
+
   const handleToolResult = useCallback(
     (toolName: string, result: Record<string, unknown>) => {
       // LF-USERDASH-0514 Phase 3: route the user's browser on navigate
@@ -229,11 +279,10 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       // sit under result.artifact, so the top-level show_artifact branch below
       // never fired. Any tool reporting the nested envelope opens here.
       if (result.artifact_created && result.artifact) {
-        const env = result.artifact as { artifact_id?: unknown };
+        const env = result.artifact as { artifact_id?: unknown; open_in_panel?: unknown };
         if (typeof env.artifact_id === 'number') {
-          setActiveArtifactId(env.artifact_id);
           qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
-          if (!artifactsOpen) toggleArtifacts();
+          if (wantsPanel(result, env)) showArtifact(env.artifact_id);
         }
       }
       // Generative artifact (Finding #4 Phase 3) — create_artifact /
@@ -244,12 +293,10 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         result.action === 'show_artifact' &&
         typeof result.artifact_id === 'number'
       ) {
-        setActiveArtifactId(result.artifact_id);
-        // Invalidate the Recent Artifacts rail so the new artifact appears
-        // without a hard refresh. Mirrors the pattern used in useArtifact.ts
-        // mutations (useArtifactPatch / useArtifactUpdateState).
+        // Invalidate the artifact list so the new artifact appears without a
+        // hard refresh. Mirrors useArtifact.ts mutations.
         qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
-        if (!artifactsOpen) toggleArtifacts();
+        if (wantsPanel(result)) showArtifact(result.artifact_id);
       }
       // Plan extraction (D15/D16) — extract_plan_image fires from chat. The map +
       // trace canvas (MapTab) live in a different layout subtree and only mount on
@@ -267,7 +314,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             payload: { url: preview.url, sourceDocId: preview.doc_id ?? null, sourcePage: preview.page ?? null },
           });
           if (projectId) {
-            emitLandscapeCommand('navigate', { target_url: `/w/projects/${projectId}/map`, context: { tool: toolName } });
+            openMapView();
           }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('landscaper:extract_plan_canvas'));
@@ -278,7 +325,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         const overlay = result.overlay as PlanOverlayPayload;
         setPendingPlanExtract({ kind: 'overlay', payload: overlay });
         if (projectId) {
-          emitLandscapeCommand('navigate', { target_url: `/w/projects/${projectId}/map`, context: { tool: toolName } });
+          openMapView();
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('landscaper:place_plan_overlay', { detail: overlay }));
@@ -296,10 +343,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         setPendingDrapeCommand(cmd);
         const needsMap = result.action_required === 'map_placement';
         if (projectId && needsMap) {
-          const target = typeof result.navigate_to === 'string'
-            ? result.navigate_to
-            : `/w/projects/${projectId}/map`;
-          emitLandscapeCommand('navigate', { target_url: target, context: { tool: toolName } });
+          openMapView();
         }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('landscaper:control_map_overlay', { detail: cmd }));
@@ -321,7 +365,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         if (destination) void recordDestination(threadId, destination);
       }
     },
-    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc, projectId],
+    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc, projectId, wantsPanel, showArtifact, openMapView],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)
@@ -379,9 +423,37 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     }
   }, [isProjectRoot]);
 
+  // RULE 1 — NOTHING CARRIES OVER FROM THE PROJECT LEFT BEHIND.
+  //
+  // This panel stays mounted across a project switch, and the chat it showed
+  // was held here (homepageThreadId) and inside the chat component. Switching
+  // Peoria → Chadron with a Peoria chat open therefore left Peoria's
+  // conversation on screen under Chadron's header, input live (walked
+  // 2026-09-22) — a message typed there would most likely have landed in
+  // Peoria's thread. Everything chat-local is dropped on a project change, and
+  // the chat component is keyed on the project (below) so none of its internal
+  // state survives either.
+  const prevProjectIdRef = useRef<number | undefined>(projectId);
+  const projectChangedRef = useRef(false);
+  useEffect(() => {
+    if (prevProjectIdRef.current === projectId) return;
+    prevProjectIdRef.current = projectId;
+    projectChangedRef.current = true;
+    setHomepageThreadId(null);
+    setThreadTitle(null);
+    pendingMessageRef.current = null;
+    setThreadListVisible(false);
+    setActiveContentContext(null);
+  }, [projectId, setActiveContentContext]);
+
+  // The chat in the address. `thread=new` is a blank chat in this project
+  // (Rule 3); a uuid is that chat; nothing is the project's starting view.
+  const urlThreadParam = searchParams?.get('thread') ?? null;
+  const isBlankChat = isProjectRoot && urlThreadParam === NEW_THREAD;
+
   // After switching from homepage → chat, fire the pending message
   useEffect(() => {
-    if (homepageThreadId && pendingMessageRef.current) {
+    if ((homepageThreadId || initialThreadId) && pendingMessageRef.current) {
       const msg = pendingMessageRef.current;
       pendingMessageRef.current = null;
       // Give LandscaperChatThreaded time to mount and load the thread
@@ -390,7 +462,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       }, 600);
       return () => clearTimeout(timer);
     }
-  }, [homepageThreadId]);
+  }, [homepageThreadId, initialThreadId]);
 
   // Seed-prompt consumption (LF-USERDASH-0514 Phase 1 tail fix, v3).
   //
@@ -490,7 +562,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const showHomepage = isProjectRoot && !homepageThreadId && !initialThreadId;
+  const showHomepage = isProjectRoot && !homepageThreadId && !initialThreadId && !isBlankChat;
 
   // On /w/chat root (no initialThreadId), when the hook creates a thread on
   // first message send, replace the URL to /w/chat/[newId] so refresh resumes
@@ -498,6 +570,32 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   const isUnassignedChatRoot = isChatRoute && !initialThreadId;
   const handleActiveThreadChange = useCallback(
     (threadId: string | null) => {
+      // Project surface: the address follows the chat (Rules 1, 2, 8).
+      //   - A blank chat that just got its first message (thread=new → id):
+      //     REPLACE, so the blank state is not a Back step of its own, and
+      //     keep the panel — it is the new chat's memory (Rule 3).
+      //   - A different existing chat picked inside this panel: PUSH, so Back
+      //     returns to the chat before it, and bring back the panel THAT chat
+      //     last had (Rule 2); a chat with no memory keeps the panel as it is
+      //     (the address is then filled in from the panel, as one step).
+      if (isProjectRoot && projectId && isThreadUuid(threadId) && threadId !== urlThreadParam) {
+        const currentPanel = parsePanelState(searchParams);
+        if (!urlThreadParam || urlThreadParam === NEW_THREAD) {
+          router.replace(buildProjectUrl(projectId, { thread: threadId, panel: currentPanel }));
+        } else {
+          router.push(
+            buildProjectUrl(projectId, {
+              thread: threadId,
+              // No memory: leave the panel out of the address, so the panel
+              // stays as it is AND the server's "last productive" fallback
+              // below still gets its chance (writing the current panel here
+              // would record a memory before that fallback could run).
+              panel: rememberedPanel(threadId) ?? undefined,
+            }),
+          );
+        }
+        return;
+      }
       if (!isUnassignedChatRoot) return;
       if (!threadId) return;
       // Only swap the URL when we're still sitting on /w/chat (not a sub-thread).
@@ -505,13 +603,24 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         router.replace(`/w/chat/${threadId}`);
       }
     },
-    [isUnassignedChatRoot, pathname, router]
+    [isUnassignedChatRoot, pathname, router, isProjectRoot, projectId, urlThreadParam, searchParams]
   );
 
   const handleSelectThread = useCallback((threadId: string, title?: string) => {
-    setHomepageThreadId(threadId);
     setThreadTitle(title ?? null);
-  }, []);
+    // A chat picked from the project's starting view goes into the address
+    // like any other chat, with the panel it last had (Rule 2).
+    if (projectId && isThreadUuid(threadId)) {
+      router.push(
+        buildProjectUrl(projectId, {
+          thread: threadId,
+          panel: rememberedPanel(threadId) ?? undefined,
+        }),
+      );
+      return;
+    }
+    setHomepageThreadId(threadId);
+  }, [projectId, router, searchParams]);
 
   const handleStartChat = useCallback(
     async (message: string) => {
@@ -525,8 +634,13 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         });
         const data = await res.json();
         if (data?.success && data?.thread?.threadId) {
-          pendingMessageRef.current = message;
-          setHomepageThreadId(data.thread.threadId);
+          pendingMessageRef.current = message || null;
+          router.push(
+            buildProjectUrl(projectId, {
+              thread: data.thread.threadId,
+              panel: parsePanelState(searchParams),
+            }),
+          );
         }
       } catch {
         // ignore — user can type in the normal chat input
@@ -534,15 +648,20 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         setIsStartingChat(false);
       }
     },
-    [projectId, isStartingChat]
+    [projectId, isStartingChat, router, searchParams]
   );
 
-  const handleBackToHomepage = useCallback(() => {
-    setHomepageThreadId(null);
-    setThreadTitle(null);
-    pendingMessageRef.current = null;
-    setActiveContentContext(null);
-  }, [setActiveContentContext]);
+  // RULE 8 (Gregg "8e"): the in-app "← Back" does exactly what the browser's
+  // Back does — steps back through what the panel showed, then to the previous
+  // chat in whatever project it lives. It used to mean "back to the project
+  // overview", which the browser's Back never did.
+  const handleBack = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/w/dashboard');
+    }
+  }, [router]);
 
   // ── Universal file-attach wiring (FB-298) ──
   // Drop/paste any file(s) → pending-attachment pills → upload on Send via the
@@ -558,7 +677,12 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   useEffect(() => {
     if (initialThreadId) setActiveThreadId(initialThreadId);
     else if (homepageThreadId) setActiveThreadId(homepageThreadId);
-  }, [initialThreadId, homepageThreadId]);
+    // A project switch or a blank chat (Rules 1, 3) leaves no chat active
+    // until one is created — never the previous project's chat, which would
+    // receive this chat's uploads and destination writes.
+    else if (isBlankChat || projectChangedRef.current) setActiveThreadId(null);
+    projectChangedRef.current = false;
+  }, [initialThreadId, homepageThreadId, isBlankChat, projectId]);
 
   // Keep the ref handleToolResult reads in step with the state.
   useEffect(() => {
@@ -569,7 +693,17 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   // Decision 1a (2026-07-28): restore immediately, no "Resume" prompt, so the
   // app behaves the same way whether a result arrives live or is reopened
   // later. Fires at most once per thread per mount — see useThreadRestore.
-  const { pending: pendingRestore, clear: clearRestore } = useThreadRestore(activeThreadId);
+  //
+  // 2026-09-22: a chat whose panel is remembered in this browser (Rule 2 —
+  // what was VISIBLE) is restored from the address, not from here. This
+  // server-side "last productive" pointer is now only the fallback for a chat
+  // never opened in this browser. Decided once per chat, when it becomes
+  // active, so the memory written a moment later cannot cancel the fetch.
+  const restoreThreadId = React.useMemo(
+    () => (rememberedPanel(activeThreadId) ? null : activeThreadId),
+    [activeThreadId],
+  );
+  const { pending: pendingRestore, clear: clearRestore } = useThreadRestore(restoreThreadId);
 
   useEffect(() => {
     if (!pendingRestore) return;
@@ -580,6 +714,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       // rest alongside — so opening the pointer alone satisfies "newest open,
       // others one click away" with no extra query.
       setActiveArtifactId(pendingRestore.artifactId);
+      // Bring the panel to Artifacts: restored behind the Screens view, the
+      // artifact was there but invisible (walked 2026-09-22).
+      setProjectRightPanelView('artifacts');
       if (!artifactsOpen) toggleArtifacts();
 
       // ...and make sure there is somewhere for it to appear. Only the chat
@@ -812,7 +949,10 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         }
         title={
           <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
-            {projectName || userName || 'Landscaper'}
+            {/* While a project's details are still loading (a switch, a
+                pasted link, a refresh) say so, rather than showing a blank
+                header or the user's own name as if this were a home chat. */}
+            {projectName || (projectId && !isChatRoute ? 'Loading project…' : userName || 'Landscaper')}
           </span>
         }
         trailing={
@@ -833,12 +973,12 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
                 {getPropertyTypeLabel(projectTypeCode)}
               </span>
             )}
-            {isProjectRoot && homepageThreadId && (
+            {isProjectRoot && !showHomepage && (
               <button
                 className="w-btn w-btn-ghost w-btn-sm"
-                onClick={handleBackToHomepage}
+                onClick={handleBack}
                 style={{ marginRight: '4px' }}
-                title="Back to project overview"
+                title="Back — same as the browser's Back"
               >
                 ← Back
               </button>
@@ -908,7 +1048,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           />
         ) : (
           <LandscaperChatThreaded
-            key={sessionKey ?? 'default'}
+            // Keyed on the project as well as the session: a chat must never
+            // survive a project switch (Rule 1).
+            key={`${sessionKey ?? 'default'}:${projectId ?? 'none'}`}
             ref={chatRef}
             projectId={projectId}
             pageContext={projectId ? getPageContext() : 'general'}
@@ -929,8 +1071,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             // Phase 4 — chat-card "Open" → re-activate the artifact in the
             // workspace panel (and re-open the panel if collapsed).
             onOpenArtifact={(artifactId) => {
-              setActiveArtifactId(artifactId);
-              if (!artifactsOpen) toggleArtifacts();
+              // A card click is asking to see it (Rule 4): open it and bring
+              // the panel to Artifacts, whatever view it was on.
+              showArtifact(artifactId);
               // Same dead spot as thread restore, and it predates it: on the
               // map / reports / documents pages there is no artifact surface,
               // so this button set global state and appeared to do nothing.
@@ -954,9 +1097,15 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
               }
               if (isChatRoute) {
                 router.replace('/w/chat');
+                return;
               }
-              // Other project routes: leave the user on the page; the chat panel
-              // will fall back to project-scoped get_or_create on next send.
+              // Project surface: the remembered chat is gone (deleted or
+              // archived). Forget it and open the project's starting view
+              // rather than a dead chat.
+              if (isProjectRoot && projectId) {
+                forgetProjectThread(projectId);
+                router.replace(`/w/projects/${projectId}`);
+              }
             }}
           />
         )}

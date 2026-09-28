@@ -244,8 +244,15 @@ export function useFolderNavigation(
         return;
       }
 
-      // Build new URL with search params
-      const params = new URLSearchParams();
+      // Build new URL with search params. Everything else already in the
+      // address is KEPT — in the chat-first shell it names the open chat and
+      // the panel view (?thread=…&view=screen), and dropping it moved the user
+      // off their chat every time a screen changed its own tab (2026-09-22).
+      // Scoped to the chat-first shell (/w/) so the classic surface and the
+      // studio keep their existing behaviour exactly.
+      const params = new URLSearchParams(
+        pathname.startsWith('/w/') ? searchParams?.toString() ?? '' : '',
+      );
       params.set('folder', folder);
       params.set('tab', targetTab);
 
@@ -255,6 +262,7 @@ export function useFolderNavigation(
     [
       pathname,
       router,
+      searchParams,
       propertyType,
       analysisType,
       tileConfig,

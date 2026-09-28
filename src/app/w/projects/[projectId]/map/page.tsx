@@ -1,24 +1,34 @@
 'use client';
 
-import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
-import { MapTab } from '@/components/map-tab/MapTab';
-import type { Project } from '@/components/map-tab/types';
-import { useWrapperProject, useWrapperProjectRefetch } from '@/contexts/WrapperProjectContext';
+import { useEffect } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
-export default function WrapperMapPage() {
-  const project = useWrapperProject();
-  const refetchProject = useWrapperProjectRefetch();
+/**
+ * Legacy per-project map route — now a redirect to the panel's Map tab.
+ *
+ * Rule 9 (D-2026-09-22-NAV-R9, Gregg "9a"): one Map per project, and it is the
+ * Map tab of the right panel. This route used to replace the whole right-hand
+ * side with a second copy of the same map, and it is still what several
+ * Landscaper tools and older links point at (plan extraction, site-plan drape
+ * control, remembered chat destinations). Rather than change every caller,
+ * the route forwards to the tab, carrying the chat and anything else in the
+ * address. The map component drains any pending plan-extract or drape command
+ * when it mounts in the tab, exactly as it did here.
+ *
+ * Replace, not push, so this address never becomes a Back step of its own.
+ */
+export default function WrapperMapRedirect() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = params?.projectId as string | undefined;
 
-  // Adapt WrapperProject to the MapTab Project shape. Project carries an
-  // index signature ([key: string]: unknown) that WrapperProject lacks, so
-  // spread into a fresh object literal to satisfy the structural target.
-  const mapProject: Project = { ...project };
+  useEffect(() => {
+    if (!projectId) return;
+    const qs = new URLSearchParams(searchParams?.toString() ?? '');
+    qs.set('view', 'map');
+    router.replace(`/w/projects/${projectId}?${qs.toString()}`);
+  }, [projectId, router, searchParams]);
 
-  return (
-    <RightContentPanel title="Map" subtitle={project.project_name}>
-      <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
-        <MapTab project={mapProject} onProjectUpdated={refetchProject} />
-      </div>
-    </RightContentPanel>
-  );
+  return null;
 }
