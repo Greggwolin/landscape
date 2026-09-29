@@ -716,9 +716,13 @@ const GROUPS: Array<{ title: string; fields: FieldDef[] }> = [
   {
     title: 'Release',
     fields: [
-      { key: 'release_price_pct', label: 'Release price', kind: 'number', suffix: '% of sale' },
-      { key: 'minimum_release_amount', label: 'Minimum release', kind: 'number' },
-      { key: 'repayment_acceleration', label: 'Acceleration', kind: 'number', suffix: '×' },
+      // The engine prices a release as the loan's per-lot share (commitment
+      // ÷ lots it holds) × this % × acceleration, floored at the minimum —
+      // not a share of the sale price.
+      { key: 'release_price_pct', label: 'Release price (% of loan per lot)', kind: 'number', suffix: '%' },
+      { key: 'repayment_acceleration', label: 'Release acceleration', kind: 'number', suffix: '×' },
+      { key: 'minimum_release_amount', label: 'Minimum release per lot', kind: 'number' },
+      { key: 'interest_reserve_inflator', label: 'Interest reserve cushion (inflator)', kind: 'number', suffix: '×' },
     ],
   },
 ];
