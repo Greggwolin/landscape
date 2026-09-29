@@ -44,7 +44,7 @@ class DebtScheduleView(APIView):
         ) or 0
         loan_start_period = service._get_period_index_for_date(
             service._generate_periods(project_config['start_date'], max(required_periods, 1)),
-            loan.loan_start_date,
+            service.loan_start_date_for(loan),
         )
         min_periods_for_loan = loan_start_period + loan_term_months + 1
         required_periods = max(required_periods, min_periods_for_loan)
@@ -73,7 +73,7 @@ class DebtScheduleView(APIView):
         engine = DebtServiceEngine()
 
         if loan.structure_type == 'REVOLVER':
-            params = service._build_revolver_params(loan, periods)
+            params = service._build_revolver_params(loan, periods, period_data)
             try:
                 result = engine.calculate_revolver(params, period_data)
             except NotImplementedError as exc:
@@ -122,7 +122,7 @@ class DebtScheduleView(APIView):
             return Response(response, status=status.HTTP_200_OK)
 
         if loan.structure_type == 'TERM':
-            params = service._build_term_params(loan, periods)
+            params = service._build_term_params(loan, periods, period_data)
             result = engine.calculate_term(params, len(periods))
             response = {
                 'loan_id': loan.loan_id,

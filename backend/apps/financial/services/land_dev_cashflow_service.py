@@ -1459,7 +1459,7 @@ class LandDevCashFlowService:
             period_data = self.build_loan_period_data(
                 loan, cost_schedule, absorption_schedule, periods,
             )
-            params = self._build_revolver_params(loan, periods)
+            params = self._build_revolver_params(loan, periods, period_data)
             revolver_result = engine.calculate_revolver(params, period_data)
 
             period_amounts = []
@@ -1495,7 +1495,10 @@ class LandDevCashFlowService:
             if loan.takes_out_loan_id:
                 findings.append(self._take_out_finding(loan))
 
-            params = self._build_term_params(loan, periods)
+            term_period_data = self.build_loan_period_data(
+                loan, cost_schedule, absorption_schedule, periods,
+            )
+            params = self._build_term_params(loan, periods, term_period_data)
             term_result = engine.calculate_term(params, period_count)
             initial_net_proceeds = self._resolve_net_loan_proceeds(loan, params.loan_amount)
 
@@ -1561,10 +1564,19 @@ class LandDevCashFlowService:
             ),
         }
 
-    def _build_revolver_params(self, loan: Loan, periods: List[Dict]) -> RevolverLoanParams:
-        """Translate Loan model to revolver parameters for calculation engine."""
+    def _build_revolver_params(
+        self,
+        loan: Loan,
+        periods: List[Dict],
+        period_data: Optional[List[PeriodCosts]] = None,
+    ) -> RevolverLoanParams:
+        """Translate Loan model to revolver parameters for calculation engine.
+
+        Given the loan's own period data, the loan is due on sale: whatever is
+        owed is retired in the period its last collateral sells.
+        """
         loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
-        loan_start_period = self._get_period_index_for_date(periods, loan.loan_start_date)
+        loan_start_period = self._get_period_index_for_date(periods, self.loan_start_date_for(loan))
 
         closing_costs = (
             float(loan.closing_costs_appraisal or 0)
@@ -1584,12 +1596,26 @@ class LandDevCashFlowService:
             loan_start_period=loan_start_period,
             loan_term_months=loan_term_months or len(periods),
             draw_trigger_type=loan.draw_trigger_type,
+            payoff_period=self._last_collateral_sale(period_data, loan_start_period),
         )
 
-    def _build_term_params(self, loan: Loan, periods: List[Dict]) -> TermLoanParams:
-        """Translate Loan model to term parameters for calculation engine."""
+    def _build_term_params(
+        self,
+        loan: Loan,
+        periods: List[Dict],
+        period_data: Optional[List[PeriodCosts]] = None,
+    ) -> TermLoanParams:
+        """Translate Loan model to term parameters for calculation engine.
+
+        Due on sale: when the loan's last collateral sells before maturity, the
+        term is cut to end in that period, so the balance balloons there.
+        """
         loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
-        loan_start_period = self._get_period_index_for_date(periods, loan.loan_start_date)
+        loan_start_period = self._get_period_index_for_date(periods, self.loan_start_date_for(loan))
+        payoff = self._last_collateral_sale(period_data, loan_start_period)
+        if payoff is not None:
+            to_sale = payoff - loan_start_period + 1
+            loan_term_months = min(loan_term_months or to_sale, to_sale)
 
         amort_months = self._normalize_term_months(loan.amortization_months, loan.amortization_years)
 
@@ -1725,6 +1751,48 @@ class LandDevCashFlowService:
             )
 
         return period_data
+
+    # -- Loan dates ---------------------------------------------------------
+
+    def acquisition_date(self) -> Optional[date]:
+        """When the land was bought: the first CLOSING in the acquisition
+        ledger, else the first dated event applied to the purchase."""
+        if not hasattr(self, '_acquisition_date_cache'):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(
+                      (SELECT MIN(event_date) FROM landscape.tbl_acquisition
+                        WHERE project_id = %s AND event_type = 'CLOSING' AND event_date IS NOT NULL),
+                      (SELECT MIN(event_date) FROM landscape.tbl_acquisition
+                        WHERE project_id = %s AND COALESCE(is_applied_to_purchase, true)
+                          AND event_date IS NOT NULL)
+                    )
+                    """,
+                    [self.project_id, self.project_id],
+                )
+                row = cursor.fetchone()
+                self._acquisition_date_cache = row[0] if row else None
+        return self._acquisition_date_cache
+
+    def loan_start_date_for(self, loan: Loan) -> Optional[date]:
+        """The loan's own start date when typed; otherwise the acquisition date."""
+        return getattr(loan, 'loan_start_date', None) or self.acquisition_date()
+
+    @staticmethod
+    def _last_collateral_sale(
+        period_data: Optional[List[PeriodCosts]],
+        loan_start_period: int,
+    ) -> Optional[int]:
+        """The period the loan's last collateral sells, or None when nothing
+        it holds sells (or the data was not supplied)."""
+        if not period_data:
+            return None
+        sales = [p.period_index for p in period_data if p.lots_sold_by_product]
+        if not sales:
+            return None
+        last = max(sales)
+        return last if last >= loan_start_period else None
 
     # -- Loans tied to containers ------------------------------------------
 
@@ -1939,7 +2007,7 @@ class LandDevCashFlowService:
 
         for loan in all_loans:
             term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years) or 0
-            loan_start = self._get_period_index_for_date(temp_periods, loan.loan_start_date)
+            loan_start = self._get_period_index_for_date(temp_periods, self.loan_start_date_for(loan))
             min_periods = loan_start + term_months + 1
             if min_periods > required_periods:
                 required_periods = min_periods

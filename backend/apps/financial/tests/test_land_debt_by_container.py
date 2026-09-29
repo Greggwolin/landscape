@@ -152,6 +152,7 @@ def _periods(n=6):
 
 def test_financing_section_uses_per_loan_period_data():
     svc = LandDevCashFlowService(1)
+    svc._acquisition_date_cache = None  # no acquisition ledger in a pure test
     loan = _fake_loan()
     with mock.patch.object(svc, '_fetch_loans', side_effect=[[loan], []]), \
          mock.patch.object(svc, 'build_loan_period_data', wraps=lambda *a, **k: []) as spy, \
@@ -187,6 +188,7 @@ def test_construction_loan_run_uses_per_loan_period_data():
 # (f) a take-out is a finding returned to the caller, not a crash or a log line
 def test_take_out_surfaces_as_finding():
     svc = LandDevCashFlowService(1)
+    svc._acquisition_date_cache = None
     taken = SimpleNamespace(loan_name='Land loan')
     loan = _fake_loan(takes_out_loan_id=3, takes_out_loan=taken, loan_name='A&D revolver')
     with mock.patch.object(svc, '_fetch_loans', side_effect=[[loan], []]), \
@@ -233,3 +235,36 @@ def test_ratio_with_no_basis_is_skipped_not_zero():
     assert r['governing_constraint'] == 'LTC'
     assert r['commitment_amount'] == L.Decimal('500.00')
     assert any('Loan-to-value ignored' in n for n in r['sizing_notes'])
+
+
+# Due on sale: whatever a loan still owes is retired when its last collateral sells
+def test_revolver_retired_at_last_collateral_sale():
+    from apps.calculations.engines.debt_service_engine import (
+        DebtServiceEngine, PeriodCosts, RevolverLoanParams)
+    pd = [PeriodCosts(i, '', 1000.0 if i < 6 else 0.0,
+                      {1: 5} if i in (8, 10) else {}, {1: 100.0}) for i in range(24)]
+    base = dict(loan_to_cost_pct=0.6, interest_rate_annual=0.08, origination_fee_pct=0.0,
+                interest_reserve_inflator=1.0, repayment_acceleration=1.0, release_price_pct=0.5,
+                release_price_minimum=0.0, closing_costs=0.0, loan_start_period=0, loan_term_months=24)
+    last = LandDevCashFlowService._last_collateral_sale(pd, 0)
+    assert last == 10
+    r = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, payoff_period=last), pd)
+    assert r.periods[10].ending_balance == 0
+    assert all(p.accrued_interest == 0 and p.ending_balance == 0 for p in r.periods[11:])
+    r_old = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
+    assert r_old.periods[-1].ending_balance > 0  # without due-on-sale it lingered
+
+
+def test_term_loan_balloons_at_last_collateral_sale():
+    from datetime import date
+    svc = LandDevCashFlowService(1)
+    svc._acquisition_date_cache = date(2027, 1, 28)
+    from apps.calculations.engines.debt_service_engine import PeriodCosts
+    pd = [PeriodCosts(i, '', 0.0, {1: 3} if i == 30 else {}, {}) for i in range(48)]
+    loan = _fake_loan(structure_type='TERM', loan_amount=1000, commitment_amount=1000,
+                      loan_term_months=120, amortization_months=240, amortization_years=None,
+                      interest_only_months=24, payment_frequency='MONTHLY')
+    periods = [{'endDate': date(2027 + (i // 12), 1 + (i % 12), 28)} for i in range(48)]
+    params = svc._build_term_params(loan, periods, pd)
+    assert params.loan_start_period == 0          # the acquisition date, since none was typed
+    assert params.loan_term_months == 31          # ends in the sale period, not month 120

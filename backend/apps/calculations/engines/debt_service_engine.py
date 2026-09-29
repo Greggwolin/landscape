@@ -23,6 +23,9 @@ class RevolverLoanParams:
     loan_start_period: int
     loan_term_months: int
     draw_trigger_type: Optional[str] = None
+    # Due on sale: the period the loan's last collateral sells. Whatever is
+    # still owed is retired then. None keeps the old behaviour.
+    payoff_period: Optional[int] = None
 
 
 @dataclass
@@ -467,8 +470,10 @@ class DebtServiceEngine:
             release_payments_by_product: Dict[int, float] = {}
             parcels_this_period = 0
 
-            # Cost draws: only during loan term
-            if params.loan_start_period <= period_index < term_end:
+            past_payoff = params.payoff_period is not None and period_index > params.payoff_period
+
+            # Cost draws: only during loan term, never after the loan is retired
+            if params.loan_start_period <= period_index < term_end and not past_payoff:
                 cost_draw = draw_by_period.get(period_index, 0.0)
                 balance += cost_draw
 
@@ -500,6 +505,11 @@ class DebtServiceEngine:
                         release_payments_by_product[product_id] = (
                             release_price_per_lot * lots_sold * cap_ratio
                         )
+
+                # Due on sale: the last collateral sale retires what is left.
+                if params.payoff_period is not None and period_index == params.payoff_period and balance > 0:
+                    release_payments += balance
+                    balance = 0.0
 
             cumulative_parcels += parcels_this_period
             ending_balance = max(balance, 0.0)

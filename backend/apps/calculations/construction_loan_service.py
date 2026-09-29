@@ -133,7 +133,7 @@ class ConstructionLoanService:
                 )
 
             # 4. Build revolver params from the loan
-            params = svc._build_revolver_params(loan, periods)
+            params = svc._build_revolver_params(loan, periods, period_data)
 
             # 5. Run the engine (iterative reserve convergence)
             engine = DebtServiceEngine()

@@ -330,7 +330,7 @@ class LoanSizingService:
                 absorption_schedule,
                 periods,
             )
-            params = service._build_revolver_params(loan, periods)
+            params = service._build_revolver_params(loan, periods, period_data)
             result = DebtServiceEngine().calculate_revolver(params, period_data)
             return {
                 "recommended_reserve": round(result.interest_reserve_funded, 2),

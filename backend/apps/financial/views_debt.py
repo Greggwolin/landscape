@@ -62,6 +62,17 @@ class LoanViewSet(viewsets.ModelViewSet):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, project_id=project_id)
         loan = serializer.save(project=project, created_at=timezone.now(), updated_at=timezone.now())
+        # A new loan starts on the acquisition date unless one was typed; the
+        # user can overwrite it like any other field.
+        if not loan.loan_start_date:
+            try:
+                from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+                start = LandDevCashFlowService(int(project_id)).acquisition_date()
+                if start:
+                    loan.loan_start_date = start
+                    loan.save(update_fields=['loan_start_date'])
+            except Exception:
+                logger.exception("Default start date failed for loan %s", loan.loan_id)
         try:
             self._apply_sizing(loan, project)
         except Exception as e:
