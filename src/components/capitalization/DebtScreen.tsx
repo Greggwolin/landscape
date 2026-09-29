@@ -860,7 +860,10 @@ function DetailPanel({
                 aria-label="Share"
                 className={`form-control form-control-sm ${styles.shareInput} ${styles.typed}`}
                 type="number"
-                defaultValue={num(c.allocation_pct) ?? 100}
+                // Empty means the loan takes all of this container (the engine
+                // reads no share as the whole of it); nothing is filled in for it.
+                defaultValue={num(c.allocation_pct) ?? ''}
+                placeholder="all"
                 onBlur={(e) => setShare(c.division_id, e.target.value)}
               />
               %
