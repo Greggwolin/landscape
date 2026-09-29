@@ -744,6 +744,8 @@ export default function LoanCard({
                       <option value="PERMANENT">Permanent</option>
                       <option value="BRIDGE">Bridge</option>
                       <option value="MEZZANINE">Mezzanine</option>
+                      <option value="ACQUISITION_DEVELOPMENT">A&amp;D</option>
+                      <option value="LAND">Land</option>
                     </select>
                   </AssumptionRow>
                 </div>

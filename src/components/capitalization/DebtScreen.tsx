@@ -58,11 +58,12 @@ type LoanRecord = Record<string, unknown> & {
   containers?: LoanContainerRow[];
 };
 
-// The loan types the database accepts today. "A&D" and "Land" are not among
-// them yet — an A&D revolver is entered as Construction · Revolver.
+// The loan types the database accepts (A&D and Land added 2026-09-29).
 const LOAN_TYPES: Array<{ value: string; label: string }> = [
-  { value: 'CONSTRUCTION', label: 'Construction / A&D' },
-  { value: 'BRIDGE', label: 'Bridge / land' },
+  { value: 'ACQUISITION_DEVELOPMENT', label: 'A&D' },
+  { value: 'LAND', label: 'Land' },
+  { value: 'CONSTRUCTION', label: 'Construction' },
+  { value: 'BRIDGE', label: 'Bridge' },
   { value: 'PERMANENT', label: 'Permanent' },
   { value: 'MEZZANINE', label: 'Mezzanine' },
   { value: 'LINE_OF_CREDIT', label: 'Line of credit' },
@@ -271,7 +272,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
     createLoan.mutate(
       {
         loan_name: `Loan ${loans.length + 1}`,
-        loan_type: 'CONSTRUCTION',
+        loan_type: 'ACQUISITION_DEVELOPMENT',
         structure_type: 'REVOLVER',
         seniority: loans.length + 1,
         status: 'pending',
