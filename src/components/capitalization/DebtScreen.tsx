@@ -89,6 +89,11 @@ const STATUSES = [
   { value: 'closed', label: 'Closed' },
   { value: 'defeased', label: 'Defeased' },
 ];
+const RELEASE_BASES = [
+  { value: 'LOT', label: 'Per lot' },
+  { value: 'ACRE', label: 'Per acre' },
+  { value: 'CASH_SWEEP', label: 'Cash sweep (100% of net sale proceeds)' },
+];
 const INTEREST_TYPES = [
   { value: 'Floating', label: 'Floating' },
   { value: 'Fixed', label: 'Fixed' },
@@ -767,13 +772,14 @@ const GROUPS: Array<{ title: string; fields: FieldDef[] }> = [
   {
     title: 'Release',
     fields: [
-      // The engine prices a release as the loan's per-lot share (commitment
-      // ÷ lots it holds) × this % × acceleration, floored at the minimum —
-      // not a share of the sale price.
-      { key: 'release_price_pct', label: 'Release price (% of loan per lot)', kind: 'number', suffix: '%' },
+      // Per lot or per acre: the loan's share of each lot or acre (commitment ÷
+      // lots or acres it holds) × this % × acceleration, floored at the
+      // minimum. Cash sweep: 100% of each sale's net proceeds, no price.
+      { key: 'release_basis', label: 'Release basis', kind: 'select', options: RELEASE_BASES },
+      { key: 'release_price_pct', label: 'Release price (% of loan per lot or acre)', kind: 'number', suffix: '%' },
       { key: 'repayment_acceleration', label: 'Release acceleration', kind: 'number', suffix: '×' },
-      { key: 'minimum_release_amount', label: 'Minimum release per lot', kind: 'number' },
-      { key: 'interest_reserve_inflator', label: 'Interest reserve cushion (inflator)', kind: 'number', suffix: '×' },
+      { key: 'minimum_release_amount', label: 'Minimum release (per lot or acre)', kind: 'number' },
+      { key: 'interest_reserve_inflator', label: 'Interest reserve contingency', kind: 'number', suffix: '×' },
     ],
   },
 ];
@@ -994,8 +1000,13 @@ interface ReserveCheck {
   first_uncovered_month: number | null;
   has_reserve: boolean;
   uses_calculator: boolean;
-  missing_inputs: Array<{ key: string; label: string }>;
-  inputs: Array<{ key: string; label: string; value: number | null }>;
+  missing_inputs: Array<{
+    key: string;
+    label: string;
+    kind: 'number' | 'choice';
+    choices: Array<{ value: string; label: string }> | null;
+  }>;
+  price_inputs: string[];
 }
 
 function ReservePrompt({
@@ -1010,25 +1021,29 @@ function ReservePrompt({
   onDone: (note?: string) => void;
 }) {
   const [step, setStep] = useState<'ask' | 'inputs' | 'result'>('ask');
+  // Only what the loan does not already carry is asked for.
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(check.inputs.map((i) => [i.key, i.value === null ? '' : String(i.value)])),
+    Object.fromEntries(check.missing_inputs.map((i) => [i.key, ''])),
   );
+  const sweep = values.release_basis === 'CASH_SWEEP';
+  const shown = check.missing_inputs.filter((i) => !(sweep && check.price_inputs.includes(i.key)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ recommended_reserve?: number; calculation_basis?: Record<string, unknown> } | null>(null);
-  const missing = new Set(check.missing_inputs.map((m) => m.key));
   const base = `${DJANGO_API_URL}/api/projects/${projectId}/loans/${check.loan_id}`;
 
   const size = async () => {
     setBusy(true);
     setError(null);
     try {
-      const data: Record<string, number> = {};
-      for (const i of check.inputs) {
-        const v = values[i.key];
-        if (v !== undefined && v.trim() !== '' && Number.isFinite(Number(v))) data[i.key] = Number(v);
+      const data: Record<string, number | string> = {};
+      for (const i of shown) {
+        const v = (values[i.key] ?? '').trim();
+        if (v === '') continue;
+        if (i.kind === 'choice') data[i.key] = v;
+        else if (Number.isFinite(Number(v))) data[i.key] = Number(v);
       }
-      const unfilled = check.inputs.filter((i) => data[i.key] === undefined);
+      const unfilled = shown.filter((i) => data[i.key] === undefined);
       if (unfilled.length > 0) {
         setError(`Still needed: ${unfilled.map((i) => i.label).join(', ')}.`);
         return;
@@ -1096,22 +1111,35 @@ function ReservePrompt({
         <>
           <p>
             The reserve is sized by the loan calculator: it runs the draws, releases and interest, sizes the
-            reserve with its cushion, and repeats until the numbers settle. It needs these; the empty ones are
-            missing.
-            {!check.uses_calculator && ' Giving this loan a release price is what puts it through the calculator.'}
+            reserve with its contingency, and repeats until the numbers settle.{' '}
+            {shown.length > 0
+              ? 'The loan already carries everything else; it still needs:'
+              : 'The loan already carries everything it needs.'}
+            {!check.uses_calculator && ' Giving this loan a release basis is what puts it through the calculator.'}
           </p>
-          {check.inputs.map((i) => (
+          {shown.map((i) => (
             <div key={i.key} className={styles.row}>
-              <span className={styles.rowLabel}>
-                {i.label}
-                {missing.has(i.key) ? ' — needed' : ''}
-              </span>
-              <input
-                className={`form-control form-control-sm ${styles.shareInput} ${styles.typed}`}
-                type="number"
-                value={values[i.key] ?? ''}
-                onChange={(e) => setValues((v) => ({ ...v, [i.key]: e.target.value }))}
-              />
+              <span className={styles.rowLabel}>{i.label}</span>
+              {i.kind === 'choice' ? (
+                <select
+                  className={`form-select form-select-sm ${styles.typed}`}
+                  style={{ width: 'auto' }}
+                  value={values[i.key] ?? ''}
+                  onChange={(e) => setValues((v) => ({ ...v, [i.key]: e.target.value }))}
+                >
+                  <option value="">Choose…</option>
+                  {(i.choices ?? []).map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className={`form-control form-control-sm ${styles.shareInput} ${styles.typed}`}
+                  type="number"
+                  value={values[i.key] ?? ''}
+                  onChange={(e) => setValues((v) => ({ ...v, [i.key]: e.target.value }))}
+                />
+              )}
             </div>
           ))}
           <div className="d-flex gap-2" style={{ marginTop: 8 }}>

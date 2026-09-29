@@ -104,6 +104,7 @@ class LoanListSerializer(serializers.ModelSerializer):
             'closing_costs_other',
             'release_price_pct',
             'minimum_release_amount',
+            'release_basis',
             'rate_floor_pct',
             'rate_cap_pct',
             'takes_out_loan_id',

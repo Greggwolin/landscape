@@ -370,3 +370,50 @@ def test_investment_irr_takes_the_real_root():
     assert investment_irr(conventional) == float(npf.irr(conventional))
     # a genuine loss stays negative
     assert investment_irr([-100.0, 20.0, 30.0]) < 0
+
+
+# Release basis (Gregg, 2026-09-29): per lot, per acre, or a cash sweep of 100%
+# of each sale's net proceeds.
+def _sale_case():
+    from apps.calculations.engines.debt_service_engine import PeriodCosts
+    pd = []
+    for i in range(20):
+        sold = i in (10, 14)
+        pd.append(PeriodCosts(i, '', 1000.0 if i < 5 else 0.0,
+                              {1: 10} if sold else {}, {1: 100.0},
+                              acres_sold=4.0 if sold else 0.0,
+                              sale_proceeds=2500.0 if sold else 0.0))
+    base = dict(loan_to_cost_pct=0.6, interest_rate_annual=0.06, origination_fee_pct=0.0,
+                interest_reserve_inflator=1.0, repayment_acceleration=1.0, release_price_pct=0.5,
+                release_price_minimum=0.0, closing_costs=0.0, loan_start_period=0, loan_term_months=20)
+    return pd, base
+
+
+def test_cash_sweep_takes_all_net_proceeds():
+    from apps.calculations.engines.debt_service_engine import DebtServiceEngine, RevolverLoanParams
+    pd, base = _sale_case()
+    r = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, release_basis='CASH_SWEEP'), pd)
+    p10 = r.periods[10]
+    assert abs(p10.release_payments - min(2500.0, p10.beginning_balance + p10.accrued_interest)) < 1e-6
+
+
+def test_per_acre_release_uses_acres():
+    from apps.calculations.engines.debt_service_engine import DebtServiceEngine, RevolverLoanParams
+    pd, base = _sale_case()
+    r = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, release_basis='ACRE'), pd)
+    per_acre = r.commitment_amount / 8.0 * 0.5
+    assert abs(r.periods[10].release_payments - per_acre * 4.0) < 1e-6
+
+
+def test_lot_basis_unchanged_by_the_new_fields():
+    from apps.calculations.engines.debt_service_engine import DebtServiceEngine, RevolverLoanParams
+    pd, base = _sale_case()
+    a = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
+    b = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, release_basis='LOT'), pd)
+    assert [p.ending_balance for p in a.periods] == [p.ending_balance for p in b.periods]
+
+
+def test_cash_sweep_term_loan_uses_calculator():
+    from types import SimpleNamespace as N
+    assert LandDevCashFlowService.uses_release_calculator(
+        N(structure_type='TERM', release_price_pct=None, release_basis='CASH_SWEEP'))

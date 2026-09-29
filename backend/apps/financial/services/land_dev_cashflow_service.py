@@ -1135,6 +1135,7 @@ class LandDevCashFlowService:
                 'closingCosts': closing_costs,
                 'subdivisionCosts': subdivision_costs,
                 'units': int(units) if units else 1,
+                'acres': float(parcel.get('acres_gross') or 0),
             }
 
         # Fallback: calculate from pricing table (minimal implementation)
@@ -1611,6 +1612,7 @@ class LandDevCashFlowService:
                 else 'costs'
             ),
             revolving=(loan.structure_type or '').upper() == 'REVOLVER',
+            release_basis=(getattr(loan, 'release_basis', None) or 'LOT').upper(),
             commitment_cap=self._fixed_commitment(loan),
         )
 
@@ -1685,6 +1687,14 @@ class LandDevCashFlowService:
                 cost_schedule, absorption_schedule, period_count,
                 phase_to_division, loan_scope,
             )
+            shares = loan_scope.get('shares') or {}
+            ancestry = loan_scope.get('ancestry') or {}
+            acres_s, proceeds_s = self._sales_by_period(
+                absorption_schedule, period_count,
+                lambda parcel: self._share_for_division(
+                    phase_to_division.get(parcel.get('containerId')), shares, ancestry,
+                ),
+            )
             return [
                 PeriodCosts(
                     period_index=idx,
@@ -1692,6 +1702,8 @@ class LandDevCashFlowService:
                     total_costs=period_totals_s[idx],
                     lots_sold_by_product=lots_s.get(idx, {}),
                     cost_per_lot_by_product=cost_per_lot_s,
+                    acres_sold=acres_s[idx],
+                    sale_proceeds=proceeds_s[idx],
                 )
                 for idx in range(period_count)
             ]
@@ -1752,6 +1764,9 @@ class LandDevCashFlowService:
             else:
                 cost_per_lot_by_division[division_id] = total_cost / lot_count
 
+        acres_all, proceeds_all = self._sales_by_period(
+            absorption_schedule, period_count, lambda parcel: 1.0,
+        )
         period_data: List[PeriodCosts] = []
         for idx in range(period_count):
             period = periods[idx]
@@ -1762,10 +1777,32 @@ class LandDevCashFlowService:
                     total_costs=float(period_totals[idx]) if idx < len(period_totals) else 0.0,
                     lots_sold_by_product=lots_by_period.get(idx, {}),
                     cost_per_lot_by_product=cost_per_lot_by_division,
+                    acres_sold=acres_all[idx],
+                    sale_proceeds=proceeds_all[idx],
                 )
             )
 
         return period_data
+
+    @staticmethod
+    def _sales_by_period(absorption_schedule: Dict, period_count: int, weight):
+        """Acres sold and net sale proceeds per period, for releases priced
+        per acre and for a cash sweep. ``weight(parcel)`` is the loan's share
+        of that parcel's collateral: 0 leaves it out; proceeds are taken at the
+        share, acres whole (a per-acre price is already the loan's share)."""
+        acres = [0.0] * period_count
+        proceeds = [0.0] * period_count
+        for period_sale in absorption_schedule.get('periodSales', []):
+            idx = period_sale.get('periodIndex')
+            if idx is None or not (0 <= idx < period_count):
+                continue
+            for parcel in period_sale.get('parcels', []):
+                w = float(weight(parcel) or 0.0)
+                if w <= 0:
+                    continue
+                acres[idx] += float(parcel.get('acres') or 0.0)
+                proceeds[idx] += float(parcel.get('netRevenue') or 0.0) * w
+        return acres, proceeds
 
     # -- Loan dates ---------------------------------------------------------
 
@@ -2045,16 +2082,24 @@ class LandDevCashFlowService:
     CALCULATOR_STRUCTURES = ('REVOLVER', 'A_AND_D')
 
     # What the release-and-reserve calculator needs to size a reserve.
+    RELEASE_BASIS_CHOICES = (
+        ('LOT', 'Per lot'),
+        ('ACRE', 'Per acre'),
+        ('CASH_SWEEP', 'Cash sweep (100% of net sale proceeds)'),
+    )
     RESERVE_INPUTS = (
         ('loan_to_cost_pct', 'Loan to cost (%)'),
         ('interest_rate_pct', 'Interest rate (%)'),
         ('origination_fee_pct', 'Origination fee (%)'),
         ('loan_term_months', 'Term (months)'),
-        ('interest_reserve_inflator', 'Reserve cushion (inflator, e.g. 1.2)'),
-        ('release_price_pct', 'Release price (% of loan per lot)'),
+        ('interest_reserve_inflator', 'Reserve contingency (e.g. 1.2 = 20%)'),
+        ('release_basis', 'Release basis'),
+        ('release_price_pct', 'Release price (% of the loan per lot or acre)'),
         ('repayment_acceleration', 'Release acceleration'),
-        ('minimum_release_amount', 'Minimum release per lot'),
+        ('minimum_release_amount', 'Minimum release (per lot or acre)'),
     )
+    # A cash sweep takes the whole of each sale's net proceeds, so it needs no price.
+    PRICE_INPUTS = ('release_price_pct', 'repayment_acceleration', 'minimum_release_amount')
 
     def interest_coverage(self, loan: Loan) -> Dict[str, Any]:
         """Months where this loan charges interest but the project has no
@@ -2095,9 +2140,22 @@ class LandDevCashFlowService:
                 short = due - max(net_before[i], 0.0)
                 if short > 0.5:
                     uncovered.append((i, short))
+        sweep = (getattr(loan, 'release_basis', None) or '').upper() == 'CASH_SWEEP'
+        wanted = [
+            (key, label) for key, label in self.RESERVE_INPUTS
+            if not (sweep and key in self.PRICE_INPUTS)
+        ]
+        # Only what the loan does not already carry is asked for.
         missing = [
-            {'key': key, 'label': label}
-            for key, label in self.RESERVE_INPUTS
+            {
+                'key': key, 'label': label,
+                'kind': 'choice' if key == 'release_basis' else 'number',
+                'choices': (
+                    [{'value': v, 'label': l} for v, l in self.RELEASE_BASIS_CHOICES]
+                    if key == 'release_basis' else None
+                ),
+            }
+            for key, label in wanted
             if getattr(loan, key, None) in (None, '')
         ]
         return {
@@ -2108,12 +2166,7 @@ class LandDevCashFlowService:
             'has_reserve': float(getattr(loan, 'interest_reserve_amount', None) or 0) > 0,
             'uses_calculator': self.uses_release_calculator(loan),
             'missing_inputs': missing,
-            'inputs': [
-                {'key': key, 'label': label, 'value': (
-                    float(getattr(loan, key)) if getattr(loan, key, None) not in (None, '') else None
-                )}
-                for key, label in self.RESERVE_INPUTS
-            ],
+            'price_inputs': list(self.PRICE_INPUTS),
         }
 
     @classmethod
@@ -2122,7 +2175,11 @@ class LandDevCashFlowService:
         structure = (getattr(loan, 'structure_type', '') or '').upper()
         if structure in cls.CALCULATOR_STRUCTURES:
             return True
-        return structure == 'TERM' and float(getattr(loan, 'release_price_pct', None) or 0) > 0
+        if structure != 'TERM':
+            return False
+        if (getattr(loan, 'release_basis', None) or '').upper() == 'CASH_SWEEP':
+            return True
+        return float(getattr(loan, 'release_price_pct', None) or 0) > 0
 
     def _fetch_loans(self, structure_type: Optional[str], container_ids: Optional[List[int]]) -> List[Loan]:
         """Fetch loans for project (one structure, or all when None), optionally

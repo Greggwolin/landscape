@@ -35,6 +35,9 @@ class RevolverLoanParams:
     # is the A&D behaviour the Star Valley baseline was built on: total
     # advances stop at the commitment and releases never free up room.
     revolving: bool = False
+    # How a sale repays the loan: 'LOT' (price per lot, as built), 'ACRE'
+    # (price per acre), or 'CASH_SWEEP' (100% of the sale's net proceeds).
+    release_basis: str = 'LOT'
     # A commitment fixed elsewhere (loan-to-value governs, or entered by hand).
     # The calculator never sizes above it. None: the calculator sizes by LTC.
     commitment_cap: Optional[float] = None
@@ -63,6 +66,10 @@ class PeriodCosts:
     total_costs: float
     lots_sold_by_product: Dict[int, int]
     cost_per_lot_by_product: Dict[int, float]
+    # For releases priced per acre, and for a cash sweep of each sale's net
+    # proceeds. Zero when not supplied, which leaves per-lot releases unchanged.
+    acres_sold: float = 0.0
+    sale_proceeds: float = 0.0
 
 
 @dataclass
@@ -436,6 +443,13 @@ class DebtServiceEngine:
             )
         else:
             release_price_per_lot = 0.0
+        basis = (params.release_basis or 'LOT').upper()
+        total_acres = sum(p.acres_sold for p in period_data)
+        release_price_per_acre = (
+            max(commitment / total_acres * params.release_price_pct * params.repayment_acceleration,
+                params.release_price_minimum)
+            if total_acres > 0 else 0.0
+        )
 
         # --- Pass 1: Pre-allocate cost draws using reverse-fill ordering ---
         # Available commitment capacity for cost draws (after reserve/fee/closing)
@@ -541,7 +555,13 @@ class DebtServiceEngine:
             # Release payments: whenever parcels sell (even past term_end)
             if period_index >= params.loan_start_period:
                 parcels_this_period = sum(period.lots_sold_by_product.values())
-                if parcels_this_period > 0 and release_price_per_lot > 0:
+                if basis == 'CASH_SWEEP' and period.sale_proceeds > 0:
+                    release_payments = min(period.sale_proceeds, max(balance, 0.0))
+                    balance -= release_payments
+                elif basis == 'ACRE' and period.acres_sold > 0 and release_price_per_acre > 0:
+                    release_payments = min(release_price_per_acre * period.acres_sold, max(balance, 0.0))
+                    balance -= release_payments
+                elif basis not in ('CASH_SWEEP', 'ACRE') and parcels_this_period > 0 and release_price_per_lot > 0:
                     uncapped_release = release_price_per_lot * parcels_this_period
                     release_payments = min(uncapped_release, max(balance, 0.0))
                     balance -= release_payments
