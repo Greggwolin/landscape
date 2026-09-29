@@ -2044,6 +2044,78 @@ class LandDevCashFlowService:
 
     CALCULATOR_STRUCTURES = ('REVOLVER', 'A_AND_D')
 
+    # What the release-and-reserve calculator needs to size a reserve.
+    RESERVE_INPUTS = (
+        ('loan_to_cost_pct', 'Loan to cost (%)'),
+        ('interest_rate_pct', 'Interest rate (%)'),
+        ('origination_fee_pct', 'Origination fee (%)'),
+        ('loan_term_months', 'Term (months)'),
+        ('interest_reserve_inflator', 'Reserve cushion (inflator, e.g. 1.2)'),
+        ('release_price_pct', 'Release price (% of loan per lot)'),
+        ('repayment_acceleration', 'Release acceleration'),
+        ('minimum_release_amount', 'Minimum release per lot'),
+    )
+
+    def interest_coverage(self, loan: Loan) -> Dict[str, Any]:
+        """Months where this loan charges interest but the project has no
+        cash that month to pay it, before any financing (Gregg, 2026-09-29:
+        on save, offer an interest reserve when there are any)."""
+        project_config = self._get_project_config()
+        dcf = self._get_dcf_assumptions()
+        n = self._determine_required_periods(None)
+        n = max(self._extend_periods_for_loans(n, project_config['start_date'], None), n, 1)
+        periods = self._generate_periods(project_config['start_date'], n)
+        cost = self._generate_cost_schedule(n, None, dcf.get('cost_inflation_rate'))
+        absorption = self._generate_absorption_schedule(
+            project_config['start_date'], None,
+            dcf.get('price_growth_rate'), dcf.get('cost_inflation_rate'),
+        )
+        sections = self._build_sections(cost, absorption, n)
+        net_before = self._build_net_cash_flow_array(sections, n)
+        period_data = self.build_loan_period_data(loan, cost, absorption, periods)
+        engine = DebtServiceEngine()
+        interest = [0.0] * n
+        if self.uses_release_calculator(loan):
+            result = engine.calculate_revolver(
+                self._build_revolver_params(loan, periods, period_data), period_data,
+            )
+            for p in result.periods:
+                if 0 <= p.period_index < n:
+                    # Interest the reserve pays needs no project cash.
+                    interest[p.period_index] = max(p.accrued_interest - p.interest_reserve_draw, 0.0)
+        else:
+            result = engine.calculate_term(self._build_term_params(loan, periods, period_data), n)
+            for p in result.periods:
+                if 0 <= p.period_index < n:
+                    interest[p.period_index] = p.interest_component
+        uncovered = []
+        for i in range(n):
+            due = interest[i]
+            if due > 0.5:
+                short = due - max(net_before[i], 0.0)
+                if short > 0.5:
+                    uncovered.append((i, short))
+        missing = [
+            {'key': key, 'label': label}
+            for key, label in self.RESERVE_INPUTS
+            if getattr(loan, key, None) in (None, '')
+        ]
+        return {
+            'loan_id': loan.loan_id,
+            'uncovered_months': len(uncovered),
+            'uncovered_interest': round(sum(s for _, s in uncovered), 2),
+            'first_uncovered_month': (uncovered[0][0] + 1) if uncovered else None,
+            'has_reserve': float(getattr(loan, 'interest_reserve_amount', None) or 0) > 0,
+            'uses_calculator': self.uses_release_calculator(loan),
+            'missing_inputs': missing,
+            'inputs': [
+                {'key': key, 'label': label, 'value': (
+                    float(getattr(loan, key)) if getattr(loan, key, None) not in (None, '') else None
+                )}
+                for key, label in self.RESERVE_INPUTS
+            ],
+        }
+
     @classmethod
     def uses_release_calculator(cls, loan: Loan) -> bool:
         """Revolver and A&D always; a term loan only when it has a release price."""

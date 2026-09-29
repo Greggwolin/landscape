@@ -286,6 +286,20 @@ class LoanBudgetSummaryView(APIView):
         return Response(summary, status=status.HTTP_200_OK)
 
 
+class InterestReserveCheckView(APIView):
+    """Does this loan charge interest in months the project has no cash to
+    pay it? If so the screen offers to build in an interest reserve."""
+
+    def get(self, request, project_id: int, loan_id: int):
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+        loan = get_object_or_404(Loan, project_id=project_id, loan_id=loan_id)
+        try:
+            return Response(LandDevCashFlowService(int(project_id)).interest_coverage(loan))
+        except Exception as e:  # noqa: BLE001 — a failed check must not block saving
+            logger.exception("Interest coverage check failed for loan %s", loan_id)
+            return Response({'loan_id': loan.loan_id, 'uncovered_months': 0, 'error': str(e)})
+
+
 class InterestReserveCalculationView(APIView):
     """Calculate recommended interest reserve for a loan."""
 

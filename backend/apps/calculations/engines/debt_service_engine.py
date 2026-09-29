@@ -130,7 +130,9 @@ class TermResult:
 
 
 class DebtServiceEngine:
-    MAX_ITERATIONS = 15
+    # The reserve/interest loop converges by damped oscillation; 15 rounds
+    # stopped Peoria loan 63 about $2 short of the $1 tolerance (2026-09-29).
+    MAX_ITERATIONS = 50
     CONVERGENCE_TOLERANCE = 1.0
 
     def calculate_revolver(

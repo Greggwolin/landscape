@@ -235,3 +235,17 @@
   padding: 1px 4px;
   text-align: right;
 }
+
+.prompt {
+  max-width: 760px;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--cui-primary);
+  border-radius: 4px;
+  background: var(--cui-tertiary-bg);
+  font-size: 12px;
+}
+
+.prompt p {
+  margin: 0 0 8px;
+}

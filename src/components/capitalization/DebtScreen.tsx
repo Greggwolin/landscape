@@ -14,7 +14,7 @@
  * the body colour. Nothing about actuals — the schedule is projected only.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useLoans,
@@ -233,6 +233,25 @@ export function DebtScreen({ project, onNavigate }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [sizing, setSizing] = useState(false);
+  // Interest-reserve prompt (Gregg, 2026-09-29): after a save, if the loan
+  // charges interest in months the project has no cash to pay it, ask once.
+  const [reserveCheck, setReserveCheck] = useState<ReserveCheck | null>(null);
+  const prompted = useRef<Set<number>>(new Set());
+  const checkReserve = async (loanId: number) => {
+    if (prompted.current.has(loanId)) return;
+    try {
+      const r = await authFetch(
+        `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loanId}/interest-reserve/check/`,
+      );
+      const body = (await r.json()) as ReserveCheck;
+      if (r.ok && body.uncovered_months > 0 && !body.has_reserve) {
+        prompted.current.add(loanId);
+        setReserveCheck(body);
+      }
+    } catch {
+      /* the check never blocks a save */
+    }
+  };
 
   const containerOptions = useMemo(
     () => [
@@ -254,6 +273,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ['loan-schedule', projectId, loanId] });
           queryClient.invalidateQueries({ queryKey: ['loan-detail', projectId, loanId] });
+          void checkReserve(loanId);
         },
         onError: async (err: unknown) => {
           let detail = 'The change was not saved.';
@@ -372,6 +392,21 @@ export function DebtScreen({ project, onNavigate }: Props) {
         </button>
         {message && <span className={styles.message}>{message}</span>}
       </div>
+
+      {reserveCheck && (
+        <ReservePrompt
+          projectId={projectId}
+          check={reserveCheck}
+          loanName={loans.find((l) => l.loan_id === reserveCheck.loan_id)?.loan_name ?? 'This loan'}
+          onDone={(note) => {
+            setReserveCheck(null);
+            if (note) setMessage(note);
+            queryClient.invalidateQueries({ queryKey: ['loans', projectId] });
+            queryClient.invalidateQueries({ queryKey: ['loan-detail', projectId, reserveCheck.loan_id] });
+            queryClient.invalidateQueries({ queryKey: ['loan-schedule', projectId, reserveCheck.loan_id] });
+          }}
+        />
+      )}
 
       {isLoading ? (
         <div className={styles.hint}>Loading loans…</div>
@@ -946,6 +981,173 @@ function DetailPanel({
         ))}
       </section>
     </aside>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Interest-reserve prompt
+// ---------------------------------------------------------------------------
+interface ReserveCheck {
+  loan_id: number;
+  uncovered_months: number;
+  uncovered_interest: number;
+  first_uncovered_month: number | null;
+  has_reserve: boolean;
+  uses_calculator: boolean;
+  missing_inputs: Array<{ key: string; label: string }>;
+  inputs: Array<{ key: string; label: string; value: number | null }>;
+}
+
+function ReservePrompt({
+  projectId,
+  check,
+  loanName,
+  onDone,
+}: {
+  projectId: string;
+  check: ReserveCheck;
+  loanName: string;
+  onDone: (note?: string) => void;
+}) {
+  const [step, setStep] = useState<'ask' | 'inputs' | 'result'>('ask');
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(check.inputs.map((i) => [i.key, i.value === null ? '' : String(i.value)])),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ recommended_reserve?: number; calculation_basis?: Record<string, unknown> } | null>(null);
+  const missing = new Set(check.missing_inputs.map((m) => m.key));
+  const base = `${DJANGO_API_URL}/api/projects/${projectId}/loans/${check.loan_id}`;
+
+  const size = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const data: Record<string, number> = {};
+      for (const i of check.inputs) {
+        const v = values[i.key];
+        if (v !== undefined && v.trim() !== '' && Number.isFinite(Number(v))) data[i.key] = Number(v);
+      }
+      const unfilled = check.inputs.filter((i) => data[i.key] === undefined);
+      if (unfilled.length > 0) {
+        setError(`Still needed: ${unfilled.map((i) => i.label).join(', ')}.`);
+        return;
+      }
+      const saved = await authFetch(`${base}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!saved.ok) throw new Error(JSON.stringify(await saved.json().catch(() => ({}))));
+      const run = await authFetch(`${base}/interest-reserve/calculate/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      const body = await run.json();
+      if (!run.ok) throw new Error(JSON.stringify(body));
+      setResult(body);
+      setStep('result');
+    } catch (e) {
+      setError(`The reserve could not be sized: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const useReserve = async () => {
+    if (!result?.recommended_reserve) return;
+    setBusy(true);
+    try {
+      const r = await authFetch(`${base}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interest_reserve_amount: result.recommended_reserve }),
+      });
+      if (!r.ok) throw new Error('save');
+      onDone(`Interest reserve of ${money(result.recommended_reserve)} built into ${loanName}.`);
+    } catch {
+      setError('The reserve was sized but not saved.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={styles.prompt}>
+      {step === 'ask' && (
+        <>
+          <p>
+            <strong>{loanName}</strong> charges interest in {check.uncovered_months} month
+            {check.uncovered_months === 1 ? '' : 's'} when the project has no cash to pay it — about{' '}
+            {money(check.uncovered_interest)} in all
+            {check.first_uncovered_month ? `, starting month ${check.first_uncovered_month}` : ''}. Build in an
+            interest reserve?
+          </p>
+          <div className="d-flex gap-2">
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => setStep('inputs')}>
+              Yes, size a reserve
+            </button>
+            <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={() => onDone('Loan kept as it is, with no interest reserve.')}>
+              No, keep the loan as it is
+            </button>
+          </div>
+        </>
+      )}
+      {step === 'inputs' && (
+        <>
+          <p>
+            The reserve is sized by the loan calculator: it runs the draws, releases and interest, sizes the
+            reserve with its cushion, and repeats until the numbers settle. It needs these; the empty ones are
+            missing.
+            {!check.uses_calculator && ' Giving this loan a release price is what puts it through the calculator.'}
+          </p>
+          {check.inputs.map((i) => (
+            <div key={i.key} className={styles.row}>
+              <span className={styles.rowLabel}>
+                {i.label}
+                {missing.has(i.key) ? ' — needed' : ''}
+              </span>
+              <input
+                className={`form-control form-control-sm ${styles.shareInput} ${styles.typed}`}
+                type="number"
+                value={values[i.key] ?? ''}
+                onChange={(e) => setValues((v) => ({ ...v, [i.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <div className="d-flex gap-2" style={{ marginTop: 8 }}>
+            <button type="button" className="btn btn-sm btn-primary" onClick={size} disabled={busy}>
+              {busy ? 'Sizing…' : 'Size the reserve'}
+            </button>
+            <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={() => onDone()}>
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+      {step === 'result' && result && (
+        <>
+          <p>
+            Recommended interest reserve: <strong>{money(result.recommended_reserve)}</strong>
+            {result.calculation_basis?.iterations
+              ? ` (settled after ${String(result.calculation_basis.iterations)} rounds)`
+              : ''}
+            {result.calculation_basis?.peak_balance
+              ? `; peak balance ${money(result.calculation_basis.peak_balance)}`
+              : ''}
+            .
+          </p>
+          <div className="d-flex gap-2">
+            <button type="button" className="btn btn-sm btn-primary" onClick={useReserve} disabled={busy}>
+              Use this reserve
+            </button>
+            <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={() => onDone('Reserve sized but not used.')}>
+              Don&apos;t use it
+            </button>
+          </div>
+        </>
+      )}
+      {error && <div className={styles.message} style={{ marginTop: 6 }}>{error}</div>}
+    </div>
   );
 }
 
