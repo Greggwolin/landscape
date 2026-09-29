@@ -1,0 +1,237 @@
+/* The Debt screen (board D-20). CoreUI tokens only — no hard-coded colours —
+   so it follows the surface's theme. Typed values are blue, computed values
+   take the body colour. */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--cui-body-color);
+  background: var(--cui-body-bg);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.tab {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.tabOn {
+  color: var(--cui-body-color);
+  border-color: var(--cui-border-color);
+  background: var(--cui-body-bg);
+  font-weight: 600;
+  cursor: default;
+}
+
+.tabOff {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message {
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+}
+
+.hint {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+}
+
+.empty {
+  padding: 24px 12px;
+  color: var(--cui-secondary-color);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 0 0 12px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.barLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: auto;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.badgeOn {
+  color: var(--cui-body-color);
+  border-color: var(--cui-primary);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+/* Sized to content; headings of figure columns may wrap, the stub column's
+   heading does not (UI conventions, rule 2). */
+.table {
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 12px;
+  width: auto;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--cui-border-color);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.table th.num {
+  text-align: right;
+  white-space: normal;
+}
+
+.table td {
+  padding: 2px 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--cui-border-color-translucent, var(--cui-border-color));
+}
+
+.table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.rowOn td {
+  background: var(--cui-tertiary-bg);
+}
+
+.editable {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: text;
+}
+
+.typed {
+  color: var(--cui-primary);
+}
+
+.cellInput {
+  height: 24px;
+  padding: 1px 4px;
+  min-width: 70px;
+}
+
+.muted {
+  color: var(--cui-secondary-color);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cui-link-color, var(--cui-primary));
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.detail {
+  width: 340px;
+  flex-shrink: 0;
+  overflow: auto;
+  border-left: 1px solid var(--cui-border-color);
+  padding: 8px;
+  font-size: 12px;
+}
+
+.detailTitle {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 2px 4px 8px;
+}
+
+.group {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+
+.groupTitle {
+  padding: 4px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--cui-border-color);
+  margin-bottom: 2px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+}
+
+.rowLabel {
+  color: var(--cui-secondary-color);
+}
+
+.rowValue {
+  text-align: right;
+  min-width: 90px;
+}
+
+.shareInput {
+  width: 64px;
+  height: 24px;
+  padding: 1px 4px;
+  text-align: right;
+}

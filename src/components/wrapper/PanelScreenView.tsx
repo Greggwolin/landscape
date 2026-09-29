@@ -33,6 +33,7 @@ import { useWrapperProject } from '@/contexts/WrapperProjectContext';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import ProjectContentRouter from '@/app/projects/[projectId]/ProjectContentRouter';
+import { DebtScreen } from '@/components/capitalization/DebtScreen';
 
 /** Folders that are panel TABS, not screens (Rule 9). */
 const TAB_FOLDERS = new Set(['documents', 'map']);
@@ -127,12 +128,27 @@ export function PanelScreenView() {
         )}
       </div>
       <div className="project-folder-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-        <ProjectContentRouter
-          project={routerProject}
-          currentFolder={currentFolder}
-          currentTab={currentTab}
-          setFolderTab={setFolderTab}
-        />
+        {/* Land Debt is the chat-first Debt screen (board D-20): loans tied to
+            the villages and phases they fund. Income property keeps the
+            classic Debt screen, and the classic surface is untouched. */}
+        {currentFolder === 'capital' && currentTab === 'debt'
+          && (effectiveType || '').toUpperCase() === 'LAND' ? (
+          <DebtScreen
+            project={project}
+            onNavigate={(to) => {
+              if (to === 'equity') setFolderTab('capital', 'equity');
+              else if (to === 'cashflow') setFolderTab('feasibility', 'cashflow');
+              else setFolderTab('property', 'parcels');
+            }}
+          />
+        ) : (
+          <ProjectContentRouter
+            project={routerProject}
+            currentFolder={currentFolder}
+            currentTab={currentTab}
+            setFolderTab={setFolderTab}
+          />
+        )}
       </div>
     </div>
   );

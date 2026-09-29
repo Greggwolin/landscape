@@ -2,6 +2,8 @@
 Serializers for unified debt/loan models.
 """
 
+from decimal import Decimal
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -58,6 +60,9 @@ class LoanListSerializer(serializers.ModelSerializer):
     closing_costs_appraisal = serializers.FloatField(allow_null=True)
     closing_costs_legal = serializers.FloatField(allow_null=True)
     closing_costs_other = serializers.FloatField(allow_null=True)
+    # The containers the loan funds and its share of each — the ledger's
+    # "Funds" column. Additive: existing consumers ignore it.
+    containers = LoanContainerSerializer(many=True, read_only=True, source='loan_containers')
 
     class Meta:
         model = Loan
@@ -97,6 +102,12 @@ class LoanListSerializer(serializers.ModelSerializer):
             'closing_costs_appraisal',
             'closing_costs_legal',
             'closing_costs_other',
+            'release_price_pct',
+            'minimum_release_amount',
+            'rate_floor_pct',
+            'rate_cap_pct',
+            'takes_out_loan_id',
+            'containers',
         ]
 
 
@@ -138,6 +149,14 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    # The containers a loan funds WITH its share of each, e.g.
+    # [{"division_id": 21, "allocation_pct": 60, "collateral_type": null}].
+    # Takes precedence over container_ids when both are sent.
+    container_allocations = serializers.ListField(
+        child=serializers.DictField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Loan
@@ -163,6 +182,28 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
             [LoanContainer(loan=loan, division_id=division_id) for division_id in container_ids]
         )
 
+    def _sync_container_allocations(self, loan, allocations):
+        LoanContainer.objects.filter(loan=loan).delete()
+        rows = []
+        seen = set()
+        # Last entry wins for a repeated container (one row per loan+container).
+        for item in reversed(list(allocations or [])):
+            division_id = item.get('division_id')
+            if division_id in (None, ''):
+                continue
+            if int(division_id) in seen:
+                continue
+            seen.add(int(division_id))
+            pct = item.get('allocation_pct')
+            rows.append(LoanContainer(
+                loan=loan,
+                division_id=int(division_id),
+                allocation_pct=(None if pct in (None, '') else Decimal(str(pct))),
+                collateral_type=item.get('collateral_type') or None,
+            ))
+        if rows:
+            LoanContainer.objects.bulk_create(rows)
+
     def _sync_finance_structures(self, loan, finance_structure_ids):
         LoanFinanceStructure.objects.filter(loan=loan).delete()
         if not finance_structure_ids:
@@ -177,9 +218,12 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         container_ids = validated_data.pop('container_ids', None)
+        allocations = validated_data.pop('container_allocations', None)
         finance_structure_ids = validated_data.pop('finance_structure_ids', None)
         loan = super().create(validated_data)
-        if container_ids is not None:
+        if allocations is not None:
+            self._sync_container_allocations(loan, allocations)
+        elif container_ids is not None:
             self._sync_containers(loan, container_ids)
         if finance_structure_ids is not None:
             self._sync_finance_structures(loan, finance_structure_ids)
@@ -188,9 +232,12 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         container_ids = validated_data.pop('container_ids', None)
+        allocations = validated_data.pop('container_allocations', None)
         finance_structure_ids = validated_data.pop('finance_structure_ids', None)
         loan = super().update(instance, validated_data)
-        if container_ids is not None:
+        if allocations is not None:
+            self._sync_container_allocations(loan, allocations)
+        elif container_ids is not None:
             self._sync_containers(loan, container_ids)
         if finance_structure_ids is not None:
             self._sync_finance_structures(loan, finance_structure_ids)
