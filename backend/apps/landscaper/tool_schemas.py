@@ -1954,6 +1954,18 @@ LANDSCAPER_TOOLS = [
                         "to them."
                     ),
                 },
+                "include_financing": {
+                    "type": "boolean",
+                    "description": (
+                        "Optional. The Financing switch. Omit it and the cash "
+                        "flow includes the project's loans (draws, interest, "
+                        "releases, and levered plus unlevered returns) whenever "
+                        "a land project has one. Pass false only when the user "
+                        "asks for the cash flow WITHOUT financing / unlevered; "
+                        "pass true when they ask for it WITH financing. An "
+                        "explicit choice makes its own card."
+                    ),
+                },
             },
         },
     },

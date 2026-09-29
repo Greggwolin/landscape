@@ -55,6 +55,34 @@ def empty_cashflow_envelope(project_id: int) -> Dict[str, Any]:
     }
 
 
+def project_loan_count(project_id: int) -> int:
+    """How many loans are on the record for this project."""
+    from apps.financial.models_debt import Loan
+
+    return Loan.objects.filter(project_id=project_id).count()
+
+
+def resolve_financing(project_id: int, requested: Optional[bool] = None) -> bool:
+    """The Financing knob on the cash flow.
+
+    ``requested`` True/False is the user's explicit choice and wins. Unset
+    (None) means: on for a land project that has at least one loan, off
+    otherwise — so a project with no loan gets exactly the unlevered cash flow
+    it always did, and one with a loan sees its financing without being asked.
+    Income property stays off unless asked: its financing is modelled by a
+    separate engine this knob has not been verified against.
+    """
+    if requested is not None:
+        return bool(requested)
+    try:
+        if get_project_type_code(project_id) != 'LAND':
+            return False
+        return project_loan_count(project_id) > 0
+    except Exception:  # noqa: BLE001 — a failed count must never fail the cash flow
+        logger.exception('[resolve_financing] loan count failed for project %s', project_id)
+        return False
+
+
 def fetch_cashflow_schedule(
     project_id: int,
     include_financing: bool = True,

@@ -340,6 +340,7 @@ def _fetch_growth_set_names(set_ids: List[int]) -> Dict[int, str]:
 def fetch_cashflow_schedule_data(
     project_id: int,
     container_ids: Optional[List[int]] = None,
+    financing: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Everything the cash-flow artifact needs, read once.
 
@@ -353,7 +354,11 @@ def fetch_cashflow_schedule_data(
     render. Raises RuntimeError only if the engine itself fails; an un-modeled
     project yields ``rows == []`` and the caller degrades cleanly.
     """
-    from apps.financial.services.cashflow_routing import leveraged_cashflow_summary
+    from apps.financial.services.cashflow_routing import (
+        leveraged_cashflow_summary,
+        project_loan_count,
+        resolve_financing,
+    )
     from apps.landscaper.tool_executor import (
         CASHFLOW_RESULT_KEYS,
         _build_cashflow_assumptions,
@@ -371,13 +376,45 @@ def fetch_cashflow_schedule_data(
     project_type_code = (prow[1] if prow else '') or ''
     property_type = property_type_for_code(project_type_code)
 
-    envelope = _fetch_cashflow_schedule(project_id, container_ids=container_ids)
+    # The Financing knob. Off (or no loan): one run, exactly as before. On: the
+    # levered run draws the grid, and a second, unlevered run supplies the
+    # unlevered returns so both can be read side by side.
+    financing_on = resolve_financing(project_id, financing)
+    envelope = _fetch_cashflow_schedule(
+        project_id, container_ids=container_ids, include_financing=financing_on,
+    )
     summary_reduced = leveraged_cashflow_summary(envelope)
     rows = summary_reduced.get('rows') or []
 
     assumptions = _build_cashflow_assumptions(project_id)
     engine_summary = envelope.get('summary') or {}
     results = {k: engine_summary[k] for k in CASHFLOW_RESULT_KEYS if k in engine_summary}
+
+    results_unlevered: Optional[Dict[str, Any]] = None
+    if financing_on:
+        try:
+            unlevered = _fetch_cashflow_schedule(
+                project_id, container_ids=container_ids, include_financing=False,
+            )
+            u_summary = unlevered.get('summary') or {}
+            results_unlevered = {
+                k: u_summary[k] for k in CASHFLOW_RESULT_KEYS if k in u_summary
+            }
+        except Exception:  # noqa: BLE001 — levered numbers still stand alone
+            logger.exception('cashflow_artifact_builder: unlevered run failed')
+    try:
+        loan_count = project_loan_count(project_id)
+    except Exception:  # noqa: BLE001
+        loan_count = 0
+    financing_state = {
+        'on': financing_on,
+        'explicit': financing is not None,
+        'loan_count': loan_count,
+        'findings': [
+            f.get('message') for f in (envelope.get('financingFindings') or [])
+            if f.get('message')
+        ],
+    }
 
     dcf_row = fetch_dcf_row(project_id, property_type)
     spec = assumption_spec_for(property_type)
@@ -408,6 +445,8 @@ def fetch_cashflow_schedule_data(
         'rows': rows,
         'assumptions': assumptions,
         'results': results,
+        'results_unlevered': results_unlevered,
+        'financing': financing_state,
         'dcf_row': dcf_row,
         'growth_set_names': growth_set_names,
         'net_revenue_label': 'Net Operating Income' if is_income else 'Net Revenue',
@@ -523,6 +562,7 @@ def build_cashflow_artifact_schema(
     growth_set_names: Optional[Dict[int, str]] = None,
     captured_at: Optional[str] = None,
     exit_note: Optional[str] = None,
+    results_unlevered: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build the fixed cash-flow-artifact schema (KPI header + assumptions strip +
     period grid).
@@ -537,14 +577,24 @@ def build_cashflow_artifact_schema(
 
     # ---- KPI header — engine outputs only, present keys only (no fabrication) --
     kpi_pairs: List[Dict[str, Any]] = []
+    # With financing on, each return is shown levered and unlevered side by
+    # side; with it off, the labels are exactly what they always were.
+    lev = ' (levered)' if results_unlevered is not None else ''
+    unl = results_unlevered or {}
     if results.get('npv') is not None:
-        kpi_pairs.append({'label': 'Net Present Value', 'value': round(_num(results['npv']) or 0)})
+        kpi_pairs.append({'label': f'Net Present Value{lev}', 'value': round(_num(results['npv']) or 0)})
+    if unl.get('npv') is not None:
+        kpi_pairs.append({'label': 'Net Present Value (unlevered)', 'value': round(_num(unl['npv']) or 0)})
     if results.get('irr') is not None:
-        kpi_pairs.append({'label': 'IRR', 'value': _pct_label(results['irr'])})
+        kpi_pairs.append({'label': f'IRR{lev}', 'value': _pct_label(results['irr'])})
+    if unl.get('irr') is not None:
+        kpi_pairs.append({'label': 'IRR (unlevered)', 'value': _pct_label(unl['irr'])})
     if results.get('equityMultiple') is not None:
-        kpi_pairs.append({'label': 'Equity Multiple', 'value': _multiple_label(results['equityMultiple'])})
+        kpi_pairs.append({'label': f'Equity Multiple{lev}', 'value': _multiple_label(results['equityMultiple'])})
+    if unl.get('equityMultiple') is not None:
+        kpi_pairs.append({'label': 'Equity Multiple (unlevered)', 'value': _multiple_label(unl['equityMultiple'])})
     if results.get('peakEquity') is not None:
-        kpi_pairs.append({'label': 'Peak Capital', 'value': round(_num(results['peakEquity']) or 0)})
+        kpi_pairs.append({'label': f'Peak Capital{lev}', 'value': round(_num(results['peakEquity']) or 0)})
     period_word = (period_type or 'period').capitalize()
     kpi_pairs.append({'label': f'{period_word}s', 'value': int(total_periods or len(rows))})
 
@@ -574,12 +624,16 @@ def build_cashflow_artifact_schema(
     ]
     if show_financing:
         period_columns.append({'key': 'financing', 'label': 'Financing', 'align': 'right'})
+    if show_financing and results_unlevered is not None:
+        # Net before financing, so a reader can see what the loan changed in
+        # each period without subtracting columns in their head.
+        period_columns.append({'key': 'net_unlevered', 'label': 'Net Before Financing', 'align': 'right'})
     if show_reversion:
         period_columns.append({'key': 'reversion', 'label': 'Reversion', 'align': 'right'})
     period_columns.extend([
         # Net + cumulative are CALCULATED; Landscaper edits the assumptions above,
         # never these cells.
-        {'key': 'net', 'label': 'Net Cash Flow', 'align': 'right'},
+        {'key': 'net', 'label': 'Net Cash Flow After Financing' if (show_financing and results_unlevered is not None) else 'Net Cash Flow', 'align': 'right'},
         {'key': 'cumulative', 'label': 'Cumulative', 'align': 'right'},
     ])
 
@@ -594,6 +648,8 @@ def build_cashflow_artifact_schema(
         }
         if show_financing:
             cells['financing'] = _num(r.get('financing'))
+            if results_unlevered is not None:
+                cells['net_unlevered'] = (_num(r.get('net')) or 0) - (_num(r.get('financing')) or 0)
         if show_reversion:
             cells['reversion'] = _num(r.get('reversion'))
         period_rows.append({'id': f'p{idx}', 'cells': cells})
@@ -637,6 +693,7 @@ def build_cashflow_artifact_schema(
 def build_cashflow_refresh_payload(
     project_id: int,
     container_ids: Optional[List[int]] = None,
+    financing: Optional[bool] = None,
 ) -> Optional[Dict[str, Any]]:
     """The schema AND the view specification, from one engine run.
 
@@ -652,7 +709,9 @@ def build_cashflow_refresh_payload(
     """
     from .cashflow_view_spec import build_cashflow_view_config
 
-    data = fetch_cashflow_schedule_data(project_id, container_ids=container_ids)
+    data = fetch_cashflow_schedule_data(
+        project_id, container_ids=container_ids, financing=financing,
+    )
     if not data['rows']:
         return None
 
@@ -667,6 +726,7 @@ def build_cashflow_refresh_payload(
         dcf_row=data['dcf_row'],
         growth_set_names=data['growth_set_names'],
         exit_note=data.get('exit_note'),
+        results_unlevered=data.get('results_unlevered'),
     )
     view_config = build_cashflow_view_config(
         project_id=project_id,
@@ -675,11 +735,15 @@ def build_cashflow_refresh_payload(
         period_type=data['period_type'],
         total_periods=data['total_periods'],
         container_ids=data['container_ids'],
+        financing=data.get('financing'),
     )
     return {'schema': schema, 'view_config': view_config}
 
 
-def cashflow_dedup_key(container_ids: Optional[List[int]] = None) -> str:
+def cashflow_dedup_key(
+    container_ids: Optional[List[int]] = None,
+    financing: Optional[bool] = None,
+) -> str:
     """One canonical cash flow per project, plus one per container selection.
 
     The canonical key is unchanged, so the project-wide cash flow every existing
@@ -689,9 +753,16 @@ def cashflow_dedup_key(container_ids: Optional[List[int]] = None) -> str:
     project-wide one.
     """
     ids = sorted({int(i) for i in (container_ids or [])})
-    if not ids:
-        return 'cashflow:schedule_detail'
-    return 'cashflow:schedule_detail:containers:' + '-'.join(str(i) for i in ids)
+    key = 'cashflow:schedule_detail'
+    if ids:
+        key += ':containers:' + '-'.join(str(i) for i in ids)
+    # An EXPLICIT financing choice is its own card, so asking for the unlevered
+    # view never overwrites the default one. Unset keeps every existing key.
+    if financing is True:
+        key += ':financing-on'
+    elif financing is False:
+        key += ':financing-off'
+    return key
 
 
 def create_cashflow_artifact(
@@ -711,6 +782,9 @@ def create_cashflow_artifact(
     container_ids: Optional[List[int]] = None,
     user_id: Any = None,
     thread_id: Any = None,
+    results_unlevered: Optional[Dict[str, Any]] = None,
+    financing_state: Optional[Dict[str, Any]] = None,
+    financing: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Build + register the cash-flow schedule artifact server-side.
 
@@ -742,6 +816,7 @@ def create_cashflow_artifact(
         dcf_row=dcf_row,
         growth_set_names=growth_set_names,
         exit_note=exit_note,
+        results_unlevered=results_unlevered,
     )
     from .cashflow_view_spec import CASHFLOW_CONFIG_KEY, build_cashflow_view_config
 
@@ -752,6 +827,7 @@ def create_cashflow_artifact(
         period_type=period_type,
         total_periods=total_periods,
         container_ids=container_ids,
+        financing=financing_state,
     )
     # The view specification resolves the container names, so the card's title
     # comes from it rather than being spelled a second way here.
@@ -777,9 +853,13 @@ def create_cashflow_artifact(
                 # write re-runs the engine for the same containers instead of
                 # silently widening a filtered cash flow back to the project.
                 'container_ids': [int(i) for i in (container_ids or [])],
+                # The user's explicit Financing choice, or None for the default
+                # (on when the project has a loan) — so the rebuild after a
+                # write answers the same question.
+                'financing': financing,
                 CASHFLOW_CONFIG_KEY: view_config,
             },
-            dedup_key=cashflow_dedup_key(container_ids),
+            dedup_key=cashflow_dedup_key(container_ids, financing),
             prior_tool_calls=['get_cashflow_schedule'],
         )
     except Exception as exc:  # noqa: BLE001

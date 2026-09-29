@@ -3014,6 +3014,7 @@ INCOME_PROPERTY_TYPE_CODES = ('MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU')
 def _fetch_cashflow_schedule(
     project_id: int,
     container_ids: Optional[List[int]] = None,
+    include_financing: bool = False,
 ) -> Dict[str, Any]:
     """
     Fetch cash flow schedule for a project, routing by project_type_code.
@@ -3032,7 +3033,7 @@ def _fetch_cashflow_schedule(
     from apps.financial.services.cashflow_routing import fetch_cashflow_schedule
     return fetch_cashflow_schedule(
         project_id,
-        include_financing=False,
+        include_financing=bool(include_financing),
         container_ids=container_ids or None,
     )
 
@@ -9205,8 +9206,12 @@ def handle_get_cashflow_schedule(
             fetch_cashflow_schedule_data,
         )
         container_ids = _coerce_container_ids(tool_input.get('container_ids'))
+        _fin = tool_input.get('include_financing')
+        financing = None if _fin is None else (
+            _fin.strip().lower() in {'true', '1', 'yes'} if isinstance(_fin, str) else bool(_fin)
+        )
         data = fetch_cashflow_schedule_data(
-            int(project_id), container_ids=container_ids or None
+            int(project_id), container_ids=container_ids or None, financing=financing,
         )
         rows = data['rows']
 
@@ -9241,6 +9246,9 @@ def handle_get_cashflow_schedule(
             container_ids=container_ids or None,
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
+            results_unlevered=data.get('results_unlevered'),
+            financing_state=data.get('financing'),
+            financing=financing,
         )
 
         # What this cash flow could be narrowed to, and what it is. Read from the
@@ -9279,6 +9287,9 @@ def handle_get_cashflow_schedule(
                 'available_containers': available_containers,
                 'container_ids': container_ids or None,
                 'scope': scope_label,
+                'financing_on': (data.get('financing') or {}).get('on', False),
+                'loan_count': (data.get('financing') or {}).get('loan_count', 0),
+                'financing_findings': (data.get('financing') or {}).get('findings', []),
                 'instruction': (
                     'The cash-flow schedule artifact has ALREADY been created and '
                     'is open in the right panel. Do NOT call create_artifact. Reply '
