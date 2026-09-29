@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 interface DocumentVersion {
   doc_id: number;
@@ -61,7 +62,8 @@ export default function DocumentVersionHistory({
     setError(null);
     try {
       const response = await fetch(
-        `/api/projects/${projectId}/dms/docs/${docId}/versions`
+        `/api/projects/${projectId}/dms/docs/${docId}/versions`,
+        { headers: getAuthHeaders() }
       );
       if (!response.ok) {
         throw new Error('Failed to load version history');
@@ -88,7 +90,7 @@ export default function DocumentVersionHistory({
         `/api/projects/${projectId}/dms/docs/${docId}/restore-version`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ source_doc_id: version.doc_id }),
         }
       );
