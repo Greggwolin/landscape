@@ -10592,6 +10592,19 @@ def handle_update_parcel(
                 updates = {k: v for k, v in tool_input.items()
                            if k in PARCEL_COLUMNS and v is not None}
 
+                # BM1: moving an existing parcel into a phase. The area always
+                # follows the phase, so it is derived rather than taken from input.
+                if phase_id:
+                    cursor.execute("""
+                        SELECT area_id FROM landscape.tbl_phase
+                        WHERE phase_id = %s AND project_id = %s
+                    """, [phase_id, project_id])
+                    phase_row = cursor.fetchone()
+                    if not phase_row:
+                        return {'success': False, 'error': f'Phase {phase_id} not found in this project'}
+                    updates['phase_id'] = phase_id
+                    updates['area_id'] = phase_row[0]
+
                 if not updates:
                     return {'success': False, 'error': 'No valid fields to update'}
 
@@ -10600,12 +10613,12 @@ def handle_update_parcel(
                     updates['property_metadata'] = json.dumps(updates['property_metadata'])
 
                 set_parts = [f"{k} = %s" for k in updates.keys()]
-                values = list(updates.values()) + [parcel_id]
+                values = list(updates.values()) + [parcel_id, project_id]
 
                 cursor.execute(f"""
                     UPDATE landscape.tbl_parcel
                     SET {', '.join(set_parts)}
-                    WHERE parcel_id = %s
+                    WHERE parcel_id = %s AND project_id = %s
                     RETURNING parcel_id, parcel_name
                 """, values)
 
@@ -16391,16 +16404,19 @@ def execute_tool(
     if tool_name == 'create_artifact' and prior_tool_calls is not None:
         extra['prior_tool_calls'] = prior_tool_calls
     try:
-        # All handlers receive the same kwargs for consistency
-        return handler(
-            tool_input=tool_input,
-            project_id=project_id,
-            propose_only=propose_only,
-            source_message_id=source_message_id,
-            thread_id=thread_id,
-            user_id=user_id,
-            **extra,
-        )
+        # BM1: record the call so any proposal it creates can be replayed on confirm.
+        from .services.mutation_service import replay_context
+        with replay_context(tool_name, tool_input):
+            # All handlers receive the same kwargs for consistency
+            return handler(
+                tool_input=tool_input,
+                project_id=project_id,
+                propose_only=propose_only,
+                source_message_id=source_message_id,
+                thread_id=thread_id,
+                user_id=user_id,
+                **extra,
+            )
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
         return {

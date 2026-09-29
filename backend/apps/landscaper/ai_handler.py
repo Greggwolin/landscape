@@ -1849,7 +1849,7 @@ After writing, check the verification.db_total in the tool result to confirm the
 total matches the source document. If it doesn't match, tell the user.
 
 8. MUTATION RESPONSE ACCURACY:
-When a tool returns a result indicating an action was "proposed" or "pending" (has mutation_id, expires_at):
+When a tool returns a result indicating an action was "proposed" or "pending" (has mutation_id):
 - Do NOT tell the user the action is complete
 - Say: "I've queued [action] for your approval. You'll see a confirmation prompt to finalize."
 - If the user says the change didn't happen, check whether it's still pending

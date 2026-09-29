@@ -94,8 +94,9 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function getExpirationMinutes(expiresAt: string): number {
-  if (!expiresAt) return 60;
+function getExpirationMinutes(expiresAt: string): number | null {
+  // No expiry recorded: proposals stay until confirmed or rejected (BM2).
+  if (!expiresAt) return null;
   const expDate = new Date(expiresAt);
   const now = new Date();
   return Math.max(0, Math.round((expDate.getTime() - now.getTime()) / 60000));
@@ -324,7 +325,8 @@ export function MutationProposalCard({
             ))}
           </div>
 
-          {/* Expiration notice */}
+          {/* Expiration notice — only when the proposal actually expires */}
+          {expiresInMinutes !== null && (
           <div
             className="mt-3 pt-2 small text-muted text-center"
             style={{
@@ -338,6 +340,7 @@ export function MutationProposalCard({
               <>These proposals may have expired. Please refresh if needed.</>
             )}
           </div>
+          )}
         </CCardBody>
     </CCard>
   );
