@@ -197,3 +197,39 @@ def test_take_out_surfaces_as_finding():
     assert section['findings'][0]['code'] == 'take_out_not_modelled'
     assert 'Land loan is taken out by A&D revolver' in section['findings'][0]['message']
     assert svc._financing_findings == section['findings']
+
+
+# A term loan whose amortisation is shorter than its term stops paying once
+# the balance is gone (found on Peoria loan 63: 20-month amortisation on a
+# 120-month term kept charging the full payment to month 120).
+def test_term_loan_payments_stop_at_payoff():
+    from apps.calculations.engines.debt_service_engine import DebtServiceEngine, TermLoanParams
+    params = TermLoanParams(
+        loan_amount=1_000_000, interest_rate_annual=0.06, amortization_months=20,
+        interest_only_months=24, loan_term_months=120, origination_fee_pct=0.0,
+        loan_start_period=0, payment_frequency='MONTHLY',
+    )
+    r = DebtServiceEngine().calculate_term(params, 120)
+    paid_principal = sum(p.principal_component for p in r.periods)
+    assert abs(paid_principal - 1_000_000) < 1.0
+    assert all(p.scheduled_payment == 0 for p in r.periods[45:])
+    total_paid = sum(p.scheduled_payment for p in r.periods) + sum(p.balloon_amount for p in r.periods)
+    assert total_paid < 1_000_000 * 1.25  # 24 months IO + 20 amortising, not 96 full payments
+
+
+# Sizing never sizes a loan off a missing basis
+def test_ratio_with_no_basis_is_skipped_not_zero():
+    from types import SimpleNamespace
+    from unittest import mock
+    from apps.calculations import loan_sizing_service as L
+    loan = SimpleNamespace(loan_id=None, loan_to_value_pct=50, loan_to_cost_pct=50,
+                           commitment_amount=None, loan_amount=None, origination_fee_pct=0,
+                           interest_reserve_amount=0, closing_costs_appraisal=0,
+                           closing_costs_legal=0, closing_costs_other=0)
+    project = SimpleNamespace(project_id=9, project_type_code='LAND')
+    with mock.patch.object(L, 'purchase_price_basis', return_value={'amount': L.Decimal('0'), 'source': None}), \
+         mock.patch.object(L, 'development_budget_basis', return_value={'total': L.Decimal('1000'), 'by_activity': {}, 'funds_acquisition': True, 'project_wide': True}):
+        r = L.LoanSizingService.calculate_commitment(loan, project)
+    assert r['governing_constraint'] == 'LTC'
+    assert r['commitment_amount'] == L.Decimal('500.00')
+    assert any('Loan-to-value ignored' in n for n in r['sizing_notes'])

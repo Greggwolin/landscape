@@ -138,6 +138,39 @@ def budget_basis_from_rows(budget_rows, shares: Dict[int, float], project_wide: 
     return total, by_activity
 
 
+def purchase_price_basis(project: Any) -> Dict[str, Any]:
+    """The land purchase price and where it came from.
+
+    The acquisition ledger wins — the same rows the cash flow puts in period 0
+    (``is_applied_to_purchase`` and a positive amount). Then the project's own
+    acquisition price, then its asking price. None of them: zero, and the
+    caller says there is no price on the record rather than sizing off it.
+    """
+    project_id = getattr(project, "project_id", None)
+    if project_id is not None:
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(amount), 0)
+                FROM landscape.tbl_acquisition
+                WHERE project_id = %s
+                  AND COALESCE(is_applied_to_purchase, true)
+                  AND amount > 0
+                """,
+                [project_id],
+            )
+            ledger = _to_decimal(cursor.fetchone()[0])
+        if ledger > 0:
+            return {"amount": ledger, "source": "acquisition ledger"}
+    for field, label in (("acquisition_price", "acquisition price"), ("asking_price", "asking price")):
+        value = _to_decimal(getattr(project, field, None))
+        if value > 0:
+            return {"amount": value, "source": label}
+    return {"amount": Decimal("0"), "source": None}
+
+
 def _is_land(project: Any) -> bool:
     return (getattr(project, "project_type_code", "") or "").upper() == "LAND"
 
@@ -181,7 +214,11 @@ class LoanSizingService:
         has_ltv = ltv_pct >= 0
         has_ltc = ltc_pct >= 0
 
-        value_basis = _to_decimal(getattr(project, "asking_price", None))
+        # Value basis for LTV: the purchase price on record (acquisition
+        # ledger first). There is no separate appraised-value field; this is
+        # the same role the asking price played before, from the right table.
+        price = purchase_price_basis(project)
+        value_basis = price["amount"]
 
         closing_costs_total = (
             _to_decimal(getattr(loan, "closing_costs_appraisal", None))
@@ -198,6 +235,20 @@ class LoanSizingService:
             cost_basis = purchase + closing_costs_total + budget_basis["total"]
         else:
             cost_basis = value_basis + closing_costs_total
+
+        # A ratio with nothing to multiply is not a $0 loan. Skip it and say
+        # why, so "the lesser of LTV and LTC" is never won by a missing basis.
+        sizing_notes = []
+        if has_ltv and value_basis <= 0:
+            has_ltv = False
+            sizing_notes.append(
+                "Loan-to-value ignored: no purchase price or value on the record."
+            )
+        if has_ltc and cost_basis <= 0:
+            has_ltc = False
+            sizing_notes.append(
+                "Loan-to-cost ignored: no purchase price or budget on the record for what this loan funds."
+            )
 
         ltv_amount = (ltv_pct / Decimal("100")) * value_basis if has_ltv else None
         ltc_amount = (ltc_pct / Decimal("100")) * cost_basis if has_ltc else None
@@ -234,6 +285,8 @@ class LoanSizingService:
             "ltc_basis_amount": _q2(cost_basis),
             "ltv_amount": _q2(ltv_amount) if ltv_amount is not None else None,
             "ltc_amount": _q2(ltc_amount) if ltc_amount is not None else None,
+            "purchase_price_source": price["source"],
+            "sizing_notes": sizing_notes,
             "development_budget_basis": (
                 _q2(budget_basis["total"]) if budget_basis is not None else None
             ),
@@ -326,7 +379,7 @@ class LoanSizingService:
         """Build read-only loan budget breakdown for modal display."""
         sizing = LoanSizingService.calculate_commitment(loan, project)
         commitment = _to_decimal(sizing["commitment_amount"])
-        acquisition = _to_decimal(getattr(project, "asking_price", None))
+        acquisition = purchase_price_basis(project)["amount"]
         capex = Decimal("0")
         activity_rows = []
         if _is_land(project) and getattr(project, "project_id", None) is not None:

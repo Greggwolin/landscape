@@ -262,8 +262,15 @@ class DebtServiceEngine:
                 principal_component = 0.0
                 is_io_period = True
             else:
-                scheduled_payment = monthly_payment_amort
-                principal_component = scheduled_payment - interest_component
+                # Once the loan is paid off the payments stop, and the last
+                # payment is only what is left. Before this, an amortisation
+                # shorter than the term kept charging the full payment every
+                # month to maturity on a zero balance.
+                principal_component = min(
+                    max(monthly_payment_amort - interest_component, 0.0),
+                    max(beginning_balance, 0.0),
+                )
+                scheduled_payment = interest_component + principal_component
                 balance = max(beginning_balance - principal_component, 0.0)
                 total_principal += principal_component
 
