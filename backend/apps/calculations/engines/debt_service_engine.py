@@ -30,6 +30,14 @@ class RevolverLoanParams:
     # revolver as built). 'single': one advance at the start (a term loan run
     # through this calculator because it has release prices).
     advance_mode: str = 'costs'
+    # Revolver (Gregg, 2026-09-29, 6a): money repaid by releases can be drawn
+    # again; only the balance outstanding is limited by the commitment. False
+    # is the A&D behaviour the Star Valley baseline was built on: total
+    # advances stop at the commitment and releases never free up room.
+    revolving: bool = False
+    # A commitment fixed elsewhere (loan-to-value governs, or entered by hand).
+    # The calculator never sizes above it. None: the calculator sizes by LTC.
+    commitment_cap: Optional[float] = None
 
 
 @dataclass
@@ -359,6 +367,8 @@ class DebtServiceEngine:
             iterations = iteration + 1
 
             commitment = (base_costs + params.closing_costs + prev_reserve) * ltc / denom
+            if params.commitment_cap is not None and params.commitment_cap > 0:
+                commitment = min(commitment, params.commitment_cap)
             origination_fee = commitment * fee_pct
 
             schedule = self._generate_revolver_schedule(
@@ -375,6 +385,8 @@ class DebtServiceEngine:
             if abs(new_reserve - prev_reserve) < self.CONVERGENCE_TOLERANCE:
                 prev_reserve = new_reserve
                 commitment = (base_costs + params.closing_costs + prev_reserve) * ltc / denom
+                if params.commitment_cap is not None and params.commitment_cap > 0:
+                    commitment = min(commitment, params.commitment_cap)
                 origination_fee = commitment * fee_pct
                 break
 
@@ -454,6 +466,23 @@ class DebtServiceEngine:
             if period_index not in draw_by_period:
                 draw_by_period[period_index] = 0.0
 
+        # Revolving: the borrower's equity goes in first — the same amount the
+        # loan-to-cost leaves to the borrower — then the loan funds each cost
+        # as far as the room under the commitment allows. Releases reduce the
+        # balance and so free room to draw again.
+        equity_remaining = 0.0
+        if params.revolving and params.advance_mode != 'single':
+            term_costs = sum(c for _, c in cost_periods)
+            ltc = params.loan_to_cost_pct
+            denom = 1.0 - ltc * params.origination_fee_pct
+            ltc_commitment = (sum(p.total_costs for p in period_data) + params.closing_costs
+                              + interest_reserve) * ltc / denom if denom else 0.0
+            ltc_capacity = max(ltc_commitment - interest_reserve
+                               - ltc_commitment * params.origination_fee_pct
+                               - params.closing_costs, 0.0)
+            equity_remaining = max(term_costs - ltc_capacity, 0.0)
+        cost_by_period = {i: c for i, c in cost_periods}
+
         # --- Pass 2: Generate period-by-period schedule ---
         reserve_balance = 0.0
         ending_balance = 0.0
@@ -483,7 +512,14 @@ class DebtServiceEngine:
 
             # Cost draws: only during loan term, never after the loan is retired
             if params.loan_start_period <= period_index < term_end and not past_payoff:
-                cost_draw = draw_by_period.get(period_index, 0.0)
+                if params.revolving and params.advance_mode != 'single':
+                    period_cost = cost_by_period.get(period_index, 0.0)
+                    equity_part = min(period_cost, equity_remaining)
+                    equity_remaining -= equity_part
+                    room = commitment - interest_reserve - balance
+                    cost_draw = min(period_cost - equity_part, max(room, 0.0))
+                else:
+                    cost_draw = draw_by_period.get(period_index, 0.0)
                 balance += cost_draw
 
             # Interest accrues on beginning balance whenever balance > 0

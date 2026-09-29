@@ -1602,6 +1602,8 @@ class LandDevCashFlowService:
             draw_trigger_type=loan.draw_trigger_type,
             payoff_period=self._last_collateral_sale(period_data, loan_start_period),
             advance_mode='single' if (loan.structure_type or '').upper() == 'TERM' else 'costs',
+            revolving=(loan.structure_type or '').upper() == 'REVOLVER',
+            commitment_cap=self._fixed_commitment(loan),
         )
 
     def _build_term_params(
@@ -1783,6 +1785,17 @@ class LandDevCashFlowService:
     def loan_start_date_for(self, loan: Loan) -> Optional[date]:
         """The loan's own start date when typed; otherwise the acquisition date."""
         return getattr(loan, 'loan_start_date', None) or self.acquisition_date()
+
+    @staticmethod
+    def _fixed_commitment(loan: Loan) -> Optional[float]:
+        """The commitment when something other than loan-to-cost fixed it
+        (loan-to-value governs, or an amount was entered by hand); the
+        calculator will not size above it. None when LTC governs."""
+        governing = (getattr(loan, 'governing_constraint', '') or '').upper()
+        amount = float(getattr(loan, 'commitment_amount', None) or 0)
+        if governing in ('LTV', 'MANUAL') and amount > 0:
+            return amount
+        return None
 
     @staticmethod
     def _last_collateral_sale(

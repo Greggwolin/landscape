@@ -292,3 +292,41 @@ def test_term_on_calculator_advances_once_a_and_d_follows_costs():
     multi = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
     assert [p.period_index for p in single.periods if p.cost_draw > 0] == [0]
     assert len([p for p in multi.periods if p.cost_draw > 0]) > 1
+
+
+# 6a: a revolver re-lends what releases repay; A&D does not
+def _revolver_case():
+    from apps.calculations.engines.debt_service_engine import PeriodCosts
+    # costs in two waves with sales in between; a commitment too small for both waves at once
+    pd = []
+    for i in range(30):
+        cost = 1000.0 if (i < 5 or 12 <= i < 17) else 0.0
+        lots = {1: 10} if i in (8, 9, 22, 24) else {}
+        pd.append(PeriodCosts(i, '', cost, lots, {1: 100.0}))
+    base = dict(loan_to_cost_pct=0.6, interest_rate_annual=0.06, origination_fee_pct=0.0,
+                interest_reserve_inflator=1.0, repayment_acceleration=1.0, release_price_pct=1.2,
+                release_price_minimum=0.0, closing_costs=0.0, loan_start_period=0,
+                loan_term_months=30, commitment_cap=3500.0)
+    return pd, base
+
+
+def test_revolver_redraws_after_releases():
+    from apps.calculations.engines.debt_service_engine import DebtServiceEngine, RevolverLoanParams
+    pd, base = _revolver_case()
+    ad = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
+    rv = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, revolving=True), pd)
+    ad_draws = sum(p.cost_draw for p in ad.periods)
+    rv_draws = sum(p.cost_draw for p in rv.periods)
+    assert ad.commitment_amount <= 3500.0 + 1e-6 and rv.commitment_amount <= 3500.0 + 1e-6
+    assert ad_draws <= ad.commitment_amount + 1e-6          # A&D: total advances capped
+    assert rv_draws > ad_draws                               # revolver re-lends after releases
+    assert all(p.beginning_balance <= rv.commitment_amount + 1e-6 for p in rv.periods)
+
+
+def test_a_and_d_default_is_unchanged_without_a_cap():
+    from apps.calculations.engines.debt_service_engine import DebtServiceEngine, RevolverLoanParams
+    pd, base = _revolver_case()
+    base = dict(base, commitment_cap=None)
+    a = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
+    b = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, revolving=False), pd)
+    assert [round(p.ending_balance, 6) for p in a.periods] == [round(p.ending_balance, 6) for p in b.periods]
