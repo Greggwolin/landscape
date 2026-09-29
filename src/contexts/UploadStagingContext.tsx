@@ -388,6 +388,26 @@ export function UploadStagingProvider({
 
         const docResult = await response.json();
 
+        // The server refuses to create a second copy of a file already in the
+        // project (same name or same content) and answers 200 with duplicate:true.
+        // Before this check the row was marked complete and simply vanished, so a
+        // dragged file "didn't upload" with no word why. Say where it already is.
+        if (docResult?.duplicate && docResult.existing_doc) {
+          const existing = docResult.existing_doc;
+          const where = existing.doc_type ? ` under ${existing.doc_type}` : '';
+          const how =
+            docResult.match_type === 'content'
+              ? `Same file is already in this project as "${existing.filename}"${where}`
+              : `Already in this project${where}`;
+          dispatch({
+            type: 'UPDATE_FILE',
+            id,
+            updates: { status: 'error', errorMessage: `${how} — not added again.` },
+          });
+          setIsTrayOpen(true);
+          return;
+        }
+
         // 3. Track extract-routed docs for intake choice modal.
         //    Instead of auto-firing intake, surface the doc info so the
         //    parent component can show IntakeChoiceModal.
@@ -468,6 +488,16 @@ export function UploadStagingProvider({
       void confirmFile(file.id);
     }
   }, [stagedFiles, autoConfirmIds, confirmFile]);
+
+  // ------------------------------------------
+  // Surface failures. Drag-to-filter uploads run without the tray open, so a
+  // file that fails (or is refused as already present) would otherwise leave
+  // no trace on screen.
+  // ------------------------------------------
+
+  useEffect(() => {
+    if (stagedFiles.some(f => f.status === 'error')) setIsTrayOpen(true);
+  }, [stagedFiles]);
 
   // ------------------------------------------
   // Auto-close tray when all files are done
