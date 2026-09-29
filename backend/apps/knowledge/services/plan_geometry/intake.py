@@ -24,8 +24,12 @@ file is fine and the pipeline simply cannot read it yet.
 
 What it writes
 --------------
-`core_doc.doc_type` becomes "Plan", and the verdict goes into the existing
-`profile_json` under a `plan` key. Deliberately no new columns: `profile_json`
+The verdict goes into the existing `profile_json` under a `plan` key — that is
+what every plan feature reads. `core_doc.doc_type` becomes "Plan" **only when
+nobody chose a folder** (the type is blank or "General"). A folder the user
+picked is theirs: on 2026-09-29 an agreement dropped on Agreements was moved to
+Plan, and a plat Gregg had filed himself sat under Civil Plans. Recognising a
+drawing never moves it out of a folder a person put it in. Deliberately no new columns: `profile_json`
 is already there for exactly this, and adding columns to `core_doc` would
 touch a table 88 live Property Data rows depend on for no gain.
 
@@ -52,6 +56,14 @@ __all__ = ["PlanIntake", "inspect_upload", "verdict_to_profile", "AWAITING_OCR"]
 #: fine and the reader is not ready — the difference decides whether anyone
 #: ever looks at it again.
 AWAITING_OCR = "awaiting_ocr"
+
+#: Types that mean "nobody chose a folder" — the tray's fallback, and blanks.
+#: Anything else is a folder a person picked and is left alone.
+_UNCHOSEN_TYPES = {"", "general", "document", "staged"}
+
+
+def _folder_was_chosen(current_doc_type: Optional[str]) -> bool:
+    return (current_doc_type or "").strip().lower() not in _UNCHOSEN_TYPES
 
 
 @dataclass
@@ -102,6 +114,7 @@ def inspect_upload(
     extracted_text: str = "",
     title_text: str = "",
     extraction_failed: bool = False,
+    current_doc_type: Optional[str] = None,
 ) -> PlanIntake:
     """
     Decide whether an upload is a drawing, without touching the database.
@@ -128,15 +141,18 @@ def inspect_upload(
     if not verdict.is_plan:
         return PlanIntake(verdict=verdict)
 
+    # Refile only a document nobody filed. None leaves the row's type alone.
+    new_type = None if _folder_was_chosen(current_doc_type) else PLAN_DOC_TYPE
+
     if extraction_failed:
         return PlanIntake(
             verdict=verdict,
-            doc_type=PLAN_DOC_TYPE,
+            doc_type=new_type,
             status=AWAITING_OCR,
             message=(
                 "This looks like a drawing, but its pages have no readable text "
                 "layer — it needs to be scanned into text before the lots can be "
-                "read off it. Filed as a plan in the meantime."
+                "read off it. Recognised as a plan in the meantime."
             ),
         )
 
@@ -148,14 +164,14 @@ def inspect_upload(
         )
         return PlanIntake(
             verdict=verdict,
-            doc_type=PLAN_DOC_TYPE,
-            message=f"Filed as a plan.{guess} Confirm it before anything is measured from it.",
+            doc_type=new_type,
+            message=f"Recognised as a plan drawing.{guess} Confirm it before anything is measured from it.",
         )
 
     return PlanIntake(
         verdict=verdict,
-        doc_type=PLAN_DOC_TYPE,
-        message=f"Filed as a plan — {verdict.describe()}",
+        doc_type=new_type,
+        message=f"Recognised as a plan drawing — {verdict.describe()}",
     )
 
 

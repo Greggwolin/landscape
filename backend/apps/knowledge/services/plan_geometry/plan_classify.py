@@ -57,6 +57,7 @@ __all__ = [
     "PlanVerdict",
     "classify_plan",
     "is_plan_document",
+    "names_itself_written",
     "PLAN_DOC_TYPE",
     "FILENAME_HINT",
 ]
@@ -117,6 +118,26 @@ _CASE = (
     (re.compile(r"\bSUB[-\s]?\d{2}[-\s]?\d{2,4}\b", re.I), PlanStage.PRELIMINARY_PLAT),
     (re.compile(r"\bPAD[-\s]?\d{2}[-\s]?\d{2,4}\b", re.I), PlanStage.ZONING_EXHIBIT),
     (re.compile(r"\bPA[-\s]?\d{2}[-\s]?\d{2,4}\b", re.I), PlanStage.ZONING_EXHIBIT),
+)
+
+#: A document that names itself as something written — an instrument or a
+#: report — is not a drawing, however many bearings its legal description or
+#: exhibit map carries. Added 2026-09-29: an executed roadway participation
+#: agreement for Red Valley had a boundary exhibit (a bearing, a basis of
+#: bearings, a right-of-way) and the county recorder's stamp, and was read as a
+#: recorded final plat and pulled out of the Agreements folder. A drainage
+#: design report in the same upload set tripped the drawing test the same way.
+_WRITTEN_NAME = re.compile(
+    r"\b(agreements?|agmt|contracts?|resolutions?|ordinances?|deeds?|covenants?|cc\s*&\s*rs?"
+    r"|declarations?|reports?|memo(randum)?|narratives?|letters?|applications?"
+    r"|commitments?|stud(y|ies)|minutes|requests?|extensions?|loi|proposals?"
+    r"|approvals?|summary|booklets?)\b",
+    re.I,
+)
+#: The opening of a written instrument, for files whose name says nothing.
+_INSTRUMENT_OPENING = re.compile(
+    r"\bthis\s+(?:[\w&,.'’()-]+\s+){0,10}?(agreement|contract|deed|declaration|resolution|ordinance)\b",
+    re.I,
 )
 
 #: A filename is weak evidence but it is often the only thing that survives a
@@ -193,6 +214,18 @@ def _drawing_marks(text: str) -> list[str]:
     return found
 
 
+def names_itself_written(text: str, filename: str = "") -> bool:
+    """
+    Whether the document says it is an instrument or a report rather than a
+    drawing — in its file name, or in the opening of a written instrument
+    ("THIS ROADWAY PARTICIPATION AGREEMENT is made…").
+    """
+    stem = re.sub(r"[_\-.]+", " ", filename or "")
+    if _WRITTEN_NAME.search(stem):
+        return True
+    return bool(_INSTRUMENT_OPENING.search((text or "")[:3000]))
+
+
 def is_plan_document(text: str, filename: str = "") -> bool:
     """
     Whether this reads as a drawing of the land rather than a report about it.
@@ -201,7 +234,13 @@ def is_plan_document(text: str, filename: str = "") -> bool:
     single mark is never enough: a report quotes one bearing when it describes
     a boundary, and a file called "exhibit" is as often a spreadsheet as a
     sheet of linework.
+
+    And no count of marks outweighs the document saying what it is: an
+    agreement's exhibit map or a report's boundary description carries every
+    mark a plat does.
     """
+    if names_itself_written(text, filename):
+        return False
     marks = len(_drawing_marks(text or ""))
     if marks >= 3:
         return True
@@ -232,12 +271,22 @@ def classify_plan(
     stage: Optional[PlanStage] = None
     confidence = 0.0
 
-    # 1 — recording language. Only a recorded instrument carries it.
+    # 1 — recording language. Only a recorded instrument carries it — but deeds,
+    #     easements and agreements are recorded too, so the recorder's stamp says
+    #     "recorded", not "plat". It names a final plat only when the document
+    #     also calls itself a plat somewhere: its title, its name, or its sheet.
     rec = _RECORDED.search(text)
     if rec:
-        stage = PlanStage.FINAL_PLAT
-        confidence = 0.95
-        evidence.append(f"Carries recording language — “{rec.group(0).strip()}”.")
+        says_plat = re.search(r"\bplat\b", f"{title_text}\n{filename}\n{text[:4000]}", re.I)
+        if says_plat:
+            stage = PlanStage.FINAL_PLAT
+            confidence = 0.95
+            evidence.append(f"Carries recording language — “{rec.group(0).strip()}”.")
+        else:
+            evidence.append(
+                f"Carries recording language (“{rec.group(0).strip()}”), but nothing "
+                "names it a plat — recorded, not necessarily a plat."
+            )
 
     # 2 — the sheet's own title. Beats body text; overrides a recording guess
     #     only when it names an even later instrument.
