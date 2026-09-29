@@ -190,6 +190,30 @@ class Database:
             hierarchy=row.get("hierarchy") or {},
         )
 
+    def get_geo_overrides(self, series_ids: Sequence[int], geo_id: str) -> Dict[Tuple[int, str], str]:
+        """
+        Per-geography publisher codes from ``public.series_geo_alias`` for one geography,
+        keyed ``(series_id, provider)``. These cover series whose publisher codes cannot
+        be derived from a template -- FRED's own metro permit IDs (PHOE004BP1FHSA),
+        Case-Shiller's 20 metros (PHXRNSA). Returns {} if the table does not exist yet,
+        so this module still runs against a database the migration has not reached.
+        """
+        if not series_ids:
+            return {}
+        with self.connection() as conn, conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
+            cur.execute("SELECT to_regclass('public.series_geo_alias') AS t")
+            if not cur.fetchone()["t"]:
+                return {}
+            cur.execute(
+                """
+                SELECT series_id, provider, provider_series_code
+                FROM public.series_geo_alias
+                WHERE geo_id = %s AND series_id = ANY(%s)
+                """,
+                (geo_id, list(series_ids)),
+            )
+            return {(r["series_id"], r["provider"]): r["provider_series_code"] for r in cur.fetchall()}
+
     def find_city(self, city: str, state_abbr: str) -> GeoRecord:
         with self.connection() as conn, conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
             cur.execute(

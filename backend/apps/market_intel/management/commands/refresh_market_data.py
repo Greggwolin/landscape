@@ -80,23 +80,55 @@ def _load_runner():
 
 
 def _refresh_set():
-    """(geo_id, geo_level, geo_name, [series_code, ...]) for every tracked geography."""
+    """(geo_id, geo_level, geo_name, [series_code, ...]) for every tracked geography.
+
+    A geography is tracked once it holds any observation (and is not excluded).
+    Its series are the union of:
+      * every (geography, series) pair already held -- keeps history current; and
+      * every ACTIVE series whose coverage names this geography's own level
+        (2026-09-29) -- so a series added to the catalogue starts filling at every
+        tracked geography of its level on the next run, instead of waiting for
+        someone to seed a first observation by hand.
+    """
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT md.geo_id,
+            WITH tracked AS (
+                SELECT DISTINCT md.geo_id
+                  FROM public.market_data md
+                 WHERE md.geo_id <> ALL(%s)
+            ),
+            held AS (
+                SELECT md.geo_id, ms.series_code
+                  FROM public.market_data md
+                  JOIN public.market_series ms ON ms.series_id = md.series_id
+                 WHERE ms.is_active = TRUE
+                   AND md.geo_id <> ALL(%s)
+                 GROUP BY md.geo_id, ms.series_code
+            ),
+            by_level AS (
+                SELECT t.geo_id, ms.series_code
+                  FROM tracked t
+                  JOIN public.geo_xwalk gx ON gx.geo_id = t.geo_id
+                  JOIN public.market_series ms
+                    ON ms.is_active = TRUE
+                   AND gx.geo_level = ANY(string_to_array(ms.coverage_level, '|'))
+            ),
+            pairs AS (
+                SELECT geo_id, series_code FROM held
+                UNION
+                SELECT geo_id, series_code FROM by_level
+            )
+            SELECT p.geo_id,
                    gx.geo_level,
                    gx.geo_name,
-                   array_agg(DISTINCT ms.series_code ORDER BY ms.series_code) AS series_codes
-              FROM public.market_data md
-              JOIN public.geo_xwalk gx ON gx.geo_id = md.geo_id
-              JOIN public.market_series ms ON ms.series_id = md.series_id
-             WHERE md.geo_id <> ALL(%s)
-               AND ms.is_active = TRUE
-             GROUP BY md.geo_id, gx.geo_level, gx.geo_name
-             ORDER BY gx.geo_level, md.geo_id
+                   array_agg(DISTINCT p.series_code ORDER BY p.series_code) AS series_codes
+              FROM pairs p
+              JOIN public.geo_xwalk gx ON gx.geo_id = p.geo_id
+             GROUP BY p.geo_id, gx.geo_level, gx.geo_name
+             ORDER BY gx.geo_level, p.geo_id
             """,
-            (list(EXCLUDED_GEOS),),
+            (list(EXCLUDED_GEOS), list(EXCLUDED_GEOS)),
         )
         return cur.fetchall()
 
@@ -152,6 +184,7 @@ class Command(BaseCommand):
         runner = _load_runner()
 
         succeeded, failed = [], []
+        skipped, series_errors = [], []
         for index, (geo_id, geo_level, geo_name, codes) in enumerate(targets, start=1):
             label = f'[{index}/{len(targets)}] {geo_level} {geo_id} ({geo_name})'
             self.stdout.write(f'{label}: {len(codes)} series')
@@ -166,7 +199,9 @@ class Command(BaseCommand):
                 argv.append('--dry-run')
 
             try:
-                runner.main(argv)
+                stats = runner.main(argv) or {}
+                skipped.extend(stats.get('skipped', []))
+                series_errors.extend(stats.get('series_errors', []))
                 succeeded.append(geo_id)
             except Exception as exc:  # one bad geography must not abort the month
                 failed.append((geo_id, str(exc)))
@@ -174,6 +209,19 @@ class Command(BaseCommand):
 
         self.stdout.write('')
         self.stdout.write(f'Succeeded: {len(succeeded)}/{len(targets)}')
+        # A series that cannot be built for a geography (no derivable publisher code)
+        # is skipped by design and listed here, deduplicated, so a gap is visible
+        # rather than silent.
+        seen = set()
+        for item in skipped:
+            k = (item['series'], item['geo_id'])
+            if k in seen:
+                continue
+            seen.add(k)
+            self.stdout.write(f"  skipped {item['series']} @ {item['geo_id']}: {item['reason']}")
+        for item in series_errors:
+            self.stdout.write(self.style.WARNING(
+                f"  fetch error {item['series']} @ {item['geo_id']}: {item.get('error')}"))
         if failed:
             self.stdout.write(self.style.ERROR(f'Failed: {len(failed)}'))
             for geo_id, reason in failed:

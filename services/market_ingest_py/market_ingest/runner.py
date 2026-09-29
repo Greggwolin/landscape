@@ -22,6 +22,14 @@ from .fred_client import FredClient
 from .geo import GeoResolver, GeoTarget
 from .geo_bootstrap import FIPS_TO_ABBR
 from .normalize import NormalizedObservation
+from .provider_codes import resolve_provider_code
+from .umich_client import UMichClient
+
+# One process runs the refresh for every tracked geography in turn, and each run
+# expands its geography up to the nation -- so a national series such as CPIAUCSL
+# was requested once per geography, ~30 times a run. Publisher responses are
+# memoised per process on (provider, code, window, frequency, geo_id).
+_FETCH_MEMO: Dict[tuple, List[NormalizedObservation]] = {}
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
@@ -63,25 +71,39 @@ def group_series_by_source(series_map: Dict[str, SeriesMeta]) -> Dict[str, List[
     return grouped
 
 
+def _state_fips_for(geo: GeoRecord) -> Optional[str]:
+    """State FIPS for a geography; falls back to a two-digit parent (some metro rows
+    carry the state only as parent_geo_id, e.g. Tucson MSA 46060)."""
+    if geo.state_fips:
+        return geo.state_fips
+    parent = (geo.parent_geo_id or "").strip()
+    return parent if len(parent) == 2 and parent.isdigit() else None
+
+
+def resolve_code(meta: SeriesMeta, provider: str, geo: GeoRecord,
+                 overrides: Dict[Tuple[int, str], str]) -> Tuple[Optional[str], Optional[str]]:
+    """Publisher code for this series at this geography, or (None, reason). See provider_codes."""
+    return resolve_provider_code(
+        meta.provider_code(provider) or (meta.series_code if geo.geo_level == "US" else None),
+        geo_level=geo.geo_level,
+        state_fips=_state_fips_for(geo),
+        county_fips=geo.county_fips,
+        place_fips=geo.place_fips,
+        cbsa_code=geo.cbsa_code,
+        override=overrides.get((meta.series_id, provider)),
+    )
+
+
 def interpolate_provider_code(template: str, geo: GeoRecord) -> str:
-    """Replace placeholders like {STATE_FIPS} with actual values from geo record."""
-    result = template
-    if "{STATE_FIPS}" in result and geo.state_fips:
-        result = result.replace("{STATE_FIPS}", geo.state_fips)
-    if "{STATE_ABBR}" in result and geo.geo_level == "STATE":
-        # For STATE level, geo_id is the state FIPS
-        abbr = FIPS_TO_ABBR.get(geo.state_fips or geo.geo_id, "")
-        result = result.replace("{STATE_ABBR}", abbr)
-    if "{COUNTY_FIPS}" in result and geo.county_fips:
-        result = result.replace("{COUNTY_FIPS}", geo.county_fips)
-    if "{PLACE_FIPS}" in result and geo.place_fips:
-        result = result.replace("{PLACE_FIPS}", geo.place_fips)
-    if "{CBSA_CODE}" in result and geo.cbsa_code:
-        result = result.replace("{CBSA_CODE}", geo.cbsa_code)
-    return result
+    """Kept for callers outside this module; new code uses resolve_code()."""
+    code, _reason = resolve_provider_code(
+        template, geo_level=geo.geo_level, state_fips=_state_fips_for(geo),
+        county_fips=geo.county_fips, place_fips=geo.place_fips, cbsa_code=geo.cbsa_code,
+    )
+    return code or template
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: Optional[Sequence[str]] = None) -> dict:
     args = parse_args(argv)
     settings = get_settings()
 
@@ -120,12 +142,15 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     census_client = CensusClient(settings.providers.census_api_key)
     bls_client = BlsClient(settings.providers.bls_api_key)
     fhfa_client = FhfaClient(fred_client) if fred_client else None
+    umich_client = UMichClient()
 
     stats = {
         "rows_written": 0,
         "series": {},
         "requested_range": {"start": start.isoformat(), "end": end.isoformat()},
         "geo_targets": [target.__dict__ for target in targets],
+        "skipped": [],
+        "series_errors": [],
     }
     coverage_notes: List[str] = []
     collected: Dict[Tuple[str, str], List[NormalizedObservation]] = defaultdict(list)
@@ -154,16 +179,19 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
                 logger.debug("Fetching %d %s series for %s", len(eligible_metas), source, target.geo_id)
 
-                if source in {"FRED", "SPCS", "BEA"}:
-                    if not fred_client:
-                        raise RuntimeError("FRED client unavailable")
-                    for meta in eligible_metas:
-                        provider_code = meta.provider_code("FRED") or meta.series_code
-                        provider_code = interpolate_provider_code(provider_code, target_geo)
-                        frequency = args.freq or meta.frequency
-                        observations = fred_client.fetch_series(
+                overrides = db.get_geo_overrides([m.series_id for m in eligible_metas], target_geo.geo_id)
+
+                def _skip(meta: SeriesMeta, reason: str) -> None:
+                    stats["skipped"].append({"series": meta.series_code, "geo_id": target_geo.geo_id, "reason": reason})
+                    logger.warning("Skipping {} for {} {}: {}", meta.series_code, target_geo.geo_level, target_geo.geo_id, reason)
+
+                def _fetch_one(meta: SeriesMeta, provider: str, client, code: str) -> None:
+                    frequency = args.freq or meta.frequency
+                    key = (provider, code, start, end, frequency, target_geo.geo_id, meta.series_code)
+                    if key not in _FETCH_MEMO:
+                        _FETCH_MEMO[key] = client.fetch_series(
                             meta.series_code,
-                            provider_code,
+                            code,
                             geo_id=target_geo.geo_id,
                             geo_level=target_geo.geo_level,
                             start=start,
@@ -172,7 +200,21 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                             seasonal=meta.seasonal,
                             frequency=frequency,
                         )
-                        store_observations(meta, target_geo, observations)
+                    store_observations(meta, target_geo, _FETCH_MEMO[key])
+
+                if source in {"FRED", "SPCS", "BEA"}:
+                    if not fred_client:
+                        raise RuntimeError("FRED client unavailable")
+                    for meta in eligible_metas:
+                        code, reason = resolve_code(meta, "FRED", target_geo, overrides)
+                        if not code:
+                            _skip(meta, reason)
+                            continue
+                        try:
+                            _fetch_one(meta, "FRED", fred_client, code)
+                        except Exception as exc:  # one bad series must not sink the geography
+                            stats["series_errors"].append({"series": meta.series_code, "geo_id": target_geo.geo_id, "code": code, "error": str(exc)[:300]})
+                            logger.error("FRED fetch failed for {} ({}) at {}: {}", meta.series_code, code, target_geo.geo_id, exc)
 
                 elif source == "FHFA":
                     if not fhfa_client:
@@ -203,22 +245,53 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                         store_observations(meta, target_geo, obs)
 
                 elif source == "BLS":
+                    batch = []
                     for meta in eligible_metas:
-                        provider_code = meta.provider_code("BLS") or meta.series_code
-                        provider_code = interpolate_provider_code(provider_code, target_geo)
-                        freq = args.freq or meta.frequency
-                        observations = bls_client.fetch_series(
-                            meta.series_code,
-                            provider_code,
-                            geo_id=target_geo.geo_id,
-                            geo_level=target_geo.geo_level,
-                            start=start,
-                            end=end,
-                            units=meta.units,
-                            seasonal=meta.seasonal,
-                            frequency=freq,
-                        )
-                        store_observations(meta, target_geo, observations)
+                        code, reason = resolve_code(meta, "BLS", target_geo, overrides)
+                        if not code:
+                            _skip(meta, reason)
+                            continue
+                        batch.append((meta, code))
+                    todo = [(m.series_code, c, target_geo.geo_id, target_geo.geo_level, m.units, m.seasonal)
+                            for m, c in batch if ("BLS", c, start, end) not in _FETCH_MEMO]
+                    try:
+                        if todo:
+                            for code, obs in bls_client.fetch_many(todo, start, end).items():
+                                _FETCH_MEMO[("BLS", code, start, end)] = obs
+                    except Exception as exc:
+                        for m, c in batch:
+                            stats["series_errors"].append({"series": m.series_code, "geo_id": target_geo.geo_id, "code": c, "error": str(exc)[:300]})
+                        logger.error("BLS batch failed at {}: {}", target_geo.geo_id, exc)
+                    for m, c in batch:
+                        obs = _FETCH_MEMO.get(("BLS", c, start, end))
+                        if obs is None:
+                            continue
+                        if not obs:
+                            _skip(m, f"BLS has no data for {c}")
+                        store_observations(m, target_geo, [o for o in obs if start <= o.date <= end])
+
+                elif source == "UMICH":
+                    # National only. Until 2026-09-29 no branch existed for this source,
+                    # so the three sentiment series stopped at 2026-03 and nothing said so.
+                    if target_geo.geo_level != "US":
+                        continue
+                    wanted = {m.series_code: m for m in eligible_metas}
+                    try:
+                        key = ("UMICH", tuple(sorted(wanted)))
+                        if key not in _FETCH_MEMO:
+                            obs = []
+                            if "UMCSENT" in wanted:
+                                obs += umich_client.fetch_composite("UMCSENT")
+                            if {"UMICC", "UMICE"} & set(wanted):
+                                obs += umich_client.fetch_components("UMICC", "UMICE")
+                            if "UMICH_INFL_1Y" in wanted or "UMICH_INFL_5Y" in wanted:
+                                obs += umich_client.fetch_inflation_expectations("UMICH_INFL_1Y", "UMICH_INFL_5Y")
+                            _FETCH_MEMO[key] = [o for o in obs if start <= o.date <= end]
+                        for meta in eligible_metas:
+                            store_observations(meta, target_geo, [o for o in _FETCH_MEMO[key] if o.series_code == meta.series_code])
+                    except Exception as exc:
+                        stats["series_errors"].append({"series": ",".join(wanted), "geo_id": "US", "error": str(exc)[:300]})
+                        logger.error("UMich fetch failed: {}", exc)
 
                 else:
                     logger.warning("No client configured for source %s", source)
@@ -270,7 +343,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
         if args.dry_run:
             logger.info("Dry run complete: {} rows prepared", sum(len(v) for v in collected.values()))
-            return
+            return stats
 
         fetch_params = {
             "geo_level": base_geo_level,
@@ -307,6 +380,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
                 job_id,
                 ingestion_id,
             )
+            return stats
         except Exception as exc:
             logger.exception("Ingestion failed")
             db.finalize_fetch_job(job_id, "failed", stats, str(exc), ingestion_id)

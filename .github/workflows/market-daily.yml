@@ -1,0 +1,150 @@
+# GitHub Actions: Daily Market Data Refresh
+# Version: v1.0 (2026-09-29) -- session MQ-MKTDATA-S1
+#
+# Gregg, 2026-09-29: "the macro data should update automatically each day."
+# The monthly job (market-refresh.yml) stays as the deep pass: a 36-month window that
+# picks up publisher revisions going back two to three years. This daily job re-reads the
+# last 6 months of every tracked series, which is enough for every new release (daily
+# rates, weekly mortgage rates, monthly jobs, prices, permits, starts, sentiment) and for
+# the ordinary first and second revisions that follow a release.
+#
+# A re-read of an unchanged month writes nothing new; a changed figure is kept in
+# public.market_data_revision by trigger (migration 20260929_market_data_revisions_and_geo_codes).
+#
+# CADENCE: 13:15 UTC = 06:15 Phoenix, after the early-morning releases (FRED posts the
+# overnight SOFR and prime rate by then; BLS/Census 08:30 ET releases land the next run).
+# Skips the 16th, when the monthly deep pass runs.
+
+name: Daily Market Refresh
+
+on:
+  schedule:
+    - cron: '15 13 1-15,17-31 * *'   # daily 06:15 Phoenix, except the 16th (monthly deep pass)
+  # The branch-scoped push trigger that proved this workflow runs has done its
+  # job and is gone (2026-08-26). It existed because `workflow_dispatch` cannot
+  # be fired until the workflow sits on the default branch, so there was no
+  # other way to watch a real run before merging. It has run green; keeping it
+  # would mean every future push to that branch re-ran a monthly job.
+  workflow_dispatch:
+    inputs:
+      geo_id:
+        description: 'Restrict to one geo_id (smoke test). Blank = the full tracked set.'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Fetch and normalise but write nothing'
+        type: boolean
+        required: false
+        default: false
+
+# Never let two refreshes overlap -- they would race on the same upsert keys.
+concurrency:
+  group: market-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh tracked market series
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      NEON_DB_URL: ${{ secrets.NEON_DB_URL }}
+      DATABASE_URL: ${{ secrets.NEON_DB_URL }}
+      # Django refuses to import settings without this. Nothing in this job signs
+      # or encrypts anything -- it opens a database connection and talks to four
+      # HTTP APIs -- so a fixed placeholder is correct here, matching the
+      # convention preview.yml already uses for its backend test job.
+      SECRET_KEY: ci-market-refresh-not-used-for-signing
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
+      BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r services/market_ingest_py/requirements.txt 2>/dev/null \
+            || pip install loguru tenacity python-dateutil pydantic psycopg2-binary requests
+
+      - name: Fail fast if any credential is missing
+        run: |
+          missing=""
+          for k in NEON_DB_URL FRED_API_KEY CENSUS_API_KEY BLS_API_KEY; do
+            [ -z "${!k}" ] && missing="$missing $k"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            exit 1
+          fi
+          echo "All four provider credentials present."
+
+      - name: Show the refresh set
+        working-directory: backend
+        run: python manage.py refresh_market_data --list
+
+      - name: Record row count before
+        id: before
+        run: |
+          COUNT=$(python -c "
+          import os, psycopg2
+          c = psycopg2.connect(os.environ['NEON_DB_URL'])
+          cur = c.cursor()
+          cur.execute('SELECT count(*), max(date) FROM public.market_data')
+          r = cur.fetchone(); print(f'{r[0]}|{r[1]}')
+          ")
+          echo "rows=${COUNT%%|*}" >> "$GITHUB_OUTPUT"
+          echo "newest=${COUNT##*|}" >> "$GITHUB_OUTPUT"
+          echo "Before: ${COUNT%%|*} rows, newest ${COUNT##*|}"
+
+      - name: Refresh
+        working-directory: backend
+        run: |
+          ARGS="--window-months 6"
+          [ -n "${{ inputs.geo_id }}" ] && ARGS="$ARGS --geo-id ${{ inputs.geo_id }}"
+          [ "${{ inputs.dry_run }}" = "true" ] && ARGS="$ARGS --dry-run"
+          python manage.py refresh_market_data $ARGS
+
+      - name: Report what changed
+        if: always()
+        run: |
+          python - <<'PY'
+          import os, psycopg2
+          c = psycopg2.connect(os.environ['NEON_DB_URL'])
+          cur = c.cursor()
+          cur.execute('SELECT count(*), max(date) FROM public.market_data')
+          rows, newest = cur.fetchone()
+          before = int('${{ steps.before.outputs.rows }}' or 0)
+          cur.execute("""
+              SELECT job_id, status, COALESCE(stats->>'rows_written','?')
+              FROM public.market_fetch_job ORDER BY job_id DESC LIMIT 1
+          """)
+          job = cur.fetchone()
+          cur.execute("""
+              SELECT latest_observation_date, (CURRENT_DATE - latest_observation_date)
+              FROM landscape.v_current_cpi_inflation WHERE series_code = 'CPIAUCSL'
+          """)
+          cpi = cur.fetchone()
+
+          out = [
+              f'Rows: {before} -> {rows} ({rows - before:+d})',
+              f'Newest observation: {newest}',
+              f'Last fetch job: #{job[0]} {job[1]}, {job[2]} rows written' if job else 'No fetch job row',
+          ]
+          if cpi:
+              state = 'sync will DECLINE (stale)' if cpi[1] > 95 else 'sync may write'
+              out.append(f'CPIAUCSL newest {cpi[0]} ({cpi[1]} days old) -- CPI {state}')
+          summary = '\n'.join(f'- {line}' for line in out)
+          print(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as fh:
+              fh.write('## Daily market refresh\n' + summary + '\n')
+          PY

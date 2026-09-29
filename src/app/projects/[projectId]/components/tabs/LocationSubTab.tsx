@@ -760,13 +760,20 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
       for (const level of GEO_LEVEL_ORDER) {
         const target = geoData.targets.find((t) => t.geo_level === level);
         if (!target) continue;
-        const matchingSeries = seriesData.find(
-          (s) =>
-            s.geo_id === target.geo_id &&
-            config.codes.some((prefix) =>
+        // The codes list is in priority order. Walk it in that order rather than
+        // taking the first series that matches any prefix: the series arrive sorted
+        // by code, so a broad prefix ('EMP_') would otherwise let a sector series such
+        // as EMP_MSA_CONSTRUCTION (added 2026-09-29) stand in for total payrolls.
+        let matchingSeries: (typeof seriesData)[number] | undefined;
+        for (const prefix of config.codes) {
+          matchingSeries = seriesData.find(
+            (s) =>
+              s.geo_id === target.geo_id &&
+              s.data.length > 0 &&
               s.series_code.toUpperCase().startsWith(prefix.toUpperCase()),
-            ),
-        );
+          );
+          if (matchingSeries) break;
+        }
         if (matchingSeries && matchingSeries.data.length > 0) {
           const { value, change, direction } = computeYoYChange(
             matchingSeries.data,
