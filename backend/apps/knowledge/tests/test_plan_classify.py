@@ -297,6 +297,67 @@ def test_a_final_plat_quoting_its_preplat_is_still_a_final_plat():
 # pipeline acts on it — a separate claim, and the one that decides whether a
 # scanned plat survives its own upload.
 
+# ── written instruments and folders (2026-09-29) ───────────────────────────
+#
+# An executed roadway participation agreement for Red Valley was read as a
+# recorded final plat — its boundary exhibit carried a bearing, a basis of
+# bearings and a right-of-way, and the recorder's stamp did the rest — and was
+# moved out of the Agreements folder Gregg dropped it on. Text below is taken
+# from that document's extracted pages.
+
+RECORDED_AGREEMENT = """
+When recorded, return to: City Clerk, City of Maricopa
+PUBLIC ROADWAY PARTICIPATION AGREEMENT
+THIS PUBLIC ROADWAY PARTICIPATION AGREEMENT is entered into by and between the
+City of Maricopa and Volkswagen Group of America, Inc.
+EXHIBIT A  LEGAL DESCRIPTION
+THENCE N0°00'00"E ALONG THE WEST LINE  BASIS OF BEARING
+60' RIGHT OF WAY
+PINAL COUNTY RECORDER
+"""
+
+
+def test_a_recorded_agreement_with_an_exhibit_map_is_not_a_plan():
+    name = "RVR_City-VW_Public-Roadway-Participation-Agreement_EXECUTED_2025-11-13.pdf"
+    v = classify_plan(RECORDED_AGREEMENT, name)
+    assert v.is_plan is False
+    assert v.stage is None
+
+
+def test_an_agreement_is_recognised_from_its_opening_when_the_name_says_nothing():
+    assert is_plan_document(RECORDED_AGREEMENT, "scan0093.pdf") is False
+
+
+def test_recording_language_alone_does_not_make_a_final_plat():
+    """Deeds and easements are recorded too — the stamp says recorded, not plat."""
+    unnamed = FINAL_PLAT.replace("FINAL PLAT", "")
+    v = classify_plan(unnamed, "scan0417.pdf")
+    assert v.is_plan is True
+    assert v.stage is not PlanStage.FINAL_PLAT
+    assert v.trusted_for_money is False
+    assert any("nothing names it a plat" in e for e in v.evidence)
+
+
+def test_a_design_report_is_not_a_plan_even_with_boundary_marks():
+    text = "BASIS OF BEARINGS  R/W  P.U.E.  SHEET 3 OF 9"
+    assert is_plan_document(text, "3g. RVR Prelim Drainage Design Report WDR 6.9.21.pdf") is False
+
+
+def test_a_folder_the_user_chose_is_never_changed():
+    for folder in ("Agreements", "Civil Plans", "Entitlements", "Property Data"):
+        r = inspect_upload("P6475 PHASE 1 PLAT_R9 1-21-25.pdf", extracted_text=FINAL_PLAT,
+                           title_text=_title(FINAL_PLAT), current_doc_type=folder)
+        assert r.is_plan is True           # still recognised, still read
+        assert r.doc_type is None          # ...but left where it was filed
+
+
+def test_a_plan_nobody_filed_goes_under_plan():
+    for unchosen in (None, "", "General", "general", "Document"):
+        r = inspect_upload("P6475 PHASE 1 PLAT_R9 1-21-25.pdf", extracted_text=FINAL_PLAT,
+                           title_text=_title(FINAL_PLAT), current_doc_type=unchosen)
+        assert r.doc_type == PLAN_DOC_TYPE
+
+
 from unittest.mock import patch  # noqa: E402
 
 from apps.knowledge.services.document_processor import DocumentProcessor  # noqa: E402
@@ -330,6 +391,9 @@ class _FakeConnection:
         return self.cursor_obj
 
 
+_pipeline_calls: list = []
+
+
 def _run_pipeline_with_no_text(doc_name: str):
     """Drive process_document for a document whose pages carry no text."""
     # (doc_id, storage_uri, mime_type, doc_name, doc_type, project_id)
@@ -341,6 +405,8 @@ def _run_pipeline_with_no_text(doc_name: str):
                return_value=("", "No text layer found")):
         result = DocumentProcessor().process_document(99)
 
+    global _pipeline_calls
+    _pipeline_calls = list(conn.cursor_obj.executed)
     statuses = [p[0] for _sql, p in conn.cursor_obj.executed if p]
     sql = " ".join(sql for sql, _p in conn.cursor_obj.executed)
     return result, statuses, sql
@@ -355,9 +421,11 @@ def test_pipeline_parks_a_scanned_plan_as_awaiting_ocr():
     assert AWAITING_OCR in statuses
     assert "text layer" in result["error"]
 
-    # ...and it was refiled as a plan on the way through.
-    assert "doc_type = COALESCE" in sql
+    # ...its verdict was recorded, but the folder it was put in (Property Data
+    # in this fixture) is kept: the type parameter is None, so COALESCE keeps it.
     assert "profile_json" in sql
+    applied = [p for q, p in _pipeline_calls if "doc_type = COALESCE" in q]
+    assert applied and applied[0][0] is None
 
 
 def test_pipeline_still_fails_a_scanned_document_that_is_not_a_drawing():

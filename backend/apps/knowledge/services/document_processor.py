@@ -138,6 +138,7 @@ class DocumentProcessor:
                 doc_name=doc_name or '',
                 extracted_text=extracted_text or '',
                 extraction_failed=extraction_failed,
+                current_doc_type=doc_type,
             )
             if intake.is_plan:
                 with connection.cursor() as cursor:
