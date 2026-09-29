@@ -36,6 +36,112 @@ def _as_float(value: Decimal) -> float:
     return float(_q2(value))
 
 
+# Activity order for the budget breakdown, matching the budget screen.
+_ACTIVITY_ORDER = (
+    "Acquisition",
+    "Planning & Engineering",
+    "Improvements",
+    "Operations",
+    "Disposition",
+    "Financing",
+)
+
+
+def _loan_scope_rows(loan: Any):
+    """(division_id, share, collateral_type) for each container the loan funds.
+
+    Empty for an unsaved loan or one with no container rows — both mean the
+    loan is project-wide.
+    """
+    loan_id = getattr(loan, "loan_id", None)
+    if loan_id is None:
+        return []
+    from apps.financial.models_debt import LoanContainer
+
+    out = []
+    for division_id, pct, collateral_type in LoanContainer.objects.filter(
+        loan_id=loan_id
+    ).values_list("division_id", "allocation_pct", "collateral_type"):
+        if division_id is None:
+            continue
+        share = _to_decimal(pct) / Decimal("100") if pct is not None else Decimal("1")
+        out.append((int(division_id), share, (collateral_type or "").upper()))
+    return out
+
+
+def development_budget_basis(loan: Any, project_id: int) -> Dict[str, Any]:
+    """The development budget a loan is sized against.
+
+    Every budget line on a funded container — or on anything underneath one
+    (a parcel line under a funded phase) — times the loan's share of that
+    container. A project-wide loan takes every line. Lines with no dates count:
+    a static estimate is still cost; only the timing of draws needs dates.
+
+    Returns ``{"total": Decimal, "by_activity": {activity: Decimal},
+    "funds_acquisition": bool, "project_wide": bool}``.
+    """
+    from django.db import connection
+    from apps.containers.ancestry import DIVISION_ANCESTRY_CTE
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+    rows = _loan_scope_rows(loan)
+    project_wide = not rows
+    shares: Dict[int, float] = {}
+    funds_acquisition = project_wide
+    for division_id, share, collateral_type in rows:
+        shares[division_id] = shares.get(division_id, 0.0) + float(share)
+        if collateral_type in LandDevCashFlowService.ACQUISITION_COLLATERAL_TYPES:
+            funds_acquisition = True
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            WITH {DIVISION_ANCESTRY_CTE}
+            SELECT b.division_id, a.tier1_id, a.tier2_id,
+                   COALESCE(NULLIF(TRIM(b.activity), ''), 'Unassigned') AS activity,
+                   b.amount
+            FROM landscape.core_fin_fact_budget b
+            LEFT JOIN division_ancestry a ON a.division_id = b.division_id
+            WHERE b.project_id = %s AND b.amount > 0
+            """,
+            [project_id],
+        )
+        budget_rows = cursor.fetchall()
+
+    total, by_activity = budget_basis_from_rows(budget_rows, shares, project_wide)
+    return {
+        "total": total,
+        "by_activity": by_activity,
+        "funds_acquisition": funds_acquisition,
+        "project_wide": project_wide,
+    }
+
+
+def budget_basis_from_rows(budget_rows, shares: Dict[int, float], project_wide: bool):
+    """Sum ``(division_id, tier1_id, tier2_id, activity, amount)`` rows at the
+    loan's share. Pure, so the sizing rule is testable without a database."""
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+    total = Decimal("0")
+    by_activity: Dict[str, Decimal] = {}
+    for division_id, tier1_id, tier2_id, activity, amount in budget_rows:
+        if project_wide:
+            share = 1.0
+        else:
+            ancestry = {division_id: (tier1_id, tier2_id)} if division_id is not None else {}
+            share = LandDevCashFlowService._share_for_division(division_id, shares, ancestry)
+        if share <= 0:
+            continue
+        contribution = _to_decimal(amount) * Decimal(str(share))
+        total += contribution
+        by_activity[activity] = by_activity.get(activity, Decimal("0")) + contribution
+    return total, by_activity
+
+
+def _is_land(project: Any) -> bool:
+    return (getattr(project, "project_type_code", "") or "").upper() == "LAND"
+
+
 class LoanSizingService:
     """Calculations for commitment sizing, net proceeds, and budget breakdown."""
 
@@ -82,8 +188,16 @@ class LoanSizingService:
             + _to_decimal(getattr(loan, "closing_costs_legal", None))
             + _to_decimal(getattr(loan, "closing_costs_other", None))
         )
-        # TODO: Include capex budget basis once capital budget source is integrated.
-        cost_basis = value_basis + closing_costs_total
+        # Land: LTC is sized on the purchase (when the loan funds it) plus the
+        # development budget of the containers it funds. Income property keeps
+        # its purchase-plus-closing basis until its capital budget is wired.
+        budget_basis = None
+        if _is_land(project) and getattr(project, "project_id", None) is not None:
+            budget_basis = development_budget_basis(loan, project.project_id)
+            purchase = value_basis if budget_basis["funds_acquisition"] else Decimal("0")
+            cost_basis = purchase + closing_costs_total + budget_basis["total"]
+        else:
+            cost_basis = value_basis + closing_costs_total
 
         ltv_amount = (ltv_pct / Decimal("100")) * value_basis if has_ltv else None
         ltc_amount = (ltc_pct / Decimal("100")) * cost_basis if has_ltc else None
@@ -120,6 +234,9 @@ class LoanSizingService:
             "ltc_basis_amount": _q2(cost_basis),
             "ltv_amount": _q2(ltv_amount) if ltv_amount is not None else None,
             "ltc_amount": _q2(ltc_amount) if ltc_amount is not None else None,
+            "development_budget_basis": (
+                _q2(budget_basis["total"]) if budget_basis is not None else None
+            ),
             **holdbacks,
         }
 
@@ -154,7 +271,8 @@ class LoanSizingService:
                 dcf_assumptions.get("price_growth_rate"),
                 dcf_assumptions.get("cost_inflation_rate"),
             )
-            period_data = service._build_period_costs_for_financing(
+            period_data = service.build_loan_period_data(
+                loan,
                 cost_schedule,
                 absorption_schedule,
                 periods,
@@ -210,7 +328,17 @@ class LoanSizingService:
         commitment = _to_decimal(sizing["commitment_amount"])
         acquisition = _to_decimal(getattr(project, "asking_price", None))
         capex = Decimal("0")
-        # TODO: Replace with actual capex budget once project budget source is integrated.
+        activity_rows = []
+        if _is_land(project) and getattr(project, "project_id", None) is not None:
+            basis = development_budget_basis(loan, project.project_id)
+            if not basis["funds_acquisition"]:
+                acquisition = Decimal("0")
+            capex = basis["total"]
+            order = {name: i for i, name in enumerate(_ACTIVITY_ORDER)}
+            activity_rows = sorted(
+                basis["by_activity"].items(),
+                key=lambda kv: (order.get(kv[0], len(order)), kv[0]),
+            )
 
         origination_fee = _to_decimal(sizing["origination_fee_amount"])
         interest_reserve = _to_decimal(sizing["interest_reserve_amount"])
@@ -228,17 +356,26 @@ class LoanSizingService:
         remaining_net_proceeds -= acquisition_lender_alloc
         capex_lender_alloc = min(capex, remaining_net_proceeds)
 
+        # The development budget, one row per activity, when there is one to
+        # show; otherwise the single improvements row as before. The lender's
+        # allocation is spread over the activities in order.
+        if activity_rows:
+            capex_rows = []
+            remaining_capex_alloc = capex_lender_alloc
+            for activity, amount in activity_rows:
+                lender = min(amount, remaining_capex_alloc)
+                remaining_capex_alloc -= lender
+                capex_rows.append({"label": activity, "total": amount, "lender": lender})
+        else:
+            capex_rows = [{"label": line_item_b_label, "total": capex, "lender": capex_lender_alloc}]
+
         raw_budget_rows = [
             {
                 "label": line_item_a_label,
                 "total": acquisition,
                 "lender": acquisition_lender_alloc,
             },
-            {
-                "label": line_item_b_label,
-                "total": capex,
-                "lender": capex_lender_alloc,
-            },
+            *capex_rows,
             {
                 "label": "Origination Fee",
                 "total": origination_fee,

@@ -1,0 +1,199 @@
+"""Land financing by container — XN62-LANDDEBT-0929.
+
+A loan tied to containers draws on THEIR costs times its share of each, is
+released only by THEIR parcel sales, and is sized against THEIR development
+budget. A loan with no container rows is project-wide, which is what every
+loan was before. Pure tests: no database — the scoping rules are pure
+functions so they can be pinned down on their own.
+"""
+
+from decimal import Decimal
+from types import SimpleNamespace
+from unittest import mock
+
+from apps.calculations.loan_sizing_service import budget_basis_from_rows
+from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+# Divisions: two villages (10, 20); phases 11 under 10, 21 under 20; parcel 211
+# under phase 21.  ancestry: division_id -> (village, phase)
+ANCESTRY = {
+    10: (10, None),
+    11: (10, 11),
+    20: (20, None),
+    21: (20, 21),
+    211: (20, 21),
+}
+
+
+def _cost_schedule():
+    return {
+        'categorySummary': {
+            'Development': {
+                'items': [
+                    # Village 1's phase: 100 per period in periods 0-2
+                    {'containerId': 11, 'totalAmount': 300.0,
+                     'periods': [{'periodIndex': i, 'amount': 100.0} for i in range(3)]},
+                    # Village 2's phase: 1,000 in periods 1-2
+                    {'containerId': 21, 'totalAmount': 2000.0,
+                     'periods': [{'periodIndex': i, 'amount': 1000.0} for i in (1, 2)]},
+                    # A parcel line under Village 2's phase: 50 in period 3
+                    {'containerId': 211, 'totalAmount': 50.0,
+                     'periods': [{'periodIndex': 3, 'amount': 50.0}]},
+                ],
+            },
+            'Land Acquisition': {
+                'items': [
+                    {'containerId': None, 'totalAmount': 5000.0,
+                     'periods': [{'periodIndex': 0, 'amount': 5000.0}]},
+                ],
+            },
+        },
+    }
+
+
+def _absorption_schedule():
+    # parcel containerId is a tbl_phase id; phase 901 -> division 11, 902 -> 21
+    return {
+        'periodSales': [
+            {'periodIndex': 4, 'parcels': [{'containerId': 901, 'units': 10}]},
+            {'periodIndex': 5, 'parcels': [{'containerId': 902, 'units': 20}]},
+        ],
+    }
+
+
+PHASE_TO_DIVISION = {901: 11, 902: 21}
+
+
+def _scoped(shares, unassigned_share=0.0, periods=6):
+    return LandDevCashFlowService._scoped_financing_inputs(
+        _cost_schedule(), _absorption_schedule(), periods, PHASE_TO_DIVISION,
+        {'shares': shares, 'ancestry': ANCESTRY, 'unassigned_share': unassigned_share},
+    )
+
+
+# (a) two loans 60/40 on one container draw 60/40 of each period's cost
+def test_two_loans_split_each_period_60_40():
+    a_totals, _, _ = _scoped({21: 0.6})
+    b_totals, _, _ = _scoped({21: 0.4})
+    full = [0.0, 1000.0, 1000.0, 50.0, 0.0, 0.0]  # phase 21 plus its parcel line
+    for idx, amount in enumerate(full):
+        assert abs(a_totals[idx] - amount * 0.6) < 1e-9
+        assert abs(b_totals[idx] - amount * 0.4) < 1e-9
+        assert abs(a_totals[idx] + b_totals[idx] - amount) < 1e-9
+
+
+# (b) a loan on Village 2 releases only from Village 2 parcel sales, and draws
+# nothing of Village 1's costs or the land purchase
+def test_village_loan_released_only_by_its_own_sales():
+    totals, lots, cost_per_lot = _scoped({20: 1.0})
+    assert totals == [0.0, 1000.0, 1000.0, 50.0, 0.0, 0.0]
+    assert 4 not in lots                      # Village 1's sale releases nothing
+    assert lots[5] == {21: 20}
+    assert set(cost_per_lot) == {21}
+
+
+def test_acquisition_counts_only_when_the_loan_funds_it():
+    without, _, _ = _scoped({20: 1.0})
+    with_acq, _, _ = _scoped({20: 1.0}, unassigned_share=1.0)
+    assert without[0] == 0.0
+    assert with_acq[0] == 5000.0
+
+
+def test_most_specific_assignment_wins():
+    # Village 2 at 50%, but its phase 21 directly at 100%
+    assert LandDevCashFlowService._share_for_division(211, {20: 0.5, 21: 1.0}, ANCESTRY) == 1.0
+    assert LandDevCashFlowService._share_for_division(21, {20: 0.5}, ANCESTRY) == 0.5
+    assert LandDevCashFlowService._share_for_division(11, {20: 0.5}, ANCESTRY) == 0.0
+
+
+# (c) LTC basis includes the funded containers' budget lines, excludes others
+def test_ltc_basis_includes_funded_budget_lines_only():
+    rows = [
+        # (division_id, tier1_id, tier2_id, activity, amount)
+        (11, 10, 11, 'Improvements', Decimal('300')),
+        (21, 20, 21, 'Improvements', Decimal('2000')),
+        (211, 20, 21, 'Planning & Engineering', Decimal('50')),
+        (None, None, None, 'Improvements', Decimal('999')),
+    ]
+    total, by_activity = budget_basis_from_rows(rows, {20: 0.5}, project_wide=False)
+    assert total == Decimal('1025')  # (2000 + 50) x 50%
+    assert by_activity == {'Improvements': Decimal('1000'), 'Planning & Engineering': Decimal('25')}
+
+    total_all, _ = budget_basis_from_rows(rows, {}, project_wide=True)
+    assert total_all == Decimal('3349')
+
+
+def test_sizing_todos_are_gone():
+    import inspect
+    from apps.calculations import loan_sizing_service
+    assert 'TODO' not in inspect.getsource(loan_sizing_service)
+
+
+# (d) the stored construction-loan schedule and the cash-flow financing section
+# go through the SAME per-loan function, so they cannot disagree about a loan
+def _fake_loan(**kw):
+    base = dict(
+        loan_id=7, loan_name='Village 2 A&D', structure_type='REVOLVER',
+        takes_out_loan_id=None, takes_out_loan=None,
+        loan_term_months=24, loan_term_years=None, loan_start_date=None,
+        closing_costs_appraisal=0, closing_costs_legal=0, closing_costs_other=0,
+        loan_to_cost_pct=60, interest_rate_pct=8, origination_fee_pct=1,
+        interest_reserve_inflator=1.0, repayment_acceleration=1.0,
+        release_price_pct=110, minimum_release_amount=0, draw_trigger_type='COST_INCURRED',
+    )
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def _periods(n=6):
+    from datetime import date
+    return [{'endDate': date(2027, 1 + i, 28)} for i in range(n)]
+
+
+def test_financing_section_uses_per_loan_period_data():
+    svc = LandDevCashFlowService(1)
+    loan = _fake_loan()
+    with mock.patch.object(svc, '_fetch_loans', side_effect=[[loan], []]), \
+         mock.patch.object(svc, 'build_loan_period_data', wraps=lambda *a, **k: []) as spy, \
+         mock.patch('apps.financial.services.land_dev_cashflow_service.DebtServiceEngine') as eng:
+        eng.return_value.calculate_revolver.return_value = SimpleNamespace(periods=[])
+        svc._build_financing_section({}, {}, _periods(), None)
+    spy.assert_called_once()
+    assert spy.call_args[0][0] is loan
+
+
+def test_construction_loan_run_uses_per_loan_period_data():
+    from apps.calculations import construction_loan_service as cls_mod
+    loan = _fake_loan()
+    with mock.patch.object(cls_mod.Loan.objects, 'get', return_value=loan), \
+         mock.patch.object(LandDevCashFlowService, '_get_project_config', return_value={'start_date': _periods()[0]['endDate']}), \
+         mock.patch.object(LandDevCashFlowService, '_get_dcf_assumptions', return_value={}), \
+         mock.patch.object(LandDevCashFlowService, '_get_dcf_hold_period_months', return_value=None), \
+         mock.patch.object(LandDevCashFlowService, '_determine_required_periods', return_value=6), \
+         mock.patch.object(LandDevCashFlowService, '_extend_periods_for_loans', return_value=6), \
+         mock.patch.object(LandDevCashFlowService, '_generate_cost_schedule', return_value={}) as cost_gen, \
+         mock.patch.object(LandDevCashFlowService, '_generate_absorption_schedule', return_value={}), \
+         mock.patch.object(LandDevCashFlowService, 'build_loan_period_data', return_value=[]) as spy, \
+         mock.patch('apps.calculations.engines.debt_service_engine.DebtServiceEngine.calculate_revolver',
+                    side_effect=RuntimeError('stop after inputs')):
+        result = cls_mod.ConstructionLoanService(1, 7).calculate_and_store()
+    assert result['success'] is False  # stopped on purpose after the inputs
+    spy.assert_called_once()
+    assert spy.call_args[0][0] is loan
+    # project-wide schedules; the loan's own rows do the scoping
+    assert cost_gen.call_args[0][1] is None
+
+
+# (f) a take-out is a finding returned to the caller, not a crash or a log line
+def test_take_out_surfaces_as_finding():
+    svc = LandDevCashFlowService(1)
+    taken = SimpleNamespace(loan_name='Land loan')
+    loan = _fake_loan(takes_out_loan_id=3, takes_out_loan=taken, loan_name='A&D revolver')
+    with mock.patch.object(svc, '_fetch_loans', side_effect=[[loan], []]), \
+         mock.patch.object(svc, 'build_loan_period_data', return_value=[]), \
+         mock.patch('apps.financial.services.land_dev_cashflow_service.DebtServiceEngine') as eng:
+        eng.return_value.calculate_revolver.return_value = SimpleNamespace(periods=[])
+        section = svc._build_financing_section({}, {}, _periods(), None)
+    assert section['findings'][0]['code'] == 'take_out_not_modelled'
+    assert 'Land loan is taken out by A&D revolver' in section['findings'][0]['message']
+    assert svc._financing_findings == section['findings']

@@ -17,20 +17,16 @@ class DebtScheduleView(APIView):
     def get(self, request, project_id: int, loan_id: int):
         loan = get_object_or_404(Loan, loan_id=loan_id, project_id=project_id)
 
+        # A take-out is captured but not modelled: say so alongside the
+        # schedule rather than refusing to show one.
+        findings = []
         if loan.takes_out_loan_id:
-            return Response(
-                {
-                    'error': 'TERM take-out logic not implemented for debt schedule',
-                    'loan_id': loan.loan_id,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            findings.append(LandDevCashFlowService._take_out_finding(loan))
 
-        container_ids = list(
-            LoanContainer.objects.filter(loan_id=loan.loan_id).values_list('division_id', flat=True)
-        )
-        if not container_ids:
-            container_ids = None
+        # Project-wide schedules; the loan's own container rows (and shares)
+        # decide what it draws on and what releases it, through the same
+        # function the cash flow and the construction-loan run use.
+        container_ids = None
 
         service = LandDevCashFlowService(project_id)
         project_config = service._get_project_config()
@@ -67,7 +63,8 @@ class DebtScheduleView(APIView):
             dcf_assumptions.get('price_growth_rate'),
             dcf_assumptions.get('cost_inflation_rate'),
         )
-        period_data = service._build_period_costs_for_financing(
+        period_data = service.build_loan_period_data(
+            loan,
             cost_schedule,
             absorption_schedule,
             periods,
@@ -88,6 +85,7 @@ class DebtScheduleView(APIView):
                 'loan_id': loan.loan_id,
                 'loan_name': loan.loan_name,
                 'structure_type': loan.structure_type,
+                'findings': findings,
                 'calculation_summary': {
                     'commitment_amount': result.commitment_amount,
                     'interest_reserve_funded': result.interest_reserve_funded,
@@ -103,6 +101,12 @@ class DebtScheduleView(APIView):
                         'period_index': p.period_index,
                         'date': p.date,
                         'beginning_balance': p.beginning_balance,
+                        # The costs of the funded containers (x share) in this
+                        # period — what the draw is taken against.
+                        'costs_funded': (
+                            period_data[p.period_index].total_costs
+                            if p.period_index < len(period_data) else 0.0
+                        ),
                         'cost_draw': p.cost_draw,
                         'accrued_interest': p.accrued_interest,
                         'interest_reserve_draw': p.interest_reserve_draw,
@@ -124,6 +128,7 @@ class DebtScheduleView(APIView):
                 'loan_id': loan.loan_id,
                 'loan_name': loan.loan_name,
                 'structure_type': loan.structure_type,
+                'findings': findings,
                 'calculation_summary': {
                     'loan_amount': result.loan_amount,
                     'total_interest': result.total_interest,

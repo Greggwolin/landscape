@@ -66,13 +66,15 @@ class ConstructionLoanService:
                 'error': f'Construction loan calculation requires REVOLVER structure_type, got {structure_type}',
             }
 
-        # If container_ids not passed, try to get from loan_container assignments
-        if container_ids is None:
-            assigned = list(
-                loan.loan_containers.values_list('division_id', flat=True)
-            )
-            if assigned:
-                container_ids = assigned
+        # container_ids passed explicitly: a one-off run narrowed to those
+        # containers, at 100%. Not passed: the loan's own container rows decide
+        # what it draws on and what releases it, with their shares — the same
+        # rule the cash-flow financing section applies, through the same
+        # function (build_loan_period_data), so the stored draw schedule and
+        # the cash flow cannot disagree about one loan.
+        explicit_scope = bool(container_ids)
+        if not explicit_scope:
+            container_ids = None
 
         # 2. Run the cash flow service with financing included
         try:
@@ -116,11 +118,19 @@ class ConstructionLoanService:
             )
 
             # 3. Build PeriodCosts for the engine
-            period_data = svc._build_period_costs_for_financing(
-                cost_schedule,
-                absorption_schedule,
-                periods,
-            )
+            if explicit_scope:
+                period_data = svc._build_period_costs_for_financing(
+                    cost_schedule,
+                    absorption_schedule,
+                    periods,
+                )
+            else:
+                period_data = svc.build_loan_period_data(
+                    loan,
+                    cost_schedule,
+                    absorption_schedule,
+                    periods,
+                )
 
             # 4. Build revolver params from the loan
             params = svc._build_revolver_params(loan, periods)

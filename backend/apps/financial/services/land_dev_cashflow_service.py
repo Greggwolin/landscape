@@ -87,6 +87,8 @@ class LandDevCashFlowService:
         self.project_id = project_id
         self._project_config: Optional[Dict] = None
         self._dcf_assumptions: Optional[Dict] = None
+        self._division_ancestry: Optional[Dict[int, Tuple[Optional[int], Optional[int]]]] = None
+        self._financing_findings: List[Dict[str, Any]] = []
 
     def calculate(
         self,
@@ -119,6 +121,7 @@ class LandDevCashFlowService:
         # chosen ids drops it, and a filtered cash flow that quietly omits real
         # money is worse than no filter at all.
         container_ids = expand_division_scope(self.project_id, container_ids)
+        self._financing_findings = []
 
         # Step 1: Load project configuration and DCF assumptions
         project_config = self._get_project_config()
@@ -208,6 +211,11 @@ class LandDevCashFlowService:
             'sections': sections,
             'summary': summary,
             'generatedAt': date.today().isoformat(),
+            # Only present when a loan could not be modelled as written (a
+            # take-out). Absent otherwise, so a run with no such loan returns
+            # exactly the envelope it always did.
+            **({'financingFindings': list(self._financing_findings)}
+               if self._financing_findings else {}),
         }
 
     # =========================================================================
@@ -1425,29 +1433,32 @@ class LandDevCashFlowService:
         periods: List[Dict],
         container_ids: Optional[List[int]],
     ) -> Optional[Dict]:
-        """Build financing section from loan schedules (revolvers and term loans)."""
+        """Build financing section from loan schedules (revolvers and term loans).
+
+        Each revolver draws on the costs of the containers it funds, times its
+        share of each, and is released only by sales in those containers
+        (``build_loan_period_data``). A loan with no container assignment is
+        project-wide and sees every cost and every sale, which is what every
+        loan saw before loans could be tied to containers.
+        """
         revolver_loans = self._fetch_loans(structure_type='REVOLVER', container_ids=container_ids)
         term_loans = self._fetch_loans(structure_type='TERM', container_ids=container_ids)
 
         if not revolver_loans and not term_loans:
             return None
 
-        period_data = self._build_period_costs_for_financing(
-            cost_schedule,
-            absorption_schedule,
-            periods,
-        )
-
         engine = DebtServiceEngine()
         line_items = []
+        findings: List[Dict[str, Any]] = []
         period_count = len(periods)
 
         for loan in revolver_loans:
             if loan.takes_out_loan_id:
-                raise NotImplementedError(
-                    f"Loan {loan.loan_id} has takes_out_loan_id; take-out logic not implemented."
-                )
+                findings.append(self._take_out_finding(loan))
 
+            period_data = self.build_loan_period_data(
+                loan, cost_schedule, absorption_schedule, periods,
+            )
             params = self._build_revolver_params(loan, periods)
             revolver_result = engine.calculate_revolver(params, period_data)
 
@@ -1482,9 +1493,7 @@ class LandDevCashFlowService:
 
         for loan in term_loans:
             if loan.takes_out_loan_id:
-                raise NotImplementedError(
-                    f"Loan {loan.loan_id} has takes_out_loan_id; take-out logic not implemented."
-                )
+                findings.append(self._take_out_finding(loan))
 
             params = self._build_term_params(loan, periods)
             term_result = engine.calculate_term(params, period_count)
@@ -1523,13 +1532,33 @@ class LandDevCashFlowService:
         subtotals = self._calculate_subtotals(line_items, period_count)
         section_total = sum(item['total'] for item in line_items)
 
-        return {
+        self._financing_findings = findings
+        section = {
             'sectionId': 'financing',
             'sectionName': 'FINANCING',
             'lineItems': line_items,
             'subtotals': subtotals,
             'sectionTotal': section_total,
             'sortOrder': 99,
+        }
+        if findings:
+            section['findings'] = findings
+        return section
+
+    @staticmethod
+    def _take_out_finding(loan: Loan) -> Dict[str, Any]:
+        """A take-out is captured on the loan but not modelled. Say so, to the
+        caller, rather than crashing the run or writing a log line nobody reads."""
+        taken_out = getattr(loan, 'takes_out_loan', None)
+        taken_out_name = getattr(taken_out, 'loan_name', None) or f'loan {loan.takes_out_loan_id}'
+        return {
+            'code': 'take_out_not_modelled',
+            'loanId': loan.loan_id,
+            'takesOutLoanId': loan.takes_out_loan_id,
+            'message': (
+                f"{taken_out_name} is taken out by {loan.loan_name}; take-out is "
+                f"not modelled — balances are shown as if it were not."
+            ),
         }
 
     def _build_revolver_params(self, loan: Loan, periods: List[Dict]) -> RevolverLoanParams:
@@ -1594,9 +1623,38 @@ class LandDevCashFlowService:
         cost_schedule: Dict,
         absorption_schedule: Dict,
         periods: List[Dict],
+        loan_scope: Optional[Dict[str, Any]] = None,
     ) -> List[PeriodCosts]:
-        """Build PeriodCosts inputs for the debt service engine."""
+        """Build PeriodCosts inputs for the debt service engine.
+
+        ``loan_scope`` None is the project-wide case: every cost, every sale.
+        Given a scope (``_loan_scope``), only the costs of the funded
+        containers — times the loan's share of each — and only the sales in
+        them reach the engine.
+        """
         period_count = len(periods)
+        if loan_scope is not None:
+            phase_ids = set()
+            for period_sale in absorption_schedule.get('periodSales', []):
+                for parcel in period_sale.get('parcels', []):
+                    if parcel.get('containerId'):
+                        phase_ids.add(parcel.get('containerId'))
+            phase_to_division = self._fetch_phase_division_mapping(list(phase_ids))
+            period_totals_s, lots_s, cost_per_lot_s = self._scoped_financing_inputs(
+                cost_schedule, absorption_schedule, period_count,
+                phase_to_division, loan_scope,
+            )
+            return [
+                PeriodCosts(
+                    period_index=idx,
+                    date=periods[idx]['endDate'].isoformat() if periods[idx].get('endDate') else '',
+                    total_costs=period_totals_s[idx],
+                    lots_sold_by_product=lots_s.get(idx, {}),
+                    cost_per_lot_by_product=cost_per_lot_s,
+                )
+                for idx in range(period_count)
+            ]
+
         period_totals = cost_schedule.get('periodTotals', [])
 
         phase_ids = set()
@@ -1667,6 +1725,173 @@ class LandDevCashFlowService:
             )
 
         return period_data
+
+    # -- Loans tied to containers ------------------------------------------
+
+    # A container row with one of these collateral types says the loan also
+    # funds the land purchase, which is carried on no container.
+    ACQUISITION_COLLATERAL_TYPES = ('ACQUISITION', 'LAND')
+
+    def build_loan_period_data(
+        self,
+        loan: Loan,
+        cost_schedule: Dict,
+        absorption_schedule: Dict,
+        periods: List[Dict],
+    ) -> List[PeriodCosts]:
+        """The costs this loan draws on and the sales that release it.
+
+        One function for every caller — the cash-flow financing section, the
+        construction-loan run that stores the draw schedule, and the reserve
+        recommendation — so the three cannot disagree about the same loan.
+        """
+        return self._build_period_costs_for_financing(
+            cost_schedule,
+            absorption_schedule,
+            periods,
+            loan_scope=self._loan_scope(loan),
+        )
+
+    def _loan_scope(self, loan: Loan) -> Optional[Dict[str, Any]]:
+        """Which containers a loan funds and its share of each.
+
+        None means project-wide: the loan has no container rows. A row with no
+        ``allocation_pct`` is a 100% share.
+        """
+        loan_id = getattr(loan, 'loan_id', None)
+        if loan_id is None:
+            return None
+        rows = list(
+            LoanContainer.objects.filter(loan_id=loan_id)
+            .values_list('division_id', 'allocation_pct', 'collateral_type')
+        )
+        shares: Dict[int, float] = {}
+        unassigned_share = 0.0
+        for division_id, pct, collateral_type in rows:
+            if division_id is None:
+                continue
+            share = float(pct) / 100.0 if pct is not None else 1.0
+            shares[int(division_id)] = shares.get(int(division_id), 0.0) + share
+            if (collateral_type or '').upper() in self.ACQUISITION_COLLATERAL_TYPES:
+                unassigned_share = max(unassigned_share, share)
+        if not shares:
+            return None
+        return {
+            'shares': shares,
+            'ancestry': self._get_division_ancestry(),
+            'unassigned_share': unassigned_share,
+        }
+
+    def _get_division_ancestry(self) -> Dict[int, Tuple[Optional[int], Optional[int]]]:
+        """division_id -> (village id, phase id) above it, for this project."""
+        if self._division_ancestry is None:
+            from apps.containers.ancestry import DIVISION_ANCESTRY_CTE
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    WITH {DIVISION_ANCESTRY_CTE}
+                    SELECT division_id, tier1_id, tier2_id
+                    FROM division_ancestry
+                    WHERE project_id = %s
+                    """,
+                    [self.project_id],
+                )
+                self._division_ancestry = {
+                    row[0]: (row[1], row[2]) for row in cursor.fetchall()
+                }
+        return self._division_ancestry
+
+    @staticmethod
+    def _share_for_division(
+        division_id: Optional[int],
+        shares: Dict[int, float],
+        ancestry: Dict[int, Tuple[Optional[int], Optional[int]]],
+    ) -> float:
+        """The loan's share of a division: its own row, else its phase's, else
+        its village's. The most specific assignment wins."""
+        if division_id is None:
+            return 0.0
+        if division_id in shares:
+            return shares[division_id]
+        tier1_id, tier2_id = ancestry.get(division_id, (None, None))
+        if tier2_id is not None and tier2_id in shares:
+            return shares[tier2_id]
+        if tier1_id is not None and tier1_id in shares:
+            return shares[tier1_id]
+        return 0.0
+
+    @classmethod
+    def _scoped_financing_inputs(
+        cls,
+        cost_schedule: Dict,
+        absorption_schedule: Dict,
+        period_count: int,
+        phase_to_division: Dict[int, int],
+        loan_scope: Dict[str, Any],
+    ) -> Tuple[List[float], Dict[int, Dict[int, int]], Dict[int, float]]:
+        """Per-period costs, lots sold and cost per lot for ONE loan.
+
+        Pure — no database — so the scoping rule is testable on its own.
+        Costs: each budget line whose container is funded (directly, or through
+        the phase or village above it) contributes its per-period amounts times
+        the loan's share. Lines on no container (the land purchase) count only
+        when the loan is marked as funding the acquisition. Sales: only parcels
+        whose phase is funded release the loan.
+        """
+        shares = loan_scope.get('shares') or {}
+        ancestry = loan_scope.get('ancestry') or {}
+        unassigned_share = float(loan_scope.get('unassigned_share') or 0.0)
+
+        def share_of(division_id: Optional[int]) -> float:
+            return cls._share_for_division(division_id, shares, ancestry)
+
+        period_totals = [0.0] * period_count
+        cost_by_phase: Dict[int, float] = {}
+        total_cost = 0.0
+        for category in cost_schedule.get('categorySummary', {}).values():
+            for item in category.get('items', []):
+                container_id = item.get('containerId')
+                share = unassigned_share if container_id is None else share_of(container_id)
+                if share <= 0:
+                    continue
+                for pv in item.get('periods', []):
+                    idx = pv.get('periodIndex')
+                    if idx is not None and 0 <= idx < period_count:
+                        period_totals[idx] += float(pv.get('amount') or 0) * share
+                amount = float(item.get('totalAmount') or 0) * share
+                total_cost += amount
+                if container_id is not None:
+                    phase_id = ancestry.get(container_id, (None, None))[1]
+                    if phase_id is not None:
+                        cost_by_phase[phase_id] = cost_by_phase.get(phase_id, 0.0) + amount
+
+        lots_by_period: Dict[int, Dict[int, int]] = {}
+        lots_by_division: Dict[int, int] = {}
+        for period_sale in absorption_schedule.get('periodSales', []):
+            idx = period_sale.get('periodIndex')
+            if idx is None:
+                continue
+            for parcel in period_sale.get('parcels', []):
+                division_id = phase_to_division.get(parcel.get('containerId'))
+                if division_id is None or share_of(division_id) <= 0:
+                    continue
+                units = int(parcel.get('units') or 0)
+                if units <= 0:
+                    continue
+                lots_by_period.setdefault(idx, {})
+                lots_by_period[idx][division_id] = lots_by_period[idx].get(division_id, 0) + units
+                lots_by_division[division_id] = lots_by_division.get(division_id, 0) + units
+
+        total_lots = sum(lots_by_division.values())
+        default_cost_per_lot = total_cost / total_lots if total_lots else 0.0
+        cost_per_lot: Dict[int, float] = {}
+        for division_id, lot_count in lots_by_division.items():
+            phase_cost = cost_by_phase.get(division_id)
+            cost_per_lot[division_id] = (
+                phase_cost / lot_count if phase_cost else default_cost_per_lot
+            )
+
+        return period_totals, lots_by_period, cost_per_lot
 
     def _fetch_phase_division_mapping(self, phase_ids: List[int]) -> Dict[int, int]:
         """Map phase_id to division_id (tier 2) for product grouping."""
