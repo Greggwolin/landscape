@@ -358,11 +358,9 @@ export function UploadStagingProvider({
         }
       }
 
-      // Route B: Cost Library stub
-      if (effectiveRoute === 'library') {
-        dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });
-        return;
-      }
+      // A file routed to the cost library used to be marked complete here and
+      // never uploaded — the library route was a stub. It now uploads like any
+      // other document (2026-09-29: "CopperNail-Farrel Cost Estimate" vanished).
 
       try {
         // 1. Upload file via UploadThing
