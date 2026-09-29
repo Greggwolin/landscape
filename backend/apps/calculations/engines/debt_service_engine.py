@@ -26,6 +26,10 @@ class RevolverLoanParams:
     # Due on sale: the period the loan's last collateral sells. Whatever is
     # still owed is retired then. None keeps the old behaviour.
     payoff_period: Optional[int] = None
+    # 'costs': advances follow the costs, several over the term (A&D, and the
+    # revolver as built). 'single': one advance at the start (a term loan run
+    # through this calculator because it has release prices).
+    advance_mode: str = 'costs'
 
 
 @dataclass
@@ -433,6 +437,11 @@ class DebtServiceEngine:
         # Reverse-fill: allocate from last period backward
         draw_by_period: Dict[int, float] = {}
         remaining_capacity = available_for_costs
+        if params.advance_mode == 'single':
+            # One advance at the start: the whole cost capacity at closing.
+            draw_by_period[params.loan_start_period] = available_for_costs
+            remaining_capacity = 0.0
+            cost_periods = []
         for period_index, period_cost in reversed(cost_periods):
             draw = min(period_cost, remaining_capacity)
             draw_by_period[period_index] = draw

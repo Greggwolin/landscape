@@ -69,10 +69,20 @@ const LOAN_TYPES: Array<{ value: string; label: string }> = [
   { value: 'LINE_OF_CREDIT', label: 'Line of credit' },
   { value: 'PREFERRED_EQUITY', label: 'Preferred equity' },
 ];
+// Gregg, 2026-09-29: Term (one advance), Revolver, and A&D (like a term loan
+// but with several advances). Revolver and A&D — and a term loan with a
+// release price — run through the release-and-reserve calculator.
 const STRUCTURES = [
+  { value: 'A_AND_D', label: 'A&D (multiple advances)' },
   { value: 'REVOLVER', label: 'Revolver' },
-  { value: 'TERM', label: 'Term' },
+  { value: 'TERM', label: 'Term (one advance)' },
 ];
+
+function usesReleaseCalculator(loan: Record<string, unknown>): boolean {
+  const s = String(loan.structure_type ?? '').toUpperCase();
+  if (s === 'REVOLVER' || s === 'A_AND_D') return true;
+  return s === 'TERM' && (Number(loan.release_price_pct) || 0) > 0;
+}
 const STATUSES = [
   { value: 'pending', label: 'Pending' },
   { value: 'active', label: 'Active' },
@@ -273,7 +283,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
       {
         loan_name: `Loan ${loans.length + 1}`,
         loan_type: 'ACQUISITION_DEVELOPMENT',
-        structure_type: 'REVOLVER',
+        structure_type: 'A_AND_D',
         seniority: loans.length + 1,
         status: 'pending',
         interest_type: 'Floating',
@@ -308,7 +318,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
       );
       if (!patched.ok) throw new Error('sizing');
       let peak = '';
-      if (selected.structure_type === 'REVOLVER') {
+      if (usesReleaseCalculator(selected)) {
         // The revolver run solves the interest reserve and stores the draws.
         const run = await authFetch(
           `${DJANGO_API_URL}/api/projects/${projectId}/loans/${selected.loan_id}/calculate/`,
@@ -550,9 +560,13 @@ function DrawsTable({
 }) {
   const { data, isLoading } = useLoanSchedule(projectId, loan.loan_id);
   const schedule = data as
-    | { periods?: SchedulePeriod[]; findings?: Array<{ message: string }>; error?: string; structure_type?: string }
+    | { periods?: SchedulePeriod[]; findings?: Array<{ message: string }>; error?: string;
+        structure_type?: string; schedule_kind?: string }
     | undefined;
-  const isTerm = (schedule?.structure_type ?? loan.structure_type) === 'TERM';
+  // Fixed-payment columns only for a loan that is not on the release calculator.
+  const isTerm = schedule?.schedule_kind
+    ? schedule.schedule_kind === 'payment'
+    : !usesReleaseCalculator(loan);
 
   // Sum the flows within each bucket; the balance is the LAST one in it, never
   // a sum of balances.

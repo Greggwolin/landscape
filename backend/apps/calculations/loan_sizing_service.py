@@ -303,7 +303,7 @@ class LoanSizingService:
         """
         structure_type = (getattr(loan, "structure_type", "") or "").upper()
 
-        if structure_type == "REVOLVER":
+        if LandDevCashFlowService.uses_release_calculator(loan):
             service = LandDevCashFlowService(project.project_id)
             project_config = service._get_project_config()
             dcf_assumptions = service._get_dcf_assumptions()

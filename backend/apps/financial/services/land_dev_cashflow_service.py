@@ -1441,8 +1441,12 @@ class LandDevCashFlowService:
         project-wide and sees every cost and every sale, which is what every
         loan saw before loans could be tied to containers.
         """
-        revolver_loans = self._fetch_loans(structure_type='REVOLVER', container_ids=container_ids)
-        term_loans = self._fetch_loans(structure_type='TERM', container_ids=container_ids)
+        # Revolvers and A&D loans, and any term loan with a release price, run
+        # through the release-and-reserve calculator (Gregg, 2026-09-29, 5a);
+        # a term loan without one keeps fixed payments.
+        all_loans = self._fetch_loans(structure_type=None, container_ids=container_ids)
+        revolver_loans = [l for l in all_loans if self.uses_release_calculator(l)]
+        term_loans = [l for l in all_loans if not self.uses_release_calculator(l)]
 
         if not revolver_loans and not term_loans:
             return None
@@ -1597,6 +1601,7 @@ class LandDevCashFlowService:
             loan_term_months=loan_term_months or len(periods),
             draw_trigger_type=loan.draw_trigger_type,
             payoff_period=self._last_collateral_sale(period_data, loan_start_period),
+            advance_mode='single' if (loan.structure_type or '').upper() == 'TERM' else 'costs',
         )
 
     def _build_term_params(
@@ -2016,9 +2021,23 @@ class LandDevCashFlowService:
 
         return required_periods
 
-    def _fetch_loans(self, structure_type: str, container_ids: Optional[List[int]]) -> List[Loan]:
-        """Fetch loans for project, optionally filtered by container assignments."""
-        loans = Loan.objects.filter(project_id=self.project_id, structure_type=structure_type)
+    CALCULATOR_STRUCTURES = ('REVOLVER', 'A_AND_D')
+
+    @classmethod
+    def uses_release_calculator(cls, loan: Loan) -> bool:
+        """Revolver and A&D always; a term loan only when it has a release price."""
+        structure = (getattr(loan, 'structure_type', '') or '').upper()
+        if structure in cls.CALCULATOR_STRUCTURES:
+            return True
+        return structure == 'TERM' and float(getattr(loan, 'release_price_pct', None) or 0) > 0
+
+    def _fetch_loans(self, structure_type: Optional[str], container_ids: Optional[List[int]]) -> List[Loan]:
+        """Fetch loans for project (one structure, or all when None), optionally
+        filtered by container assignments."""
+        loans = Loan.objects.filter(project_id=self.project_id)
+        if structure_type:
+            loans = loans.filter(structure_type=structure_type)
+        loans = loans.order_by('seniority', 'loan_id')
         if container_ids:
             loans = loans.filter(loan_containers__division_id__in=container_ids).distinct()
         return list(loans)

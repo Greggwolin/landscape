@@ -281,8 +281,8 @@ export interface Loan {
     | 'ACQUISITION_DEVELOPMENT'
     | 'LAND'
     | string;
-  facility_structure?: 'TERM' | 'REVOLVER' | string | null;
-  structure_type?: 'TERM' | 'REVOLVER' | string | null;
+  facility_structure?: 'TERM' | 'REVOLVER' | 'A_AND_D' | string | null;
+  structure_type?: 'TERM' | 'REVOLVER' | 'A_AND_D' | string | null;
   lender_name: string | null;
   seniority: number;
   status: 'active' | 'pending' | 'closed' | 'defeased';

@@ -268,3 +268,27 @@ def test_term_loan_balloons_at_last_collateral_sale():
     params = svc._build_term_params(loan, periods, pd)
     assert params.loan_start_period == 0          # the acquisition date, since none was typed
     assert params.loan_term_months == 31          # ends in the sale period, not month 120
+
+
+# Gregg, 2026-09-29 (5a + three structures): which loans use the calculator
+def test_release_calculator_routing():
+    from types import SimpleNamespace as N
+    u = LandDevCashFlowService.uses_release_calculator
+    assert u(N(structure_type='REVOLVER', release_price_pct=None))
+    assert u(N(structure_type='A_AND_D', release_price_pct=None))
+    assert u(N(structure_type='TERM', release_price_pct=115))
+    assert not u(N(structure_type='TERM', release_price_pct=None))
+
+
+def test_term_on_calculator_advances_once_a_and_d_follows_costs():
+    from apps.calculations.engines.debt_service_engine import (
+        DebtServiceEngine, PeriodCosts, RevolverLoanParams)
+    pd = [PeriodCosts(i, '', 1000.0 if 2 <= i < 8 else 0.0,
+                      {1: 5} if i == 12 else {}, {1: 100.0}) for i in range(16)]
+    base = dict(loan_to_cost_pct=0.6, interest_rate_annual=0.08, origination_fee_pct=0.0,
+                interest_reserve_inflator=1.0, repayment_acceleration=1.0, release_price_pct=1.1,
+                release_price_minimum=0.0, closing_costs=0.0, loan_start_period=0, loan_term_months=16)
+    single = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, advance_mode='single'), pd)
+    multi = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
+    assert [p.period_index for p in single.periods if p.cost_draw > 0] == [0]
+    assert len([p for p in multi.periods if p.cost_draw > 0]) > 1

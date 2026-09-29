@@ -59,11 +59,14 @@ class ConstructionLoanService:
         except Loan.DoesNotExist:
             return {'success': False, 'error': f'Loan {self.loan_id} not found for project {self.project_id}'}
 
-        structure_type = (loan.structure_type or '').upper()
-        if structure_type != 'REVOLVER':
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService as _Svc
+        if not _Svc.uses_release_calculator(loan):
             return {
                 'success': False,
-                'error': f'Construction loan calculation requires REVOLVER structure_type, got {structure_type}',
+                'error': (
+                    'This calculation is for revolver and A&D loans, or a term loan '
+                    'with a release price; this loan has fixed payments.'
+                ),
             }
 
         # container_ids passed explicitly: a one-off run narrowed to those

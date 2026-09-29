@@ -72,7 +72,7 @@ class DebtScheduleView(APIView):
 
         engine = DebtServiceEngine()
 
-        if loan.structure_type == 'REVOLVER':
+        if LandDevCashFlowService.uses_release_calculator(loan):
             params = service._build_revolver_params(loan, periods, period_data)
             try:
                 result = engine.calculate_revolver(params, period_data)
@@ -85,6 +85,7 @@ class DebtScheduleView(APIView):
                 'loan_id': loan.loan_id,
                 'loan_name': loan.loan_name,
                 'structure_type': loan.structure_type,
+                'schedule_kind': 'release',
                 'findings': findings,
                 'calculation_summary': {
                     'commitment_amount': result.commitment_amount,
@@ -121,13 +122,14 @@ class DebtScheduleView(APIView):
             }
             return Response(response, status=status.HTTP_200_OK)
 
-        if loan.structure_type == 'TERM':
+        if (loan.structure_type or '').upper() == 'TERM':
             params = service._build_term_params(loan, periods, period_data)
             result = engine.calculate_term(params, len(periods))
             response = {
                 'loan_id': loan.loan_id,
                 'loan_name': loan.loan_name,
                 'structure_type': loan.structure_type,
+                'schedule_kind': 'payment',
                 'findings': findings,
                 'calculation_summary': {
                     'loan_amount': result.loan_amount,

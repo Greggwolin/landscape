@@ -416,7 +416,8 @@ export default function LoanCard({
   }, [loan, defaultExpanded]);
 
   const facilityStructure = getFacilityStructure(formData);
-  const isRevolver = facilityStructure === 'REVOLVER';
+  // A&D advances like a revolver (several draws), so it shows the same fields.
+  const isRevolver = facilityStructure === 'REVOLVER' || facilityStructure === 'A_AND_D';
   const isFloating = (formData.interest_type || 'Fixed') === 'Floating';
   const existingLoan = loan && loan.loan_id ? loan : null;
   const calculateReserve = useCalculateInterestReserve(projectId, existingLoan?.loan_id ?? null);
@@ -736,6 +737,7 @@ export default function LoanCard({
                     <select value={facilityStructure} onChange={handleSelectChange('facility_structure')}>
                       <option value="TERM">TERM</option>
                       <option value="REVOLVER">REVOLVER</option>
+                      <option value="A_AND_D">A&amp;D</option>
                     </select>
                   </AssumptionRow>
                   <AssumptionRow label="Type" error={errors.loan_type} className="input-type">
