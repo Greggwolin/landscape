@@ -278,7 +278,6 @@ export interface Loan {
     | 'MEZZANINE'
     | 'LINE_OF_CREDIT'
     | 'PREFERRED_EQUITY'
-    | 'ACQUISITION_DEVELOPMENT'
     | 'LAND'
     | string;
   facility_structure?: 'TERM' | 'REVOLVER' | 'A_AND_D' | string | null;

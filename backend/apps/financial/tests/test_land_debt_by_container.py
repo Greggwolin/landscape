@@ -330,3 +330,28 @@ def test_a_and_d_default_is_unchanged_without_a_cap():
     a = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base), pd)
     b = DebtServiceEngine().calculate_revolver(RevolverLoanParams(**base, revolving=False), pd)
     assert [round(p.ending_balance, 6) for p in a.periods] == [round(p.ending_balance, 6) for p in b.periods]
+
+
+# Land loans have no additional advances; A&D loans do (Gregg, 2026-09-29)
+def test_land_loan_must_be_term():
+    import pytest
+    from rest_framework import serializers as drf
+    from apps.financial.serializers_debt import LoanCreateUpdateSerializer
+    s = LoanCreateUpdateSerializer()
+    with pytest.raises(drf.ValidationError):
+        s.validate({'loan_type': 'LAND', 'structure_type': 'A_AND_D'})
+    assert s.validate({'loan_type': 'LAND', 'structure_type': 'TERM'})['structure_type'] == 'TERM'
+    assert s.validate({'loan_type': 'CONSTRUCTION', 'structure_type': 'A_AND_D'})
+
+
+def test_land_loan_on_calculator_advances_once():
+    from datetime import date
+    svc = LandDevCashFlowService(1)
+    svc._acquisition_date_cache = None
+    loan = _fake_loan(loan_type='LAND', structure_type='TERM', release_price_pct=115,
+                      governing_constraint=None, commitment_amount=0)
+    periods = [{'endDate': date(2027, 1 + i, 28)} for i in range(6)]
+    assert svc._build_revolver_params(loan, periods).advance_mode == 'single'
+    ad = _fake_loan(loan_type='CONSTRUCTION', structure_type='A_AND_D',
+                    governing_constraint=None, commitment_amount=0)
+    assert svc._build_revolver_params(ad, periods).advance_mode == 'costs'

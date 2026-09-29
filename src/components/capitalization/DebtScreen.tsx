@@ -58,9 +58,9 @@ type LoanRecord = Record<string, unknown> & {
   containers?: LoanContainerRow[];
 };
 
-// The loan types the database accepts (A&D and Land added 2026-09-29).
+// Loan types. A&D is a structure (several advances), not a type; a Land loan
+// has one advance at closing, so it is always a Term loan (Gregg, 2026-09-29).
 const LOAN_TYPES: Array<{ value: string; label: string }> = [
-  { value: 'ACQUISITION_DEVELOPMENT', label: 'A&D' },
   { value: 'LAND', label: 'Land' },
   { value: 'CONSTRUCTION', label: 'Construction' },
   { value: 'BRIDGE', label: 'Bridge' },
@@ -244,8 +244,10 @@ export function DebtScreen({ project, onNavigate }: Props) {
   const containerName = (id: number) =>
     containerOptions.find((c) => c.id === id)?.label ?? `Container ${id}`;
 
-  const save = (loanId: number, data: Record<string, unknown>) => {
+  const save = (loanId: number, rawData: Record<string, unknown>) => {
     setMessage(null);
+    // A land loan takes one advance at closing, so choosing Land makes it Term.
+    const data = rawData.loan_type === 'LAND' ? { ...rawData, structure_type: 'TERM' } : rawData;
     updateLoan.mutate(
       { loanId, data: data as never },
       {
@@ -282,7 +284,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
     createLoan.mutate(
       {
         loan_name: `Loan ${loans.length + 1}`,
-        loan_type: 'ACQUISITION_DEVELOPMENT',
+        loan_type: 'CONSTRUCTION',
         structure_type: 'A_AND_D',
         seniority: loans.length + 1,
         status: 'pending',
@@ -783,6 +785,10 @@ function DetailPanel({
 
   const field = (f: FieldDef) => {
     const value = f.key in loan ? loan[f.key] : record[f.key];
+    // A land loan's structure is always Term — show it, but offer nothing else.
+    if (f.key === 'structure_type' && loan.loan_type === 'LAND') {
+      return <span title="A land loan has one advance at closing">Term (one advance)</span>;
+    }
     // The amount is typed only when no ratio sizes it; otherwise it is the
     // sized commitment — computed, so not offered for editing here.
     if (f.key === 'commitment_amount'

@@ -1601,7 +1601,14 @@ class LandDevCashFlowService:
             loan_term_months=loan_term_months or len(periods),
             draw_trigger_type=loan.draw_trigger_type,
             payoff_period=self._last_collateral_sale(period_data, loan_start_period),
-            advance_mode='single' if (loan.structure_type or '').upper() == 'TERM' else 'costs',
+            # One advance at closing for a term loan and for any land loan
+            # (land loans have no additional advances — Gregg, 2026-09-29).
+            advance_mode=(
+                'single'
+                if (loan.structure_type or '').upper() == 'TERM'
+                or (getattr(loan, 'loan_type', '') or '').upper() == 'LAND'
+                else 'costs'
+            ),
             revolving=(loan.structure_type or '').upper() == 'REVOLVER',
             commitment_cap=self._fixed_commitment(loan),
         )

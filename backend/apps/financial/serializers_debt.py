@@ -182,6 +182,24 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
             [LoanContainer(loan=loan, division_id=division_id) for division_id in container_ids]
         )
 
+    def validate(self, attrs):
+        # Gregg, 2026-09-29: a land loan has no additional advances — one
+        # advance at closing — so its structure is Term. A&D and revolvers are
+        # the loans that advance more than once.
+        attrs = super().validate(attrs)
+        instance = getattr(self, 'instance', None)
+        loan_type = attrs.get('loan_type', getattr(instance, 'loan_type', None))
+        structure = attrs.get('structure_type', getattr(instance, 'structure_type', None))
+        if (loan_type or '').upper() == 'LAND' and (structure or 'TERM').upper() != 'TERM':
+            raise serializers.ValidationError({
+                'structure_type': (
+                    'A land loan has one advance at closing and no additional '
+                    'advances, so its structure is Term. Use A&D or Revolver for a '
+                    'loan that advances more than once.'
+                )
+            })
+        return attrs
+
     def _sync_container_allocations(self, loan, allocations):
         LoanContainer.objects.filter(loan=loan).delete()
         rows = []
