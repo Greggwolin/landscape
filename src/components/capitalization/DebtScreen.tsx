@@ -365,12 +365,9 @@ export function DebtScreen({ project, onNavigate }: Props) {
       ) : loans.length === 0 ? (
         <div className={styles.empty}>
           <p>No loan on the record — the cash flow and the returns are unlevered until one exists.</p>
-          <div className="d-flex gap-2">
-            <button type="button" className="btn btn-sm btn-primary" onClick={addLoan}>+ Loan</button>
-            <button type="button" className="btn btn-sm btn-ghost-secondary" disabled title="Add a loan first">
-              Size from the budget
-            </button>
-          </div>
+          <p className={styles.muted}>
+            Add a loan, name the villages or phases it funds, give it a loan-to-cost, then size it from the budget.
+          </p>
         </div>
       ) : (
         <div className={styles.body}>
@@ -767,6 +764,12 @@ function DetailPanel({
 
   const field = (f: FieldDef) => {
     const value = f.key in loan ? loan[f.key] : record[f.key];
+    // The amount is typed only when no ratio sizes it; otherwise it is the
+    // sized commitment — computed, so not offered for editing here.
+    if (f.key === 'commitment_amount'
+      && (num(loan.loan_to_cost_pct) !== null || num(loan.loan_to_value_pct) !== null)) {
+      return <span title="Sized from the ratio above">{money(value)}</span>;
+    }
     if (f.kind === 'bool') {
       return (
         <input
@@ -790,7 +793,7 @@ function DetailPanel({
         display={display}
         kind={f.kind === 'select' ? 'select' : f.kind}
         options={f.options}
-        align={f.kind === 'number' ? 'right' : 'left'}
+        align="right"
         onCommit={(v) => onSave(loan.loan_id, { [f.key]: v })}
       />
     );
