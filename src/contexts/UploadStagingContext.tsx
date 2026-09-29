@@ -35,6 +35,18 @@ export interface StageFilesOptions {
   suggestedDocType?: string;
 }
 
+export interface RejectedDrop {
+  file: File;
+  errors: readonly { code: string; message: string }[];
+}
+
+function rejectionReason(errors: readonly { code: string; message: string }[]): string {
+  const codes = errors.map(e => e.code);
+  if (codes.includes('file-too-large')) return 'Too large to upload — the limit is 32 MB.';
+  if (codes.includes('file-invalid-type')) return 'This kind of file cannot be uploaded here.';
+  return errors[0]?.message || 'Not accepted.';
+}
+
 export interface PendingIntakeDoc {
   docId: number;
   docName: string;
@@ -45,6 +57,8 @@ interface UploadStagingContextValue {
   stagedFiles: StagedFile[];
   isTrayOpen: boolean;
   stageFiles: (files: File[], options?: StageFilesOptions) => void;
+  /** Files the drop zone refused (wrong type, too large) — shown as failed rows, never dropped silently. */
+  reportRejectedFiles: (rejections: RejectedDrop[]) => void;
   removeFile: (id: string) => void;
   clearAll: () => void;
   closeTray: () => void;
@@ -232,6 +246,17 @@ export function UploadStagingProvider({
     },
     [processQueue]
   );
+
+  const reportRejectedFiles = useCallback((rejections: RejectedDrop[]) => {
+    if (rejections.length === 0) return;
+    const rows = rejections.map(r => ({
+      ...createStagedFile(r.file),
+      status: 'error' as const,
+      errorMessage: rejectionReason(r.errors),
+    }));
+    dispatch({ type: 'ADD_FILES', files: rows });
+    setIsTrayOpen(true);
+  }, []);
 
   const removeFile = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_FILE', id });
@@ -545,6 +570,7 @@ export function UploadStagingProvider({
     stagedFiles,
     isTrayOpen,
     stageFiles,
+    reportRejectedFiles,
     removeFile,
     clearAll,
     closeTray,

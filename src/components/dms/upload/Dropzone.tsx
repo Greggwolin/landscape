@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { useUploadStaging } from '@/contexts/UploadStagingContext';
 
 interface DropzoneProps {
@@ -26,14 +26,16 @@ interface DropzoneProps {
 export default function Dropzone({
   docType = 'general',
 }: DropzoneProps) {
-  const { stageFiles, isTrayOpen } = useUploadStaging();
+  const { stageFiles, reportRejectedFiles, isTrayOpen } = useUploadStaging();
 
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
-      stageFiles(acceptedFiles, docType !== 'general' ? { suggestedDocType: docType } : undefined);
+    (acceptedFiles: File[], rejected: FileRejection[]) => {
+      if (acceptedFiles.length > 0) {
+        stageFiles(acceptedFiles, docType !== 'general' ? { suggestedDocType: docType } : undefined);
+      }
+      reportRejectedFiles(rejected);
     },
-    [stageFiles, docType]
+    [stageFiles, reportRejectedFiles, docType]
   );
 
   const {
@@ -45,7 +47,7 @@ export default function Dropzone({
   } = useDropzone({
     onDrop,
     maxSize: 32 * 1024 * 1024,
-    maxFiles: 10,
+    // No count limit — a cap makes the drop library reject the whole drop.
   });
 
   const borderColor = isDragAccept
