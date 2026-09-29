@@ -27,6 +27,7 @@ from django.db import connection
 from django.utils import timezone
 
 import numpy as np
+from apps.calculations.irr import investment_irr
 
 logger = logging.getLogger(__name__)
 
@@ -1094,7 +1095,7 @@ class WhatIfEngine:
         irr = None
         if len(annual_cash_flows) >= 2:
             try:
-                irr_result = npf.irr(annual_cash_flows)
+                irr_result = investment_irr(annual_cash_flows)
                 if not np.isnan(irr_result):
                     irr = float(irr_result)
             except Exception:
@@ -1360,7 +1361,7 @@ class WhatIfEngine:
             try:
                 # Simplified: lump sum cost at T0, lump sum revenue at T=hold_years
                 cf = [-total_costs] + [0] * (hold_years - 1) + [net_revenue]
-                irr_result = npf.irr(cf)
+                irr_result = investment_irr(cf)
                 if not np.isnan(irr_result):
                     irr = float(irr_result)
             except Exception:
@@ -1444,7 +1445,7 @@ class WhatIfEngine:
         if noi_series and pv > 0:
             try:
                 cf = [-pv] + noi_series[:-1] + [noi_series[-1] + net_reversion]
-                irr_result = npf.irr(cf)
+                irr_result = investment_irr(cf)
                 if not np.isnan(irr_result):
                     irr = float(irr_result)
             except Exception:

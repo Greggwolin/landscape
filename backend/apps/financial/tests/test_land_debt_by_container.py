@@ -355,3 +355,18 @@ def test_land_loan_on_calculator_advances_once():
     ad = _fake_loan(loan_type='CONSTRUCTION', structure_type='A_AND_D',
                     governing_constraint=None, commitment_amount=0)
     assert svc._build_revolver_params(ad, periods).advance_mode == 'costs'
+
+
+# A levered IRR cannot be negative when the deal returns 52% on 6% money:
+# numpy's nearest-to-zero root was meaningless for a multi-sign-change flow.
+def test_investment_irr_takes_the_real_root():
+    import numpy_financial as npf
+    from apps.calculations.irr import investment_irr
+    peoria_levered = [-56.0, -3.9, 12.1, 330.7, -11.4, -3.0, 10.1, -21.4]  # $M by year, 2026-09-29
+    r = investment_irr(peoria_levered)
+    assert 0.8 < r < 0.95
+    # one sign change: identical to numpy-financial
+    conventional = [-100.0, 10.0, 20.0, 150.0]
+    assert investment_irr(conventional) == float(npf.irr(conventional))
+    # a genuine loss stays negative
+    assert investment_irr([-100.0, 20.0, 30.0]) < 0

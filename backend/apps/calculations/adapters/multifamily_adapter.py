@@ -33,6 +33,7 @@ except ImportError:
     NPF_AVAILABLE = False
 
 from django.db import connection
+from apps.calculations.irr import investment_irr
 
 logger = logging.getLogger(__name__)
 
@@ -480,12 +481,12 @@ class MultifamilyCashFlowAdapter:
 
         # Use existing numpy_financial (already in services/financial_engine_py/)
         try:
-            unlevered_irr = npf.irr(cash_flows['unlevered'])
+            unlevered_irr = investment_irr(cash_flows['unlevered'])
         except Exception:
             unlevered_irr = None
 
         try:
-            levered_irr = npf.irr(cash_flows['levered'])
+            levered_irr = investment_irr(cash_flows['levered'])
         except Exception:
             levered_irr = None
 
