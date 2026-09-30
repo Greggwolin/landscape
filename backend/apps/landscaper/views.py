@@ -1434,6 +1434,7 @@ class ConfirmMutationView(APIView):
                 user_id = request.user.email or str(request.user.id)
 
             result = MutationService.confirm_mutation(mutation_id, user_id)
+            _refresh_artifacts_after_confirm([result], user_id)
 
             status_code = status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST
             return Response(result, status=status_code)
@@ -1569,6 +1570,7 @@ class ConfirmBatchView(APIView):
                 user_id = request.user.email or str(request.user.id)
 
             result = MutationService.confirm_batch(batch_id, user_id)
+            _refresh_artifacts_after_confirm(result.get('results'), user_id)
 
             status_code = status.HTTP_200_OK if result.get('success') else status.HTTP_400_BAD_REQUEST
             return Response(result, status=status_code)
@@ -3541,3 +3543,48 @@ class OverrideRevertView(APIView):
             return Response(result, status=status.HTTP_404_NOT_FOUND)
 
         return Response(result)
+
+
+# BM6 (2026-09-29): a confirmed proposal changes project data, but the
+# artifacts built from that data were only rebuilt when Landscaper re-ran the
+# tool that made them — so the Parcels artifact kept showing the old parcels
+# after an area / phase / parcel change was confirmed. Rebuild the project's
+# live artifacts that read the tables the confirm touched. Never fails the
+# confirm: the write has already landed.
+_CONFIRM_REFRESH_TOOLS_BY_TABLE = {
+    'tbl_area': ('open_parcels',),
+    'tbl_phase': ('open_parcels',),
+    'tbl_parcel': ('open_parcels',),
+}
+
+
+def _refresh_artifacts_after_confirm(results, user_id):
+    import logging as _logging
+    log = _logging.getLogger(__name__)
+    wanted = {}
+    for r in results or []:
+        if not r or not r.get('success'):
+            continue
+        pid = r.get('project_id')
+        tools = _CONFIRM_REFRESH_TOOLS_BY_TABLE.get(r.get('table_name') or '')
+        if pid and tools:
+            wanted.setdefault(int(pid), set()).update(tools)
+    if not wanted:
+        return
+    try:
+        from apps.artifacts.models import Artifact
+        from apps.artifacts.views import _refresh_artifact_after_write
+    except Exception:
+        log.exception('artifact refresh after confirm: import failed')
+        return
+    for pid, tools in wanted.items():
+        for artifact in Artifact.objects.filter(
+            project_id=pid, tool_name__in=list(tools), is_archived=False
+        ):
+            try:
+                out = _refresh_artifact_after_write(artifact=artifact, user_id=user_id)
+                if not out.get('success'):
+                    log.warning('artifact %s refresh after confirm: %s',
+                                artifact.artifact_id, out.get('error'))
+            except Exception:
+                log.exception('artifact %s refresh after confirm failed', artifact.artifact_id)

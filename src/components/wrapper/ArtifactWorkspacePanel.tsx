@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { onMutationComplete } from '@/lib/events/landscaper-events';
 import { ChevronDown, ChevronRight, Pin, Clock, Database, Pencil, Trash2, LayoutList } from 'lucide-react';
 import { useWrapperUI, type LocationBriefArtifactConfig, type MapArtifactConfig } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
@@ -164,6 +166,17 @@ export function ArtifactWorkspacePanel({
   // Active artifact — full detail.
   const activeQuery = useArtifact(activeArtifactId);
   const active = activeQuery.data ?? null;
+
+  /* BM6: when a Landscaper change is confirmed, the server rebuilds the
+   * artifacts that read that data. Refetch so the open artifact shows it —
+   * the Property > Parcels screen already listened for this; the panel did not. */
+  const artifactQueryClient = useQueryClient();
+  useEffect(
+    () => onMutationComplete(() => {
+      artifactQueryClient.invalidateQueries({ queryKey: ['artifacts'] });
+    }),
+    [artifactQueryClient],
+  );
 
   /* Follow a superseded artifact to the one that replaced it.
    *

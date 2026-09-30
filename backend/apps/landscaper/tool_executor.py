@@ -10571,6 +10571,29 @@ def handle_update_parcel(
     if not parcel_id and (not phase_id or not parcel_name):
         return {'success': False, 'error': 'phase_id and parcel_name required for new parcels'}
 
+    # BM6: check the phase BEFORE proposing. On 2026-09-29 Landscaper proposed
+    # eight parcels under phase ids that did not exist (59, 60); every one was
+    # confirmed and every one failed, after the old parcels had already been
+    # deleted. Refuse at proposal time and name the real phases, so the model
+    # corrects itself instead of the user confirming a write that cannot land.
+    if phase_id:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT phase_id, phase_name FROM landscape.tbl_phase
+                WHERE project_id = %s ORDER BY phase_id
+            """, [project_id])
+            phases = cursor.fetchall()
+        if int(phase_id) not in {row[0] for row in phases}:
+            return {
+                'success': False,
+                'error': f'Phase {phase_id} does not exist in this project.',
+                'valid_phases': [{'phase_id': r[0], 'phase_name': r[1]} for r in phases],
+                'instruction': (
+                    'Use one of valid_phases. If the phase the user wants is not '
+                    'listed, create it with update_phase first. Do not guess ids.'
+                ),
+            }
+
     if propose_only:
         from .services.mutation_service import MutationService
         return MutationService.create_proposal(
