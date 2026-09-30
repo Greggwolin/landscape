@@ -34,6 +34,14 @@ export default function WrapperProjectLayout({
       .then((data) => {
         if (data) {
           setProject({
+            // Carry the whole record, then pin the fields below. The panel's
+            // Screens view hands this object to the same screens the classic
+            // surface renders, and those screens read fields this list never
+            // named — the Property > Location screen reads the project's city
+            // and, without it, reported "city/state not configured" on every
+            // project (FB, 2026-09-30). A whitelist here silently starves
+            // every screen of whatever it forgot.
+            ...data,
             project_id: data.project_id ?? projectId,
             project_name: data.project_name ?? '',
             project_type_code: data.project_type_code ?? undefined,
@@ -52,6 +60,10 @@ export default function WrapperProjectLayout({
             county: data.county ?? undefined,
             state: data.state ?? undefined,
             apn_primary: data.apn_primary ?? undefined,
+            city: data.city ?? undefined,
+            jurisdiction_city: data.jurisdiction_city ?? undefined,
+            jurisdiction_county: data.jurisdiction_county ?? undefined,
+            jurisdiction_state: data.jurisdiction_state ?? undefined,
           });
         }
       })

@@ -18692,15 +18692,21 @@ def handle_log_alpha_feedback(
     **kwargs
 ) -> Dict[str, Any]:
     """
-    Log feedback from Alpha Assistant chat to the tbl_alpha_feedback table.
+    Log feedback raised in chat to the feedback tracker (landscape.tbl_feedback).
 
-    This allows users to submit bug reports, suggestions, and questions
-    directly from the chat interface.
+    This used to write to tbl_alpha_feedback, a table nothing reads: the
+    tracker, the daily brief and the admin feedback page all read tbl_feedback.
+    Feedback logged through this tool was therefore reported to the user as
+    "Logged as feedback #8" and then seen by no one (found 2026-09-30 — four
+    items had gone there since May). It now goes through capture_feedback, the
+    same path as #FB messages, and reports the tracker's own FB number.
     """
+    from .feedback_utils import capture_feedback
+
     feedback_type = tool_input.get('feedback_type', 'bug')
-    summary = tool_input.get('summary', '')
-    user_quote = tool_input.get('user_quote', '')
-    page_context = tool_input.get('page_context', 'alpha_assistant_chat')
+    summary = (tool_input.get('summary') or '').strip()
+    user_quote = (tool_input.get('user_quote') or '').strip()
+    page_context = tool_input.get('page_context') or 'landscaper_chat'
 
     if not summary:
         return {
@@ -18708,42 +18714,52 @@ def handle_log_alpha_feedback(
             'error': 'Summary is required for feedback'
         }
 
-    # Build notes with additional context
-    notes_parts = []
+    parts = [summary]
     if feedback_type:
-        notes_parts.append(f"Type: {feedback_type}")
+        parts.append(f"Type: {feedback_type}")
     if user_quote:
-        notes_parts.append(f"User said: {user_quote}")
-    notes = "\n".join(notes_parts) if notes_parts else None
+        parts.append(f"User said: {user_quote}")
+    parts.append("(Logged by Landscaper from chat.)")
+    message_text = "\n\n".join(parts)
 
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO landscape.tbl_alpha_feedback
-                (page_context, project_id, user_id, feedback, status, submitted_at, notes)
-                VALUES (%s, %s, %s, %s, 'new', NOW(), %s)
-                RETURNING id
-            """, [page_context, project_id, user_id, summary, notes])
-            feedback_id = cursor.fetchone()[0]
+    project_name = None
+    if project_id:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                    [project_id],
+                )
+                row = cursor.fetchone()
+                project_name = row[0] if row else None
+        except Exception as e:  # name is decoration; never block the log on it
+            logger.warning(f"[ALPHA_FEEDBACK] project name lookup failed: {e}")
 
-        logger.info(
-            f"[ALPHA_FEEDBACK] Logged feedback #{feedback_id}: "
-            f"type={feedback_type}, project={project_id}, user={user_id}"
-        )
+    feedback_id = capture_feedback(
+        user_message=message_text,
+        user_id=user_id,
+        project_id=project_id or None,
+        project_name=project_name,
+        page_context=page_context,
+    )
 
-        return {
-            'success': True,
-            'feedback_id': feedback_id,
-            'message': f"Logged as feedback #{feedback_id}. The team will review this.",
-            'action': 'created'
-        }
-
-    except Exception as e:
-        logger.error(f"[ALPHA_FEEDBACK] Failed to log feedback: {e}")
+    if feedback_id is None:
         return {
             'success': False,
-            'error': f"Failed to log feedback: {str(e)}"
+            'error': 'Failed to log feedback to the tracker. Tell the user it was NOT logged.',
         }
+
+    logger.info(
+        f"[ALPHA_FEEDBACK] Logged FB-{feedback_id}: "
+        f"type={feedback_type}, project={project_id}, user={user_id}"
+    )
+
+    return {
+        'success': True,
+        'feedback_id': feedback_id,
+        'message': f"Logged as FB-{feedback_id}. Quote this number to the user exactly.",
+        'action': 'created'
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
