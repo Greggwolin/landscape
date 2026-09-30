@@ -245,22 +245,29 @@ export function ParcelsArtifact({
     (column: ParcelsColumn, row: ParcelsRow): Array<{ value: string; label: string }> | null => {
       const all = column.options;
       if (!all?.length) return null;
+
+      // One product can sit under several types, so the same code appears
+      // more than once in the full list. Show each code once, on EVERY path —
+      // a duplicate is two identical choices and a React key collision
+      // (BM5: Red Valley rows have no type yet, so they took the unfiltered
+      // path, which skipped this).
+      const unique = (list: typeof all) => {
+        const seen = new Set<string>();
+        return list
+          .filter((o) => (seen.has(String(o.value)) ? false : (seen.add(String(o.value)), true)))
+          .map((o) => ({ value: String(o.value), label: o.label }));
+      };
+
       const parentKey = column.key === 'type' ? 'family'
         : column.key === 'product' ? 'type' : null;
-      if (!parentKey) return all.map((o) => ({ value: String(o.value), label: o.label }));
+      if (!parentKey) return unique(all);
 
       const parentValue = row.cells[parentKey];
       if (parentValue === null || parentValue === undefined || parentValue === '') {
-        return all.map((o) => ({ value: String(o.value), label: o.label }));
+        return unique(all);
       }
       const narrowed = all.filter((o) => String(o.parent ?? '') === String(parentValue));
-      const usable = narrowed.length ? narrowed : all;
-      // One product can sit under several types, so the same code can appear
-      // twice once the parent filter is off. Show it once.
-      const seen = new Set<string>();
-      return usable
-        .filter((o) => (seen.has(String(o.value)) ? false : seen.add(String(o.value))))
-        .map((o) => ({ value: String(o.value), label: o.label }));
+      return unique(narrowed.length ? narrowed : all);
     },
     [],
   );
