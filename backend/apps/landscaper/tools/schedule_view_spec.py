@@ -518,8 +518,8 @@ def build_budget_view_config(
         {'key': 'category', 'label': 'Category', 'align': 'left',
          'kind': 'picklist', 'options': picklists.get('category') or []},
         # Stage options are VALID_ACTIVITIES -- the writer's allowlist -- plus
-        # any value the visible rows actually hold. 153 of 366 live lines carry
-        # 'Development', which the writer would reject; appending it as a
+        # any value the visible rows actually hold. Until 2026-09-30 some live
+        # lines carried 'Development', which the writer rejects; appending it as a
         # legacy choice means opening such a line shows its real stage instead
         # of a blank dropdown that silently rewrites it on the next save.
         {'key': 'stage', 'label': 'Stage', 'align': 'left',
@@ -825,8 +825,8 @@ def _stage_options(picklists: Dict[str, Any],
     Three lists disagree about this vocabulary today (measured 2026-08-19):
     the backend's VALID_ACTIVITIES has six values including 'Planning &
     Engineering'; the frontend's LIFECYCLE_STAGES has five and omits it; and
-    the live data uses only 'Development' (153 rows, absent from
-    VALID_ACTIVITIES) and 'Planning & Engineering' (153 rows). Offering the
+    the live data then used 'Development' (absent from VALID_ACTIVITIES;
+    moved to 'Improvements' on 2026-09-30) and 'Planning & Engineering'. Offering the
     allowlist alone would show 153 lines a dropdown that cannot represent their
     own stored value.
 
