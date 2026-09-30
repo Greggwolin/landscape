@@ -116,7 +116,7 @@ export function StandardArtifactFrame({
           aria-label={isPinned ? 'Unpin' : 'Pin'}
           aria-pressed={isPinned}
         >
-          <Pin size={13} />
+          <Pin size={13} fill={isPinned ? 'currentColor' : 'none'} />
         </button>
         <button type="button" style={btnStyle} onClick={handleCopy} title="Copy" aria-label="Copy">
           {copied ? <Check size={13} /> : <Copy size={13} />}
