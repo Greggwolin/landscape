@@ -96,7 +96,7 @@ def build_pricing_register_view_config(
     flat = [r for r in rows if not r['cells'].get('growth_rate')]
     inherited = [r for r in rows if r.get('growth_inherited')]
 
-    title = f'{project_name} — Pricing' if project_name else 'Pricing'
+    title = f'Pricing - {project_name}' if project_name else 'Pricing'
     return {
         'topic': 'pricing',
         'kicker': 'Pricing register',

@@ -521,7 +521,9 @@ def build_parcels_view_config(
     return {
         'topic': 'parcels',
         'kicker': f'{project_name} · Planning' if project_name else 'Planning',
-        'title': _plural(labels[3]),
+        # Gregg, 2026-09-30: one plain title, "<Topic> - <Project>".
+        'title': (f'{_plural(labels[3])} - {project_name}' if project_name
+                  else _plural(labels[3])),
         'source_label': 'the project’s parcels',
         # No dollars basis exists on a parcel table, so the budget's basis badge
         # is absent rather than present and inert.

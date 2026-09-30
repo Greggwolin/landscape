@@ -187,7 +187,8 @@ class ColumnsAndRungs(SimpleTestCase):
         self.assertEqual(by_key['level1'], 'District')
         self.assertEqual(by_key['level2'], 'Block')
         self.assertEqual(by_key['parcel'], 'Pad')
-        self.assertEqual(cfg['title'], 'Pads')
+        # Gregg, 2026-09-30: the title reads "<Topic> - <Project>".
+        self.assertEqual(cfg['title'], 'Pads - Somewhere Else')
         group_labels = [g['label'] for g in cfg['group_options']]
         self.assertIn('district', group_labels)
         self.assertIn('block', group_labels)

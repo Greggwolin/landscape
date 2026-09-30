@@ -99,8 +99,10 @@ function sumOrNull(rows: SalesRow[], key: string): number | null {
 export function SalesArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [rung, setRung] = useState<string>(config.default_rung || 'standard');
-  const [grouping, setGrouping] = useState<string>(config.default_grouping || 'none');
+  // Gregg, 2026-09-30 (BM16): every table opens on its most detailed view with
+  // no grouping, whatever the stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.rung_columns?.detail ? 'detail' : (config.default_rung || 'standard')));
+  const [grouping, setGrouping] = useState<string>('none');
   const [areas, setAreas] = useState<string[]>([]);
   const [phases, setPhases] = useState<string[]>([]);
   const [expanded, setExpanded] = useState(false);
@@ -264,7 +266,6 @@ export function SalesArtifact({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div className={styles.head}>
         <div style={{ minWidth: 0 }}>
-          <div className={styles.kicker}>{config.kicker}</div>
           <div className={styles.titleRow}>
             <span className={styles.title}>{config.title}</span>
             <span className={styles.titleBadges}>

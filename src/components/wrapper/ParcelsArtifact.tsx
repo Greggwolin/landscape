@@ -156,8 +156,10 @@ function cellText(key: string, value: string | number | null): string {
 export function ParcelsArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [rung, setRung] = useState<string>(config.default_rung || 'summary');
-  const [grouping, setGrouping] = useState<string>(config.default_grouping || 'use');
+  // BM15 (Gregg, 2026-09-30): the table always opens on Detail = All and
+  // Group = None, whatever an older stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.default_rung || 'summary'));
+  const [grouping, setGrouping] = useState<string>('none');
   const [level1, setLevel1] = useState<number[]>([]);
   const [level2, setLevel2] = useState<number[]>([]);
   const [families, setFamilies] = useState<string[]>([]);
@@ -168,6 +170,13 @@ export function ParcelsArtifact({
    * the same commit path the budget uses, so there is one write path and one
    * impact banner rather than a parcels-specific copy of either. */
   const edits = useStagedEdits(onCommitFieldEdits, artifactId);
+  // BM14: leaving with unsaved picks asks first instead of throwing them away.
+  React.useEffect(() => {
+    if (!edits.stagedCount) return undefined;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [edits.stagedCount]);
 
   const levelOne = config.levels.find((l) => l.level === 1);
   const levelTwo = config.levels.find((l) => l.level === 2);
@@ -446,7 +455,6 @@ export function ParcelsArtifact({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div className={styles.head}>
         <div style={{ minWidth: 0 }}>
-          <div className={styles.kicker}>{config.kicker}</div>
           <div className={styles.titleRow}>
             <span className={styles.title}>{config.title}</span>
             <span className={styles.titleBadges}>
@@ -549,6 +557,33 @@ export function ParcelsArtifact({
           </button>
         ))}
       </div>
+
+      {/* BM14 (Gregg, 2026-09-30): the bar sat below a long table and was never
+        * seen, so picks were lost. It now sits above the table, in warning colour. */}
+      {/* Nothing posts on a keystroke. The whole set lands through ONE batch
+        * request, which is what lets the server report a single impact line for
+        * the set — and what lets a change be thought better of before it is
+        * real. Same hook, same commit path as the budget. */}
+      {edits.stagedCount > 0 && (
+        <div className={styles.commitBar} role="region" aria-label="Staged changes"
+             style={{ borderColor: 'var(--cui-warning)', background: 'var(--cui-warning-bg-subtle)', fontWeight: 600 }}>
+          <span className={styles.commitCount}>
+            {edits.stagedCount} change{edits.stagedCount === 1 ? '' : 's'} not saved — press Commit to save
+          </span>
+          <span className={styles.commitActions}>
+            <button type="button" className={styles.commitButton}
+                    disabled={edits.committing}
+                    onClick={() => { void edits.commitStaged(); }}>
+              {edits.committing ? 'Saving…' : 'Commit'}
+            </button>
+            <button type="button" className={styles.discardButton}
+                    disabled={edits.committing}
+                    onClick={edits.discardStaged}>
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {rows.length === 0 ? (
@@ -705,30 +740,6 @@ export function ParcelsArtifact({
           </table>
         )}
       </div>
-
-      {/* Nothing posts on a keystroke. The whole set lands through ONE batch
-        * request, which is what lets the server report a single impact line for
-        * the set — and what lets a change be thought better of before it is
-        * real. Same hook, same commit path as the budget. */}
-      {edits.stagedCount > 0 && (
-        <div className={styles.commitBar} role="region" aria-label="Staged changes">
-          <span className={styles.commitCount}>
-            {edits.stagedCount} change{edits.stagedCount === 1 ? '' : 's'} staged
-          </span>
-          <span className={styles.commitActions}>
-            <button type="button" className={styles.commitButton}
-                    disabled={edits.committing}
-                    onClick={() => { void edits.commitStaged(); }}>
-              {edits.committing ? 'Saving…' : 'Commit'}
-            </button>
-            <button type="button" className={styles.discardButton}
-                    disabled={edits.committing}
-                    onClick={edits.discardStaged}>
-              Discard
-            </button>
-          </span>
-        </div>
-      )}
 
       {hiddenRowCount > 0 && !isGrouped && (
         <button type="button" className={styles.hint} onClick={() => setExpanded(true)}

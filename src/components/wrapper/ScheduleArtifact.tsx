@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Printer, X } from 'lucide-react';
 import type { BlockDocument } from '@/types/artifact';
 import { printArtifact } from './printArtifact';
 import styles from './ScheduleArtifact.module.css';
@@ -207,8 +206,10 @@ export function ScheduleArtifact({
   // A level holds a SET of chosen members, not one. Selecting two villages
   // means both, and the arithmetic below sums across them.
   const [scope, setScope] = useState<Record<number, number[]>>({});
-  const [rung, setRung] = useState<string>(config.default_rung);
-  const [grouping, setGrouping] = useState<string>(config.default_grouping);
+  // Gregg, 2026-09-30 (BM16): every table opens on its most detailed view with
+  // no grouping, whatever the stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.rung_columns?.detail ? 'detail' : (config.default_rung || 'summary')));
+  const [grouping, setGrouping] = useState<string>('none');
   const [extraColumns, setExtraColumns] = useState<string[]>([]);
   /* Columns the user has switched OFF.
    *
@@ -888,25 +889,6 @@ export function ScheduleArtifact({
 
       {/* ── Header ── */}
       <div className={styles.head}>
-        <div className={styles.kicker}>
-          <span>{config.kicker}</span>
-          <span className={styles.headActions}>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={printThis}
-              title="Print (or save as PDF)"
-              aria-label="Print"
-            >
-              <Printer size={14} />
-            </button>
-            {onClose && (
-              <button type="button" className={styles.iconBtn} onClick={onClose} title="Close">
-                <X size={14} />
-              </button>
-            )}
-          </span>
-        </div>
         <div className={styles.titleRow}>
           <div className={styles.title}>{title}</div>
           <div className={styles.titleBadges}>
