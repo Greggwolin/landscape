@@ -241,6 +241,60 @@ export function ParcelsArtifact({
    * dropdown is indistinguishable from a broken one. In that case the full
    * list is offered instead: a convenience that removes every choice is worse
    * than no convenience. */
+  /* BM8 — reverse validation. The family > type > product lists cascade
+   * downward; picking a lower level fills the levels above it. Product fills
+   * type when the product belongs to exactly one type (or keeps the row's type
+   * when that type is one of its parents), and family from that type. Type
+   * fills family. Nothing is overwritten with a guess: an ambiguous type is
+   * left for the user. Each filled cell is staged like a typed edit, so it is
+   * visible before Commit and reverts with the rest. */
+  const stageLandUseCascade = React.useCallback(
+    (row: ParcelsRow, key: string, value: string) => {
+      if (!value || (key !== 'product' && key !== 'type')) return;
+      const typeCol = config.columns.find((c) => c.key === 'type');
+      const productCol = config.columns.find((c) => c.key === 'product');
+      const currentOf = (k: string) => {
+        const t = onCommitFieldEdits ? budgetCellTarget(schema, row.id, k) : null;
+        const sk = t ? stagedKey(t.cellPath) : null;
+        const st = sk ? edits.staged[sk] : undefined;
+        return st ? String(st.value) : (row.cells[k] == null ? '' : String(row.cells[k]));
+      };
+      const stage = (k: string, v: string) => {
+        if (!v || currentOf(k) === v) return;
+        const t = onCommitFieldEdits ? budgetCellTarget(schema, row.id, k) : null;
+        if (!t) return;
+        edits.stageEdit(t.cellPath, v, row.cells[k] ?? null, t.expectedRef);
+      };
+      let typeCode = key === 'type' ? value : currentOf('type');
+      if (key === 'product') {
+        const parents = Array.from(new Set((productCol?.options ?? [])
+          .filter((o) => String(o.value) === value)
+          .map((o) => String(o.parent ?? ''))
+          .filter(Boolean)));
+        if (!parents.includes(typeCode)) {
+          if (parents.length === 1) {
+            typeCode = parents[0];
+            stage('type', typeCode);
+          } else {
+            typeCode = '';
+          }
+        }
+      }
+      if (typeCode) {
+        const fam = (typeCol?.options ?? []).find((o) => String(o.value) === typeCode)?.parent;
+        if (fam) stage('family', String(fam));
+      } else if (key === 'product') {
+        // Type still open: fill family only when every parent type agrees on it.
+        const parents = (productCol?.options ?? [])
+          .filter((o) => String(o.value) === value).map((o) => String(o.parent ?? ''));
+        const fams = Array.from(new Set(parents.map((tc) =>
+          (typeCol?.options ?? []).find((o) => String(o.value) === tc)?.parent).filter(Boolean)));
+        if (fams.length === 1) stage('family', String(fams[0]));
+      }
+    },
+    [config.columns, edits, onCommitFieldEdits, schema],
+  );
+
   const optionsFor = React.useCallback(
     (column: ParcelsColumn, row: ParcelsRow): Array<{ value: string; label: string }> | null => {
       const all = column.options;
@@ -534,6 +588,7 @@ export function ParcelsArtifact({
                                     onChange={(e) => {
                                       edits.stageEdit(target.cellPath, e.target.value,
                                                       committed, target.expectedRef);
+                                      stageLandUseCascade(row, c.key, e.target.value);
                                       setEditing(null);
                                     }}
                                     onBlur={() => setEditing(null)}

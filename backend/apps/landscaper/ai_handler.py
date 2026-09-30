@@ -1864,6 +1864,8 @@ When a tool directly executes and returns action='deleted' or action='updated':
 - These are final — the change is already applied
 
 NEVER say "Done" or "Deleted" when the actual result says proposed/pending/confirm_required.
+Creates and edits the user asks for now write immediately (the result says created/updated) — report them as done, plainly. Deletions still come back as proposals for the user to confirm.
+Never delete records in order to re-create them. Change the existing records in place; delete only what the user asked to remove.
 
 8. MUTATION EXECUTION REQUIREMENTS (CRITICAL):
 TOOL USE FORMAT (CRITICAL — DO NOT VIOLATE):

@@ -10633,6 +10633,17 @@ def handle_update_parcel(
             have_family=bool(tool_input.get('family_name')),
             have_type=bool(tool_input.get('type_code')),
         ))
+    if tool_input.get('type_code') and not tool_input.get('family_name'):
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT f.name FROM landscape.lu_type t
+                JOIN landscape.lu_family f ON f.family_id = t.family_id
+                WHERE t.code = %s AND t.active
+            """, [tool_input['type_code']])
+            fams = {r[0] for r in cursor.fetchall()}
+        if len(fams) == 1:
+            tool_input = dict(tool_input)
+            tool_input['family_name'] = fams.pop()
 
     if propose_only:
         from .services.mutation_service import MutationService
@@ -16337,6 +16348,27 @@ AUTO_EXECUTE_TOOLS = {
 }
 
 
+
+_PLANNING_WRITE_TOOLS = frozenset({
+    'update_area', 'update_phase', 'update_parcel', 'bulk_create_parcels',
+    'create_land_dev_containers', 'configure_project_hierarchy', 'update_lot',
+    'create_lot', 'land_planning_save',
+})
+
+
+def _is_delete_call(tool_name: str, tool_input: Any) -> bool:
+    """True when a mutation removes data — those still need the user's confirm."""
+    if tool_name.startswith(('delete_', 'remove_')):
+        return True
+    if isinstance(tool_input, dict):
+        for k, v in tool_input.items():
+            kl = str(k).lower()
+            if ('delete' in kl or 'remove' in kl) and v:
+                return True
+            if kl in ('action', 'operation', 'mode') and str(v).lower() in ('delete', 'remove', 'unassign'):
+                return True
+    return False
+
 def execute_tool(
     tool_name: str,
     tool_input: Dict[str, Any],
@@ -16459,6 +16491,16 @@ def execute_tool(
         propose_only = False
         logger.info(f"Auto-executing {tool_name} (in AUTO_EXECUTE_TOOLS list)")
 
+    # BM8 (Gregg, 2026-09-30, option 2c/2a): when the user directs a change,
+    # Landscaper makes it. Creates and edits write immediately; DELETIONS still
+    # come back as proposals for one plain-English "Confirm all" — the night of
+    # 2026-09-29 eleven parcels were deleted through a stack of confirm cards.
+    direct_write = False
+    if propose_only and getattr(handler, '_is_mutation', False) and not _is_delete_call(tool_name, tool_input):
+        propose_only = False
+        direct_write = True
+        logger.info(f"Direct write for {tool_name} (non-delete mutation)")
+
     # JB55: thread the turn's already-run tools ONLY into the freeform
     # create_artifact handler (it accepts **kwargs), so the create-time
     # fabrication guard can verify a numbers tool sourced the card. Other
@@ -16471,7 +16513,7 @@ def execute_tool(
         from .services.mutation_service import replay_context
         with replay_context(tool_name, tool_input):
             # All handlers receive the same kwargs for consistency
-            return handler(
+            result = handler(
                 tool_input=tool_input,
                 project_id=project_id,
                 propose_only=propose_only,
@@ -16480,6 +16522,17 @@ def execute_tool(
                 user_id=user_id,
                 **extra,
             )
+        if direct_write and isinstance(result, dict) and result.get('success') \
+                and tool_name in _PLANNING_WRITE_TOOLS:
+            # Rebuild the Parcels artifact the same way a confirm does.
+            try:
+                from .views import _refresh_artifacts_after_confirm
+                _refresh_artifacts_after_confirm(
+                    [{'success': True, 'project_id': project_id, 'table_name': 'tbl_parcel'}],
+                    str(user_id) if user_id else None)
+            except Exception:
+                logger.exception('artifact refresh after direct write failed')
+        return result
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
         return {

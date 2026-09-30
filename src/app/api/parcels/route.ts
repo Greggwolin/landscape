@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
         ph.phase_no AS phase_no,
         CASE
           WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
+               AND COALESCE((SELECT c.level1_enabled FROM landscape.tbl_project_config c
+                             WHERE c.project_id = p.project_id), true)
           THEN CONCAT(a.area_no::text, '.', ph.phase_no::text)
           WHEN ph.phase_no IS NOT NULL
           THEN ph.phase_no::text
@@ -185,6 +187,8 @@ export async function POST(request: NextRequest) {
         ph.phase_no AS phase_no,
         CASE
           WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
+               AND COALESCE((SELECT c.level1_enabled FROM landscape.tbl_project_config c
+                             WHERE c.project_id = p.project_id), true)
           THEN CONCAT(a.area_no::text, '.', ph.phase_no::text)
           WHEN ph.phase_no IS NOT NULL
           THEN ph.phase_no::text
