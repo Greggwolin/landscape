@@ -1338,6 +1338,44 @@
   user-select: none;
 }
 
+/* Sub-page links beside the Screen dropdown in the panel's Screens view
+   (PanelScreenView). Echoes the prp-toggle row above it at a smaller size. */
+.panel-screen-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  min-width: 0;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.panel-screen-subtab {
+  background: none;
+  border: none;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: inherit;
+  white-space: nowrap;
+}
+
+.panel-screen-subtab:hover {
+  color: var(--cui-body-color);
+}
+
+.panel-screen-subtab.is-active {
+  color: var(--cui-emphasis-color, var(--cui-body-color));
+  font-weight: 600;
+  cursor: default;
+}
+
+.panel-screen-subtab-sep {
+  color: var(--cui-border-color);
+  user-select: none;
+}
+
 /* Body container for documents view inside the right panel — fills the
    remaining height beneath the WrapperHeader and provides scroll. */
 .project-right-panel-body {
