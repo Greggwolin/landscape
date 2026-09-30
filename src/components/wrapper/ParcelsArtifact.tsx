@@ -433,6 +433,11 @@ export function ParcelsArtifact({
 
   const totalAcres = rows.reduce((s, r) => s + (Number(r.cells.acres) || 0), 0);
   const totalUnits = rows.reduce((s, r) => s + (Number(r.cells.units) || 0), 0);
+  // BM10: frontage totals like acres and units. Null (dash) when no row on
+  // screen carries a frontage, so an absent figure never reads as zero.
+  const feetRows = rows.filter((r) => r.cells.front_feet !== null && r.cells.front_feet !== undefined);
+  const totalFrontFeet = feetRows.length
+    ? feetRows.reduce((s, r) => s + (Number(r.cells.front_feet) || 0), 0) : null;
 
   const align = (c: ParcelsColumn) =>
     c.align === 'right' ? styles.right : c.align === 'center' ? styles.center : undefined;
@@ -676,6 +681,7 @@ export function ParcelsArtifact({
                             if (i === 0) return <td key={c.key}>{g.label} total</td>;
                             if (c.key === 'acres') return <td key={c.key} className={styles.right}>{fmt(g.acres)}</td>;
                             if (c.key === 'units') return <td key={c.key} className={styles.right}>{fmt(g.units)}</td>;
+                            if (c.key === 'front_feet') return <td key={c.key} className={styles.right}>{fmt(g.frontFeet)}</td>;
                             return <td key={c.key} />;
                           })}
                         </tr>
@@ -690,6 +696,7 @@ export function ParcelsArtifact({
                   if (c.key === 'parcels') return <td key={c.key} className={styles.right}>{fmt(rows.length)}</td>;
                   if (c.key === 'acres') return <td key={c.key} className={styles.right}>{fmt(totalAcres)}</td>;
                   if (c.key === 'units') return <td key={c.key} className={styles.right}>{fmt(totalUnits)}</td>;
+                  if (c.key === 'front_feet') return <td key={c.key} className={styles.right}>{fmt(totalFrontFeet)}</td>;
                   if (c.key === 'pct_acres') return <td key={c.key} className={styles.right}>100.0%</td>;
                   return <td key={c.key} />;
                 })}
