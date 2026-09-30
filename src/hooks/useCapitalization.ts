@@ -223,6 +223,36 @@ export interface AcquisitionPriceSummary {
   price_source: 'calculated' | 'asking' | null;
 }
 
+/** What the loan form multiplies LTV and LTC against, and the start date a loan
+ *  with none takes — from the same server functions the save uses (HQ132). */
+export interface LoanSizingBasis {
+  value_basis: number;
+  cost_basis: number;
+  price_source: string | null;
+  basis_rule: string;
+  default_start_date: string | null;
+  notes: string[];
+}
+
+export function useLoanSizingBasis(
+  projectId: string,
+  params: { loanId?: number | null; loanType?: string | null; structureType?: string | null },
+) {
+  const q = new URLSearchParams();
+  if (params.loanId) q.set('loan_id', String(params.loanId));
+  if (params.loanType) q.set('loan_type', params.loanType);
+  if (params.structureType) q.set('structure_type', params.structureType);
+  return useQuery({
+    queryKey: ['loan-sizing-basis', projectId, q.toString()],
+    queryFn: async () => {
+      const response = await authFetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/sizing-basis/?${q.toString()}`);
+      if (!response.ok) throw new Error(`Failed to fetch loan sizing basis: ${response.statusText}`);
+      return response.json() as Promise<LoanSizingBasis>;
+    },
+    enabled: !!projectId,
+  });
+}
+
 export function useAcquisitionPriceSummary(projectId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: ['acquisition-price-summary', projectId],

@@ -425,3 +425,35 @@ def test_cash_sweep_term_loan_uses_calculator():
     from types import SimpleNamespace as N
     assert LandDevCashFlowService.uses_release_calculator(
         N(structure_type='TERM', release_price_pct=None, release_basis='CASH_SWEEP'))
+
+
+# HQ132 (Gregg, 2026-09-30): "since its a term>bridge loan, it should default to
+# the acqusition price for the value /cost." Both bases are the first CLOSING
+# amount; a basis the user typed wins; other loans keep their own rule.
+def test_term_bridge_sizes_both_bases_on_the_acquisition_price():
+    from types import SimpleNamespace
+    from unittest import mock
+    from apps.calculations import loan_sizing_service as L
+    loan = SimpleNamespace(loan_id=None, loan_type='BRIDGE', structure_type='TERM',
+                           loan_to_value_pct=50, loan_to_cost_pct=50,
+                           commitment_amount=None, loan_amount=None, origination_fee_pct=1,
+                           interest_reserve_amount=0, closing_costs_appraisal=0,
+                           closing_costs_legal=0, closing_costs_other=0)
+    project = SimpleNamespace(project_id=9, project_type_code='LAND')
+    price = {'amount': L.Decimal('104000000'), 'source': 'acquisition closing'}
+    with mock.patch.object(L, 'acquisition_closing_price', return_value=price), \
+         mock.patch.object(L, 'development_budget_basis') as budget:
+        r = L.LoanSizingService.calculate_commitment(loan, project)
+        assert not budget.called            # the budget plays no part for a term bridge loan
+        assert r['ltv_basis_amount'] == L.Decimal('104000000.00')
+        assert r['ltc_basis_amount'] == L.Decimal('104000000.00')
+        assert r['commitment_amount'] == L.Decimal('52000000.00')
+        assert r['net_loan_proceeds'] == L.Decimal('51480000.00')
+        typed = L.LoanSizingService.calculate_commitment(loan, project, {'ltv_basis_amount': '90000000'})
+        assert typed['ltv_basis_amount'] == L.Decimal('90000000.00')
+        assert typed['commitment_amount'] == L.Decimal('45000000.00')   # lesser of 45M (LTV) and 52M (LTC)
+    revolver = SimpleNamespace(**{**vars(loan), 'structure_type': 'REVOLVER', 'loan_type': 'CONSTRUCTION'})
+    with mock.patch.object(L, 'purchase_price_basis', return_value={'amount': L.Decimal('104000000'), 'source': 'acquisition ledger'}), \
+         mock.patch.object(L, 'development_budget_basis', return_value={'total': L.Decimal('39709125'), 'by_activity': {}, 'funds_acquisition': True, 'project_wide': True}):
+        r = L.LoanSizingService.calculate_commitment(revolver, project)
+    assert r['ltc_basis_amount'] == L.Decimal('143709125.00')   # unchanged rule for other loans

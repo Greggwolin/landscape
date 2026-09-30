@@ -895,7 +895,13 @@ function DetailPanel({
           {g.title === 'Sizing' && (
             <>
               <div className={styles.row}>
-                <span className={styles.rowLabel}>Cost basis (budget of funded containers)</span>
+                <span className={styles.rowLabel}>Value basis</span>
+                <span className={styles.rowValue}>{money(loan.ltv_basis_amount)}</span>
+              </div>
+              <div className={styles.row}>
+                {/* A term bridge loan is sized on the acquisition price; other loans on
+                    the purchase plus the budget of the containers they fund (HQ132). */}
+                <span className={styles.rowLabel}>Cost basis</span>
                 <span className={styles.rowValue}>{money(loan.ltc_basis_amount)}</span>
               </div>
               <div className={styles.row}>

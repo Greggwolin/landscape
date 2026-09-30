@@ -149,6 +149,11 @@ urlpatterns = [
         name='loan-list'
     ),
     path(
+        'projects/<int:project_id>/loans/sizing-basis/',
+        LoanViewSet.as_view({'get': 'sizing_basis'}),
+        name='loan-sizing-basis',
+    ),
+    path(
         'projects/<int:project_id>/loans/<int:loan_id>/',
         LoanViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
         name='loan-detail'

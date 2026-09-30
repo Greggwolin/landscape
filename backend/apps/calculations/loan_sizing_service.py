@@ -8,7 +8,7 @@ cash-flow services use the same calculations.
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from apps.calculations.engines.debt_service_engine import DebtServiceEngine
 from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
@@ -171,6 +171,42 @@ def purchase_price_basis(project: Any) -> Dict[str, Any]:
     return {"amount": Decimal("0"), "source": None}
 
 
+def acquisition_closing_price(project: Any) -> Dict[str, Any]:
+    """The acquisition price: the first CLOSING amount in the acquisition ledger
+    (the same event the loan's default start date comes from). Falls back to
+    ``purchase_price_basis`` when the ledger has no priced CLOSING."""
+    project_id = getattr(project, "project_id", None)
+    if project_id is not None:
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT amount FROM landscape.tbl_acquisition
+                WHERE project_id = %s AND event_type = 'CLOSING' AND amount > 0
+                ORDER BY event_date NULLS LAST, acquisition_id
+                LIMIT 1
+                """,
+                [project_id],
+            )
+            row = cursor.fetchone()
+        if row and _to_decimal(row[0]) > 0:
+            return {"amount": _to_decimal(row[0]), "source": "acquisition closing"}
+    return purchase_price_basis(project)
+
+
+def is_bridge_term(loan: Any) -> bool:
+    """A term loan of type bridge (Gregg, 2026-09-30: "since its a term>bridge
+    loan, it should default to the acqusition price for the value /cost")."""
+    return ((getattr(loan, "structure_type", "") or "").upper() == "TERM"
+            and (getattr(loan, "loan_type", "") or "").upper() == "BRIDGE")
+
+
+def _positive(value: Any) -> Optional[Decimal]:
+    d = _to_decimal(value)
+    return d if d > 0 else None
+
+
 def _is_land(project: Any) -> bool:
     return (getattr(project, "project_type_code", "") or "").upper() == "LAND"
 
@@ -204,7 +240,68 @@ class LoanSizingService:
         }
 
     @staticmethod
-    def calculate_commitment(loan: Any, project: Any) -> Dict[str, Any]:
+    def sizing_bases(loan: Any, project: Any, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """The value basis (for LTV) and cost basis (for LTC) a loan is sized on.
+
+        A term loan of type bridge: both are the acquisition price (the first
+        CLOSING in the ledger), Gregg 2026-09-30. Every other loan keeps the
+        rule it had: value = the purchase price on record (acquisition ledger
+        first); cost = for land, the purchase when the loan funds it plus
+        closing costs plus the development budget of the containers it funds,
+        otherwise purchase plus closing costs. A basis the user typed
+        (``overrides``: ltv_basis_amount / ltc_basis_amount) wins over either.
+        The loan form reads this same function, so it and the save agree.
+        """
+        overrides = overrides or {}
+        closing_costs_total = (
+            _to_decimal(getattr(loan, "closing_costs_appraisal", None))
+            + _to_decimal(getattr(loan, "closing_costs_legal", None))
+            + _to_decimal(getattr(loan, "closing_costs_other", None))
+        )
+        budget_basis = None
+        if is_bridge_term(loan):
+            price = acquisition_closing_price(project)
+            value_basis = price["amount"]
+            cost_basis = price["amount"]
+            rule = "acquisition price (term bridge loan)"
+        else:
+            # Value basis for LTV: the purchase price on record (acquisition
+            # ledger first). There is no separate appraised-value field.
+            price = purchase_price_basis(project)
+            value_basis = price["amount"]
+            # Land: LTC is sized on the purchase (when the loan funds it) plus the
+            # development budget of the containers it funds. Income property keeps
+            # its purchase-plus-closing basis until its capital budget is wired.
+            if _is_land(project) and getattr(project, "project_id", None) is not None:
+                budget_basis = development_budget_basis(loan, project.project_id)
+                purchase = value_basis if budget_basis["funds_acquisition"] else Decimal("0")
+                cost_basis = purchase + closing_costs_total + budget_basis["total"]
+                rule = "purchase (if funded) + closing costs + development budget of funded containers"
+            else:
+                cost_basis = value_basis + closing_costs_total
+                rule = "purchase price + closing costs"
+        default_value, default_cost = value_basis, cost_basis
+        typed_value = _positive(overrides.get("ltv_basis_amount"))
+        typed_cost = _positive(overrides.get("ltc_basis_amount"))
+        if typed_value is not None:
+            value_basis = typed_value
+        if typed_cost is not None:
+            cost_basis = typed_cost
+        return {
+            "value_basis": value_basis,
+            "cost_basis": cost_basis,
+            "default_value_basis": default_value,
+            "default_cost_basis": default_cost,
+            "value_basis_typed": typed_value is not None,
+            "cost_basis_typed": typed_cost is not None,
+            "price_source": price["source"],
+            "basis_rule": rule,
+            "budget_basis": budget_basis,
+            "closing_costs_total": closing_costs_total,
+        }
+
+    @staticmethod
+    def calculate_commitment(loan: Any, project: Any, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Derive commitment from LTV/LTC and compute holdbacks/net proceeds.
         """
@@ -214,27 +311,11 @@ class LoanSizingService:
         has_ltv = ltv_pct >= 0
         has_ltc = ltc_pct >= 0
 
-        # Value basis for LTV: the purchase price on record (acquisition
-        # ledger first). There is no separate appraised-value field; this is
-        # the same role the asking price played before, from the right table.
-        price = purchase_price_basis(project)
-        value_basis = price["amount"]
-
-        closing_costs_total = (
-            _to_decimal(getattr(loan, "closing_costs_appraisal", None))
-            + _to_decimal(getattr(loan, "closing_costs_legal", None))
-            + _to_decimal(getattr(loan, "closing_costs_other", None))
-        )
-        # Land: LTC is sized on the purchase (when the loan funds it) plus the
-        # development budget of the containers it funds. Income property keeps
-        # its purchase-plus-closing basis until its capital budget is wired.
-        budget_basis = None
-        if _is_land(project) and getattr(project, "project_id", None) is not None:
-            budget_basis = development_budget_basis(loan, project.project_id)
-            purchase = value_basis if budget_basis["funds_acquisition"] else Decimal("0")
-            cost_basis = purchase + closing_costs_total + budget_basis["total"]
-        else:
-            cost_basis = value_basis + closing_costs_total
+        bases = LoanSizingService.sizing_bases(loan, project, overrides)
+        price = {"source": bases["price_source"]}
+        value_basis = bases["value_basis"]
+        cost_basis = bases["cost_basis"]
+        budget_basis = bases["budget_basis"]
 
         # A ratio with nothing to multiply is not a $0 loan. Skip it and say
         # why, so "the lesser of LTV and LTC" is never won by a missing basis.
@@ -286,6 +367,7 @@ class LoanSizingService:
             "ltv_amount": _q2(ltv_amount) if ltv_amount is not None else None,
             "ltc_amount": _q2(ltc_amount) if ltc_amount is not None else None,
             "purchase_price_source": price["source"],
+            "basis_rule": bases["basis_rule"],
             "sizing_notes": sizing_notes,
             "development_budget_basis": (
                 _q2(budget_basis["total"]) if budget_basis is not None else None
