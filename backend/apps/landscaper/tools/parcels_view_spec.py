@@ -530,8 +530,9 @@ def build_parcels_view_config(
         'columns': columns,
         'rung_columns': rung_columns,
         'grouped_rung': GROUPED_RUNG,
-        'default_rung': 'summary',
-        'default_grouping': 'use',
+        # Gregg, 2026-09-30: always open on Detail = All, Group = None.
+        'default_rung': 'all',
+        'default_grouping': 'none',
         'group_options': [
             {'value': 'use', 'label': 'use'},
             {'value': 'level1', 'label': labels[1].lower(),

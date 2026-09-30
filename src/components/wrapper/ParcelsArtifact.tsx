@@ -156,8 +156,10 @@ function cellText(key: string, value: string | number | null): string {
 export function ParcelsArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [rung, setRung] = useState<string>(config.default_rung || 'summary');
-  const [grouping, setGrouping] = useState<string>(config.default_grouping || 'use');
+  // BM15 (Gregg, 2026-09-30): the table always opens on Detail = All and
+  // Group = None, whatever an older stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.default_rung || 'summary'));
+  const [grouping, setGrouping] = useState<string>('none');
   const [level1, setLevel1] = useState<number[]>([]);
   const [level2, setLevel2] = useState<number[]>([]);
   const [families, setFamilies] = useState<string[]>([]);
