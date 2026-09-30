@@ -337,7 +337,6 @@ export function PricingRegisterArtifact({
     <div className={styles.root}>
       <div className={styles.head}>
         <div>
-          <div className={styles.kicker}>{config.kicker}</div>
           <div className={styles.titleRow}>
             <span className={styles.title}>{config.title}</span>
             <span className={styles.titleBadges}>

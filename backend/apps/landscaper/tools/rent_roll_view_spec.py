@@ -188,7 +188,7 @@ def build_rent_roll_view_config(
         if not present
     ]
 
-    title = f'{project_name} — Rent Roll' if project_name else 'Rent Roll'
+    title = f'Rent Roll - {project_name}' if project_name else 'Rent Roll'
     return {
         'topic': 'rent_roll',
         'kicker': 'Rent roll',

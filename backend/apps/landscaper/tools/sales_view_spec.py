@@ -115,7 +115,7 @@ def build_sales_view_config(
         if not shown(key)
     ]
 
-    title = f'{project_name} — Sales' if project_name else 'Sales'
+    title = f'Sales - {project_name}' if project_name else 'Sales'
     return {
         'topic': 'sales',
         'kicker': 'Sales schedule',

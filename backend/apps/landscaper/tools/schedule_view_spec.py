@@ -607,7 +607,7 @@ def build_budget_view_config(
         'spec_version': BUDGET_VIEW_SPEC_VERSION,
         'topic': 'budget',
         'kicker': f'{project_name} · Costs' if project_name else 'Costs',
-        'title': 'Development budget',
+        'title': f'Budget - {project_name}' if project_name else 'Budget',
         'source_label': 'development budget',
         # Exactly one binding chip, always visible: this is how you know at a
         # glance whether you are looking at the model or at a sandbox.

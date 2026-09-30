@@ -266,7 +266,6 @@ export function SalesArtifact({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div className={styles.head}>
         <div style={{ minWidth: 0 }}>
-          <div className={styles.kicker}>{config.kicker}</div>
           <div className={styles.titleRow}>
             <span className={styles.title}>{config.title}</span>
             <span className={styles.titleBadges}>

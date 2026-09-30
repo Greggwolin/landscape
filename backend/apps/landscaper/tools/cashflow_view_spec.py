@@ -194,7 +194,7 @@ def build_cashflow_view_config(
         (by_id[i]['label'] if i in by_id else f'Container {i}') for i in active_ids
     ]
 
-    title = f'{project_name} — Cash Flow' if project_name else 'Cash Flow'
+    title = f'Cash Flow - {project_name}' if project_name else 'Cash Flow'
     if active_labels:
         title = f'{title} — {", ".join(active_labels)}'
     return {
