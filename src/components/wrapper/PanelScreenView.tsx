@@ -110,20 +110,33 @@ export function PanelScreenView() {
             </option>
           ))}
         </select>
+        {/* Sub-pages are links beside the box, not a second dropdown
+            (Gregg, 2026-09-30): every page in the folder is visible at once
+            and one click away. Same look as the Screens | Artifacts |
+            Documents | Map row above. Wraps to a second line when a folder
+            has more pages than the panel is wide. */}
         {activeFolder && activeFolder.subTabs.length > 0 && (
-          <select
-            aria-label="Screen within this folder"
-            className="form-select form-select-sm"
-            style={{ width: 'auto', minWidth: 140 }}
-            value={currentTab}
-            onChange={(e) => setFolderTab(activeFolder.id, e.target.value)}
-          >
-            {activeFolder.subTabs.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
+          <nav className="panel-screen-subtabs" aria-label="Pages in this screen">
+            {activeFolder.subTabs.map((t, i) => (
+              <React.Fragment key={t.id}>
+                {i > 0 && (
+                  <span className="panel-screen-subtab-sep" aria-hidden>
+                    |
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={`panel-screen-subtab${t.id === currentTab ? ' is-active' : ''}`}
+                  aria-current={t.id === currentTab ? 'page' : undefined}
+                  onClick={() => {
+                    if (t.id !== currentTab) setFolderTab(activeFolder.id, t.id);
+                  }}
+                >
+                  {t.label}
+                </button>
+              </React.Fragment>
             ))}
-          </select>
+          </nav>
         )}
       </div>
       <div className="project-folder-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
