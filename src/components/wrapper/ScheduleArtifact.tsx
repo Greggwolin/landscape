@@ -207,8 +207,10 @@ export function ScheduleArtifact({
   // A level holds a SET of chosen members, not one. Selecting two villages
   // means both, and the arithmetic below sums across them.
   const [scope, setScope] = useState<Record<number, number[]>>({});
-  const [rung, setRung] = useState<string>(config.default_rung);
-  const [grouping, setGrouping] = useState<string>(config.default_grouping);
+  // Gregg, 2026-09-30 (BM16): every table opens on its most detailed view with
+  // no grouping, whatever the stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.rung_columns?.detail ? 'detail' : (config.default_rung || 'summary')));
+  const [grouping, setGrouping] = useState<string>('none');
   const [extraColumns, setExtraColumns] = useState<string[]>([]);
   /* Columns the user has switched OFF.
    *

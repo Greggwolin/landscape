@@ -109,8 +109,10 @@ const isOccupied = (row: RentRollRow) =>
 export function RentRollArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [rung, setRung] = useState<string>(config.default_rung || 'standard');
-  const [grouping, setGrouping] = useState<string>(config.default_grouping || 'none');
+  // Gregg, 2026-09-30 (BM16): every table opens on its most detailed view with
+  // no grouping, whatever the stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.rung_columns?.detail ? 'detail' : (config.default_rung || 'standard')));
+  const [grouping, setGrouping] = useState<string>('none');
   const [buildings, setBuildings] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [expanded, setExpanded] = useState(false);
