@@ -25,6 +25,12 @@ export interface WrapperProject {
   county?: string | null;
   state?: string | null;
   apn_primary?: string | null;
+  // Location by name — the Property > Location screen resolves its market
+  // geography from these and refuses to load without a city.
+  city?: string | null;
+  jurisdiction_city?: string | null;
+  jurisdiction_county?: string | null;
+  jurisdiction_state?: string | null;
 }
 
 const WrapperProjectContext = createContext<WrapperProject | null>(null);
