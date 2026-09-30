@@ -1624,12 +1624,14 @@ class LandDevCashFlowService:
     ) -> TermLoanParams:
         """Translate Loan model to term parameters for calculation engine.
 
-        Due on sale: when the loan's last collateral sells before maturity, the
-        term is cut to end in that period, so the balance balloons there.
+        Due on sale: the term is cut to end in the first period the sales of
+        the loan's collateral cover it (the last collateral sale at the
+        latest), so the balance balloons there (``_term_payoff_period``).
         """
         loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
         loan_start_period = self._get_period_index_for_date(periods, self.loan_start_date_for(loan))
-        payoff = self._last_collateral_sale(period_data, loan_start_period)
+        loan_amount = float(loan.loan_amount or loan.commitment_amount or 0)
+        payoff = self._term_payoff_period(period_data, loan_start_period, loan_amount)
         if payoff is not None:
             to_sale = payoff - loan_start_period + 1
             loan_term_months = min(loan_term_months or to_sale, to_sale)
@@ -1637,7 +1639,7 @@ class LandDevCashFlowService:
         amort_months = self._normalize_term_months(loan.amortization_months, loan.amortization_years)
 
         return TermLoanParams(
-            loan_amount=float(loan.loan_amount or loan.commitment_amount or 0),
+            loan_amount=loan_amount,
             interest_rate_annual=float(loan.interest_rate_pct or 0) / 100.0,
             amortization_months=amort_months or 0,
             interest_only_months=int(loan.interest_only_months or 0),
@@ -1856,6 +1858,35 @@ class LandDevCashFlowService:
             return None
         last = max(sales)
         return last if last >= loan_start_period else None
+
+    @staticmethod
+    def _term_payoff_period(
+        period_data: Optional[List[PeriodCosts]],
+        loan_start_period: int,
+        loan_amount: float,
+    ) -> Optional[int]:
+        """When a term loan with no release price is retired: the first period
+        the sale proceeds of its collateral, counted from the loan's start,
+        cover the loan; the last collateral sale at the latest.
+
+        Retiring it only at the last collateral sale (as first built) held the
+        debt while earlier sales were paid out, then called the balloon from a
+        later, smaller year — Peoria loan 63 at $52M: $335M of 2029 proceeds
+        distributed, a $47M balloon in 2033, and a levered flow with two IRRs
+        (-51% and +81%). A loan cannot be outstanding while the collateral
+        securing it has already been sold for more than it owes (HQ129).
+        """
+        last = LandDevCashFlowService._last_collateral_sale(period_data, loan_start_period)
+        if last is None or loan_amount <= 0:
+            return last
+        covered = 0.0
+        for p in period_data or []:
+            if p.period_index < loan_start_period:
+                continue
+            covered += p.sale_proceeds or 0.0
+            if covered >= loan_amount:
+                return min(p.period_index, last)
+        return last
 
     # -- Loans tied to containers ------------------------------------------
 

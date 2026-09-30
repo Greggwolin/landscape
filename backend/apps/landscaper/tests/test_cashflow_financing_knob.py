@@ -11,6 +11,7 @@ from apps.financial.services import cashflow_routing
 from apps.landscaper.tools.cashflow_artifact_builder import (
     build_cashflow_artifact_schema,
     cashflow_dedup_key,
+    financing_moves_cash,
 )
 from apps.landscaper.tools.cashflow_view_spec import _financing_knob
 
@@ -84,3 +85,15 @@ def test_knob_says_unlevered_when_no_loan():
     knob = _financing_knob({'on': False, 'loan_count': 0})
     assert knob['on'] is False
     assert 'unlevered until one exists' in knob['note']
+
+
+# HQ129: "at the project level there is an unlevered and levered irr (thats all).
+# if no debt, then there is only 1." A loan row that lends nothing is not debt.
+def test_levered_pair_only_when_a_loan_moves_cash():
+    zero_loan = {'sections': [{'sectionId': 'financing', 'lineItems': [
+        {'lineId': 'financing-loan-63', 'periods': []}]}]}
+    funded = {'sections': [{'sectionId': 'financing', 'lineItems': [
+        {'lineId': 'financing-loan-63', 'periods': [{'periodIndex': 0, 'amount': 48_360_000.0}]}]}]}
+    assert financing_moves_cash(zero_loan) is False
+    assert financing_moves_cash({'sections': []}) is False
+    assert financing_moves_cash(funded) is True

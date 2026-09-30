@@ -337,6 +337,18 @@ def _fetch_growth_set_names(set_ids: List[int]) -> Dict[int, str]:
         return {r[0]: r[1] for r in cursor.fetchall()}
 
 
+def financing_moves_cash(envelope: Dict[str, Any]) -> bool:
+    """True when the engine's financing section moves any cash in any period.
+    A loan row with nothing to lend adds a financing line of zeros; the run is
+    then unlevered in all but name (HQ129)."""
+    return any(
+        abs(float(p.get('amount') or 0)) > 0
+        for s in (envelope.get('sections') or []) if s.get('sectionId') == 'financing'
+        for li in (s.get('lineItems') or [])
+        for p in (li.get('periods') or [])
+    )
+
+
 def fetch_cashflow_schedule_data(
     project_id: int,
     container_ids: Optional[List[int]] = None,
@@ -390,8 +402,14 @@ def fetch_cashflow_schedule_data(
     engine_summary = envelope.get('summary') or {}
     results = {k: engine_summary[k] for k in CASHFLOW_RESULT_KEYS if k in engine_summary}
 
+    # A levered return exists only when a loan actually moves cash. A loan row
+    # with nothing to lend (Peoria loan 63: amount and commitment 0) leaves the
+    # levered run identical to the unlevered one, and the project level shows
+    # one IRR, not the same figure twice (Gregg: "if no debt, then there is only
+    # 1" — HQ129).
+    has_debt = financing_moves_cash(envelope)
     results_unlevered: Optional[Dict[str, Any]] = None
-    if financing_on:
+    if financing_on and has_debt:
         try:
             unlevered = _fetch_cashflow_schedule(
                 project_id, container_ids=container_ids, include_financing=False,

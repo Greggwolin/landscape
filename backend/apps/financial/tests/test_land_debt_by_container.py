@@ -270,6 +270,29 @@ def test_term_loan_balloons_at_last_collateral_sale():
     assert params.loan_term_months == 31          # ends in the sale period, not month 120
 
 
+# HQ129: a term loan is retired when its collateral's sales first cover it, not
+# held to the last sale while earlier proceeds are paid out (Peoria loan 63 at
+# $52M: a 2033 balloon after $335M of 2029 sales gave the levered flow two IRRs).
+def test_term_loan_retired_when_sales_first_cover_it():
+    from datetime import date
+    from apps.calculations.engines.debt_service_engine import PeriodCosts
+    svc = LandDevCashFlowService(1)
+    svc._acquisition_date_cache = date(2027, 1, 28)
+    sales = {12: 400.0, 20: 900.0, 40: 50.0}      # net proceeds; the loan is 1,000
+    pd = [PeriodCosts(i, '', 0.0, {1: 1} if i in sales else {}, {}, sale_proceeds=sales.get(i, 0.0))
+          for i in range(48)]
+    loan = _fake_loan(structure_type='TERM', loan_amount=1000, commitment_amount=1000,
+                      loan_term_months=120, amortization_months=240, amortization_years=None,
+                      interest_only_months=24, payment_frequency='MONTHLY')
+    periods = [{'endDate': date(2027 + (i // 12), 1 + (i % 12), 28)} for i in range(48)]
+    assert LandDevCashFlowService._term_payoff_period(pd, 0, 1000.0) == 20
+    assert svc._build_term_params(loan, periods, pd).loan_term_months == 21   # balloons at month 20
+    # never covered: the last collateral sale, as before
+    assert LandDevCashFlowService._term_payoff_period(pd, 0, 10_000.0) == 40
+    # sales before the loan starts do not count toward it
+    assert LandDevCashFlowService._term_payoff_period(pd, 13, 1000.0) == 40
+
+
 # Gregg, 2026-09-29 (5a + three structures): which loans use the calculator
 def test_release_calculator_routing():
     from types import SimpleNamespace as N
