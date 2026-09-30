@@ -9947,6 +9947,34 @@ def _log_planning_activity(project_id: int, table: str, action: str, count: int,
         logger.warning(f"Failed to log planning activity: {e}")
 
 
+
+def _landuse_from_product(product_code: str, *, have_family: bool, have_type: bool) -> Dict[str, Any]:
+    """Reverse lookup product -> type -> family from the lot-product catalogue."""
+    if have_family and have_type:
+        return {}
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT t.code, f.name
+                  FROM landscape.res_lot_product p
+                  JOIN landscape.type_lot_product j ON j.product_id = p.product_id
+                  JOIN landscape.lu_type t ON t.type_id = j.type_id
+                  JOIN landscape.lu_family f ON f.family_id = t.family_id
+                 WHERE p.code = %s AND p.is_active AND t.active
+            """, [product_code])
+            pairs = cursor.fetchall()
+    except Exception as e:
+        logger.warning(f"product reverse lookup failed for {product_code}: {e}")
+        return {}
+    out: Dict[str, Any] = {}
+    types = {p[0] for p in pairs}
+    families = {p[1] for p in pairs}
+    if not have_type and len(types) == 1:
+        out['type_code'] = next(iter(types))
+    if not have_family and len(families) == 1:
+        out['family_name'] = next(iter(families))
+    return out
+
 # ============ AREA TOOLS ============
 
 @register_tool('get_areas')
@@ -10593,6 +10621,18 @@ def handle_update_parcel(
                     'listed, create it with update_phase first. Do not guess ids.'
                 ),
             }
+
+    # BM7: the product decides the rest of the land-use chain. Fill family (and
+    # type, when the product sits under exactly one type) from the catalogue,
+    # never overriding a value the caller supplied. Most lot sizes are listed
+    # under both detached and build-to-rent, so type is often left open.
+    if tool_input.get('product_code'):
+        tool_input = dict(tool_input)
+        tool_input.update(_landuse_from_product(
+            tool_input['product_code'],
+            have_family=bool(tool_input.get('family_name')),
+            have_type=bool(tool_input.get('type_code')),
+        ))
 
     if propose_only:
         from .services.mutation_service import MutationService

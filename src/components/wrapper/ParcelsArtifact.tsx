@@ -59,7 +59,7 @@ import { useStagedEdits, stagedKey, type CommitEditsFn } from './useStagedEdits'
 /* ─── The specification, as the server sends it ────────────────────────── */
 
 export interface ParcelsLevelMember { id: number; label: string; parent_id: number | null }
-export interface ParcelsLevel { level: number; label: string; members: ParcelsLevelMember[] }
+export interface ParcelsLevel { level: number; label: string; enabled?: boolean; members: ParcelsLevelMember[] }
 export interface ParcelsColumn {
   key: string;
   label: string | null;
@@ -389,7 +389,18 @@ export function ParcelsArtifact({
         ))}
       </div>
 
-      {levelOne && levelOne.members.length > 0 && (
+      {/* BM7: a project with its top level switched off shows the row greyed,
+        * so it is plain the level exists but is not in use. */}
+      {levelOne && levelOne.enabled === false && (
+        <div className={styles.bar}>
+          <span className={`${styles.barLabel} ${styles.badgeGhost}`}>{levelOne.label}</span>
+          <button type="button" disabled className={`${styles.badge} ${styles.badgeGhost}`}>
+            not used
+          </button>
+        </div>
+      )}
+
+      {levelOne && levelOne.enabled !== false && levelOne.members.length > 0 && (
         <div className={styles.bar}>
           <span className={styles.barLabel}>{levelOne.label}</span>
           {levelOne.members.map((m) => (
@@ -448,8 +459,8 @@ export function ParcelsArtifact({
          *  Gregg, 2026-08-25: one label, same row, to the right of Detail. */}
         <span className={styles.barLabel} style={{ marginLeft: 18 }}>Group</span>
         {config.group_options.map((g) => (
-          <button key={g.value} type="button"
-            className={`${styles.badge} ${grouping === g.value ? styles.badgeOn : ''}`}
+          <button key={g.value} type="button" disabled={g.available === false}
+            className={`${styles.badge} ${grouping === g.value ? styles.badgeOn : ''} ${g.available === false ? styles.badgeGhost : ''}`}
             onClick={() => setGrouping(g.value)}>
             {g.label}
           </button>
