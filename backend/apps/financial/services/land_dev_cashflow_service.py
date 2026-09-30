@@ -39,7 +39,6 @@ from apps.calculations.engines.lotbank_engine import (
     LotbankProduct,
 )
 from apps.financial.models_debt import Loan, LoanContainer
-from apps.calculations.irr import investment_irr
 
 # ---------------------------------------------------------------------------
 # Curve steepness scale
@@ -2656,7 +2655,7 @@ class LandDevCashFlowService:
         irr = None
         if len(annual_cash_flows) >= 2:
             try:
-                irr_result = investment_irr(annual_cash_flows)
+                irr_result = npf.irr(annual_cash_flows)
                 if not np.isnan(irr_result):
                     irr = float(irr_result)
             except Exception:

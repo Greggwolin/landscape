@@ -37,7 +37,6 @@ engine dependency is absent. Do not hoist these imports to module scope.
 
 import math
 from typing import List, Optional
-from apps.calculations.irr import investment_irr
 
 
 def irr_from_series(cash_flows: List[float]) -> Optional[float]:
@@ -57,7 +56,7 @@ def irr_from_series(cash_flows: List[float]) -> Optional[float]:
     """
     import numpy_financial as npf
 
-    irr = investment_irr(cash_flows)
+    irr = npf.irr(cash_flows)
     if irr is None:
         return None
     irr = float(irr)

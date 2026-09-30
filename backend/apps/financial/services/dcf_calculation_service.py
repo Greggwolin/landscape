@@ -29,7 +29,6 @@ from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
 from .income_approach_service import IncomeApproachDataService
-from apps.calculations.irr import investment_irr
 
 
 # PD15 Fix 6 (PD14 Defect A2) — a deal whose terminal year loses money has no
@@ -630,7 +629,7 @@ class DCFCalculationService:
             cash_flows.extend(noi_series[:-1])  # Years 1 to N-1
             cash_flows.append(noi_series[-1] + net_reversion)  # Year N includes reversion
 
-            irr = investment_irr(cash_flows)
+            irr = npf.irr(cash_flows)
 
             if irr is None or (hasattr(irr, '__iter__') and len(irr) == 0):
                 return None
@@ -1180,7 +1179,7 @@ class DCFCalculationService:
             cash_flows.extend(noi_series[:-1])
             cash_flows.append(noi_series[-1] + net_reversion)
 
-            monthly_irr = investment_irr(cash_flows)
+            monthly_irr = npf.irr(cash_flows)
 
             if monthly_irr is None or np.isnan(monthly_irr):
                 return None

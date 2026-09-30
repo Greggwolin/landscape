@@ -14,7 +14,6 @@ Calculates investment return metrics:
 from decimal import Decimal
 from typing import List, Optional
 import numpy_financial as npf
-from apps.calculations.irr import investment_irr
 
 
 class MetricsCalculator:
@@ -114,7 +113,7 @@ class MetricsCalculator:
             IRR as decimal (0.12 = 12%) or None if cannot calculate
         """
         try:
-            return float(investment_irr(cash_flows))
+            return float(npf.irr(cash_flows))
         except:
             return None
 
