@@ -2648,16 +2648,16 @@ class LandDevCashFlowService:
         period_count = len(periods)
         net_cash_flows = self._build_net_cash_flow_array(sections, period_count)
 
-        # Aggregate to annual for IRR (to match Excel methodology)
-        annual_cash_flows = self._aggregate_to_annual(net_cash_flows, periods)
-
-        # Calculate IRR using numpy-financial
+        # IRR on the monthly flows, annualized — the same method the waterfall
+        # uses, so the project shows one IRR everywhere (HQ132). Summing to
+        # years first netted a year's costs against the same year's sales and
+        # gave Peoria 51.6% here against 39.1% in the waterfall on the same flow.
         irr = None
-        if len(annual_cash_flows) >= 2:
+        if len(net_cash_flows) >= 2:
             try:
-                irr_result = npf.irr(annual_cash_flows)
+                irr_result = npf.irr(net_cash_flows)
                 if not np.isnan(irr_result):
-                    irr = float(irr_result)
+                    irr = float((1.0 + float(irr_result)) ** 12 - 1.0)
             except Exception:
                 pass
 
