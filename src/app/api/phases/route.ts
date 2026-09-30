@@ -24,8 +24,15 @@ export async function GET(request: NextRequest) {
         p.area_id,
         a.area_no,
         p.phase_no,
-        CONCAT(a.area_no::text, '.', p.phase_no::text) AS phase_name,
-        CONCAT(a.area_no::text, '.', p.phase_no::text) AS phase_code,
+        -- BM8: a project with its top level switched off numbers phases 1, 2 …
+        CASE WHEN COALESCE((SELECT c.level1_enabled FROM landscape.tbl_project_config c
+                            WHERE c.project_id = p.project_id), true)
+             THEN CONCAT(a.area_no::text, '.', p.phase_no::text)
+             ELSE p.phase_no::text END AS phase_name,
+        CASE WHEN COALESCE((SELECT c.level1_enabled FROM landscape.tbl_project_config c
+                            WHERE c.project_id = p.project_id), true)
+             THEN CONCAT(a.area_no::text, '.', p.phase_no::text)
+             ELSE p.phase_no::text END AS phase_code,
         COALESCE(SUM(par.units_total), 0) AS units_total,
         COALESCE(SUM(CAST(par.acres_gross AS FLOAT)), 0) AS gross_acres,
         0 AS net_acres,

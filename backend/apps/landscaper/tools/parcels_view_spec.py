@@ -355,6 +355,15 @@ def fetch_levels(project_id: int, labels: Dict[int, str]) -> List[Dict[str, Any]
     from django.db import connection
 
     with connection.cursor() as cursor:
+        # BM7: a project can switch its top level off (Red Valley Ranch has no
+        # areas). Phases still need a parent row in the database, so such a
+        # project keeps one hidden default area — but the table must not show
+        # it: no area column, a greyed area row, and phases numbered 1, 2 …
+        cursor.execute(
+            'SELECT COALESCE(level1_enabled, true) FROM landscape.tbl_project_config '
+            'WHERE project_id = %s', [project_id])
+        cfg = cursor.fetchone()
+        level1_enabled = bool(cfg[0]) if cfg else True
         cursor.execute(
             'SELECT area_id, area_no FROM landscape.tbl_area '
             'WHERE project_id = %s ORDER BY area_no',
@@ -373,8 +382,9 @@ def fetch_levels(project_id: int, labels: Dict[int, str]) -> List[Dict[str, Any]
         {
             'level': 1,
             'label': labels[1],
-            'members': [{'id': a[0], 'label': str(a[1]), 'parent_id': None}
-                        for a in areas],
+            'enabled': level1_enabled,
+            'members': ([{'id': a[0], 'label': str(a[1]), 'parent_id': None}
+                         for a in areas] if level1_enabled else []),
         },
         {
             'level': 2,
@@ -383,7 +393,8 @@ def fetch_levels(project_id: int, labels: Dict[int, str]) -> List[Dict[str, Any]
             # villages, so on its own it cannot say which phase it is. This is
             # the composed label the old screen shows and the one Gregg reads.
             'members': [{'id': p[0],
-                         'label': f'{area_no_by_id.get(p[1], "?")}.{p[2]}',
+                         'label': (f'{area_no_by_id.get(p[1], "?")}.{p[2]}'
+                                   if level1_enabled else str(p[2])),
                          'parent_id': p[1]}
                         for p in phases],
         },
@@ -409,6 +420,8 @@ def build_parcels_view_config(
     Numbers leave raw. Formatting — separators, dashes for nothing — belongs to
     the renderer, so a number can never arrive pre-formatted and unfilterable.
     """
+    level1_enabled = next((lv.get('enabled', True) for lv in levels
+                           if lv.get('level') == 1), True)
     rows: List[Dict[str, Any]] = []
     for idx, record in enumerate(records, start=1):
         acres = _num(record.get('acres_gross'))
@@ -429,10 +442,13 @@ def build_parcels_view_config(
             'parcel_id': record.get('parcel_id'),
             'scope': scope,
             'cells': {
-                'level1': str(area_no) if area_no is not None else None,
-                'level2': (f'{area_no}.{phase_no}'
-                           if area_no is not None and phase_no is not None
+                'level1': (str(area_no) if level1_enabled and area_no is not None
                            else None),
+                'level2': ((f'{area_no}.{phase_no}' if level1_enabled
+                            else str(phase_no))
+                           if area_no is not None and phase_no is not None
+                           else (str(phase_no) if phase_no is not None
+                                 and not level1_enabled else None)),
                 # A parcel with no number renders with a dash and is still
                 # counted. There is one on project 9. A parcel that exists and
                 # cannot be named is something to see, not to quietly drop.
@@ -463,6 +479,9 @@ def build_parcels_view_config(
                             'label': _COLUMN_META[key]['label'],
                             'available': False,
                             'reason': 'no parcel in this project carries one'})
+
+    if not level1_enabled:
+        present.discard('level1')
 
     rung_columns: Dict[str, List[str]] = {
         rung: [key for key in _RUNG_COLUMNS[rung] if key in present]
@@ -515,7 +534,8 @@ def build_parcels_view_config(
         'default_grouping': 'use',
         'group_options': [
             {'value': 'use', 'label': 'use'},
-            {'value': 'level1', 'label': labels[1].lower()},
+            {'value': 'level1', 'label': labels[1].lower(),
+             'available': level1_enabled},
             {'value': 'level2', 'label': labels[2].lower()},
             {'value': 'none', 'label': 'none'},
         ],

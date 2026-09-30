@@ -81,6 +81,16 @@ function formatTableName(table: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function titleFor(field: string | null, value: unknown): string {
+  if (field) return formatFieldName(field);
+  if (isRecordObject(value) && (value as Record<string, unknown>).delete) return 'Delete';
+  return isRecordObject(value) ? 'Change' : 'Record';
+}
+
+function isRecordObject(value: unknown): boolean {
+  return value !== null && typeof value === 'object';
+}
+
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return '(empty)';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
@@ -94,8 +104,9 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function getExpirationMinutes(expiresAt: string): number {
-  if (!expiresAt) return 60;
+function getExpirationMinutes(expiresAt: string): number | null {
+  // No expiry recorded: proposals stay until confirmed or rejected (BM2).
+  if (!expiresAt) return null;
   const expDate = new Date(expiresAt);
   const now = new Date();
   return Math.max(0, Math.round((expDate.getTime() - now.getTime()) / 60000));
@@ -144,10 +155,17 @@ export function MutationProposalCard({
   };
 
   const handleConfirmAll = async () => {
-    if (!batchId || !onConfirmAll) return;
     setLoadingId('batch');
     try {
-      await onConfirmAll(batchId);
+      if (batchId && onConfirmAll) {
+        await onConfirmAll(batchId);
+      } else {
+        // BM8: proposals from one reply often carry no batch id (each delete
+        // is its own proposal). Confirm them one after another.
+        for (const p of pendingProposals) {
+          await onConfirm(p.mutationId);
+        }
+      }
       setResolvedIds(new Set(normalizedProposals.map((p) => p.mutationId)));
     } finally {
       setLoadingId(null);
@@ -202,7 +220,7 @@ export function MutationProposalCard({
           )}
         </div>
         <div className="d-flex align-items-center gap-2">
-          {batchId && pendingProposals.length > 1 && onConfirmAll && (
+          {pendingProposals.length > 1 && (
             <CButton
               color="success"
               size="sm"
@@ -247,7 +265,7 @@ export function MutationProposalCard({
                     {/* Field name and table */}
                     <div className="d-flex align-items-center gap-2 mb-1">
                       <span className="fw-semibold">
-                        {formatFieldName(proposal.field)}
+                        {titleFor(proposal.field, proposal.proposedValue)}
                       </span>
                       {proposal.isHighRisk && (
                         <CBadge color="danger" size="sm">
@@ -262,7 +280,9 @@ export function MutationProposalCard({
                       </span>
                     </div>
 
-                    {/* Value change */}
+                    {/* Value change. BM8: a whole-record change reads as its
+                      * reason in plain English below — never as raw JSON. */}
+                    {!isRecordObject(proposal.proposedValue) && (
                     <div className="small">
                       {proposal.currentValue !== null && (
                         <>
@@ -278,6 +298,7 @@ export function MutationProposalCard({
                         {formatValue(proposal.proposedValue)}
                       </span>
                     </div>
+                    )}
 
                     {/* Reason */}
                     {proposal.reason && (
@@ -324,7 +345,8 @@ export function MutationProposalCard({
             ))}
           </div>
 
-          {/* Expiration notice */}
+          {/* Expiration notice — only when the proposal actually expires */}
+          {expiresInMinutes !== null && (
           <div
             className="mt-3 pt-2 small text-muted text-center"
             style={{
@@ -338,6 +360,7 @@ export function MutationProposalCard({
               <>These proposals may have expired. Please refresh if needed.</>
             )}
           </div>
+          )}
         </CCardBody>
     </CCard>
   );
