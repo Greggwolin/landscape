@@ -316,14 +316,38 @@ export function ParcelsArtifact({
         : column.key === 'product' ? 'type' : null;
       if (!parentKey) return unique(all);
 
-      const parentValue = row.cells[parentKey];
-      if (parentValue === null || parentValue === undefined || parentValue === '') {
-        return unique(all);
+      // Read what the row holds NOW, including an edit staged but not yet
+      // committed — a product just picked must narrow the type list at once.
+      const valueOf = (k: string): string => {
+        const t = onCommitFieldEdits ? budgetCellTarget(schema, row.id, k) : null;
+        const sk = t ? stagedKey(t.cellPath) : null;
+        const st = sk ? edits.staged[sk] : undefined;
+        const v = st ? st.value : row.cells[k];
+        return v === null || v === undefined ? '' : String(v);
+      };
+
+      const parentValue = valueOf(parentKey);
+      let list = all;
+      if (parentValue) {
+        const narrowed = all.filter((o) => String(o.parent ?? '') === parentValue);
+        if (narrowed.length) list = narrowed;
       }
-      const narrowed = all.filter((o) => String(o.parent ?? '') === String(parentValue));
-      return unique(narrowed.length ? narrowed : all);
+      // BM9 (Gregg): product entered first -> the type list offers only the
+      // types that product belongs to (e.g. Detached and Build-to-Rent).
+      if (column.key === 'type') {
+        const product = valueOf('product');
+        if (product) {
+          const productCol = config.columns.find((c) => c.key === 'product');
+          const productTypes = new Set((productCol?.options ?? [])
+            .filter((o) => String(o.value) === product)
+            .map((o) => String(o.parent ?? '')));
+          const byProduct = list.filter((o) => productTypes.has(String(o.value)));
+          if (byProduct.length) list = byProduct;
+        }
+      }
+      return unique(list);
     },
-    [],
+    [config.columns, edits, onCommitFieldEdits, schema],
   );
 
   /* Which bucket a parcel falls in. A useCallback rather than a plain function
