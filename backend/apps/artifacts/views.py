@@ -873,24 +873,20 @@ _BUDGET_DATE_COLUMNS = {'start_date', 'end_date'}
 
 # Stage values that can ACTUALLY be saved.
 #
-# Four definitions of this vocabulary exist and no two agree (measured
-# 2026-08-19/20):
-#   * backend VALID_ACTIVITIES      -- has 'Improvements', no 'Development'
-#   * database chk_budget_lifecycle_stage -- has 'Development', no 'Improvements'
-#   * frontend LIFECYCLE_STAGES     -- five values, no 'Planning & Engineering'
-#   * the data itself               -- only 'Development' (153) and
-#                                      'Planning & Engineering' (153)
+# Until 2026-09-30 the database rule (chk_budget_lifecycle_stage) allowed
+# 'Development' but not 'Improvements', while the backend allowlist
+# (VALID_ACTIVITIES) allowed 'Improvements' but not 'Development', so this
+# writer offered only the values both accepted. On 2026-09-30 (chat HQ) the
+# database rule was changed to the same six values as VALID_ACTIVITIES and the
+# 12 rows then holding 'Development' were moved to 'Improvements' (backup:
+# landscape.bak_budget_activity_20260930; register: _project_logs/renames.md).
+# The database and the backend now agree, so 'Improvements' is writable.
 #
-# The app and the database are mutually incompatible on two of six values:
-# writing 'Improvements' passes the allowlist and is then rejected by the CHECK;
-# writing 'Development' is refused by the allowlist even though every row that
-# has a stage uses it. Offering either would hand the user a choice that fails.
-#
-# So this slice offers only the INTERSECTION -- the values both accept -- and
-# leaves reconciling the vocabularies to a decision that is not this slice's to
-# make. Reported rather than papered over.
+# Still open: the frontend LIFECYCLE_STAGES list (useUnitCostCategoriesForBudget)
+# omits 'Planning & Engineering'; and 'Financing' is to be renamed
+# 'Capitalization' in the local build (renames.md).
 WRITABLE_ACTIVITIES = frozenset({
-    'Acquisition', 'Planning & Engineering', 'Operations',
+    'Acquisition', 'Planning & Engineering', 'Improvements', 'Operations',
     'Disposition', 'Financing',
 })
 _BUDGET_BOOL_COLUMNS = {'cf_start_flag'}
@@ -1085,10 +1081,10 @@ def _write_budget_cell(*, project_id, fact_id, column, raw_value, user_id=None):
             }
         value_to_write = code
     elif column == 'activity':
-        # The writer's allowlist is the authority on what can be SAVED. 153 live
-        # rows carry 'Development', which is not on it; those are shown in the
-        # picklist as legacy so a user can SEE the stored value, but saving one
-        # is still refused rather than quietly promoting it to valid.
+        # The writer's allowlist is the authority on what can be SAVED. A stored
+        # value not on it (none since 2026-09-30, when 'Development' rows became
+        # 'Improvements') is shown in the picklist as legacy so a user can SEE
+        # it, but saving one is refused rather than quietly promoting it.
         text = '' if raw_value is None else str(raw_value).strip()
         if not text:
             return {'success': False, 'error': 'invalid_value',
