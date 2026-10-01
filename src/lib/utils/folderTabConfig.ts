@@ -540,7 +540,11 @@ export function getDefaultSubTabId(
     return 'sales-comparison';
   }
   if (folderId === 'feasibility') {
-    return 'feasibility';
+    // Land's Feasibility/Valuation folder has no 'feasibility' page; its pages
+    // are cashflow, returns, sensitivity. Defaulting to 'feasibility' made every
+    // folder-only navigation (the Screens dropdown) fail validation and do
+    // nothing (2026-10-01, QV14).
+    return 'cashflow';
   }
 
   return folder.subTabs[0].id;
