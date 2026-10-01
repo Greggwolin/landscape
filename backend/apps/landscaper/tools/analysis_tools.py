@@ -277,7 +277,7 @@ def handle_get_deal_summary(
 
             # ── Debt summary ──
             cur.execute("""
-                SELECT loan_name, loan_amount, interest_rate_pct, loan_term_months,
+                SELECT loan_id, loan_name, loan_amount, interest_rate_pct, loan_term_months,
                        amortization_months, interest_only_months, loan_to_value_pct
                 FROM landscape.tbl_loan
                 WHERE project_id = %s
@@ -286,6 +286,17 @@ def handle_get_deal_summary(
             """, [project_id])
             loan_cols = [c[0] for c in cur.description]
             loans = [dict(zip(loan_cols, r)) for r in cur.fetchall()]
+            # The amount a loan IS (HQ137): sized from the rule where nothing was
+            # saved, the same figure the Debt screen and the cash flow show.
+            try:
+                from apps.calculations.loan_sizing_service import effective_loan_terms
+                from apps.financial.models_debt import Loan
+                from apps.projects.models import Project
+                _proj = Project.objects.get(project_id=project_id)
+                for l in loans:
+                    l['loan_amount'] = effective_loan_terms(Loan.objects.get(loan_id=l['loan_id']), _proj)['commitment_amount']
+            except Exception:  # noqa: BLE001 — stored amounts still stand
+                pass
 
             # ── Valuation approaches ──
             cur.execute("""

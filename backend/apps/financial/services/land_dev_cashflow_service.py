@@ -2135,6 +2135,7 @@ class LandDevCashFlowService:
         """Months where this loan charges interest but the project has no
         cash that month to pay it, before any financing (Gregg, 2026-09-29:
         on save, offer an interest reserve when there are any)."""
+        loan = self._effective(loan)
         project_config = self._get_project_config()
         dcf = self._get_dcf_assumptions()
         n = self._determine_required_periods(None)
@@ -2220,7 +2221,18 @@ class LandDevCashFlowService:
         loans = loans.order_by('seniority', 'loan_id')
         if container_ids:
             loans = loans.filter(loan_containers__division_id__in=container_ids).distinct()
-        return list(loans)
+        # Each loan as it IS: its amount and start date from the sizing rule
+        # when nothing was saved (HQ137) — in-memory copies, never saved.
+        return [self._effective(loan) for loan in loans]
+
+    def _effective(self, loan: Loan) -> Loan:
+        if getattr(loan, '_effective_terms_copy', False):
+            return loan
+        from apps.calculations.loan_sizing_service import with_effective_terms
+        if not hasattr(self, '_project_cache'):
+            from apps.projects.models import Project
+            self._project_cache = Project.objects.get(project_id=self.project_id)
+        return with_effective_terms(loan, self._project_cache)
 
     @staticmethod
     def _get_period_index_for_date(periods: List[Dict], target_date: Optional[date]) -> int:

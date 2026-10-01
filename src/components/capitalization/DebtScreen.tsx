@@ -115,6 +115,30 @@ function money(v: unknown): string {
   return n < 0 ? `(${body})` : body;
 }
 
+/** A loan's effective terms from the server (HQ137): the sizing rule's amount,
+ *  bases and start date where nothing was saved, each flagged when a default.
+ *  Computed on read and never written back until someone saves the loan. */
+interface EffectiveTerms {
+  commitment_amount?: number;
+  ltv_basis_amount?: number;
+  ltc_basis_amount?: number;
+  governing_constraint?: string;
+  loan_start_date?: string | null;
+  basis_rule?: string;
+  value_basis_is_default?: boolean;
+  cost_basis_is_default?: boolean;
+  start_is_default?: boolean;
+  amount_is_saved?: boolean;
+  sizing_notes?: string[];
+}
+function effectiveOf(loan: Record<string, unknown>): EffectiveTerms {
+  return (loan.effective as EffectiveTerms | null | undefined) ?? {};
+}
+/** How a default basis is labelled: the acquisition price for a term bridge loan. */
+function basisDefaultLabel(e: EffectiveTerms): string {
+  return (e.basis_rule ?? '').startsWith('acquisition price') ? 'acquisition price' : 'default';
+}
+
 function pct(v: unknown, digits = 1): string {
   const n = num(v);
   return n === null ? '—' : `${n.toFixed(digits)}%`;
@@ -515,8 +539,8 @@ function LoansLedger({
                     <EditCell value={loan.lender_name} display={(loan.lender_name as string) || '—'}
                       onCommit={(v) => onSave(id, { lender_name: v })} />
                   </td>
-                  {/* Computed: the sized commitment. */}
-                  <td className={styles.num}>{money(loan.commitment_amount)}</td>
+                  {/* Computed: the sized commitment (effective — sized from the rule when not saved). */}
+                  <td className={styles.num}>{money(effectiveOf(loan).commitment_amount ?? loan.commitment_amount)}</td>
                   <td className={styles.num}>
                     <EditCell value={num(loan.loan_to_cost_pct)} display={pct(loan.loan_to_cost_pct)} kind="number"
                       align="right" onCommit={(v) => onSave(id, { loan_to_cost_pct: v })} />
@@ -824,8 +848,22 @@ function DetailPanel({
   });
   const record: LoanRecord = { ...(detail as LoanRecord | undefined ?? {}), ...loan };
 
+  const eff = effectiveOf(loan);
   const field = (f: FieldDef) => {
     const value = f.key in loan ? loan[f.key] : record[f.key];
+    // No start date saved: show the default (the acquisition date), marked, and
+    // let a typed date replace it (HQ137).
+    if (f.key === 'loan_start_date' && !value && eff.loan_start_date) {
+      return (
+        <EditCell
+          value={eff.loan_start_date}
+          display={`${eff.loan_start_date} · acquisition date`}
+          kind="date"
+          align="right"
+          onCommit={(v) => onSave(loan.loan_id, { loan_start_date: v })}
+        />
+      );
+    }
     // A land loan's structure is always Term — show it, but offer nothing else.
     if (f.key === 'structure_type' && loan.loan_type === 'LAND') {
       return <span title="A land loan has one advance at closing">Term (one advance)</span>;
@@ -834,7 +872,7 @@ function DetailPanel({
     // sized commitment — computed, so not offered for editing here.
     if (f.key === 'commitment_amount'
       && (num(loan.loan_to_cost_pct) !== null || num(loan.loan_to_value_pct) !== null)) {
-      return <span title="Sized from the ratio above">{money(value)}</span>;
+      return <span title="Sized from the ratio above">{money(eff.commitment_amount ?? value)}</span>;
     }
     if (f.kind === 'bool') {
       return (
@@ -894,24 +932,47 @@ function DetailPanel({
           ))}
           {g.title === 'Sizing' && (
             <>
+              {/* A term bridge loan is sized on the acquisition price; other loans on
+                  the purchase plus the budget of the containers they fund (HQ132).
+                  A basis shows its default, marked, until one is typed; clearing a
+                  typed basis returns it to the default (HQ137). */}
               <div className={styles.row}>
                 <span className={styles.rowLabel}>Value basis</span>
-                <span className={styles.rowValue}>{money(loan.ltv_basis_amount)}</span>
+                <span className={styles.rowValue}>
+                  <EditCell
+                    value={num(eff.ltv_basis_amount ?? loan.ltv_basis_amount)}
+                    display={`${money(eff.ltv_basis_amount ?? loan.ltv_basis_amount)}${eff.value_basis_is_default ? ` · ${basisDefaultLabel(eff)}` : ''}`}
+                    kind="number"
+                    align="right"
+                    onCommit={(v) => onSave(loan.loan_id, { ltv_basis_amount: v })}
+                  />
+                </span>
               </div>
               <div className={styles.row}>
-                {/* A term bridge loan is sized on the acquisition price; other loans on
-                    the purchase plus the budget of the containers they fund (HQ132). */}
                 <span className={styles.rowLabel}>Cost basis</span>
-                <span className={styles.rowValue}>{money(loan.ltc_basis_amount)}</span>
+                <span className={styles.rowValue}>
+                  <EditCell
+                    value={num(eff.ltc_basis_amount ?? loan.ltc_basis_amount)}
+                    display={`${money(eff.ltc_basis_amount ?? loan.ltc_basis_amount)}${eff.cost_basis_is_default ? ` · ${basisDefaultLabel(eff)}` : ''}`}
+                    kind="number"
+                    align="right"
+                    onCommit={(v) => onSave(loan.loan_id, { ltc_basis_amount: v })}
+                  />
+                </span>
               </div>
               <div className={styles.row}>
                 <span className={styles.rowLabel}>Commitment</span>
-                <span className={styles.rowValue}>{money(loan.commitment_amount)}</span>
+                <span className={styles.rowValue} title={eff.amount_is_saved === false ? 'Sized from the rule; saved when the loan is next saved' : undefined}>
+                  {money(eff.commitment_amount ?? loan.commitment_amount)}
+                </span>
               </div>
               <div className={styles.row}>
                 <span className={styles.rowLabel}>Governed by</span>
-                <span className={styles.rowValue}>{(loan.governing_constraint as string) || '—'}</span>
+                <span className={styles.rowValue}>{eff.governing_constraint || (loan.governing_constraint as string) || '—'}</span>
               </div>
+              {(eff.sizing_notes ?? []).map((n) => (
+                <div key={n} className={styles.hint}>{n}</div>
+              ))}
             </>
           )}
         </section>

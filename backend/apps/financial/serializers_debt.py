@@ -46,6 +46,28 @@ class LoanFinanceStructureSerializer(serializers.ModelSerializer):
         read_only_fields = ['loan_fs_id', 'created_at']
 
 
+def _effective_terms_payload(loan) -> dict:
+    """The loan's effective amount, bases and start date (HQ137): the sizing
+    rule's figures where nothing was saved, each flagged when it is a default.
+    Read-only; never written back on view."""
+    from decimal import Decimal
+    from datetime import date
+    from apps.calculations.loan_sizing_service import effective_loan_terms
+    try:
+        terms = effective_loan_terms(loan, loan.project)
+    except Exception:  # noqa: BLE001 — the stored record still serializes
+        return None
+    out = {}
+    for k, v in terms.items():
+        if isinstance(v, Decimal):
+            out[k] = float(v)
+        elif isinstance(v, date):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out
+
+
 class LoanListSerializer(serializers.ModelSerializer):
     # Return numeric values for JS arithmetic (not Decimal strings)
     commitment_amount = serializers.FloatField(allow_null=True, default=0)
@@ -63,6 +85,10 @@ class LoanListSerializer(serializers.ModelSerializer):
     # The containers the loan funds and its share of each — the ledger's
     # "Funds" column. Additive: existing consumers ignore it.
     containers = LoanContainerSerializer(many=True, read_only=True, source='loan_containers')
+    effective = serializers.SerializerMethodField()
+
+    def get_effective(self, obj):
+        return _effective_terms_payload(obj)
 
     class Meta:
         model = Loan
@@ -109,6 +135,7 @@ class LoanListSerializer(serializers.ModelSerializer):
             'rate_cap_pct',
             'takes_out_loan_id',
             'containers',
+            'effective',
         ]
 
 
@@ -124,6 +151,10 @@ class LoanDetailSerializer(serializers.ModelSerializer):
         source='loan_finance_structures'
     )
     takes_out_loan = LoanListSerializer(read_only=True)
+    effective = serializers.SerializerMethodField()
+
+    def get_effective(self, obj):
+        return _effective_terms_payload(obj)
 
     class Meta:
         model = Loan

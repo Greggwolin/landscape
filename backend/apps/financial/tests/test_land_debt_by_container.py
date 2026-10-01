@@ -457,3 +457,34 @@ def test_term_bridge_sizes_both_bases_on_the_acquisition_price():
          mock.patch.object(L, 'development_budget_basis', return_value={'total': L.Decimal('39709125'), 'by_activity': {}, 'funds_acquisition': True, 'project_wide': True}):
         r = L.LoanSizingService.calculate_commitment(revolver, project)
     assert r['ltc_basis_amount'] == L.Decimal('143709125.00')   # unchanged rule for other loans
+
+
+# HQ137: a loan's effective terms come from the sizing rule where nothing was
+# saved, flagged as defaults; a typed basis is kept; nothing is written.
+def test_effective_terms_default_where_unsaved_and_keep_what_was_typed():
+    from datetime import date
+    from types import SimpleNamespace
+    from unittest import mock
+    from apps.calculations import loan_sizing_service as L
+    project = SimpleNamespace(project_id=9, project_type_code='LAND')
+    price = {'amount': L.Decimal('104000000'), 'source': 'acquisition closing'}
+    unsaved = SimpleNamespace(loan_id=63, loan_type='BRIDGE', structure_type='TERM',
+                              loan_to_value_pct=50, loan_to_cost_pct=50, commitment_amount=0, loan_amount=0,
+                              ltv_basis_amount=0, ltc_basis_amount=0, loan_start_date=None,
+                              origination_fee_pct=1, interest_reserve_amount=0, closing_costs_appraisal=0,
+                              closing_costs_legal=0, closing_costs_other=0)
+    with mock.patch.object(L, 'acquisition_closing_price', return_value=price), \
+         mock.patch('apps.financial.services.land_dev_cashflow_service.LandDevCashFlowService.acquisition_date',
+                    return_value=date(2026, 1, 1)):
+        t = L.effective_loan_terms(unsaved, project)
+        assert t['commitment_amount'] == L.Decimal('52000000.00')
+        assert t['loan_start_date'] == date(2026, 1, 1)
+        assert t['value_basis_is_default'] and t['cost_basis_is_default'] and t['start_is_default']
+        assert t['amount_is_saved'] is False
+        typed = SimpleNamespace(**{**vars(unsaved), 'ltv_basis_amount': 90_000_000, 'loan_start_date': date(2026, 3, 1)})
+        t2 = L.effective_loan_terms(typed, project)
+        assert t2['ltv_basis_amount'] == L.Decimal('90000000.00') and not t2['value_basis_is_default']
+        assert t2['commitment_amount'] == L.Decimal('45000000.00')
+        assert t2['loan_start_date'] == date(2026, 3, 1) and not t2['start_is_default']
+        clone = L.with_effective_terms(unsaved, project)
+    assert clone.loan_amount == L.Decimal('52000000.00') and unsaved.loan_amount == 0   # the record is untouched

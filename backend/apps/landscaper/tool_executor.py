@@ -7722,11 +7722,38 @@ def handle_get_loans(
                         record[key] = str(record[key])
                 records.append(record)
 
-            return {
-                'success': True,
-                'count': len(records),
-                'records': records
-            }
+        # What each loan IS (HQ137): its amount, bases and start date from the
+        # sizing rule where nothing was saved — the figures the Debt screen and
+        # the cash flow use. The stored columns above stay as recorded.
+        try:
+            from apps.calculations.loan_sizing_service import effective_loan_terms
+            from apps.financial.models_debt import Loan
+            from apps.projects.models import Project
+            project = Project.objects.get(project_id=project_id)
+            for record in records:
+                terms = effective_loan_terms(Loan.objects.get(loan_id=record['loan_id']), project)
+                record['effective'] = {
+                    'commitment_amount': float(terms['commitment_amount']),
+                    'value_basis': float(terms['ltv_basis_amount']),
+                    'cost_basis': float(terms['ltc_basis_amount']),
+                    'governing_constraint': terms['governing_constraint'],
+                    'loan_start_date': str(terms['loan_start_date']) if terms['loan_start_date'] else None,
+                    'basis_rule': terms['basis_rule'],
+                    'defaults': [k for k, flag in (
+                        ('value basis', terms['value_basis_is_default']),
+                        ('cost basis', terms['cost_basis_is_default']),
+                        ('start date', terms['start_is_default']),
+                    ) if flag],
+                    'amount_is_saved': terms['amount_is_saved'],
+                }
+        except Exception as e:  # noqa: BLE001 — the stored loans still return
+            logger.warning(f"get_loans: effective terms unavailable: {e}")
+
+        return {
+            'success': True,
+            'count': len(records),
+            'records': records
+        }
 
     except Exception as e:
         logger.error(f"Error getting loans: {e}")

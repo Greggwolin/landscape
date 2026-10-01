@@ -609,3 +609,75 @@ class LoanSizingService:
             "summary_of_proceeds": summary_of_proceeds,
             "equity_to_close": equity_to_close,
         }
+
+
+# ---------------------------------------------------------------------------
+# A loan's effective terms (HQ137)
+# ---------------------------------------------------------------------------
+def _typed_bases_on_record(loan: Any, default_bases: Dict[str, Any]) -> Dict[str, Decimal]:
+    """A stored basis counts as typed only when it differs from today's default;
+    a stored default (or the $0 a loan saved before the ledger was priced
+    carries) is not an override. The loan form applies the same reading."""
+    typed: Dict[str, Decimal] = {}
+    for key, default in (("ltv_basis_amount", default_bases["default_value_basis"]),
+                         ("ltc_basis_amount", default_bases["default_cost_basis"])):
+        stored = _positive(getattr(loan, key, None))
+        if stored is not None and abs(stored - _to_decimal(default)) > Decimal("0.5"):
+            typed[key] = stored
+    return typed
+
+
+def effective_loan_terms(loan: Any, project: Any) -> Dict[str, Any]:
+    """What a loan IS right now: its amount, bases and start date, worked out by
+    the same functions the save uses (``sizing_bases`` / ``calculate_commitment``
+    / the acquisition date). Nothing is written — a default shows as a default
+    until someone saves the loan. Each figure says whether it was typed or is a
+    default, so a screen can mark it."""
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+    defaults = LoanSizingService.sizing_bases(loan, project)
+    typed = _typed_bases_on_record(loan, defaults)
+    sizing = LoanSizingService.calculate_commitment(loan, project, typed)
+    stored_start = getattr(loan, "loan_start_date", None)
+    start = stored_start
+    if not start and getattr(project, "project_id", None) is not None:
+        try:
+            start = LandDevCashFlowService(int(project.project_id)).acquisition_date()
+        except Exception:  # noqa: BLE001 — a missing date is shown as missing, not guessed
+            start = None
+    stored_amount = _to_decimal(getattr(loan, "commitment_amount", None) or getattr(loan, "loan_amount", None))
+    return {
+        "commitment_amount": sizing["commitment_amount"],
+        "loan_amount": sizing["loan_amount"],
+        "net_loan_proceeds": sizing["net_loan_proceeds"],
+        "governing_constraint": sizing["governing_constraint"],
+        "commitment_sizing_method": sizing["commitment_sizing_method"],
+        "ltv_basis_amount": sizing["ltv_basis_amount"],
+        "ltc_basis_amount": sizing["ltc_basis_amount"],
+        "ltv_amount": sizing["ltv_amount"],
+        "ltc_amount": sizing["ltc_amount"],
+        "basis_rule": sizing["basis_rule"],
+        "price_source": sizing["purchase_price_source"],
+        "sizing_notes": sizing["sizing_notes"],
+        "loan_start_date": start,
+        # True where the figure comes from the default rule, not from the record.
+        "value_basis_is_default": "ltv_basis_amount" not in typed,
+        "cost_basis_is_default": "ltc_basis_amount" not in typed,
+        "start_is_default": not stored_start and start is not None,
+        "amount_is_saved": abs(stored_amount - sizing["commitment_amount"]) <= Decimal("0.5"),
+    }
+
+
+def with_effective_terms(loan: Any, project: Any) -> Any:
+    """An in-memory copy of the loan carrying its effective amount, bases and
+    start date, for calculations (cash flow, draws, coverage). NEVER save it."""
+    import copy
+
+    terms = effective_loan_terms(loan, project)
+    clone = copy.copy(loan)
+    for key in ("commitment_amount", "loan_amount", "net_loan_proceeds", "governing_constraint",
+                "commitment_sizing_method", "ltv_basis_amount", "ltc_basis_amount", "loan_start_date"):
+        setattr(clone, key, terms[key])
+    clone.calculated_commitment_amount = terms["commitment_amount"]
+    clone._effective_terms_copy = True  # marks the copy; see the docstring
+    return clone

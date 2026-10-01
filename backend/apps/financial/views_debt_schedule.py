@@ -16,6 +16,11 @@ class DebtScheduleView(APIView):
 
     def get(self, request, project_id: int, loan_id: int):
         loan = get_object_or_404(Loan, loan_id=loan_id, project_id=project_id)
+        # Schedule what the loan IS: its effective amount and start date from the
+        # sizing rule when nothing was saved (HQ137). An in-memory copy — never saved.
+        from apps.calculations.loan_sizing_service import with_effective_terms
+        from apps.projects.models import Project
+        loan = with_effective_terms(loan, get_object_or_404(Project, project_id=project_id))
 
         # A take-out is captured but not modelled: say so alongside the
         # schedule rather than refusing to show one.
