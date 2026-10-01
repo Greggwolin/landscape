@@ -1087,16 +1087,15 @@ class WhatIfEngine:
             total_gross_revenue += gross
             cash_flows[period - 1] += net
 
-        annual_cash_flows = [
-            sum(cash_flows[i:i + 12])
-            for i in range(0, len(cash_flows), 12)
-        ]
+        # Same basis as LandDevCashFlowService: monthly cash flows, compounded
+        # to an annual rate (equivalent to dated XIRR on month starts). The old
+        # yearly-bucket IRR overstated returns when sales fell late in a year.
         irr = None
-        if len(annual_cash_flows) >= 2:
+        if len(cash_flows) >= 2:
             try:
-                irr_result = npf.irr(annual_cash_flows)
+                irr_result = npf.irr(cash_flows)
                 if not np.isnan(irr_result):
-                    irr = float(irr_result)
+                    irr = float((1 + irr_result) ** 12 - 1)
             except Exception:
                 pass
 
