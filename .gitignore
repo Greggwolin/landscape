@@ -252,3 +252,6 @@ reference/images/screenshots/capture-*/
 
 # Local database backups — never committed, never synced
 backups/
+
+# Rendered engine-check pages (regenerated on demand, carry live data)
+backend/notebooks/engine_checks/output/
