@@ -984,6 +984,60 @@ function DetailPanel({
         </button>
       </div>
       <div className={styles.tileGrid}>
+      {/* Gregg, 2026-10-02: column 1 is Security (was Funds), Loan, Sizing. */}
+      <div className={styles.tileCol}>
+      <section className={styles.group}>
+        <div className={styles.groupTitle}>Security</div>
+        {containers.length === 0 && (
+          <div className={styles.muted}>
+            Whole project — draws on every cost and is released by every sale, and funds the land purchase.
+          </div>
+        )}
+        {containers.map((c) => (
+          <div key={c.division_id} className={styles.row}>
+            <span className={styles.rowLabel}>{containerName(c.division_id)}</span>
+            <span className={`${styles.rowValue} d-flex align-items-center gap-2`}>
+              <input
+                aria-label="Share"
+                className={`form-control form-control-sm ${styles.shareInput} ${styles.typed}`}
+                type="number"
+                // Empty means the loan takes all of this container (the engine
+                // reads no share as the whole of it); nothing is filled in for it.
+                defaultValue={num(c.allocation_pct) ?? ''}
+                placeholder="all"
+                onBlur={(e) => setShare(c.division_id, e.target.value)}
+              />
+              %
+              <label className="d-flex align-items-center gap-1" title="The loan also funds the land purchase">
+                <input
+                  type="checkbox"
+                  className="form-check-input"
+                  checked={['ACQUISITION', 'LAND'].includes((c.collateral_type || '').toUpperCase())}
+                  onChange={(e) => setAcquisition(c.division_id, e.target.checked)}
+                />
+                land
+              </label>
+              <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={() => removeContainer(c.division_id)}>
+                Remove
+              </button>
+            </span>
+          </div>
+        ))}
+        <div className="d-flex align-items-center gap-2" style={{ marginTop: 6 }}>
+          <select className="form-select form-select-sm" value={adding} onChange={(e) => setAdding(e.target.value)}>
+            <option value="">Add a village or phase…</option>
+            {containerOptions
+              .filter((o) => !containers.some((c) => c.division_id === o.id))
+              .map((o) => (
+                <option key={o.id} value={o.id}>{o.level} · {o.label}</option>
+              ))}
+          </select>
+          <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={addContainer} disabled={!adding}>
+            Add
+          </button>
+        </div>
+      </section>
+
       {GROUPS.slice(0, 2).map((g) => (
         <section key={g.title} className={styles.group}>
           <div className={styles.groupTitle}>{g.title}</div>
@@ -1041,58 +1095,8 @@ function DetailPanel({
         </section>
       ))}
 
-      <section className={styles.group}>
-        <div className={styles.groupTitle}>Funds</div>
-        {containers.length === 0 && (
-          <div className={styles.muted}>
-            Whole project — draws on every cost and is released by every sale, and funds the land purchase.
-          </div>
-        )}
-        {containers.map((c) => (
-          <div key={c.division_id} className={styles.row}>
-            <span className={styles.rowLabel}>{containerName(c.division_id)}</span>
-            <span className={`${styles.rowValue} d-flex align-items-center gap-2`}>
-              <input
-                aria-label="Share"
-                className={`form-control form-control-sm ${styles.shareInput} ${styles.typed}`}
-                type="number"
-                // Empty means the loan takes all of this container (the engine
-                // reads no share as the whole of it); nothing is filled in for it.
-                defaultValue={num(c.allocation_pct) ?? ''}
-                placeholder="all"
-                onBlur={(e) => setShare(c.division_id, e.target.value)}
-              />
-              %
-              <label className="d-flex align-items-center gap-1" title="The loan also funds the land purchase">
-                <input
-                  type="checkbox"
-                  className="form-check-input"
-                  checked={['ACQUISITION', 'LAND'].includes((c.collateral_type || '').toUpperCase())}
-                  onChange={(e) => setAcquisition(c.division_id, e.target.checked)}
-                />
-                land
-              </label>
-              <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={() => removeContainer(c.division_id)}>
-                Remove
-              </button>
-            </span>
-          </div>
-        ))}
-        <div className="d-flex align-items-center gap-2" style={{ marginTop: 6 }}>
-          <select className="form-select form-select-sm" value={adding} onChange={(e) => setAdding(e.target.value)}>
-            <option value="">Add a village or phase…</option>
-            {containerOptions
-              .filter((o) => !containers.some((c) => c.division_id === o.id))
-              .map((o) => (
-                <option key={o.id} value={o.id}>{o.level} · {o.label}</option>
-              ))}
-          </select>
-          <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={addContainer} disabled={!adding}>
-            Add
-          </button>
-        </div>
-      </section>
-
+      </div>
+      <div className={styles.tileCol}>
       {GROUPS.slice(2).map((g) => (
         <section key={g.title} className={styles.group}>
           <div className={styles.groupTitle}>{g.title}</div>
@@ -1116,6 +1120,7 @@ function DetailPanel({
           </div>
         ))}
       </section>
+      </div>
       </div>
     </div>
   );
