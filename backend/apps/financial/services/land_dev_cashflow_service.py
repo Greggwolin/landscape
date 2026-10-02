@@ -4,7 +4,7 @@ Land Development Cash Flow Service
 Calculates complete cash flow projections for Land Development projects.
 Port of TypeScript engine (src/lib/financial-engine/cashflow/) to Django.
 
-Uses numpy-financial for IRR/NPV calculations to match Excel methodology.
+Uses numpy-financial for NPV; IRR is dated (XIRR) on monthly cash flows.
 
 Key Features:
 - Monthly period generation from project start date
@@ -2666,18 +2666,13 @@ class LandDevCashFlowService:
         period_count = len(periods)
         net_cash_flows = self._build_net_cash_flow_array(sections, period_count)
 
-        # IRR on the monthly flows, annualized — the same method the waterfall
-        # uses, so the project shows one IRR everywhere (HQ132). Summing to
-        # years first netted a year's costs against the same year's sales and
-        # gave Peoria 51.6% here against 39.1% in the waterfall on the same flow.
-        irr = None
-        if len(net_cash_flows) >= 2:
-            try:
-                irr_result = npf.irr(net_cash_flows)
-                if not np.isnan(irr_result):
-                    irr = float((1.0 + float(irr_result)) ** 12 - 1.0)
-            except Exception:
-                pass
+        # IRR on actual dates: each month's cash is timed at the date it lands
+        # (Excel XIRR convention, days/365). Gregg's call, 2026-10-01 (QV7, 4a).
+        # The previous method summed each calendar year and treated the total as
+        # arriving at the start of that year, which pulled late-year sales
+        # forward by up to eleven months and overstated the IRR (Peoria Meadows:
+        # 51.6% yearly vs 39.1% on actual dates).
+        irr = self._calculate_dated_irr(net_cash_flows, periods)
 
         # Calculate NPV if discount rate provided
         npv = None
@@ -2752,26 +2747,38 @@ class LandDevCashFlowService:
 
         return cash_flows
 
-    def _aggregate_to_annual(self, monthly_cash_flows: List[float], periods: List[Dict]) -> List[float]:
+    @staticmethod
+    def _calculate_dated_irr(monthly_cash_flows: List[float], periods: List[Dict]) -> Optional[float]:
+        """Annual IRR with each monthly cash flow dated to its period start.
+
+        Uses the shared XIRR solver (financial_engine.waterfall.irr), the same
+        one the waterfall uses. Falls back to the monthly IRR compounded to a
+        year if the dated solver finds no answer. Returns None when no IRR
+        exists (e.g. no sign change).
         """
-        Aggregate monthly cash flows to annual for IRR calculation.
+        if len(monthly_cash_flows) < 2 or len(periods) < len(monthly_cash_flows):
+            return None
+        if not (any(cf < 0 for cf in monthly_cash_flows) and any(cf > 0 for cf in monthly_cash_flows)):
+            return None
 
-        Groups by calendar year based on period start dates.
-        """
-        if not monthly_cash_flows:
-            return []
+        dates: List[date] = []
+        for p in periods[:len(monthly_cash_flows)]:
+            d = p.get('startDate')
+            dates.append(date.fromisoformat(d[:10]) if isinstance(d, str) else d)
 
-        yearly_totals = {}
+        try:
+            from decimal import Decimal
+            from financial_engine.waterfall.irr import calculate_xirr
+            result = calculate_xirr(dates, [Decimal(str(round(cf, 2))) for cf in monthly_cash_flows])
+            if result is not None:
+                return float(result)
+        except Exception:
+            pass
 
-        for i, cf in enumerate(monthly_cash_flows):
-            if i < len(periods):
-                # Get year from period's start date
-                start_date = periods[i].get('startDate')
-                if isinstance(start_date, str):
-                    year = int(start_date[:4])
-                else:
-                    year = start_date.year
-                yearly_totals[year] = yearly_totals.get(year, 0) + cf
-
-        sorted_years = sorted(yearly_totals.keys())
-        return [yearly_totals[year] for year in sorted_years]
+        try:
+            monthly = npf.irr(monthly_cash_flows)
+            if not np.isnan(monthly):
+                return float((1 + monthly) ** 12 - 1)
+        except Exception:
+            pass
+        return None

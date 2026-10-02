@@ -242,9 +242,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert document into core_doc
-    // When intent=structured_ingestion, hide from DMS until commit by setting
-    // deleted_at. commit_staging will flip deleted_at → NULL on success.
-    const hideUntilCommit = system.intent === 'structured_ingestion';
+    // A new document is always visible. It used to be hidden (deleted_at set)
+    // whenever the tray routed it for extraction, to be un-hidden only when a
+    // Workbench commit succeeded — but the person is then asked how to handle
+    // it, and choosing "documents only" or closing the question never un-hid
+    // it. Every spreadsheet dropped on a folder vanished that way; nine Red
+    // Valley documents were found hidden on 2026-09-29. Cancelling the
+    // Workbench still removes the document through its own abandon path.
 
     const inserted = await sql`
       INSERT INTO landscape.core_doc (
@@ -284,7 +288,7 @@ export async function POST(req: NextRequest) {
         ${JSON.stringify(profile)}::jsonb,
         ${requestUser.userId},
         ${requestUser.userId},
-        ${hideUntilCommit ? new Date().toISOString() : null}
+        ${null}
       )
       RETURNING doc_id, version_no, doc_name, status, created_at
     `;

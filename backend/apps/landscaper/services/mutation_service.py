@@ -9,9 +9,11 @@ Handles the lifecycle of mutation proposals:
 
 This implements Level 2 autonomy: Landscaper proposes, user confirms.
 """
+import contextvars
 import uuid
 import json
 import logging
+from contextlib import contextmanager
 from typing import Dict, Any, List, Optional
 from datetime import timedelta
 from decimal import Decimal
@@ -645,10 +647,68 @@ FIELD_TYPES = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Confirm-time replay (BM1, 2026-09-29)
+#
+# Most mutation types have no hand-written executor in _execute_mutation, so a
+# confirmed proposal used to fail with "Unknown mutation type" and write nothing.
+# Instead of hand-writing ~35 executors, every proposal records the tool call
+# that produced it; on confirm, that tool is re-run with propose_only=False —
+# the write logic each handler already contains.
+#
+# execute_tool() opens a replay context around the handler call; create_proposal
+# reads it. A tool call that produces MORE than one proposal is not replayable
+# per row (replaying the whole call on each confirm would repeat it), so those
+# rows have their replay data cleared when the context closes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_REPLAY_CONTEXT: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = contextvars.ContextVar(
+    "landscaper_mutation_replay", default=None
+)
+
+# Types with a native executor below. These never replay.
+NATIVE_MUTATION_TYPES = frozenset({
+    "field_update", "bulk_update", "opex_upsert", "rent_roll_batch",
+    "assumption_upsert", "unit_delete", "create_project",
+})
+
+
+@contextmanager
+def replay_context(tool_name: str, tool_input: Any):
+    """Record the tool call so proposals it creates can be replayed on confirm."""
+    state = {"tool_name": tool_name, "tool_input": tool_input, "mutation_ids": []}
+    token = _REPLAY_CONTEXT.set(state)
+    try:
+        yield state
+    finally:
+        _REPLAY_CONTEXT.reset(token)
+        ids = state["mutation_ids"]
+        if len(ids) > 1:
+            try:
+                with transaction.atomic(), connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE landscape.pending_mutations
+                        SET replay_tool_name = NULL, replay_tool_input = NULL
+                        WHERE mutation_id = ANY(%s::uuid[])
+                    """, [ids])
+            except Exception as e:  # never break the chat turn over this
+                logger.warning(f"[MUTATION] Could not clear multi-proposal replay data: {e}")
+
+
+class _ReplayFailed(Exception):
+    """Raised inside the replay savepoint so partial writes roll back."""
+
+    def __init__(self, result: Dict[str, Any]):
+        super().__init__(result.get("error") or "Replay failed")
+        self.result = result
+
+
 class MutationService:
     """Service for managing Landscaper mutation proposals."""
 
-    EXPIRATION_HOURS = 1
+    # None = proposals never expire; they stay until confirmed or rejected
+    # (Gregg, 2026-09-29, BM2 — option 1c).
+    EXPIRATION_HOURS: Optional[int] = None
 
     @classmethod
     def create_proposal(
@@ -702,7 +762,16 @@ class MutationService:
             }
 
         mutation_id = str(uuid.uuid4())
-        expires_at = timezone.now() + timedelta(hours=cls.EXPIRATION_HOURS)
+        expires_at = (
+            timezone.now() + timedelta(hours=cls.EXPIRATION_HOURS)
+            if cls.EXPIRATION_HOURS else None
+        )
+
+        replay = _REPLAY_CONTEXT.get()
+        replay_tool_name = replay["tool_name"] if replay else None
+        replay_tool_input = (
+            json.dumps(replay["tool_input"], cls=DecimalEncoder) if replay else None
+        )
 
         # Determine if high-risk
         is_high_risk = cls._is_high_risk(field_name)
@@ -718,14 +787,19 @@ class MutationService:
                     INSERT INTO landscape.pending_mutations
                     (mutation_id, project_id, mutation_type, table_name, field_name, record_id,
                      current_value, proposed_value, reason, source_message_id, source_documents,
-                     is_high_risk, expires_at, batch_id, sequence_in_batch, source_type)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
+                     is_high_risk, expires_at, batch_id, sequence_in_batch, source_type,
+                     replay_tool_name, replay_tool_input)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s, %s, %s, %s, %s,
+                            %s, %s::jsonb)
                     RETURNING created_at
                 """, [
                     mutation_id, project_id, mutation_type, table_name, field_name, record_id,
                     current_json, proposed_json, reason, source_message_id, source_docs_json,
-                    is_high_risk, expires_at, batch_id, sequence, source_type
+                    is_high_risk, expires_at, batch_id, sequence, source_type,
+                    replay_tool_name, replay_tool_input,
                 ])
+                if replay is not None:
+                    replay["mutation_ids"].append(mutation_id)
                 row = cursor.fetchone()
                 created_at = row[0] if row else timezone.now()
 
@@ -750,7 +824,7 @@ class MutationService:
                 "success": True,
                 "mutation_id": mutation_id,
                 "is_high_risk": is_high_risk,
-                "expires_at": expires_at.isoformat(),
+                "expires_at": expires_at.isoformat() if expires_at else None,
                 "created_at": created_at.isoformat(),
                 "table": table_name,
                 "field": field_name,
@@ -845,7 +919,8 @@ class MutationService:
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT project_id, mutation_type, table_name, field_name, record_id,
-                       current_value, proposed_value, reason, status, expires_at, source_type
+                       current_value, proposed_value, reason, status, expires_at, source_type,
+                       replay_tool_name, replay_tool_input
                 FROM landscape.pending_mutations
                 WHERE mutation_id = %s
                 FOR UPDATE
@@ -857,14 +932,15 @@ class MutationService:
                 return {"success": False, "error": "Mutation not found"}
 
             (project_id, mutation_type, table_name, field_name, record_id,
-             current_value, proposed_value, reason, status, expires_at, source_type) = row
+             current_value, proposed_value, reason, status, expires_at, source_type,
+             replay_tool_name, replay_tool_input) = row
 
             logger.info(f"[MUTATION] Found: type={mutation_type}, table={table_name}, status={status}, project={project_id}")
 
             if status != "pending":
                 return {"success": False, "error": f"Mutation already {status}"}
 
-            if expires_at < timezone.now():
+            if expires_at is not None and expires_at < timezone.now():
                 cursor.execute("""
                     UPDATE landscape.pending_mutations
                     SET status = 'expired', resolved_at = NOW()
@@ -881,6 +957,8 @@ class MutationService:
                     field_name=field_name,
                     record_id=record_id,
                     proposed_value=proposed_value,
+                    replay_tool_name=replay_tool_name,
+                    replay_tool_input=replay_tool_input,
                 )
 
                 if execution_result.get("success"):
@@ -1055,7 +1133,8 @@ class MutationService:
                        current_value, proposed_value, reason, is_high_risk,
                        created_at, expires_at, batch_id, source_message_id
                 FROM landscape.pending_mutations
-                WHERE project_id = %s AND status = 'pending' AND expires_at > NOW()
+                WHERE project_id = %s AND status = 'pending'
+                  AND (expires_at IS NULL OR expires_at > NOW())
                 ORDER BY created_at DESC
             """, [project_id])
 
@@ -1098,6 +1177,8 @@ class MutationService:
         field_name: Optional[str],
         record_id: Optional[str],
         proposed_value: Any,
+        replay_tool_name: Optional[str] = None,
+        replay_tool_input: Any = None,
     ) -> Dict[str, Any]:
         """
         Execute the actual database mutation.
@@ -1110,6 +1191,18 @@ class MutationService:
                 proposed_value = json.loads(proposed_value)
             except json.JSONDecodeError:
                 pass  # Keep as string
+
+        if mutation_type not in NATIVE_MUTATION_TYPES:
+            if replay_tool_name:
+                return cls._replay_tool(project_id, replay_tool_name, replay_tool_input)
+            return {
+                "success": False,
+                "error": (
+                    "This proposal can't be applied from the confirm button — it was "
+                    "created before confirmations were fixed, or as part of a multi-part "
+                    "change. Ask Landscaper to propose it again."
+                ),
+            }
 
         pk_column = PK_COLUMNS.get(table_name)
         if not pk_column:
@@ -2040,6 +2133,49 @@ class MutationService:
         except Exception as e:
             logger.exception(f"Database mutation failed: {e}")
             return {"success": False, "error": str(e)}
+
+    @classmethod
+    def _replay_tool(cls, project_id: int, tool_name: str, tool_input: Any) -> Dict[str, Any]:
+        """Re-run the tool that made the proposal, this time allowed to write."""
+        from ..tool_executor import TOOL_REGISTRY  # lazy: avoids import cycle
+
+        if isinstance(tool_input, str):
+            try:
+                tool_input = json.loads(tool_input)
+            except json.JSONDecodeError:
+                return {"success": False, "error": "Stored proposal input is unreadable"}
+
+        handler = TOOL_REGISTRY.get(tool_name)
+        if handler is None:
+            return {"success": False, "error": f"Tool {tool_name} is no longer available"}
+
+        logger.info(f"[MUTATION] Replaying {tool_name} with propose_only=False")
+        try:
+            # Savepoint: a failed handler rolls back its own partial writes and
+            # leaves the outer confirm transaction usable for the audit row.
+            with transaction.atomic():
+                result = handler(
+                    tool_input=tool_input or {},
+                    project_id=project_id,
+                    propose_only=False,
+                    source_message_id=None,
+                    thread_id=None,
+                    user_id=None,
+                )
+                if not isinstance(result, dict):
+                    raise _ReplayFailed({"error": "Tool returned no result"})
+                if result.get("mutation_id") and result.get("action") != "confirmed":
+                    raise _ReplayFailed({"error": "Tool produced a new proposal instead of writing"})
+                ok = result.get("success") if "success" in result else "error" not in result
+                if not ok:
+                    raise _ReplayFailed(result)
+        except _ReplayFailed as rf:
+            return {"success": False, "error": rf.result.get("error") or rf.result.get("message") or "Tool reported failure"}
+
+        out = dict(result)
+        out["success"] = True
+        out["replayed_tool"] = tool_name
+        return out
 
     @classmethod
     def _cast_value(cls, field_name: str, value: Any) -> Any:

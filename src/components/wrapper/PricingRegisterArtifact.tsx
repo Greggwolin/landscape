@@ -173,7 +173,9 @@ function cellText(c: PricingColumn, value: unknown): string {
 export function PricingRegisterArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [rung, setRung] = useState<string>(config.default_rung || 'standard');
+  // Gregg, 2026-09-30 (BM16): every table opens on its most detailed view with
+  // no grouping, whatever the stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.rung_columns?.detail ? 'detail' : (config.default_rung || 'standard')));
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   // A cell whose picklist the user answered with "type a value". Held
@@ -335,7 +337,6 @@ export function PricingRegisterArtifact({
     <div className={styles.root}>
       <div className={styles.head}>
         <div>
-          <div className={styles.kicker}>{config.kicker}</div>
           <div className={styles.titleRow}>
             <span className={styles.title}>{config.title}</span>
             <span className={styles.titleBadges}>

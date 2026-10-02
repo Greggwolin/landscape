@@ -145,6 +145,14 @@ const TOOL_TABLE_MAP: Record<string, string[]> = {
   update_cashflow_assumption: ['dcf_analysis', 'cashflow'],  // DCF/Cashflow assumptions
   confirm_column_mapping: ['units', 'leases', 'unit_types', 'dynamic_columns'],
   compute_rent_roll_delta: ['units', 'leases'],
+  // BM8: planning writes now happen directly; tell the screens and artifacts.
+  update_area: ['areas', 'phases', 'parcels'],
+  update_phase: ['phases', 'parcels'],
+  update_parcel: ['parcels'],
+  bulk_create_parcels: ['parcels'],
+  create_land_dev_containers: ['areas', 'phases', 'parcels'],
+  create_lot: ['parcels'],
+  update_lot: ['parcels'],
 };
 
 /**

@@ -3,7 +3,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilLayers } from '@coreui/icons';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import type { DMSDocument } from '@/types/dms';
 import { useUploadStaging } from '@/contexts/UploadStagingContext';
 import MediaBadges from '@/components/dms/MediaBadges';
@@ -79,14 +79,16 @@ function FilterDropRow({
   const [isDropSuccess, setIsDropSuccess] = useState(false);
   const dropSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { stageFiles } = useUploadStaging();
+  const { stageFiles, reportRejectedFiles } = useUploadStaging();
 
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return;
-      stageFiles(acceptedFiles, { suggestedDocType: filter.doc_type });
+    (acceptedFiles: File[], rejected: FileRejection[]) => {
+      if (acceptedFiles.length > 0) {
+        stageFiles(acceptedFiles, { suggestedDocType: filter.doc_type });
+      }
+      reportRejectedFiles(rejected);
     },
-    [stageFiles, filter.doc_type]
+    [stageFiles, reportRejectedFiles, filter.doc_type]
   );
 
   const {
@@ -97,7 +99,10 @@ function FilterDropRow({
     onDrop,
     accept: acceptedFileTypes,
     maxSize: 32 * 1024 * 1024,
-    maxFiles: 10,
+    // No count limit. Each file uploads on its own, so the old cap of 10 guarded
+    // nothing — but the drop library rejects the WHOLE drop when a cap is
+    // exceeded, so dragging a folder of 11+ files did nothing at all
+    // (2026-09-29, Red Valley Entitlements = 15 files).
     noClick: true,
     noKeyboard: true,
   });

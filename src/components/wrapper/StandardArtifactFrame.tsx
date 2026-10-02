@@ -99,27 +99,24 @@ export function StandardArtifactFrame({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' }}>
+      {/* BM17 (Gregg, 2026-09-30): the actions live in the artifact's grey
+        * title bar, top right, instead of a white strip of their own. */}
       <div
         className="d-flex align-items-center justify-content-end gap-1"
-        style={{ padding: '2px 6px', flexShrink: 0 }}
+        style={{ position: 'absolute', top: 6, right: 8, zIndex: 3 }}
         role="toolbar"
         aria-label="Artifact actions"
       >
-        {isPinned && (
-          <span style={{ fontSize: 11, opacity: 0.6, marginRight: 'auto', paddingLeft: 4 }}>
-            Pinned: {pinnedLabel}
-          </span>
-        )}
         <button
           type="button"
           style={{ ...btnStyle, opacity: isPinned ? 1 : btnStyle.opacity }}
           onClick={() => (isPinned ? onUnpin() : onPin(title))}
-          title={isPinned ? 'Unpin' : 'Pin'}
+          title={isPinned ? `Pinned: ${pinnedLabel} — click to unpin` : 'Pin'}
           aria-label={isPinned ? 'Unpin' : 'Pin'}
           aria-pressed={isPinned}
         >
-          <Pin size={13} />
+          <Pin size={13} fill={isPinned ? 'currentColor' : 'none'} />
         </button>
         <button type="button" style={btnStyle} onClick={handleCopy} title="Copy" aria-label="Copy">
           {copied ? <Check size={13} /> : <Copy size={13} />}

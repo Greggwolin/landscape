@@ -98,7 +98,7 @@ def build_capitalization_view_config(
             ],
         }
 
-    title = f'{project_name} — Equity' if project_name else 'Equity'
+    title = f'Equity - {project_name}' if project_name else 'Equity'
     return {
         'topic': 'equity',
         'kicker': 'Equity',

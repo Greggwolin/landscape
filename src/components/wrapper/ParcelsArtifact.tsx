@@ -59,7 +59,7 @@ import { useStagedEdits, stagedKey, type CommitEditsFn } from './useStagedEdits'
 /* ─── The specification, as the server sends it ────────────────────────── */
 
 export interface ParcelsLevelMember { id: number; label: string; parent_id: number | null }
-export interface ParcelsLevel { level: number; label: string; members: ParcelsLevelMember[] }
+export interface ParcelsLevel { level: number; label: string; enabled?: boolean; members: ParcelsLevelMember[] }
 export interface ParcelsColumn {
   key: string;
   label: string | null;
@@ -156,8 +156,10 @@ function cellText(key: string, value: string | number | null): string {
 export function ParcelsArtifact({
   config, onClose, schema, artifactId, onCommitFieldEdits,
 }: Props) {
-  const [rung, setRung] = useState<string>(config.default_rung || 'summary');
-  const [grouping, setGrouping] = useState<string>(config.default_grouping || 'use');
+  // BM15 (Gregg, 2026-09-30): the table always opens on Detail = All and
+  // Group = None, whatever an older stored configuration says.
+  const [rung, setRung] = useState<string>(config.rung_columns?.all ? 'all' : (config.default_rung || 'summary'));
+  const [grouping, setGrouping] = useState<string>('none');
   const [level1, setLevel1] = useState<number[]>([]);
   const [level2, setLevel2] = useState<number[]>([]);
   const [families, setFamilies] = useState<string[]>([]);
@@ -168,6 +170,13 @@ export function ParcelsArtifact({
    * the same commit path the budget uses, so there is one write path and one
    * impact banner rather than a parcels-specific copy of either. */
   const edits = useStagedEdits(onCommitFieldEdits, artifactId);
+  // BM14: leaving with unsaved picks asks first instead of throwing them away.
+  React.useEffect(() => {
+    if (!edits.stagedCount) return undefined;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [edits.stagedCount]);
 
   const levelOne = config.levels.find((l) => l.level === 1);
   const levelTwo = config.levels.find((l) => l.level === 2);
@@ -241,28 +250,113 @@ export function ParcelsArtifact({
    * dropdown is indistinguishable from a broken one. In that case the full
    * list is offered instead: a convenience that removes every choice is worse
    * than no convenience. */
+  /* BM8 — reverse validation. The family > type > product lists cascade
+   * downward; picking a lower level fills the levels above it. Product fills
+   * type when the product belongs to exactly one type (or keeps the row's type
+   * when that type is one of its parents), and family from that type. Type
+   * fills family. Nothing is overwritten with a guess: an ambiguous type is
+   * left for the user. Each filled cell is staged like a typed edit, so it is
+   * visible before Commit and reverts with the rest. */
+  const stageLandUseCascade = React.useCallback(
+    (row: ParcelsRow, key: string, value: string) => {
+      if (!value || (key !== 'product' && key !== 'type')) return;
+      const typeCol = config.columns.find((c) => c.key === 'type');
+      const productCol = config.columns.find((c) => c.key === 'product');
+      const currentOf = (k: string) => {
+        const t = onCommitFieldEdits ? budgetCellTarget(schema, row.id, k) : null;
+        const sk = t ? stagedKey(t.cellPath) : null;
+        const st = sk ? edits.staged[sk] : undefined;
+        return st ? String(st.value) : (row.cells[k] == null ? '' : String(row.cells[k]));
+      };
+      const stage = (k: string, v: string) => {
+        if (!v || currentOf(k) === v) return;
+        const t = onCommitFieldEdits ? budgetCellTarget(schema, row.id, k) : null;
+        if (!t) return;
+        edits.stageEdit(t.cellPath, v, row.cells[k] ?? null, t.expectedRef);
+      };
+      let typeCode = key === 'type' ? value : currentOf('type');
+      if (key === 'product') {
+        const parents = Array.from(new Set((productCol?.options ?? [])
+          .filter((o) => String(o.value) === value)
+          .map((o) => String(o.parent ?? ''))
+          .filter(Boolean)));
+        if (!parents.includes(typeCode)) {
+          if (parents.length === 1) {
+            typeCode = parents[0];
+            stage('type', typeCode);
+          } else {
+            typeCode = '';
+          }
+        }
+      }
+      if (typeCode) {
+        const fam = (typeCol?.options ?? []).find((o) => String(o.value) === typeCode)?.parent;
+        if (fam) stage('family', String(fam));
+      } else if (key === 'product') {
+        // Type still open: fill family only when every parent type agrees on it.
+        const parents = (productCol?.options ?? [])
+          .filter((o) => String(o.value) === value).map((o) => String(o.parent ?? ''));
+        const fams = Array.from(new Set(parents.map((tc) =>
+          (typeCol?.options ?? []).find((o) => String(o.value) === tc)?.parent).filter(Boolean)));
+        if (fams.length === 1) stage('family', String(fams[0]));
+      }
+    },
+    [config.columns, edits, onCommitFieldEdits, schema],
+  );
+
   const optionsFor = React.useCallback(
     (column: ParcelsColumn, row: ParcelsRow): Array<{ value: string; label: string }> | null => {
       const all = column.options;
       if (!all?.length) return null;
+
+      // One product can sit under several types, so the same code appears
+      // more than once in the full list. Show each code once, on EVERY path —
+      // a duplicate is two identical choices and a React key collision
+      // (BM5: Red Valley rows have no type yet, so they took the unfiltered
+      // path, which skipped this).
+      const unique = (list: typeof all) => {
+        const seen = new Set<string>();
+        return list
+          .filter((o) => (seen.has(String(o.value)) ? false : (seen.add(String(o.value)), true)))
+          .map((o) => ({ value: String(o.value), label: o.label }));
+      };
+
       const parentKey = column.key === 'type' ? 'family'
         : column.key === 'product' ? 'type' : null;
-      if (!parentKey) return all.map((o) => ({ value: String(o.value), label: o.label }));
+      if (!parentKey) return unique(all);
 
-      const parentValue = row.cells[parentKey];
-      if (parentValue === null || parentValue === undefined || parentValue === '') {
-        return all.map((o) => ({ value: String(o.value), label: o.label }));
+      // Read what the row holds NOW, including an edit staged but not yet
+      // committed — a product just picked must narrow the type list at once.
+      const valueOf = (k: string): string => {
+        const t = onCommitFieldEdits ? budgetCellTarget(schema, row.id, k) : null;
+        const sk = t ? stagedKey(t.cellPath) : null;
+        const st = sk ? edits.staged[sk] : undefined;
+        const v = st ? st.value : row.cells[k];
+        return v === null || v === undefined ? '' : String(v);
+      };
+
+      const parentValue = valueOf(parentKey);
+      let list = all;
+      if (parentValue) {
+        const narrowed = all.filter((o) => String(o.parent ?? '') === parentValue);
+        if (narrowed.length) list = narrowed;
       }
-      const narrowed = all.filter((o) => String(o.parent ?? '') === String(parentValue));
-      const usable = narrowed.length ? narrowed : all;
-      // One product can sit under several types, so the same code can appear
-      // twice once the parent filter is off. Show it once.
-      const seen = new Set<string>();
-      return usable
-        .filter((o) => (seen.has(String(o.value)) ? false : seen.add(String(o.value))))
-        .map((o) => ({ value: String(o.value), label: o.label }));
+      // BM9 (Gregg): product entered first -> the type list offers only the
+      // types that product belongs to (e.g. Detached and Build-to-Rent).
+      if (column.key === 'type') {
+        const product = valueOf('product');
+        if (product) {
+          const productCol = config.columns.find((c) => c.key === 'product');
+          const productTypes = new Set((productCol?.options ?? [])
+            .filter((o) => String(o.value) === product)
+            .map((o) => String(o.parent ?? '')));
+          const byProduct = list.filter((o) => productTypes.has(String(o.value)));
+          if (byProduct.length) list = byProduct;
+        }
+      }
+      return unique(list);
     },
-    [],
+    [config.columns, edits, onCommitFieldEdits, schema],
   );
 
   /* Which bucket a parcel falls in. A useCallback rather than a plain function
@@ -348,6 +442,11 @@ export function ParcelsArtifact({
 
   const totalAcres = rows.reduce((s, r) => s + (Number(r.cells.acres) || 0), 0);
   const totalUnits = rows.reduce((s, r) => s + (Number(r.cells.units) || 0), 0);
+  // BM10: frontage totals like acres and units. Null (dash) when no row on
+  // screen carries a frontage, so an absent figure never reads as zero.
+  const feetRows = rows.filter((r) => r.cells.front_feet !== null && r.cells.front_feet !== undefined);
+  const totalFrontFeet = feetRows.length
+    ? feetRows.reduce((s, r) => s + (Number(r.cells.front_feet) || 0), 0) : null;
 
   const align = (c: ParcelsColumn) =>
     c.align === 'right' ? styles.right : c.align === 'center' ? styles.center : undefined;
@@ -356,7 +455,6 @@ export function ParcelsArtifact({
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div className={styles.head}>
         <div style={{ minWidth: 0 }}>
-          <div className={styles.kicker}>{config.kicker}</div>
           <div className={styles.titleRow}>
             <span className={styles.title}>{config.title}</span>
             <span className={styles.titleBadges}>
@@ -382,7 +480,18 @@ export function ParcelsArtifact({
         ))}
       </div>
 
-      {levelOne && levelOne.members.length > 0 && (
+      {/* BM7: a project with its top level switched off shows the row greyed,
+        * so it is plain the level exists but is not in use. */}
+      {levelOne && levelOne.enabled === false && (
+        <div className={styles.bar}>
+          <span className={`${styles.barLabel} ${styles.badgeGhost}`}>{levelOne.label}</span>
+          <button type="button" disabled className={`${styles.badge} ${styles.badgeGhost}`}>
+            not used
+          </button>
+        </div>
+      )}
+
+      {levelOne && levelOne.enabled !== false && levelOne.members.length > 0 && (
         <div className={styles.bar}>
           <span className={styles.barLabel}>{levelOne.label}</span>
           {levelOne.members.map((m) => (
@@ -441,13 +550,40 @@ export function ParcelsArtifact({
          *  Gregg, 2026-08-25: one label, same row, to the right of Detail. */}
         <span className={styles.barLabel} style={{ marginLeft: 18 }}>Group</span>
         {config.group_options.map((g) => (
-          <button key={g.value} type="button"
-            className={`${styles.badge} ${grouping === g.value ? styles.badgeOn : ''}`}
+          <button key={g.value} type="button" disabled={g.available === false}
+            className={`${styles.badge} ${grouping === g.value ? styles.badgeOn : ''} ${g.available === false ? styles.badgeGhost : ''}`}
             onClick={() => setGrouping(g.value)}>
             {g.label}
           </button>
         ))}
       </div>
+
+      {/* BM14 (Gregg, 2026-09-30): the bar sat below a long table and was never
+        * seen, so picks were lost. It now sits above the table, in warning colour. */}
+      {/* Nothing posts on a keystroke. The whole set lands through ONE batch
+        * request, which is what lets the server report a single impact line for
+        * the set — and what lets a change be thought better of before it is
+        * real. Same hook, same commit path as the budget. */}
+      {edits.stagedCount > 0 && (
+        <div className={styles.commitBar} role="region" aria-label="Staged changes"
+             style={{ borderColor: 'var(--cui-warning)', background: 'var(--cui-warning-bg-subtle)', fontWeight: 600 }}>
+          <span className={styles.commitCount}>
+            {edits.stagedCount} change{edits.stagedCount === 1 ? '' : 's'} not saved — press Commit to save
+          </span>
+          <span className={styles.commitActions}>
+            <button type="button" className={styles.commitButton}
+                    disabled={edits.committing}
+                    onClick={() => { void edits.commitStaged(); }}>
+              {edits.committing ? 'Saving…' : 'Commit'}
+            </button>
+            <button type="button" className={styles.discardButton}
+                    disabled={edits.committing}
+                    onClick={edits.discardStaged}>
+              Discard
+            </button>
+          </span>
+        </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         {rows.length === 0 ? (
@@ -516,6 +652,7 @@ export function ParcelsArtifact({
                                     onChange={(e) => {
                                       edits.stageEdit(target.cellPath, e.target.value,
                                                       committed, target.expectedRef);
+                                      stageLandUseCascade(row, c.key, e.target.value);
                                       setEditing(null);
                                     }}
                                     onBlur={() => setEditing(null)}
@@ -579,6 +716,7 @@ export function ParcelsArtifact({
                             if (i === 0) return <td key={c.key}>{g.label} total</td>;
                             if (c.key === 'acres') return <td key={c.key} className={styles.right}>{fmt(g.acres)}</td>;
                             if (c.key === 'units') return <td key={c.key} className={styles.right}>{fmt(g.units)}</td>;
+                            if (c.key === 'front_feet') return <td key={c.key} className={styles.right}>{fmt(g.frontFeet)}</td>;
                             return <td key={c.key} />;
                           })}
                         </tr>
@@ -593,6 +731,7 @@ export function ParcelsArtifact({
                   if (c.key === 'parcels') return <td key={c.key} className={styles.right}>{fmt(rows.length)}</td>;
                   if (c.key === 'acres') return <td key={c.key} className={styles.right}>{fmt(totalAcres)}</td>;
                   if (c.key === 'units') return <td key={c.key} className={styles.right}>{fmt(totalUnits)}</td>;
+                  if (c.key === 'front_feet') return <td key={c.key} className={styles.right}>{fmt(totalFrontFeet)}</td>;
                   if (c.key === 'pct_acres') return <td key={c.key} className={styles.right}>100.0%</td>;
                   return <td key={c.key} />;
                 })}
@@ -601,30 +740,6 @@ export function ParcelsArtifact({
           </table>
         )}
       </div>
-
-      {/* Nothing posts on a keystroke. The whole set lands through ONE batch
-        * request, which is what lets the server report a single impact line for
-        * the set — and what lets a change be thought better of before it is
-        * real. Same hook, same commit path as the budget. */}
-      {edits.stagedCount > 0 && (
-        <div className={styles.commitBar} role="region" aria-label="Staged changes">
-          <span className={styles.commitCount}>
-            {edits.stagedCount} change{edits.stagedCount === 1 ? '' : 's'} staged
-          </span>
-          <span className={styles.commitActions}>
-            <button type="button" className={styles.commitButton}
-                    disabled={edits.committing}
-                    onClick={() => { void edits.commitStaged(); }}>
-              {edits.committing ? 'Saving…' : 'Commit'}
-            </button>
-            <button type="button" className={styles.discardButton}
-                    disabled={edits.committing}
-                    onClick={edits.discardStaged}>
-              Discard
-            </button>
-          </span>
-        </div>
-      )}
 
       {hiddenRowCount > 0 && !isGrouped && (
         <button type="button" className={styles.hint} onClick={() => setExpanded(true)}

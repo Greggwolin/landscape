@@ -12,6 +12,7 @@ import {
   buildCollisionMessage,
   type PendingCollision,
 } from '@/contexts/LandscaperCollisionContext';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 // ============================================
 // INTENT DETECTION SYSTEM
@@ -352,6 +353,7 @@ export default function DmsLandscaperPanel({
     `/api/projects/${pendingCollision.projectId}/dms/docs/${pendingCollision.existingDoc.doc_id}/version`,
     {
      method: 'POST',
+     headers: getAuthHeaders(),
      body: formData,
     }
    );

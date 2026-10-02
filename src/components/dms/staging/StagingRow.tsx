@@ -141,7 +141,7 @@ export default function StagingRow({
             {sf.file.name}
           </div>
           <div className="text-xs" style={{ color: 'var(--cui-success)' }}>
-            {effectiveRoute === 'library' ? 'Staged for library (coming soon)' : 'Uploaded successfully'}
+            Uploaded successfully
           </div>
         </div>
         <span style={{ color: 'var(--cui-success)', fontSize: '1.1rem' }}>&#10003;</span>

@@ -594,6 +594,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
             `/api/projects/${collisionProjectId}/dms/docs/${existingDoc.doc_id}/version`,
             {
               method: 'POST',
+              headers: getAuthHeaders(),
               body: formData,
             }
           );

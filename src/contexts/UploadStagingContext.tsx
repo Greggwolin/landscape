@@ -35,6 +35,18 @@ export interface StageFilesOptions {
   suggestedDocType?: string;
 }
 
+export interface RejectedDrop {
+  file: File;
+  errors: readonly { code: string; message: string }[];
+}
+
+function rejectionReason(errors: readonly { code: string; message: string }[]): string {
+  const codes = errors.map(e => e.code);
+  if (codes.includes('file-too-large')) return 'Too large to upload — the limit is 32 MB.';
+  if (codes.includes('file-invalid-type')) return 'This kind of file cannot be uploaded here.';
+  return errors[0]?.message || 'Not accepted.';
+}
+
 export interface PendingIntakeDoc {
   docId: number;
   docName: string;
@@ -45,6 +57,8 @@ interface UploadStagingContextValue {
   stagedFiles: StagedFile[];
   isTrayOpen: boolean;
   stageFiles: (files: File[], options?: StageFilesOptions) => void;
+  /** Files the drop zone refused (wrong type, too large) — shown as failed rows, never dropped silently. */
+  reportRejectedFiles: (rejections: RejectedDrop[]) => void;
   removeFile: (id: string) => void;
   clearAll: () => void;
   closeTray: () => void;
@@ -233,6 +247,17 @@ export function UploadStagingProvider({
     [processQueue]
   );
 
+  const reportRejectedFiles = useCallback((rejections: RejectedDrop[]) => {
+    if (rejections.length === 0) return;
+    const rows = rejections.map(r => ({
+      ...createStagedFile(r.file),
+      status: 'error' as const,
+      errorMessage: rejectionReason(r.errors),
+    }));
+    dispatch({ type: 'ADD_FILES', files: rows });
+    setIsTrayOpen(true);
+  }, []);
+
   const removeFile = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_FILE', id });
   }, []);
@@ -333,11 +358,9 @@ export function UploadStagingProvider({
         }
       }
 
-      // Route B: Cost Library stub
-      if (effectiveRoute === 'library') {
-        dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });
-        return;
-      }
+      // A file routed to the cost library used to be marked complete here and
+      // never uploaded — the library route was a stub. It now uploads like any
+      // other document (2026-09-29: "CopperNail-Farrel Cost Estimate" vanished).
 
       try {
         // 1. Upload file via UploadThing
@@ -387,6 +410,26 @@ export function UploadStagingProvider({
         }
 
         const docResult = await response.json();
+
+        // The server refuses to create a second copy of a file already in the
+        // project (same name or same content) and answers 200 with duplicate:true.
+        // Before this check the row was marked complete and simply vanished, so a
+        // dragged file "didn't upload" with no word why. Say where it already is.
+        if (docResult?.duplicate && docResult.existing_doc) {
+          const existing = docResult.existing_doc;
+          const where = existing.doc_type ? ` under ${existing.doc_type}` : '';
+          const how =
+            docResult.match_type === 'content'
+              ? `Same file is already in this project as "${existing.filename}"${where}`
+              : `Already in this project${where}`;
+          dispatch({
+            type: 'UPDATE_FILE',
+            id,
+            updates: { status: 'error', errorMessage: `${how} — not added again.` },
+          });
+          setIsTrayOpen(true);
+          return;
+        }
 
         // 3. Track extract-routed docs for intake choice modal.
         //    Instead of auto-firing intake, surface the doc info so the
@@ -470,6 +513,16 @@ export function UploadStagingProvider({
   }, [stagedFiles, autoConfirmIds, confirmFile]);
 
   // ------------------------------------------
+  // Surface failures. Drag-to-filter uploads run without the tray open, so a
+  // file that fails (or is refused as already present) would otherwise leave
+  // no trace on screen.
+  // ------------------------------------------
+
+  useEffect(() => {
+    if (stagedFiles.some(f => f.status === 'error')) setIsTrayOpen(true);
+  }, [stagedFiles]);
+
+  // ------------------------------------------
   // Auto-close tray when all files are done
   // ------------------------------------------
 
@@ -515,6 +568,7 @@ export function UploadStagingProvider({
     stagedFiles,
     isTrayOpen,
     stageFiles,
+    reportRejectedFiles,
     removeFile,
     clearAll,
     closeTray,

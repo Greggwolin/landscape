@@ -1087,14 +1087,15 @@ class WhatIfEngine:
             total_gross_revenue += gross
             cash_flows[period - 1] += net
 
-        # Monthly flows, annualized: the method the cash flow and the waterfall
-        # use, so a what-if moves the same IRR the project shows (HQ132).
+        # Same basis as LandDevCashFlowService: monthly cash flows, compounded
+        # to an annual rate (equivalent to dated XIRR on month starts). The old
+        # yearly-bucket IRR overstated returns when sales fell late in a year.
         irr = None
         if len(cash_flows) >= 2:
             try:
                 irr_result = npf.irr(cash_flows)
                 if not np.isnan(irr_result):
-                    irr = float((1.0 + float(irr_result)) ** 12 - 1.0)
+                    irr = float((1 + irr_result) ** 12 - 1)
             except Exception:
                 pass
 

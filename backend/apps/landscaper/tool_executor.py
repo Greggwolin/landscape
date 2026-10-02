@@ -9998,6 +9998,34 @@ def _log_planning_activity(project_id: int, table: str, action: str, count: int,
         logger.warning(f"Failed to log planning activity: {e}")
 
 
+
+def _landuse_from_product(product_code: str, *, have_family: bool, have_type: bool) -> Dict[str, Any]:
+    """Reverse lookup product -> type -> family from the lot-product catalogue."""
+    if have_family and have_type:
+        return {}
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT t.code, f.name
+                  FROM landscape.res_lot_product p
+                  JOIN landscape.type_lot_product j ON j.product_id = p.product_id
+                  JOIN landscape.lu_type t ON t.type_id = j.type_id
+                  JOIN landscape.lu_family f ON f.family_id = t.family_id
+                 WHERE p.code = %s AND p.is_active AND t.active
+            """, [product_code])
+            pairs = cursor.fetchall()
+    except Exception as e:
+        logger.warning(f"product reverse lookup failed for {product_code}: {e}")
+        return {}
+    out: Dict[str, Any] = {}
+    types = {p[0] for p in pairs}
+    families = {p[1] for p in pairs}
+    if not have_type and len(types) == 1:
+        out['type_code'] = next(iter(types))
+    if not have_family and len(families) == 1:
+        out['family_name'] = next(iter(families))
+    return out
+
 # ============ AREA TOOLS ============
 
 @register_tool('get_areas')
@@ -10622,6 +10650,52 @@ def handle_update_parcel(
     if not parcel_id and (not phase_id or not parcel_name):
         return {'success': False, 'error': 'phase_id and parcel_name required for new parcels'}
 
+    # BM6: check the phase BEFORE proposing. On 2026-09-29 Landscaper proposed
+    # eight parcels under phase ids that did not exist (59, 60); every one was
+    # confirmed and every one failed, after the old parcels had already been
+    # deleted. Refuse at proposal time and name the real phases, so the model
+    # corrects itself instead of the user confirming a write that cannot land.
+    if phase_id:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT phase_id, phase_name FROM landscape.tbl_phase
+                WHERE project_id = %s ORDER BY phase_id
+            """, [project_id])
+            phases = cursor.fetchall()
+        if int(phase_id) not in {row[0] for row in phases}:
+            return {
+                'success': False,
+                'error': f'Phase {phase_id} does not exist in this project.',
+                'valid_phases': [{'phase_id': r[0], 'phase_name': r[1]} for r in phases],
+                'instruction': (
+                    'Use one of valid_phases. If the phase the user wants is not '
+                    'listed, create it with update_phase first. Do not guess ids.'
+                ),
+            }
+
+    # BM7: the product decides the rest of the land-use chain. Fill family (and
+    # type, when the product sits under exactly one type) from the catalogue,
+    # never overriding a value the caller supplied. Most lot sizes are listed
+    # under both detached and build-to-rent, so type is often left open.
+    if tool_input.get('product_code'):
+        tool_input = dict(tool_input)
+        tool_input.update(_landuse_from_product(
+            tool_input['product_code'],
+            have_family=bool(tool_input.get('family_name')),
+            have_type=bool(tool_input.get('type_code')),
+        ))
+    if tool_input.get('type_code') and not tool_input.get('family_name'):
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT f.name FROM landscape.lu_type t
+                JOIN landscape.lu_family f ON f.family_id = t.family_id
+                WHERE t.code = %s AND t.active
+            """, [tool_input['type_code']])
+            fams = {r[0] for r in cursor.fetchall()}
+        if len(fams) == 1:
+            tool_input = dict(tool_input)
+            tool_input['family_name'] = fams.pop()
+
     if propose_only:
         from .services.mutation_service import MutationService
         return MutationService.create_proposal(
@@ -10643,6 +10717,19 @@ def handle_update_parcel(
                 updates = {k: v for k, v in tool_input.items()
                            if k in PARCEL_COLUMNS and v is not None}
 
+                # BM1: moving an existing parcel into a phase. The area always
+                # follows the phase, so it is derived rather than taken from input.
+                if phase_id:
+                    cursor.execute("""
+                        SELECT area_id FROM landscape.tbl_phase
+                        WHERE phase_id = %s AND project_id = %s
+                    """, [phase_id, project_id])
+                    phase_row = cursor.fetchone()
+                    if not phase_row:
+                        return {'success': False, 'error': f'Phase {phase_id} not found in this project'}
+                    updates['phase_id'] = phase_id
+                    updates['area_id'] = phase_row[0]
+
                 if not updates:
                     return {'success': False, 'error': 'No valid fields to update'}
 
@@ -10651,12 +10738,12 @@ def handle_update_parcel(
                     updates['property_metadata'] = json.dumps(updates['property_metadata'])
 
                 set_parts = [f"{k} = %s" for k in updates.keys()]
-                values = list(updates.values()) + [parcel_id]
+                values = list(updates.values()) + [parcel_id, project_id]
 
                 cursor.execute(f"""
                     UPDATE landscape.tbl_parcel
                     SET {', '.join(set_parts)}
-                    WHERE parcel_id = %s
+                    WHERE parcel_id = %s AND project_id = %s
                     RETURNING parcel_id, parcel_name
                 """, values)
 
@@ -16312,6 +16399,27 @@ AUTO_EXECUTE_TOOLS = {
 }
 
 
+
+_PLANNING_WRITE_TOOLS = frozenset({
+    'update_area', 'update_phase', 'update_parcel', 'bulk_create_parcels',
+    'create_land_dev_containers', 'configure_project_hierarchy', 'update_lot',
+    'create_lot', 'land_planning_save',
+})
+
+
+def _is_delete_call(tool_name: str, tool_input: Any) -> bool:
+    """True when a mutation removes data — those still need the user's confirm."""
+    if tool_name.startswith(('delete_', 'remove_')):
+        return True
+    if isinstance(tool_input, dict):
+        for k, v in tool_input.items():
+            kl = str(k).lower()
+            if ('delete' in kl or 'remove' in kl) and v:
+                return True
+            if kl in ('action', 'operation', 'mode') and str(v).lower() in ('delete', 'remove', 'unassign'):
+                return True
+    return False
+
 def execute_tool(
     tool_name: str,
     tool_input: Dict[str, Any],
@@ -16434,6 +16542,16 @@ def execute_tool(
         propose_only = False
         logger.info(f"Auto-executing {tool_name} (in AUTO_EXECUTE_TOOLS list)")
 
+    # BM8 (Gregg, 2026-09-30, option 2c/2a): when the user directs a change,
+    # Landscaper makes it. Creates and edits write immediately; DELETIONS still
+    # come back as proposals for one plain-English "Confirm all" — the night of
+    # 2026-09-29 eleven parcels were deleted through a stack of confirm cards.
+    direct_write = False
+    if propose_only and getattr(handler, '_is_mutation', False) and not _is_delete_call(tool_name, tool_input):
+        propose_only = False
+        direct_write = True
+        logger.info(f"Direct write for {tool_name} (non-delete mutation)")
+
     # JB55: thread the turn's already-run tools ONLY into the freeform
     # create_artifact handler (it accepts **kwargs), so the create-time
     # fabrication guard can verify a numbers tool sourced the card. Other
@@ -16442,16 +16560,30 @@ def execute_tool(
     if tool_name == 'create_artifact' and prior_tool_calls is not None:
         extra['prior_tool_calls'] = prior_tool_calls
     try:
-        # All handlers receive the same kwargs for consistency
-        return handler(
-            tool_input=tool_input,
-            project_id=project_id,
-            propose_only=propose_only,
-            source_message_id=source_message_id,
-            thread_id=thread_id,
-            user_id=user_id,
-            **extra,
-        )
+        # BM1: record the call so any proposal it creates can be replayed on confirm.
+        from .services.mutation_service import replay_context
+        with replay_context(tool_name, tool_input):
+            # All handlers receive the same kwargs for consistency
+            result = handler(
+                tool_input=tool_input,
+                project_id=project_id,
+                propose_only=propose_only,
+                source_message_id=source_message_id,
+                thread_id=thread_id,
+                user_id=user_id,
+                **extra,
+            )
+        if direct_write and isinstance(result, dict) and result.get('success') \
+                and tool_name in _PLANNING_WRITE_TOOLS:
+            # Rebuild the Parcels artifact the same way a confirm does.
+            try:
+                from .views import _refresh_artifacts_after_confirm
+                _refresh_artifacts_after_confirm(
+                    [{'success': True, 'project_id': project_id, 'table_name': 'tbl_parcel'}],
+                    str(user_id) if user_id else None)
+            except Exception:
+                logger.exception('artifact refresh after direct write failed')
+        return result
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
         return {
@@ -18611,15 +18743,21 @@ def handle_log_alpha_feedback(
     **kwargs
 ) -> Dict[str, Any]:
     """
-    Log feedback from Alpha Assistant chat to the tbl_alpha_feedback table.
+    Log feedback raised in chat to the feedback tracker (landscape.tbl_feedback).
 
-    This allows users to submit bug reports, suggestions, and questions
-    directly from the chat interface.
+    This used to write to tbl_alpha_feedback, a table nothing reads: the
+    tracker, the daily brief and the admin feedback page all read tbl_feedback.
+    Feedback logged through this tool was therefore reported to the user as
+    "Logged as feedback #8" and then seen by no one (found 2026-09-30 — four
+    items had gone there since May). It now goes through capture_feedback, the
+    same path as #FB messages, and reports the tracker's own FB number.
     """
+    from .feedback_utils import capture_feedback
+
     feedback_type = tool_input.get('feedback_type', 'bug')
-    summary = tool_input.get('summary', '')
-    user_quote = tool_input.get('user_quote', '')
-    page_context = tool_input.get('page_context', 'alpha_assistant_chat')
+    summary = (tool_input.get('summary') or '').strip()
+    user_quote = (tool_input.get('user_quote') or '').strip()
+    page_context = tool_input.get('page_context') or 'landscaper_chat'
 
     if not summary:
         return {
@@ -18627,42 +18765,52 @@ def handle_log_alpha_feedback(
             'error': 'Summary is required for feedback'
         }
 
-    # Build notes with additional context
-    notes_parts = []
+    parts = [summary]
     if feedback_type:
-        notes_parts.append(f"Type: {feedback_type}")
+        parts.append(f"Type: {feedback_type}")
     if user_quote:
-        notes_parts.append(f"User said: {user_quote}")
-    notes = "\n".join(notes_parts) if notes_parts else None
+        parts.append(f"User said: {user_quote}")
+    parts.append("(Logged by Landscaper from chat.)")
+    message_text = "\n\n".join(parts)
 
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO landscape.tbl_alpha_feedback
-                (page_context, project_id, user_id, feedback, status, submitted_at, notes)
-                VALUES (%s, %s, %s, %s, 'new', NOW(), %s)
-                RETURNING id
-            """, [page_context, project_id, user_id, summary, notes])
-            feedback_id = cursor.fetchone()[0]
+    project_name = None
+    if project_id:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                    [project_id],
+                )
+                row = cursor.fetchone()
+                project_name = row[0] if row else None
+        except Exception as e:  # name is decoration; never block the log on it
+            logger.warning(f"[ALPHA_FEEDBACK] project name lookup failed: {e}")
 
-        logger.info(
-            f"[ALPHA_FEEDBACK] Logged feedback #{feedback_id}: "
-            f"type={feedback_type}, project={project_id}, user={user_id}"
-        )
+    feedback_id = capture_feedback(
+        user_message=message_text,
+        user_id=user_id,
+        project_id=project_id or None,
+        project_name=project_name,
+        page_context=page_context,
+    )
 
-        return {
-            'success': True,
-            'feedback_id': feedback_id,
-            'message': f"Logged as feedback #{feedback_id}. The team will review this.",
-            'action': 'created'
-        }
-
-    except Exception as e:
-        logger.error(f"[ALPHA_FEEDBACK] Failed to log feedback: {e}")
+    if feedback_id is None:
         return {
             'success': False,
-            'error': f"Failed to log feedback: {str(e)}"
+            'error': 'Failed to log feedback to the tracker. Tell the user it was NOT logged.',
         }
+
+    logger.info(
+        f"[ALPHA_FEEDBACK] Logged FB-{feedback_id}: "
+        f"type={feedback_type}, project={project_id}, user={user_id}"
+    )
+
+    return {
+        'success': True,
+        'feedback_id': feedback_id,
+        'message': f"Logged as FB-{feedback_id}. Quote this number to the user exactly.",
+        'action': 'created'
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

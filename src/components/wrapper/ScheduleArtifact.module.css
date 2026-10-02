@@ -27,7 +27,8 @@
 /* ─── Header ──────────────────────────────────────────────────────────── */
 
 .head {
-  padding: 11px 14px 12px;
+  /* BM17: icons from the frame sit in this bar's right edge. */
+  padding: 8px 128px 8px 14px;
   border-bottom: 1px solid var(--cui-border-color);
   background: var(--cui-tertiary-bg);
   flex-shrink: 0;
@@ -73,7 +74,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .title {
@@ -639,3 +640,8 @@
   outline: 1px solid var(--cui-warning);
   outline-offset: 1px;
 }
+
+/* BM17: the kicker line is retired — the title alone names the table. The
+   budget still uses the row for its own print/close buttons, so collapse it
+   when it carries nothing visible. */
+.kicker:empty, .kicker:not(:has(button)) { display: none; }

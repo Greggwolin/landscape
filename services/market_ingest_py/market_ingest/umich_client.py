@@ -26,6 +26,9 @@ from .normalize import NormalizedObservation, parse_decimal
 
 UMICH_COMPOSITE_URL = "https://www.sca.isr.umich.edu/files/tbmics.csv"
 UMICH_COMPONENTS_URL = "https://www.sca.isr.umich.edu/files/tbmiccice.csv"
+# Median expected price change, next 12 months (PX_MD) and 5-10 years (PX5_MD). Percent.
+# Only PX_MD is on FRED (as MICH); PX5_MD exists nowhere else, so the CSV is the source.
+UMICH_INFLATION_URL = "https://www.sca.isr.umich.edu/files/tbmpx1px5.csv"
 
 MONTH_NUMBERS = {
     "january": 1, "february": 2, "march": 3, "april": 4,
@@ -66,6 +69,19 @@ class UMichClient:
     ) -> List[NormalizedObservation]:
         text = self._fetch_csv(UMICH_COMPONENTS_URL)
         return self._parse_rows(text, {"ICC": icc_code, "ICE": ice_code}, geo_id, geo_level)
+
+    def fetch_inflation_expectations(
+        self,
+        one_year_code: str = "UMICH_INFL_1Y",
+        five_year_code: str = "UMICH_INFL_5Y",
+        geo_id: str = "US",
+        geo_level: str = "US",
+    ) -> List[NormalizedObservation]:
+        text = self._fetch_csv(UMICH_INFLATION_URL)
+        obs = self._parse_rows(text, {"PX_MD": one_year_code, "PX5_MD": five_year_code}, geo_id, geo_level)
+        # _parse_rows stamps the sentiment index's units; these two are percentages.
+        from dataclasses import replace
+        return [replace(o, units="Percent") for o in obs]
 
     def _parse_rows(
         self,

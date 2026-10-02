@@ -2189,7 +2189,8 @@ const PhaseRow: React.FC<{
   }, [editing, expanded, onEditingChange])
 
   // Get unique type codes for this phase
-  const phaseUseCodes = [...new Set(parcels.filter(p => p.phase_name === phase.phase_name).map(p => p.type_code))].filter(Boolean)
+  // BM8: a parcel with no type yet still has a use — show its family rather than "No uses".
+  const phaseUseCodes = [...new Set(parcels.filter(p => p.phase_name === phase.phase_name).map(p => p.type_code || p.family_name))].filter(Boolean)
 
   // Update description when phase changes
   useEffect(() => {
