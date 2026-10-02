@@ -69,7 +69,7 @@
   flex: 1;
   min-width: 0;
   overflow: auto;
-  padding: 0 0 12px;
+  padding: 4px 0 12px;
 }
 
 .bar {
@@ -311,4 +311,27 @@
 .lcfGrand td {
   font-weight: 700;
   border-top: 2px solid var(--cui-body-color);
+}
+
+/* Gregg, 2026-10-02: each section sits in its own card. */
+.card {
+  margin: 0 12px 12px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  background: var(--cui-card-bg, var(--cui-body-bg));
+  overflow: hidden;
+}
+
+.card > .bar:first-child {
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.foldBtn {
+  border: none;
+  background: transparent;
+  color: var(--cui-body-color);
+  font-size: 12px;
+  padding: 0 4px 0 0;
+  cursor: pointer;
 }

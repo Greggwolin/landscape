@@ -274,6 +274,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
   // Gregg, 2026-10-02: the loan's detail tiles sit under the loan line, shown
   // when an editable field in the line is clicked and hidden again by Close.
   const [tilesOpen, setTilesOpen] = useState(false);
+  const [drawsOpen, setDrawsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [sizing, setSizing] = useState(false);
   // Interest-reserve prompt (Gregg, 2026-09-29): after a save, if the loan
@@ -413,14 +414,8 @@ export function DebtScreen({ project, onNavigate }: Props) {
 
   return (
     <div className={styles.screen}>
-      {/* Tab strip: Debt is this screen. */}
-      <div className={styles.tabs}>
-        <span className={`${styles.tab} ${styles.tabOn}`}>Debt</span>
-        <button type="button" className={styles.tab} onClick={() => onNavigate?.('equity')}>Equity</button>
-        <button type="button" className={styles.tab} onClick={() => onNavigate?.('cashflow')}>Cash flow</button>
-        <span className={`${styles.tab} ${styles.tabOff}`} title="Decision points is not built yet">Decision points</span>
-      </div>
-
+      {/* Gregg, 2026-10-02: Debt and Equity are reached from the screen picker's
+          row above; the screen carries no tab strip of its own, and no Cash flow link. */}
       <div className="d-flex align-items-center gap-2" style={{ padding: '8px 12px' }}>
         <button type="button" className="btn btn-sm btn-primary" onClick={addLoan} disabled={createLoan.isPending}>
           + Loan
@@ -463,6 +458,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
       ) : (
         <div className={styles.body}>
           <div className={styles.main}>
+            <div className={styles.card}>
             <LoansLedger
               loans={loans}
               selectedId={selected?.loan_id ?? null}
@@ -490,11 +486,18 @@ export function DebtScreen({ project, onNavigate }: Props) {
                 Click any blue field in the loan line to open the loan&apos;s full detail.
               </div>
             )}
-            {/* Gregg, 2026-10-02: the leveraged cash flow sits under the loan information. */}
-            <LoanLeveredCashFlow projectId={projectId} />
+            </div>
+            {/* Gregg, 2026-10-02: each section in its own card; the loan schedule
+                (draws & balance) folds, and the leveraged cash flow sits below it. */}
             {selected && (
-              <DrawsTable projectId={projectId} loan={selected} scale={scale} onScale={setScale} />
+              <div className={styles.card}>
+                <DrawsTable projectId={projectId} loan={selected} scale={scale} onScale={setScale}
+                  open={drawsOpen} onToggle={() => setDrawsOpen((o) => !o)} />
+              </div>
             )}
+            <div className={styles.card}>
+              <LoanLeveredCashFlow projectId={projectId} />
+            </div>
           </div>
         </div>
       )}
@@ -647,11 +650,15 @@ function DrawsTable({
   loan,
   scale,
   onScale,
+  open,
+  onToggle,
 }: {
   projectId: string;
   loan: LoanRecord;
   scale: Scale;
   onScale: (s: Scale) => void;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const { data, isLoading } = useLoanSchedule(projectId, loan.loan_id);
   const schedule = data as
@@ -695,9 +702,12 @@ function DrawsTable({
 
   return (
     <>
-      <div className={styles.bar} style={{ marginTop: 16 }}>
-        <span className={styles.barLabel}>Draws &amp; balance — {loan.loan_name}</span>
-        {(['month', 'quarter', 'year'] as Scale[]).map((s) => (
+      <div className={styles.bar}>
+        <button type="button" className={styles.foldBtn} onClick={onToggle} aria-expanded={open}>
+          {open ? '▾' : '▸'}
+        </button>
+        <span className={styles.barLabel}>Loan schedule — draws &amp; balance — {loan.loan_name}</span>
+        {open && (['month', 'quarter', 'year'] as Scale[]).map((s) => (
           <button key={s} type="button"
             className={`${styles.badge} ${scale === s ? styles.badgeOn : ''}`}
             onClick={() => onScale(s)}>
@@ -705,10 +715,10 @@ function DrawsTable({
           </button>
         ))}
       </div>
-      {schedule?.findings?.map((f) => (
+      {open && schedule?.findings?.map((f) => (
         <div key={f.message} className={styles.hint}>{f.message}</div>
       ))}
-      {isLoading ? (
+      {!open ? null : isLoading ? (
         <div className={styles.hint}>Running the schedule…</div>
       ) : schedule?.error ? (
         <div className={styles.hint}>The schedule could not be run: {schedule.error}</div>
