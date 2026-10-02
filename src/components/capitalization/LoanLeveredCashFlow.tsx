@@ -14,6 +14,7 @@
 import React, { useMemo, useState } from 'react';
 import { useLeveragedCashFlow } from '@/hooks/useCapitalization';
 import styles from './DebtScreen.module.css';
+import { nonEmptyPeriodIndices, pick } from '@/lib/cashflow/emptyPeriods';
 
 type Scale = 'month' | 'quarter' | 'year';
 
@@ -123,7 +124,18 @@ export default function LoanLeveredCashFlow({ projectId }: { projectId: string }
     levered.reduce((acc, x, i) => { cumulative[i] = acc + x; return acc + x; }, 0);
     rows.push({ label: 'Cumulative', values: cumulative, kind: 'muted' });
 
-    return { buckets, rows, summary: res?.data?.summary };
+    // Empty periods do not render (Gregg, 2026-10-02). Cumulative is a running
+    // balance, not a flow, so it does not keep a period on its own; it was
+    // computed over every period above, so it stays correct after the cut.
+    const keep = nonEmptyPeriodIndices(
+      rows.filter((r) => r.kind !== 'muted').map((r) => r.values),
+      n,
+    );
+    return {
+      buckets: pick(buckets, keep),
+      rows: rows.map((r) => ({ ...r, values: pick(r.values, keep) })),
+      summary: res?.data?.summary,
+    };
   }, [res, scale]);
 
   return (

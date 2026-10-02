@@ -12,6 +12,7 @@ import {
   type AggregatedSection,
   type AggregatedPeriod,
 } from '@/lib/financial-engine/cashflow/aggregation';
+import { nonEmptyPeriodIndices, pick } from '@/lib/cashflow/emptyPeriods';
 import {
   useIncomeApproachMonthlyDCF,
   useLeveragedCashFlow,
@@ -1083,7 +1084,17 @@ export default function LeveragedCashFlow({
       }
     }
 
-    return { rows: displayRows, headers: hdrs };
+    // Empty periods do not render (Gregg, 2026-10-02). Only money flows keep a
+    // period: informational and percentage rows (rates, DSCR) do not.
+    const flowRows = displayRows
+      .filter((r) => r.rowType !== 'info' && r.rowType !== 'section-header' && r.rowType !== 'divider' && r.valueFormat !== 'percent')
+      .map((r) => r.values);
+    const keep = nonEmptyPeriodIndices(flowRows, hdrs.length);
+    if (keep.length === 0 || keep.length === hdrs.length) return { rows: displayRows, headers: hdrs };
+    return {
+      rows: displayRows.map((r) => ({ ...r, values: r.values.length === hdrs.length ? pick(r.values, keep) : r.values })),
+      headers: pick(hdrs, keep),
+    };
   }, [
     cfData,
     periodLabels,

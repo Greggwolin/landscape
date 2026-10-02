@@ -657,6 +657,16 @@ def build_cashflow_artifact_schema(
 
     period_rows: List[Dict[str, Any]] = []
     for idx, r in enumerate(rows, start=1):
+        # Empty periods do not render (Gregg, 2026-10-02: "when generating cash
+        # flow schedules of any kind, if there are empty columns, they shouldnt
+        # render"). Here the periods run down the page, so an empty period is an
+        # empty row. Cumulative is a running balance, not a flow, and does not
+        # keep a period on its own; it is carried from the engine, so it stays
+        # correct after the cut.
+        flows = (r.get('netRevenue'), r.get('costs'), r.get('financing'),
+                 r.get('reversion'), r.get('net'))
+        if all(abs(_num(v) or 0) < 0.5 for v in flows):
+            continue
         cells: Dict[str, Any] = {
             'period': r.get('label') or f'Period {r.get("seq", idx)}',
             'net_revenue': _num(r.get('netRevenue')),

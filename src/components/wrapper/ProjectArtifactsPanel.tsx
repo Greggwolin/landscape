@@ -221,7 +221,11 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     // entering remembers the width the user had, leaving puts it back, so a
     // deliberately dragged panel survives a trip to the map and back.
     const mapMode = projectRightPanelView === 'map' && showViewToggle;
-    const wantsTakeover = takeoverMode || mapMode;
+    // A screen opens at half the window, the way an artifact does (Gregg,
+    // 2026-10-02, "1a"). Before this a screen opened at the artifacts list's
+    // quarter width and was cramped.
+    const screenMode = projectRightPanelView === 'screen' && showViewToggle;
+    const wantsTakeover = takeoverMode || mapMode || screenMode;
 
     if (wantsTakeover && !inTakeoverMode.current) {
       preTakeoverWidth.current = panelWidth;
