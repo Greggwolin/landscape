@@ -25,6 +25,7 @@ import {
 import { useContainers } from '@/hooks/useContainers';
 import { authFetch } from '@/lib/authFetch';
 import styles from './DebtScreen.module.css';
+import LoanLeveredCashFlow from './LoanLeveredCashFlow';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -242,6 +243,7 @@ function EditCell({
       style={{ textAlign: align }}
       onClick={start}
       title="Click to edit"
+      data-editable="true"
     >
       {display}
     </button>
@@ -269,6 +271,9 @@ export function DebtScreen({ project, onNavigate }: Props) {
   const selected = loans.find((l) => l.loan_id === selectedId) ?? loans[0] ?? null;
   const [scale, setScale] = useState<Scale>('month');
   const [moreOpen, setMoreOpen] = useState(false);
+  // Gregg, 2026-10-02: the loan's detail tiles sit under the loan line, shown
+  // when an editable field in the line is clicked and hidden again by Close.
+  const [tilesOpen, setTilesOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [sizing, setSizing] = useState(false);
   // Interest-reserve prompt (Gregg, 2026-09-29): after a save, if the loan
@@ -462,26 +467,35 @@ export function DebtScreen({ project, onNavigate }: Props) {
               loans={loans}
               selectedId={selected?.loan_id ?? null}
               onSelect={setSelectedId}
+              onEditStart={() => setTilesOpen(true)}
               onSave={save}
               containerName={containerName}
               onOpenContainer={(id) => onNavigate?.('planning', id)}
             />
+            {selected && tilesOpen && (
+              <DetailPanel
+                projectId={projectId}
+                loan={selected}
+                onSave={save}
+                onSaveContainers={saveContainers}
+                containerOptions={containerOptions}
+                containerName={containerName}
+                moreOpen={moreOpen}
+                onToggleMore={() => setMoreOpen((o) => !o)}
+                onClose={() => setTilesOpen(false)}
+              />
+            )}
+            {selected && !tilesOpen && (
+              <div className={styles.hint}>
+                Click any blue field in the loan line to open the loan&apos;s full detail.
+              </div>
+            )}
+            {/* Gregg, 2026-10-02: the leveraged cash flow sits under the loan information. */}
+            <LoanLeveredCashFlow projectId={projectId} />
             {selected && (
               <DrawsTable projectId={projectId} loan={selected} scale={scale} onScale={setScale} />
             )}
           </div>
-          {selected && (
-            <DetailPanel
-              projectId={projectId}
-              loan={selected}
-              onSave={save}
-              onSaveContainers={saveContainers}
-              containerOptions={containerOptions}
-              containerName={containerName}
-              moreOpen={moreOpen}
-              onToggleMore={() => setMoreOpen((o) => !o)}
-            />
-          )}
         </div>
       )}
     </div>
@@ -495,6 +509,7 @@ function LoansLedger({
   loans,
   selectedId,
   onSelect,
+  onEditStart,
   onSave,
   containerName,
   onOpenContainer,
@@ -502,6 +517,7 @@ function LoansLedger({
   loans: LoanRecord[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  onEditStart: () => void;
   onSave: (loanId: number, data: Record<string, unknown>) => void;
   containerName: (id: number) => string;
   onOpenContainer: (id: number) => void;
@@ -534,7 +550,10 @@ function LoansLedger({
                 <tr
                   key={id}
                   className={id === selectedId ? styles.rowOn : undefined}
-                  onClick={() => onSelect(id)}
+                  onClick={(e) => {
+                    onSelect(id);
+                    if ((e.target as HTMLElement).closest('[data-editable]')) onEditStart();
+                  }}
                 >
                   <td>
                     <EditCell value={loan.loan_name} display={loan.loan_name}
@@ -847,6 +866,7 @@ function DetailPanel({
   containerName,
   moreOpen,
   onToggleMore,
+  onClose,
 }: {
   projectId: string;
   loan: LoanRecord;
@@ -856,6 +876,7 @@ function DetailPanel({
   containerName: (id: number) => string;
   moreOpen: boolean;
   onToggleMore: () => void;
+  onClose: () => void;
 }) {
   const [adding, setAdding] = useState('');
   const containers = loan.containers ?? [];
@@ -955,8 +976,14 @@ function DetailPanel({
   };
 
   return (
-    <aside className={styles.detail}>
-      <div className={styles.detailTitle}>{loan.loan_name}</div>
+    <div className={styles.tiles}>
+      <div className={styles.tilesHead}>
+        <span className={styles.detailTitle}>{loan.loan_name} — loan detail</span>
+        <button type="button" className="btn btn-sm btn-ghost-secondary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <div className={styles.tileGrid}>
       {GROUPS.slice(0, 2).map((g) => (
         <section key={g.title} className={styles.group}>
           <div className={styles.groupTitle}>{g.title}</div>
@@ -1089,7 +1116,8 @@ function DetailPanel({
           </div>
         ))}
       </section>
-    </aside>
+      </div>
+    </div>
   );
 }
 

@@ -249,3 +249,59 @@
 .prompt p {
   margin: 0 0 8px;
 }
+
+/* Gregg, 2026-10-02: the loan's detail tiles open under the loan line (not in a
+   right-hand column), laid out side by side, with a Close button. */
+.tiles {
+  margin: 8px 12px;
+  padding: 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  background: var(--cui-tertiary-bg);
+  font-size: 12px;
+}
+
+.tilesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+}
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.tileGrid .group {
+  margin-bottom: 0;
+  background: var(--cui-body-bg);
+}
+
+.lcfTable tbody tr {
+  cursor: default;
+}
+
+.lcfStub {
+  position: sticky;
+  left: 0;
+  background: var(--cui-body-bg);
+  white-space: nowrap;
+  min-width: 180px;
+}
+
+.lcfSub td.lcfStub {
+  padding-left: 20px;
+}
+
+.lcfTotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.lcfGrand td {
+  font-weight: 700;
+  border-top: 2px solid var(--cui-body-color);
+}
