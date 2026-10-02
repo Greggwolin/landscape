@@ -217,7 +217,25 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 2px 8px;
+  padding: 2px 12px;
+}
+
+/* Free text and controls inside a tile sit on the same 12px margin as the
+   tile's title and rows (Gregg, 2026-10-02: Security was flush to the edge). */
+.groupNote {
+  padding: 6px 12px;
+}
+
+/* The loans list: room inside the card and between rows (Gregg, 2026-10-02:
+   "its too tight"). */
+.ledgerWrap {
+  padding: 8px 12px 4px;
+}
+.ledger th {
+  padding: 6px 10px;
+}
+.ledger td {
+  padding: 7px 10px;
 }
 
 .rowLabel {

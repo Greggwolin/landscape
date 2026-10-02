@@ -241,8 +241,10 @@ function EditCell({
       type="button"
       className={`${styles.editable} ${value === null || value === undefined || value === '' ? styles.empty : styles.typed}`}
       style={{ textAlign: align }}
-      onClick={start}
-      title="Click to edit"
+      // Gregg, 2026-10-02: a single click selects (and opens the loan's
+      // detail through the row); a double click edits the field.
+      onDoubleClick={(e) => { e.stopPropagation(); start(); }}
+      title="Double-click to edit"
       data-editable="true"
     >
       {display}
@@ -483,7 +485,7 @@ export function DebtScreen({ project, onNavigate }: Props) {
             )}
             {selected && !tilesOpen && (
               <div className={styles.hint}>
-                Click any blue field in the loan line to open the loan&apos;s full detail.
+                Click a loan to open its full detail; double-click any blue field to change it.
               </div>
             )}
             </div>
@@ -528,8 +530,8 @@ function LoansLedger({
   return (
     <>
       <div className={styles.bar}><span className={styles.barLabel}>Loans</span></div>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
+      <div className={`${styles.tableWrap} ${styles.ledgerWrap}`}>
+        <table className={`${styles.table} ${styles.ledger}`}>
           <thead>
             <tr>
               <th>Loan</th>
@@ -553,9 +555,10 @@ function LoansLedger({
                 <tr
                   key={id}
                   className={id === selectedId ? styles.rowOn : undefined}
-                  onClick={(e) => {
+                  onClick={() => {
+                    // Gregg, 2026-10-02: one click anywhere on the loan opens its detail.
                     onSelect(id);
-                    if ((e.target as HTMLElement).closest('[data-editable]')) onEditStart();
+                    onEditStart();
                   }}
                 >
                   <td>
@@ -999,7 +1002,7 @@ function DetailPanel({
       <section className={styles.group}>
         <div className={styles.groupTitle}>Security</div>
         {containers.length === 0 && (
-          <div className={styles.muted}>
+          <div className={`${styles.muted} ${styles.groupNote}`}>
             Whole project — draws on every cost and is released by every sale, and funds the land purchase.
           </div>
         )}
@@ -1033,7 +1036,7 @@ function DetailPanel({
             </span>
           </div>
         ))}
-        <div className="d-flex align-items-center gap-2" style={{ marginTop: 6 }}>
+        <div className={`d-flex align-items-center gap-2 ${styles.groupNote}`}>
           <select className="form-select form-select-sm" value={adding} onChange={(e) => setAdding(e.target.value)}>
             <option value="">Add a village or phase…</option>
             {containerOptions
