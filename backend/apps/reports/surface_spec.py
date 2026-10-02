@@ -151,6 +151,10 @@ UNRESOLVED: Dict[str, str] = {
         'schedule by its tool, and it has no view specification — its definition '
         'is the schema (HQ162).'
     ),
+    'get_loan_budget': (
+        'build_loan_budget_schema is handed one loan budget summary by its tool, '
+        'and it has no view specification — its definition is the schema.'
+    ),
 }
 
 

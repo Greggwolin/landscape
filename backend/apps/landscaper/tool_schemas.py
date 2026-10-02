@@ -1992,6 +1992,26 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_loan_budget",
+        "description": (
+            "Render one loan's budget as a DETERMINISTIC artifact in the right panel: the "
+            "loan budget split between borrower and lender, the summary of proceeds "
+            "(origination, interest reserve and improvements held back as loan-in-process, "
+            "and the closing funds available) and the equity to close, after closing and in "
+            "total — no terms and no headline figures. Call it when the user asks for the "
+            "loan budget, the loan's sources and uses, or how much equity the loan leaves to "
+            "close. Built server-side and returned already created — do NOT call "
+            "create_artifact and do NOT compose the tables; announce it in one sentence. "
+            "loan_id is optional; without it the most senior loan is used."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "loan_id": {"type": "integer", "description": "The loan (optional)."},
+            },
+        },
+    },
+    {
         "name": "get_loan_summary",
         "description": (
             "Render one loan's summary as a DETERMINISTIC artifact in the right panel, laid "
@@ -2000,7 +2020,8 @@ LANDSCAPER_TOOLS = [
             "and lender; the summary of proceeds (origination, interest reserve and "
             "improvements held back as loan-in-process, and the closing funds available); "
             "and the equity to close, after closing and in total. Call it when the user asks "
-            "for the loan summary, the loan budget, the summary of proceeds, sources and uses "
+            "for the loan summary, the loan terms, or 'show me the loan' (for the loan budget "
+            "alone use get_loan_budget), the summary of proceeds, sources and uses "
             "of the loan, how much equity is needed to close, or 'show me the loan'. Built "
             "server-side and returned already created — do NOT call create_artifact and do "
             "NOT compose the tables; announce it in one sentence. loan_id is optional; "

@@ -43,6 +43,7 @@ ARTIFACT_TOOLS = [
     'get_pricing_register',
     # The loan summary (HQ162, 2026-10-02).
     'get_loan_summary',
+    'get_loan_budget',
 ]
 
 # Three ways an exit may direct the model, all acceptable:

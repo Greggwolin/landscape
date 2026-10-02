@@ -9534,10 +9534,21 @@ def handle_open_clarification(
     }
 
 
-@register_tool('get_loan_summary')
-def handle_get_loan_summary(
+def _project_has_loan(tool_input: Dict[str, Any], project_id: int) -> bool:
+    """True when the project has the asked-for loan (or any loan)."""
+    try:
+        from apps.financial.models_debt import Loan
+        loans = Loan.objects.filter(project_id=project_id)
+        loan_id = (tool_input or {}).get('loan_id')
+        return (loans.filter(loan_id=loan_id) if loan_id else loans).exists()
+    except Exception:  # noqa: BLE001 — let the helper report the real error
+        return True
+
+
+def _loan_artifact(
     tool_input: Dict[str, Any],
     project_id: int,
+    kind: str,
     **kwargs
 ) -> Dict[str, Any]:
     """Render one loan's summary as a DETERMINISTIC artifact, laid out as the
@@ -9582,6 +9593,7 @@ def handle_get_loan_summary(
             schedule=schedule,
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
+            kind=kind,
         )
         if envelope and envelope.get('success') is not False:
             return {
@@ -9592,7 +9604,7 @@ def handle_get_loan_summary(
                 'commitment_amount': summary.get('commitment_amount'),
                 'closing_funds_available': summary.get('net_loan_proceeds'),
                 'instruction': (
-                    'The loan summary artifact has ALREADY been created and is open in '
+                    f"The loan {'budget' if kind == 'budget' else 'summary'} artifact has ALREADY been created and is open in "
                     'the right panel. Do NOT call create_artifact. Reply with one short '
                     'sentence naming loan_name and stating commitment_amount and '
                     'closing_funds_available from this result.'
@@ -9602,6 +9614,44 @@ def handle_get_loan_summary(
     except Exception as e:  # noqa: BLE001
         logger.exception('get_loan_summary failed')
         return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_loan_summary')
+def handle_get_loan_summary(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """The loan on one page (HQ162) — see _loan_artifact."""
+    if not _project_has_loan(tool_input, project_id):
+        # The empty exit lives here, not only in the shared helper, so the relay
+        # coverage test can see it on the registered handler.
+        return {
+            'success': True, 'artifact_created': False,
+            'message': 'This project has no loan on the record yet.',
+            'instruction': _EMPTY_ARTIFACT_RELAY,
+        }
+    return _loan_artifact(tool_input, project_id, 'summary', **kwargs)
+
+
+@register_tool('get_loan_budget')
+def handle_get_loan_budget(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """The loan budget artifact (Gregg, 2026-10-02): the budget and proceeds
+    sections of the loan summary only — loan budget (total / borrower /
+    lender), summary of proceeds, equity. See _loan_artifact."""
+    if not _project_has_loan(tool_input, project_id):
+        # The empty exit lives here, not only in the shared helper, so the relay
+        # coverage test can see it on the registered handler.
+        return {
+            'success': True, 'artifact_created': False,
+            'message': 'This project has no loan on the record yet.',
+            'instruction': _EMPTY_ARTIFACT_RELAY,
+        }
+    return _loan_artifact(tool_input, project_id, 'budget', **kwargs)
 
 
 @register_tool('get_capitalization_schedule')

@@ -96,66 +96,9 @@ def outstanding_stats(schedule: Dict[str, Any], commitment: float) -> Dict[str, 
     }
 
 
-def build_loan_summary_schema(
-    loan: Any,
-    summary: Dict[str, Any],
-    stats: Dict[str, Optional[float]],
-) -> Dict[str, Any]:
-    commitment = _num(summary.get('commitment_amount')) or 0.0
-
-    # ---- Header: max / average outstanding --------------------------------
-    pairs = [
-        {'label': 'Commitment', 'value': round(commitment)},
-        {'label': 'Max outstanding',
-         'value': round(stats['max']) if stats.get('max') is not None else DASH},
-        {'label': 'Max % of loan', 'value': _pct(stats.get('max_pct'), 0)},
-        {'label': 'Average outstanding',
-         'value': round(stats['avg']) if stats.get('avg') is not None else DASH},
-        {'label': 'Average % of loan', 'value': _pct(stats.get('avg_pct'), 0)},
-    ]
-
-    # ---- Left: terms --------------------------------------------------------
-    index_rate = _num(getattr(loan, 'index_rate_pct', None))
-    spread_bps = _num(getattr(loan, 'interest_spread_bps', None))
-    index_name = getattr(loan, 'interest_index', None) or 'Index'
-    rate = _num(getattr(loan, 'interest_rate_pct', None))
-    orig_pct = _num(getattr(loan, 'origination_fee_pct', None))
-    if orig_pct is not None and orig_pct < 1:
-        orig_pct *= 100  # stored as a fraction (0.01) on some loans
-    terms = _kv_table('ls_terms', 'Leverage & rate', [
-        ('Total leverage (LTC)', _pct(getattr(loan, 'loan_to_cost_pct', None), 0)),
-        ('Loan to value', _pct(getattr(loan, 'loan_to_value_pct', None), 0)),
-        (f'Rate: {index_name} index', _pct(index_rate)),
-        ('Rate: spread', _pct(spread_bps / 100) if spread_bps is not None else DASH),
-        ('Loan rate', _pct(rate)),
-        ('Origination fee %', _pct(orig_pct)),
-        ('Term (months)', getattr(loan, 'loan_term_months', None) or DASH),
-        ('Interest only (months)', getattr(loan, 'interest_only_months', None) or DASH),
-    ])
-
-    budget_rows = {r['label']: r for r in (summary.get('loan_budget') or {}).get('rows', [])}
-    accel = _num(getattr(loan, 'repayment_acceleration', None))
-    other_terms = _kv_table('ls_other', 'Other terms', [
-        ('Interest reserve', _money_or_dash((budget_rows.get('Interest Reserve') or {}).get('total'))),
-        ('Origination fee', _money_or_dash((budget_rows.get('Origination Fee') or {}).get('total'))),
-        ('Loan costs: appraisal', _money_or_dash(getattr(loan, 'closing_costs_appraisal', None))),
-        ('Loan costs: legal', _money_or_dash(getattr(loan, 'closing_costs_legal', None))),
-        ('Loan costs: other', _money_or_dash(getattr(loan, 'closing_costs_other', None))),
-        ('Repayment acceleration', _pct(accel * 100, 0) if accel is not None else DASH),
-    ])
-
-    basis = (getattr(loan, 'release_basis', None) or '').upper()
-    release_rows: List[tuple] = []
-    if basis in ('CASH_SWEEP', 'SWEEP') or (basis == '' and _num(getattr(loan, 'release_price_pct', None)) is None):
-        release_rows.append(('Release basis', 'Cash sweep (100%)'))
-    else:
-        release_rows.append(('Release basis', basis.replace('_', ' ').title() or DASH))
-        release_rows.append(('Release price (% of loan per lot or acre)',
-                             _pct(getattr(loan, 'release_price_pct', None), 0)))
-    release_rows.append(('Minimum release (per lot or acre)',
-                         _money_or_dash(getattr(loan, 'minimum_release_amount', None))))
-    release = _kv_table('ls_release', 'Release', release_rows)
-
+def _budget_tables(summary: Dict[str, Any]):
+    """The loan budget, summary of proceeds and equity tables — shared by the
+    loan summary and the loan budget artifacts."""
     # ---- Right: loan budget, proceeds, equity --------------------------------
     lb = summary.get('loan_budget') or {}
     budget = {
@@ -218,6 +161,71 @@ def build_loan_summary_schema(
         ],
     }
 
+    return budget, proceeds, equity
+
+
+def build_loan_summary_schema(
+    loan: Any,
+    summary: Dict[str, Any],
+    stats: Dict[str, Optional[float]],
+) -> Dict[str, Any]:
+    commitment = _num(summary.get('commitment_amount')) or 0.0
+
+    # ---- Header: max / average outstanding --------------------------------
+    pairs = [
+        {'label': 'Commitment', 'value': round(commitment)},
+        {'label': 'Max outstanding',
+         'value': round(stats['max']) if stats.get('max') is not None else DASH},
+        {'label': 'Max % of loan', 'value': _pct(stats.get('max_pct'), 0)},
+        {'label': 'Average outstanding',
+         'value': round(stats['avg']) if stats.get('avg') is not None else DASH},
+        {'label': 'Average % of loan', 'value': _pct(stats.get('avg_pct'), 0)},
+    ]
+
+    # ---- Left: terms --------------------------------------------------------
+    index_rate = _num(getattr(loan, 'index_rate_pct', None))
+    spread_bps = _num(getattr(loan, 'interest_spread_bps', None))
+    index_name = getattr(loan, 'interest_index', None) or 'Index'
+    rate = _num(getattr(loan, 'interest_rate_pct', None))
+    orig_pct = _num(getattr(loan, 'origination_fee_pct', None))
+    if orig_pct is not None and orig_pct < 1:
+        orig_pct *= 100  # stored as a fraction (0.01) on some loans
+    terms = _kv_table('ls_terms', 'Leverage & rate', [
+        ('Total leverage (LTC)', _pct(getattr(loan, 'loan_to_cost_pct', None), 0)),
+        ('Loan to value', _pct(getattr(loan, 'loan_to_value_pct', None), 0)),
+        (f'Rate: {index_name} index', _pct(index_rate)),
+        ('Rate: spread', _pct(spread_bps / 100) if spread_bps is not None else DASH),
+        ('Loan rate', _pct(rate)),
+        ('Origination fee %', _pct(orig_pct)),
+        ('Term (months)', getattr(loan, 'loan_term_months', None) or DASH),
+        ('Interest only (months)', getattr(loan, 'interest_only_months', None) or DASH),
+    ])
+
+    budget_rows = {r['label']: r for r in (summary.get('loan_budget') or {}).get('rows', [])}
+    accel = _num(getattr(loan, 'repayment_acceleration', None))
+    other_terms = _kv_table('ls_other', 'Other terms', [
+        ('Interest reserve', _money_or_dash((budget_rows.get('Interest Reserve') or {}).get('total'))),
+        ('Origination fee', _money_or_dash((budget_rows.get('Origination Fee') or {}).get('total'))),
+        ('Loan costs: appraisal', _money_or_dash(getattr(loan, 'closing_costs_appraisal', None))),
+        ('Loan costs: legal', _money_or_dash(getattr(loan, 'closing_costs_legal', None))),
+        ('Loan costs: other', _money_or_dash(getattr(loan, 'closing_costs_other', None))),
+        ('Repayment acceleration', _pct(accel * 100, 0) if accel is not None else DASH),
+    ])
+
+    basis = (getattr(loan, 'release_basis', None) or '').upper()
+    release_rows: List[tuple] = []
+    if basis in ('CASH_SWEEP', 'SWEEP') or (basis == '' and _num(getattr(loan, 'release_price_pct', None)) is None):
+        release_rows.append(('Release basis', 'Cash sweep (100%)'))
+    else:
+        release_rows.append(('Release basis', basis.replace('_', ' ').title() or DASH))
+        release_rows.append(('Release price (% of loan per lot or acre)',
+                             _pct(getattr(loan, 'release_price_pct', None), 0)))
+    release_rows.append(('Minimum release (per lot or acre)',
+                         _money_or_dash(getattr(loan, 'minimum_release_amount', None))))
+    release = _kv_table('ls_release', 'Release', release_rows)
+
+    budget, proceeds, equity = _budget_tables(summary)
+
     return {
         'blocks': [
             {'id': 'ls_kpis', 'type': 'key_value_grid', 'columns': 5, 'pairs': pairs},
@@ -241,6 +249,23 @@ def build_loan_summary_schema(
     }
 
 
+def build_loan_budget_schema(summary: Dict[str, Any]) -> Dict[str, Any]:
+    """The loan budget artifact (Gregg, 2026-10-02): only the budget and
+    proceeds sections of the loan summary — loan budget, summary of proceeds,
+    equity. No headline figures, no terms."""
+    budget, proceeds, equity = _budget_tables(summary)
+    return {
+        'blocks': [
+            {
+                'id': 'lb_body',
+                'type': 'section',
+                'title': summary.get('loan_name') or 'Loan',
+                'children': [budget, proceeds, equity],
+            },
+        ],
+    }
+
+
 def create_loan_summary_artifact(
     *,
     project_id: int,
@@ -250,20 +275,27 @@ def create_loan_summary_artifact(
     schedule: Dict[str, Any],
     user_id: Any = None,
     thread_id: Any = None,
+    kind: str = 'summary',
 ) -> Dict[str, Any]:
-    """Build + register the loan summary artifact. One per loan — re-running
-    updates it in place."""
+    """Build + register the loan summary artifact, or with kind='budget' the
+    loan budget artifact (budget and proceeds only). One of each per loan —
+    re-running updates it in place."""
     try:
         from apps.artifacts.services import create_artifact_record
     except Exception as exc:  # noqa: BLE001
         logger.exception('loan_summary_artifact_builder: artifact service unavailable')
         return {'success': False, 'error': f'artifact service unavailable: {exc}'}
 
-    commitment = _num(summary.get('commitment_amount')) or 0.0
-    stats = outstanding_stats(schedule or {}, commitment)
-    schema = build_loan_summary_schema(loan, summary, stats)
     loan_name = summary.get('loan_name') or getattr(loan, 'loan_name', 'Loan')
-    title = f'{project_name} — Loan Summary: {loan_name}' if project_name else f'Loan Summary: {loan_name}'
+    if kind == 'budget':
+        schema = build_loan_budget_schema(summary)
+        label, tool, dkind = 'Loan Budget', 'get_loan_budget', 'loan_budget'
+    else:
+        commitment = _num(summary.get('commitment_amount')) or 0.0
+        stats = outstanding_stats(schedule or {}, commitment)
+        schema = build_loan_summary_schema(loan, summary, stats)
+        label, tool, dkind = 'Loan Summary', 'get_loan_summary', 'loan_summary'
+    title = f'{project_name} — {label}: {loan_name}' if project_name else f'{label}: {loan_name}'
     try:
         return create_artifact_record(
             title=title,
@@ -271,11 +303,11 @@ def create_loan_summary_artifact(
             project_id=project_id,
             user_id=user_id,
             thread_id=thread_id,
-            tool_name='get_loan_summary',
-            params_json={'server_rendered': True, 'kind': 'loan_summary',
+            tool_name=tool,
+            params_json={'server_rendered': True, 'kind': dkind,
                          'loan_id': getattr(loan, 'loan_id', None)},
-            dedup_key=f'loan_summary:{getattr(loan, "loan_id", "")}',
-            prior_tool_calls=['get_loan_summary'],
+            dedup_key=f'{dkind}:{getattr(loan, "loan_id", "")}',
+            prior_tool_calls=[tool],
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception('loan_summary_artifact_builder: create_artifact_record failed')

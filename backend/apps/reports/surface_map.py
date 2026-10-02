@@ -106,6 +106,13 @@ SURFACES: Dict[str, Dict[str, object]] = {
         'definition': 'schema',
         'reports': [],
     },
+    # 2026-10-02 (Gregg): the budget and proceeds sections of the loan summary
+    # on their own. Same schema builder.
+    'get_loan_budget': {
+        'label': 'Loan Budget',
+        'definition': 'schema',
+        'reports': [],
+    },
 }
 
 # Reports with no surface. They keep their own generators until one of them

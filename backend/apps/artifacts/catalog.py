@@ -73,6 +73,12 @@ CATALOG: List[Dict[str, str]] = [
         'blurb': 'A loan on one page: terms, the loan budget, the summary of proceeds and the equity to close.',
     },
     {
+        'tool': 'get_loan_budget',
+        'label': 'Loan Budget',
+        'kind': 'report',
+        'blurb': 'The loan budget by borrower and lender, the summary of proceeds and the equity to close.',
+    },
+    {
         'tool': 'get_rent_roll_schedule',
         'label': 'Rent Roll',
         'kind': 'register',
