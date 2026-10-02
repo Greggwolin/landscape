@@ -144,8 +144,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   }, [collapsed, sidebarWidth, setSidebarWidthPx]);
 
   useEffect(() => {
-    // RULE 11 (D-2026-09-22-NAV-R11, Gregg "12b"): THE SIDEBAR ONLY MOVES WHEN
-    // THE USER MOVES IT. Opening or closing an artifact, opening a chat,
+    // RULE 11 (D-2026-09-22-NAV-R11, Gregg "12b") — PARTLY SUPERSEDED
+    // 2026-10-02: a screen or artifact opening now folds the sidebar (see the
+    // "sidebar folds" effect below). The rest of Rule 11 stands. Original text:
+    // THE SIDEBAR ONLY MOVES WHEN THE USER MOVES IT. Opening or closing an artifact, opening a chat,
     // switching projects or opening the map never collapses or expands it.
     // When the panel needs room the chat gives way (D-2026-09-18-YIELD).
     //
@@ -170,6 +172,33 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeArtifactId, projectRightPanelView, pathname]);
+
+  // ── The sidebar folds while a screen or artifact is open (Gregg, 2026-10-02)
+  // "whenever a screen or artifact is open, the left nav bar should collapse."
+  // SUPERSEDES Rule 11 (D-2026-09-22-NAV-R11, "12b": the sidebar only moves
+  // when the user moves it) for this case. The sidebar folds when a screen or
+  // an artifact opens in the panel and comes back when it closes — but only if
+  // it was this rule that folded it, and only if the user has not moved the
+  // sidebar himself in between. A sidebar he opens while a screen is up stays
+  // open.
+  const sidebarAutoCollapsed = useRef(false);
+  const isChatRouteHere = /^\/w\/chat(\/|$)/.test(pathname);
+  const panelShowsWork =
+    (/^\/w\/projects\/\d+\/?$/.test(pathname) &&
+      (projectRightPanelView === 'screen' || activeArtifactId != null)) ||
+    (isChatRouteHere && activeArtifactId != null && artifactsOpen);
+  useEffect(() => {
+    if (panelShowsWork && !collapsed) {
+      sidebarAutoCollapsed.current = true;
+      setCollapsed(true);
+      if (inTakeoverMode.current) setRightPanelWidth(computeTakeoverWidth(COLLAPSED_WIDTH));
+    } else if (!panelShowsWork && sidebarAutoCollapsed.current) {
+      sidebarAutoCollapsed.current = false;
+      setCollapsed(false);
+      if (inTakeoverMode.current) setRightPanelWidth(computeTakeoverWidth(sidebarWidth));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelShowsWork]);
 
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.
@@ -534,6 +563,8 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   );
 
   const handleToggleCollapse = useCallback(() => {
+    // His move: the sidebar is no longer the auto-fold's to restore.
+    sidebarAutoCollapsed.current = false;
     setCollapsed((v) => {
       const next = !v;
       const nextSidebar = v ? DEFAULT_SIDEBAR_WIDTH : COLLAPSED_WIDTH;
@@ -550,6 +581,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
+      sidebarAutoCollapsed.current = false;
       isResizing.current = true;
       startX.current = e.clientX;
       startWidth.current = sidebarWidth;

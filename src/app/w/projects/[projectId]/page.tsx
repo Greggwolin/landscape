@@ -9,20 +9,24 @@ import { useWrapperUI } from '@/contexts/WrapperUIContext';
  * Project root page — renders the artifacts panel in the right content area.
  * Landscaper chat (center panel) shows the ProjectHomepage via CenterChatPanel.
  *
- * This page IS the chat workspace — chat must always be visible here.
- * Reacts to chatOpen going false (e.g. user clicks "Close" in thread view)
- * and immediately re-opens it, so chat cannot be hidden on the project home.
+ * The chat can fold to a strip here (its ☰, or automatically when too narrow).
  * Sets rightPanelNarrow so <main> shrinks to the 320px artifacts width.
  */
 export default function WrapperProjectRootPage() {
   const params = useParams();
   const projectId = parseInt(params.projectId as string, 10);
-  const { chatOpen, openChat, setRightPanelNarrow } = useWrapperUI();
+  const { setRightPanelNarrow, openChat } = useWrapperUI();
 
-  // Keep chat open — project home IS the chat workspace, not a closable panel
+  // Entering a project shows the chat, even if another page (Platform
+  // Knowledge) had closed it. Once here, a fold stays until reopened.
   useEffect(() => {
-    if (!chatOpen) openChat();
-  }, [chatOpen, openChat]);
+    openChat();
+  }, [openChat]);
+
+  // (Removed 2026-10-02: this page used to force the chat back open whenever it
+  // closed. Gregg asked for the chat to fold to a strip — by its ☰, or on its
+  // own when the row is too narrow to read it — so a folded chat now stays
+  // folded until he reopens it or the room comes back.)
 
   // Narrow the right panel so main shrinks to 320px artifacts width
   useEffect(() => {

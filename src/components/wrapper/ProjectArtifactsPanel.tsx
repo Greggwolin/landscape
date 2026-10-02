@@ -26,6 +26,12 @@ const MAX_ARTIFACTS_WIDTH = 1600;
  * panel taking the whole window is a different feature (takeover), reached
  * deliberately rather than by opening a wide table. */
 const MIN_CHAT_WIDTH = 380;
+/** Room above the floor before a self-folded chat comes back (no flicker). */
+const CHAT_UNFOLD_MARGIN = 40;
+/** Width of the folded chat strip — matches .wrapper-chat-center.is-folded. */
+const CHAT_FOLDED_WIDTH = 44;
+/** The panel's left-edge drag handle. */
+const DRAG_HANDLE_WIDTH = 4;
 
 // MK24 §5/§6 — widths as a share of the viewport rather than fixed pixels.
 // The map wants the screen; the artifacts rail wants to sit beside the chat.
@@ -124,6 +130,9 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     projectRightPanelView,
     setProjectRightPanelView,
     sidebarWidthPx,
+    chatOpen,
+    autoFoldChat,
+    autoUnfoldChat,
   } = useWrapperUI();
   const SIDEBAR_COLLAPSED_WIDTH = sidebarWidthPx;
 
@@ -261,6 +270,7 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [takeoverMode, projectRightPanelView, showViewToggle, sidebarWidthPx]);
 
+  const renderedWidthRef = useRef<number | null>(null);
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
@@ -269,7 +279,9 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
       // Start from what is on screen, not from the stored width. If the content
       // grew the panel past `panelWidth`, dragging from the stored value would
       // jump the edge away from the cursor on the first pixel of movement.
-      startWidth.current = effectiveWidth;
+      // While the chat is folded the panel is drawn wider than effectiveWidth
+      // (it fills the row); start from what is drawn.
+      startWidth.current = renderedWidthRef.current ?? effectiveWidth;
 
       // The drag may go as wide as the content may — otherwise a table that
       // widened itself past the legacy 1600 cap could not then be dragged, and
@@ -303,6 +315,42 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     },
     [effectiveWidth, maxContentWidth]
   );
+
+  /* ── The chat folds itself when it gets too narrow to read (Gregg, 2026-10-02)
+   * The room the chat would have beside this panel at the panel's own width.
+   * Below the chat's floor the chat folds to its strip; it comes back on its
+   * own only once there is clearly room again (a margin above the floor, so a
+   * window sitting right at the line does not flicker), and only if it folded
+   * itself — a chat the user folded stays folded. */
+  // Measured the same way as maxContentWidth (row less sidebar less panel).
+  const chatRoom =
+    viewportWidth == null ? null : viewportWidth - sidebarWidthPx - effectiveWidth;
+  const prevChatOpenRef = useRef(chatOpen);
+  useEffect(() => {
+    const wasOpen = prevChatOpenRef.current;
+    prevChatOpenRef.current = chatOpen;
+    if (chatRoom == null || viewportWidth == null || !artifactsOpen) return;
+    if (chatOpen && !wasOpen && chatRoom < MIN_CHAT_WIDTH) {
+      // He reopened the chat himself where it had no room: the panel gives
+      // way to the chat's floor rather than folding it straight back.
+      setPanelWidth(
+        Math.max(MIN_ARTIFACTS_WIDTH, viewportWidth - sidebarWidthPx - MIN_CHAT_WIDTH),
+      );
+      return;
+    }
+    if (chatOpen && chatRoom < MIN_CHAT_WIDTH) autoFoldChat();
+    else if (!chatOpen && chatRoom >= MIN_CHAT_WIDTH + CHAT_UNFOLD_MARGIN) autoUnfoldChat();
+  }, [chatRoom, chatOpen, artifactsOpen, viewportWidth, sidebarWidthPx, autoFoldChat, autoUnfoldChat]);
+
+  // While the chat is folded, the panel takes the whole row up to the strip.
+  const renderedWidth =
+    !chatOpen && viewportWidth != null
+      ? Math.max(
+          effectiveWidth,
+          viewportWidth - sidebarWidthPx - CHAT_FOLDED_WIDTH - DRAG_HANDLE_WIDTH,
+        )
+      : effectiveWidth;
+  renderedWidthRef.current = renderedWidth;
 
   /* ── Collapsed strip ── */
   if (!artifactsOpen) {
@@ -350,7 +398,7 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
           background: 'transparent',
         }}
       />
-      <div className="artifacts-panel" style={{ width: effectiveWidth, flexShrink: 0 }}>
+      <div className="artifacts-panel" style={{ width: renderedWidth, flexShrink: 0 }}>
       {/* Header — Artifacts | Documents view toggle. Sits at the top of
           the rail full-bleed (no gutter). Active label is white, inactive
           is muted. Clicking either swaps the panel body without navigating

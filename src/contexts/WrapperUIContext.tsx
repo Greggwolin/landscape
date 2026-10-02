@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 /** Viewport width below which the artifacts panel auto-collapses. */
 const ARTIFACTS_COLLAPSE_BREAKPOINT = 1200;
@@ -200,6 +200,14 @@ interface WrapperUIContextValue {
   toggleChat: () => void;
   openChat: () => void;
   closeChat: () => void;
+  /**
+   * The chat folded itself because the row got too narrow to read it (not
+   * because the user folded it). Only an auto-fold is undone automatically
+   * when the room comes back; a fold the user made stays until they reopen.
+   */
+  chatAutoFolded: boolean;
+  autoFoldChat: () => void;
+  autoUnfoldChat: () => void;
   /** When true, <main> shrinks to fit its content (e.g. 320px artifacts sidebar). */
   rightPanelNarrow: boolean;
   setRightPanelNarrow: (v: boolean) => void;
@@ -329,9 +337,35 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('resize', syncToViewport);
   }, []);
 
-  const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
-  const openChat = useCallback(() => setChatOpen(true), []);
-  const closeChat = useCallback(() => setChatOpen(false), []);
+  const [chatAutoFolded, setChatAutoFolded] = useState(false);
+  const toggleChat = useCallback(() => {
+    setChatAutoFolded(false);
+    setChatOpen((v) => !v);
+  }, []);
+  const openChat = useCallback(() => {
+    setChatAutoFolded(false);
+    setChatOpen(true);
+  }, []);
+  const closeChat = useCallback(() => {
+    setChatAutoFolded(false);
+    setChatOpen(false);
+  }, []);
+  // Gregg, 2026-10-02: the chat folds itself when it gets too narrow to read
+  // comfortably. Only a fold made this way comes undone on its own.
+  const chatOpenRef = useRef(chatOpen);
+  chatOpenRef.current = chatOpen;
+  const chatAutoFoldedRef = useRef(chatAutoFolded);
+  chatAutoFoldedRef.current = chatAutoFolded;
+  const autoFoldChat = useCallback(() => {
+    if (!chatOpenRef.current) return;
+    setChatAutoFolded(true);
+    setChatOpen(false);
+  }, []);
+  const autoUnfoldChat = useCallback(() => {
+    if (!chatAutoFoldedRef.current) return;
+    setChatAutoFolded(false);
+    setChatOpen(true);
+  }, []);
   const toggleArtifacts = useCallback(() => setArtifactsOpen((v) => !v), []);
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
@@ -339,6 +373,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   return (
     <WrapperUIContext.Provider value={{
       chatOpen, toggleChat, openChat, closeChat,
+      chatAutoFolded, autoFoldChat, autoUnfoldChat,
       rightPanelNarrow, setRightPanelNarrow,
       artifactsOpen, toggleArtifacts,
       projectRightPanelView, setProjectRightPanelView,
