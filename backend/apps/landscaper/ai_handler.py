@@ -3822,7 +3822,7 @@ def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
 _NUMBERS_PRODUCING_PREFIXES = (
     'get_budget', 'calculate_', 'compute_', 'run_draft_calculations',
     'get_deal_summary', 'get_operating_statement', 'get_cashflow_results',
-    'get_cashflow_schedule', 'get_capitalization_schedule', 'get_rent_roll_schedule',
+    'get_cashflow_schedule', 'get_capitalization_schedule', 'get_loan_summary', 'get_rent_roll_schedule',
     'review_budget_variance',
     'get_valuation_reconciliation', 'get_value_add_assumptions',
     'get_project_assumptions_detail', 'render_report_as_artifact',

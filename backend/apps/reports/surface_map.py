@@ -15,6 +15,7 @@ Two things the decision assumed are not true of the code as it stands, and both
 are recorded here rather than worked around silently:
 
 * **Seven of the nine surfaces have a view specification. Two do not.**
+  (A tenth, Loan Summary, was added 2026-10-02 with a schema only — HQ162.)
   Operating Statement and Budget Variance were built with an artifact SCHEMA and
   no specification — see ``os_artifact_builder`` and ``variance_artifact_builder``.
   Their definition is therefore the schema until they earn a specification, and
@@ -94,6 +95,16 @@ SURFACES: Dict[str, Dict[str, object]] = {
         'label': 'Budget Variance',
         'definition': 'schema',
         'reports': ['RPT_20'],
+    },
+    # HQ162 (2026-10-02): one loan on one page, laid out as the Star Valley
+    # Senior Loan Summary. Defined by its artifact schema
+    # (loan_summary_artifact_builder). RPT_03 (Loan Budget) draws on the same
+    # budget summary but is a different page; it stays unmapped until the two
+    # are made one rendering.
+    'get_loan_summary': {
+        'label': 'Loan Summary',
+        'definition': 'schema',
+        'reports': [],
     },
 }
 

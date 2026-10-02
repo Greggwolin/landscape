@@ -26,7 +26,7 @@ from apps.reports.generators.surface_preview import (
 # ── the mapping ──────────────────────────────────────────────────────────
 
 def test_every_surface_is_a_catalogue_entry_and_vice_versa():
-    """The mapping and the catalogue name the same nine surfaces.
+    """The mapping and the catalogue name the same ten surfaces.
 
     A surface added to the panel without a decision about which report renders
     it fails here rather than quietly becoming a tenth thing nobody mapped.
@@ -49,7 +49,7 @@ def test_the_counts_are_what_the_prose_says():
     twelve report codes; they carry thirteen, and the set-equality test above
     passed anyway because it never counted.
     """
-    assert len(SURFACES) == 9
+    assert len(SURFACES) == 10  # Loan Summary added 2026-10-02 (HQ162)
     assert sum(1 for e in SURFACES.values() if e['definition'] == 'view_spec') == 7
     assert sum(1 for e in SURFACES.values() if e['reports']) == 8
     assert len(mapped_reports()) == 13
@@ -299,5 +299,6 @@ def test_the_operating_statement_is_resolvable_and_the_rest_are_listed():
         'get_capitalization_schedule',
         'get_rent_roll_schedule',
         'review_budget_variance',
+        'get_loan_summary',
     }
     assert set(RESOLVERS) | set(UNRESOLVED) == set(SURFACES)

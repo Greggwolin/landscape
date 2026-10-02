@@ -9534,6 +9534,76 @@ def handle_open_clarification(
     }
 
 
+@register_tool('get_loan_summary')
+def handle_get_loan_summary(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render one loan's summary as a DETERMINISTIC artifact, laid out as the
+    Star Valley Senior Loan Summary sheet (HQ162): max and average outstanding;
+    leverage, rate, other terms and release on the left; the loan budget
+    (total / borrower / lender), the summary of proceeds (the loan-in-process
+    lines) and the equity on the right. Server-side render — the model must NOT
+    compose the tables. Reads the same loan-budget summary as the classic loan
+    budget and the loan's own schedule; a project with no loan returns a clean
+    'no loan' result."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+    try:
+        from apps.financial.models_debt import Loan
+        from apps.projects.models import Project
+        from apps.calculations.loan_sizing_service import LoanSizingService
+        from apps.financial.views_debt_schedule import DebtScheduleView
+
+        loans = Loan.objects.filter(project_id=project_id).order_by('seniority', 'loan_id')
+        loan_id = tool_input.get('loan_id')
+        loan = loans.filter(loan_id=loan_id).first() if loan_id else loans.first()
+        if loan is None:
+            return {
+                'success': True, 'artifact_created': False,
+                'message': 'This project has no loan on the record yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
+            }
+        project = Project.objects.get(project_id=project_id)
+        summary = LoanSizingService.build_budget_summary(loan, project)
+        try:
+            schedule = DebtScheduleView().get(None, project_id, loan.loan_id).data or {}
+        except Exception:  # noqa: BLE001 — the summary still renders without the stats
+            logger.exception('get_loan_summary: schedule run failed for loan %s', loan.loan_id)
+            schedule = {}
+
+        from .tools.loan_summary_artifact_builder import create_loan_summary_artifact
+        envelope = create_loan_summary_artifact(
+            project_id=int(project_id),
+            project_name=getattr(project, 'project_name', None),
+            loan=loan,
+            summary=summary,
+            schedule=schedule,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+        )
+        if envelope and envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': envelope,
+                'loan_name': loan.loan_name,
+                'commitment_amount': summary.get('commitment_amount'),
+                'closing_funds_available': summary.get('net_loan_proceeds'),
+                'instruction': (
+                    'The loan summary artifact has ALREADY been created and is open in '
+                    'the right panel. Do NOT call create_artifact. Reply with one short '
+                    'sentence naming loan_name and stating commitment_amount and '
+                    'closing_funds_available from this result.'
+                ),
+            }
+        return {'success': False, 'error': (envelope or {}).get('error', 'artifact not created')}
+    except Exception as e:  # noqa: BLE001
+        logger.exception('get_loan_summary failed')
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('get_capitalization_schedule')
 def handle_get_capitalization_schedule(
     tool_input: Dict[str, Any],

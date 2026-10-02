@@ -584,10 +584,14 @@ class LoanSizingService:
                 "pct_of_loan": pct_of_loan(interest_reserve),
                 "total": _as_float(-interest_reserve),
             },
+            # Loan-in-process improvements are the LENDER's share of the
+            # improvements (held back, drawn as built) — not the whole budget.
+            # HQ162: a land-only loan funds no improvements, so this is zero and
+            # the rows add back to the closing funds.
             {
                 "label": f"LIP: {line_item_b_label}",
-                "pct_of_loan": pct_of_loan(capex),
-                "total": _as_float(-capex),
+                "pct_of_loan": pct_of_loan(capex_lender_alloc),
+                "total": _as_float(-capex_lender_alloc),
             },
             {
                 "label": "Closing Funds Available",
@@ -596,11 +600,16 @@ class LoanSizingService:
             },
         ]
 
-        project_costs_at_close = total_budget
+        # Equity (HQ162, laid out as the Star Valley Senior Loan Summary): what
+        # is paid at closing is the land / acquisition; the loan's closing funds
+        # come off it; the borrower's share of everything after closing is the
+        # post-closing equity. Equity total = the borrower column of the budget.
+        project_costs_at_close = acquisition
         loan_proceeds = net_proceeds
         transaction_offering_cost = Decimal("0")
         option_deposit = Decimal("0")
         total_equity_to_close = project_costs_at_close - loan_proceeds + transaction_offering_cost - option_deposit
+        equity_post_closing = total_borrower - (acquisition - acquisition_lender_alloc)
 
         equity_to_close = [
             {"label": "Project Costs at Close", "total": _as_float(project_costs_at_close)},
@@ -610,6 +619,8 @@ class LoanSizingService:
         if is_land:
             equity_to_close.append({"label": "- Option Deposit", "total": _as_float(-option_deposit)})
         equity_to_close.append({"label": "Total Equity to Close", "total": _as_float(total_equity_to_close)})
+        equity_to_close.append({"label": "Equity: Post Closing", "total": _as_float(equity_post_closing)})
+        equity_to_close.append({"label": "Equity: Total", "total": _as_float(total_equity_to_close + equity_post_closing)})
 
         return {
             "project_id": getattr(project, "project_id", None),

@@ -41,6 +41,8 @@ ARTIFACT_TOOLS = [
     # rather than remembered — which is twice now that the test has earned its
     # keep by refusing a new artifact tool that had not been listed.
     'get_pricing_register',
+    # The loan summary (HQ162, 2026-10-02).
+    'get_loan_summary',
 ]
 
 # Three ways an exit may direct the model, all acceptable:
