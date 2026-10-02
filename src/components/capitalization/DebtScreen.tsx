@@ -107,6 +107,15 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Reserve contingency: stored as a multiplier (1.2), entered as a percent (20). */
+function inflatorToPct(v: unknown): number | null {
+  const n = num(v);
+  return n === null ? null : Math.round((n - 1) * 10000) / 100;
+}
+function pctToInflator(pct: number): number {
+  return Math.round((1 + pct / 100) * 10000) / 10000;
+}
+
 /** Thousands separators, parentheses for negatives, em dash for zero/absent. */
 function money(v: unknown): string {
   const n = num(v);
@@ -599,6 +608,7 @@ interface SchedulePeriod {
   cost_draw?: number;
   accrued_interest?: number;
   interest_reserve_draw?: number;
+  interest_reserve_balance?: number;
   release_payments?: number;
   ending_balance?: number;
   scheduled_payment?: number;
@@ -655,6 +665,8 @@ function DrawsTable({
         if (v !== null) row[k] = (row[k] ?? 0) + v;
       }
       row.ending_balance = num(p.ending_balance) ?? row.ending_balance;
+      // The reserve still undrawn is a balance too: the last one in the bucket.
+      row.interest_reserve_balance = num(p.interest_reserve_balance) ?? row.interest_reserve_balance;
     }
     // Only periods where something happens or a balance is outstanding.
     return out.filter((r) =>
@@ -692,15 +704,17 @@ function DrawsTable({
             <thead>
               {isTerm ? (
                 <tr>
-                  <th>Period</th><th className={styles.num}>Payment</th><th className={styles.num}>Interest</th>
+                  <th>Period</th><th className={styles.num}>Interest</th>
+                  <th className={styles.num}>Paid by reserve</th><th className={styles.num}>Paid by project</th>
                   <th className={styles.num}>Principal</th><th className={styles.num}>Balloon</th>
-                  <th className={styles.num}>Balance</th>
+                  <th className={styles.num}>Balance</th><th className={styles.num}>Reserve undrawn</th>
                 </tr>
               ) : (
                 <tr>
                   <th>Period</th><th className={styles.num}>Costs funded</th><th className={styles.num}>Draw</th>
-                  <th className={styles.num}>Interest</th><th className={styles.num}>Release from sales</th>
-                  <th className={styles.num}>Balance</th>
+                  <th className={styles.num}>Interest</th><th className={styles.num}>Paid by reserve</th>
+                  <th className={styles.num}>Release from sales</th>
+                  <th className={styles.num}>Balance</th><th className={styles.num}>Reserve undrawn</th>
                 </tr>
               )}
             </thead>
@@ -710,19 +724,25 @@ function DrawsTable({
                   <td>{r.label}</td>
                   {isTerm ? (
                     <>
-                      <td className={styles.num}>{money(r.scheduled_payment)}</td>
                       <td className={styles.num}>{money(r.interest_component)}</td>
+                      <td className={styles.num}>{money(r.interest_reserve_draw)}</td>
+                      <td className={styles.num}>
+                        {money((r.interest_component ?? 0) - (r.interest_reserve_draw ?? 0))}
+                      </td>
                       <td className={styles.num}>{money(r.principal_component)}</td>
                       <td className={styles.num}>{money(r.balloon_amount)}</td>
                       <td className={styles.num}>{money(r.ending_balance)}</td>
+                      <td className={styles.num}>{money(r.interest_reserve_balance)}</td>
                     </>
                   ) : (
                     <>
                       <td className={styles.num}>{money(r.costs_funded)}</td>
                       <td className={styles.num}>{money(r.cost_draw)}</td>
                       <td className={styles.num}>{money(r.accrued_interest)}</td>
+                      <td className={styles.num}>{money(r.interest_reserve_draw)}</td>
                       <td className={styles.num}>{money(r.release_payments ? -r.release_payments : 0)}</td>
                       <td className={styles.num}>{money(r.ending_balance)}</td>
+                      <td className={styles.num}>{money(r.interest_reserve_balance)}</td>
                     </>
                   )}
                 </tr>
@@ -789,8 +809,10 @@ const GROUPS: Array<{ title: string; fields: FieldDef[] }> = [
       { key: 'exit_fee_pct', label: 'Exit', kind: 'number', suffix: '%' },
       { key: 'unused_fee_pct', label: 'Unused', kind: 'number', suffix: '%' },
       { key: 'commitment_fee_pct', label: 'Commitment', kind: 'number', suffix: '%' },
-      { key: 'interest_reserve_amount', label: 'Interest reserve', kind: 'number' },
-      { key: 'interest_reserve_funded_upfront', label: 'Reserve funded at close', kind: 'bool' },
+      // The reserve is held back from the commitment and drawn monthly to pay
+      // interest (loan-in-process) — never funded at closing (Gregg, 2026-10-02).
+      { key: 'interest_reserve_amount', label: 'Interest reserve (held back)', kind: 'number' },
+      { key: 'interest_reserve_inflator', label: 'Reserve contingency', kind: 'number', suffix: '%' },
     ],
   },
   {
@@ -803,7 +825,6 @@ const GROUPS: Array<{ title: string; fields: FieldDef[] }> = [
       { key: 'release_price_pct', label: 'Release price (% of loan per lot or acre)', kind: 'number', suffix: '%' },
       { key: 'repayment_acceleration', label: 'Release acceleration', kind: 'number', suffix: '×' },
       { key: 'minimum_release_amount', label: 'Minimum release (per lot or acre)', kind: 'number' },
-      { key: 'interest_reserve_inflator', label: 'Interest reserve contingency', kind: 'number', suffix: '×' },
     ],
   },
 ];
@@ -873,6 +894,21 @@ function DetailPanel({
     if (f.key === 'commitment_amount'
       && (num(loan.loan_to_cost_pct) !== null || num(loan.loan_to_value_pct) !== null)) {
       return <span title="Sized from the ratio above">{money(eff.commitment_amount ?? value)}</span>;
+    }
+    // Contingency: stored as a multiplier (1.2), shown and typed as a percent (20).
+    if (f.key === 'interest_reserve_inflator') {
+      const pct = inflatorToPct(value);
+      return (
+        <EditCell
+          value={pct}
+          display={pct === null ? '—' : `${pct.toLocaleString('en-US', { maximumFractionDigits: 2 })} %`}
+          kind="number"
+          align="right"
+          onCommit={(v) => onSave(loan.loan_id, {
+            interest_reserve_inflator: num(v) === null ? null : pctToInflator(Number(v)),
+          })}
+        />
+      );
     }
     if (f.kind === 'bool') {
       return (
@@ -1108,6 +1144,11 @@ function ReservePrompt({
         const v = (values[i.key] ?? '').trim();
         if (v === '') continue;
         if (i.kind === 'choice') data[i.key] = v;
+        // The contingency is typed as a percent (20 = 20%) and stored as a
+        // multiplier (1.2).
+        else if (i.key === 'interest_reserve_inflator' && Number.isFinite(Number(v))) {
+          data[i.key] = pctToInflator(Number(v));
+        }
         else if (Number.isFinite(Number(v))) data[i.key] = Number(v);
       }
       const unfilled = shown.filter((i) => data[i.key] === undefined);

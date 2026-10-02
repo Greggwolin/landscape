@@ -143,6 +143,11 @@ class DebtScheduleView(APIView):
                     'balloon_amount': result.balloon_amount,
                     'monthly_payment_io': result.monthly_payment_io,
                     'monthly_payment_amort': result.monthly_payment_amort,
+                    # Loan-in-process: the reserve is held back at closing and
+                    # drawn monthly to pay interest.
+                    'interest_reserve': result.interest_reserve,
+                    'interest_paid_by_reserve': result.interest_paid_by_reserve,
+                    'funded_at_closing': result.funded_at_closing,
                 },
                 'periods': [
                     {
@@ -156,6 +161,8 @@ class DebtScheduleView(APIView):
                         'is_io_period': p.is_io_period,
                         'is_balloon': p.is_balloon,
                         'balloon_amount': p.balloon_amount,
+                        'interest_reserve_draw': p.interest_reserve_draw,
+                        'interest_reserve_balance': p.interest_reserve_balance,
                     }
                     for p in result.periods
                 ],

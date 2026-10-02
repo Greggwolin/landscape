@@ -261,3 +261,97 @@ class TestTermLoanCalculation(TestCase):
         )
         result = self.engine.calculate_term(params, 60)
         self.assertGreater(result.balloon_amount, 0)
+
+
+class TestInterestReserveIsLoanInProcess(TestCase):
+    """Gregg, 2026-10-02: the interest reserve is not funded at closing. It is
+    part of the commitment held back (loan-in-process); each month it pays the
+    interest by advancing the loan, so the balance grows by what it pays."""
+
+    def setUp(self):
+        self.engine = DebtServiceEngine()
+
+    def _term(self, reserve, **kw):
+        base = dict(
+            loan_amount=10_000_000, interest_rate_annual=0.06, amortization_months=0,
+            interest_only_months=0, loan_term_months=24, origination_fee_pct=0.01,
+            loan_start_period=0, payment_frequency='MONTHLY', interest_reserve=reserve,
+        )
+        base.update(kw)
+        return TermLoanParams(**base)
+
+    def test_term_closing_funds_commitment_less_reserve(self):
+        result = self.engine.calculate_term(self._term(1_000_000), 24)
+        self.assertAlmostEqual(result.funded_at_closing, 9_000_000, places=2)
+        self.assertAlmostEqual(result.periods[0].beginning_balance, 9_000_000, places=2)
+
+    def test_term_reserve_payment_raises_balance(self):
+        result = self.engine.calculate_term(self._term(1_000_000), 24)
+        p0, p1 = result.periods[0], result.periods[1]
+        self.assertAlmostEqual(p0.interest_component, 45_000, places=2)
+        self.assertAlmostEqual(p0.interest_reserve_draw, 45_000, places=2)
+        self.assertAlmostEqual(p0.scheduled_payment, 0.0, places=2)
+        self.assertAlmostEqual(p0.ending_balance, 9_045_000, places=2)
+        # Interest accrues on the reserve's own advance.
+        self.assertAlmostEqual(p1.interest_component, 9_045_000 * 0.005, places=2)
+
+    def test_term_project_pays_once_reserve_is_spent(self):
+        result = self.engine.calculate_term(self._term(100_000), 24)
+        self.assertAlmostEqual(result.interest_paid_by_reserve, 100_000, places=2)
+        last = result.periods[23]
+        self.assertGreater(last.scheduled_payment, 0)
+        self.assertAlmostEqual(last.interest_reserve_balance, 0.0, places=2)
+
+    def test_term_without_reserve_is_unchanged(self):
+        result = self.engine.calculate_term(self._term(0), 24)
+        self.assertAlmostEqual(result.funded_at_closing, 10_000_000, places=2)
+        self.assertAlmostEqual(result.periods[0].scheduled_payment, 50_000, places=2)
+        self.assertAlmostEqual(result.balloon_amount, 10_000_000, places=2)
+
+    def test_term_reserve_sizes_iteratively_with_contingency(self):
+        params = self._term(0)
+        reserve, iterations = self.engine.size_term_reserve(params, 24, 1.2)
+        result = self.engine.calculate_term(self._term(reserve), 24)
+        # The reserve covers every month's interest, with 20% left unused.
+        self.assertAlmostEqual(result.interest_paid_by_reserve, result.total_interest, places=0)
+        self.assertAlmostEqual(reserve * 0.8, result.total_interest, delta=2.0)
+        self.assertLess(iterations, DebtServiceEngine.MAX_ITERATIONS)
+
+    def test_revolver_reserve_advances_carry_into_balance(self):
+        params = RevolverLoanParams(
+            loan_to_cost_pct=0.6, interest_rate_annual=0.06, origination_fee_pct=0.01,
+            interest_reserve_inflator=1.2, repayment_acceleration=1.0, release_price_pct=1.0,
+            release_price_minimum=0.0, closing_costs=0.0, loan_start_period=0,
+            loan_term_months=12, advance_mode='single', release_basis='CASH_SWEEP',
+            payoff_period=11,
+        )
+        periods = [
+            PeriodCosts(period_index=i, date='', total_costs=(1_000_000 if i == 0 else 0.0),
+                        lots_sold_by_product={}, cost_per_lot_by_product={},
+                        sale_proceeds=(5_000_000 if i == 11 else 0.0))
+            for i in range(12)
+        ]
+        result = self.engine.calculate_revolver(params, periods)
+        p0, p1 = result.periods[0], result.periods[1]
+        # Closing advances net proceeds only: commitment less reserve and fee.
+        self.assertAlmostEqual(
+            p0.cost_draw,
+            result.commitment_amount - result.interest_reserve_funded - result.origination_fee,
+            places=2,
+        )
+        # The reserve's payment is an advance: the balance rises by it.
+        self.assertGreater(p1.interest_reserve_draw, 0)
+        self.assertAlmostEqual(p1.ending_balance, p1.beginning_balance + p1.interest_reserve_draw, places=2)
+        # What the releases repay is everything advanced, interest and fee included.
+        self.assertAlmostEqual(
+            result.total_release_payments,
+            p0.cost_draw + result.origination_fee + result.total_interest,
+            places=2,
+        )
+
+    def test_contingency_that_is_not_a_multiplier_is_refused(self):
+        from apps.calculations.engines.debt_service_engine import reserve_multiplier
+        self.assertAlmostEqual(reserve_multiplier(1.2), 1.25)
+        self.assertAlmostEqual(reserve_multiplier(None), 1.0)
+        with self.assertRaises(ValueError):
+            reserve_multiplier(20)

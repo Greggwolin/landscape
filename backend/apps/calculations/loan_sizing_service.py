@@ -380,12 +380,18 @@ class LoanSizingService:
         """
         Calculate recommended interest reserve amount.
 
-        TERM: monthly interest * reserve months * inflator.
-        REVOLVER: reuse iterative reserve sizing from debt engine.
+        Land TERM: iterative, the reserve as loan-in-process (size_term_reserve).
+        Other TERM: monthly interest * reserve months * inflator.
+        REVOLVER / A&D / release-priced: iterative sizing from the debt engine.
         """
         structure_type = (getattr(loan, "structure_type", "") or "").upper()
+        land_term = (
+            _is_land(project)
+            and structure_type == "TERM"
+            and not LandDevCashFlowService.uses_release_calculator(loan)
+        )
 
-        if LandDevCashFlowService.uses_release_calculator(loan):
+        if LandDevCashFlowService.uses_release_calculator(loan) or land_term:
             service = LandDevCashFlowService(project.project_id)
             project_config = service._get_project_config()
             dcf_assumptions = service._get_dcf_assumptions()
@@ -412,6 +418,22 @@ class LoanSizingService:
                 absorption_schedule,
                 periods,
             )
+            if land_term:
+                # Loan-in-process, sized iteratively over the loan's life to
+                # payoff (Gregg, 2026-09-29 / 2026-10-02): the reserve's own
+                # advances bear interest, so the size is circular.
+                term_params = service._build_term_params(loan, periods, period_data)
+                reserve, iterations = DebtServiceEngine().size_term_reserve(
+                    term_params, len(periods), getattr(loan, "interest_reserve_inflator", None),
+                )
+                return {
+                    "recommended_reserve": round(reserve, 2),
+                    "calculation_basis": {
+                        "method": "TERM_ITERATIVE",
+                        "iterations": iterations,
+                        "inflator": float(getattr(loan, "interest_reserve_inflator", None) or 1.0),
+                    },
+                }
             params = service._build_revolver_params(loan, periods, period_data)
             result = DebtServiceEngine().calculate_revolver(params, period_data)
             return {

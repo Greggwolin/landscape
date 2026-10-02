@@ -1118,12 +1118,20 @@ export default function LoanCard({
                 <div className="loan-assumption-body">
                   {isRevolver && (
                     <>
-                      <AssumptionRow label="Reserve Inflator" error={errors.interest_reserve_inflator} className="input-narrow">
+                      {/* Contingency: entered as a percent (20), stored as a multiplier (1.2). */}
+                      <AssumptionRow label="Reserve Contingency %" error={errors.interest_reserve_inflator} className="input-narrow">
                         <NumberDisplayInput
                           format="decimal"
                           decimals={2}
-                          value={formData.interest_reserve_inflator}
-                          onChange={(value) => setNumberField('interest_reserve_inflator', value)}
+                          value={
+                            formData.interest_reserve_inflator == null
+                              ? null
+                              : Math.round((Number(formData.interest_reserve_inflator) - 1) * 10000) / 100
+                          }
+                          onChange={(value) => setNumberField(
+                            'interest_reserve_inflator',
+                            value == null ? null : Math.round((1 + value / 100) * 10000) / 10000,
+                          )}
                         />
                       </AssumptionRow>
                       <AssumptionRow label="Repayment Accel" error={errors.repayment_acceleration} className="input-narrow">

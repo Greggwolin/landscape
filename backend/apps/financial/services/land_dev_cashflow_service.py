@@ -1470,13 +1470,16 @@ class LandDevCashFlowService:
             period_amounts = []
             total_amount = 0.0
             for period in revolver_result.periods:
-                amount = (
-                    period.cost_draw
-                    - period.accrued_interest
-                    + period.interest_reserve_draw
-                    - period.release_payments
-                    - period.origination_cost
-                )
+                # The loan's cash to and from the project: what it advances
+                # for costs (at closing, net proceeds: the commitment less the
+                # reserve held back, the fee and closing costs) less what
+                # releases repay, less any interest the reserve no longer
+                # covers (the project pays it). Interest the reserve pays and
+                # the financed fee are in the balance the releases repay, so
+                # they are not charged again here (before 2026-10-02 interest
+                # the reserve paid was never repaid, and fees were charged twice).
+                project_interest = period.accrued_interest - period.interest_reserve_draw
+                amount = period.cost_draw - period.release_payments - project_interest
                 if amount != 0:
                     period_amounts.append({
                         'periodIndex': period.period_index,
@@ -1646,6 +1649,8 @@ class LandDevCashFlowService:
             origination_fee_pct=float(loan.origination_fee_pct or 0) / 100.0,
             loan_start_period=loan_start_period,
             payment_frequency=loan.payment_frequency or 'MONTHLY',
+            # Held back as loan-in-process, drawn monthly to pay interest.
+            interest_reserve=max(float(getattr(loan, 'interest_reserve_amount', None) or 0), 0.0),
         )
 
     @staticmethod
@@ -2122,7 +2127,7 @@ class LandDevCashFlowService:
         ('interest_rate_pct', 'Interest rate (%)'),
         ('origination_fee_pct', 'Origination fee (%)'),
         ('loan_term_months', 'Term (months)'),
-        ('interest_reserve_inflator', 'Reserve contingency (e.g. 1.2 = 20%)'),
+        ('interest_reserve_inflator', 'Reserve contingency (%)'),
         ('release_basis', 'Release basis'),
         ('release_price_pct', 'Release price (% of the loan per lot or acre)'),
         ('repayment_acceleration', 'Release acceleration'),
@@ -2163,7 +2168,8 @@ class LandDevCashFlowService:
             result = engine.calculate_term(self._build_term_params(loan, periods, period_data), n)
             for p in result.periods:
                 if 0 <= p.period_index < n:
-                    interest[p.period_index] = p.interest_component
+                    # Interest the reserve pays needs no project cash.
+                    interest[p.period_index] = max(p.interest_component - p.interest_reserve_draw, 0.0)
         uncovered = []
         for i in range(n):
             due = interest[i]

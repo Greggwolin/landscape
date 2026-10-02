@@ -230,6 +230,22 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
                     'loan that advances more than once.'
                 )
             })
+        # The reserve contingency is stored as a multiplier (1.2 = 20%) and
+        # entered on screen as a percent. A typed "20" saved as 20.0 sized a
+        # negative reserve on 2026-10-02; refuse anything that is not one.
+        inflator = attrs.get('interest_reserve_inflator')
+        if inflator is not None and not (Decimal('1') <= Decimal(str(inflator)) < Decimal('2')):
+            raise serializers.ValidationError({
+                'interest_reserve_inflator': (
+                    'Reserve contingency must be between 0% and 99% '
+                    '(stored as a multiplier: 1.2 = 20%).'
+                )
+            })
+        reserve = attrs.get('interest_reserve_amount')
+        if reserve is not None and Decimal(str(reserve)) < 0:
+            raise serializers.ValidationError({
+                'interest_reserve_amount': 'An interest reserve cannot be negative.'
+            })
         return attrs
 
     def _sync_container_allocations(self, loan, allocations):

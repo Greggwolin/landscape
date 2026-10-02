@@ -45,13 +45,13 @@
     }
   },
   "expected_totals": {
-    "_note": "Re-baselined to DebtServiceEngine output per LSCMD-CALCFIX-0609-pm (engine is the source of truth; prior values were from the legacy Star Valley Excel model). These guard against regression, not against the spreadsheet. total_cost_draws left as-is (not asserted by any test).",
-    "commitment": 24905281.78,
-    "interest_reserve": 3477250.15,
-    "origination_fee": 249052.82,
-    "total_interest": 2781800.04,
-    "total_releases": 21428031.63,
-    "peak_balance": 20699096.55,
+    "_note": "Re-baselined to DebtServiceEngine output per LSCMD-CALCFIX-0609-pm (engine is the source of truth; prior values were from the legacy Star Valley Excel model). These guard against regression, not against the spreadsheet. total_cost_draws left as-is (not asserted by any test). Re-baselined again 2026-10-02 (HQ146): the interest reserve is loan-in-process (Gregg) - not funded at closing; each month it pays the interest by advancing the loan, so the balance carries it. Commitment, reserve, interest, releases and peak rose accordingly and now sit within 1% of the legacy Star Valley Excel values (peak balance within $30).",
+    "commitment": 25192259.06,
+    "interest_reserve": 3952675.84,
+    "origination_fee": 251922.59,
+    "total_interest": 3162140.83,
+    "total_releases": 24401724.05,
+    "peak_balance": 21432215.71,
     "total_cost_draws": 20967766.33
   },
   "release_prices_per_lot": {

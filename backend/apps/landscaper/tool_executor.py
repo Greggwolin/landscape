@@ -7777,6 +7777,19 @@ def handle_update_loan(
     if not loan_name and not loan_id:
         return {'success': False, 'error': 'loan_name or loan_id required'}
 
+    # Same guards as the loan screens (2026-10-02): the contingency is a
+    # multiplier (1.2 = 20%) and a reserve is never negative.
+    inflator = tool_input.get('interest_reserve_inflator')
+    if inflator is not None and not (1.0 <= float(inflator) < 2.0):
+        return {
+            'success': False,
+            'error': ('interest_reserve_inflator must be a multiplier between 1.0 and 2.0 '
+                      '(a 20% contingency is 1.2). Ask the user, then retry.'),
+        }
+    reserve = tool_input.get('interest_reserve_amount')
+    if reserve is not None and float(reserve) < 0:
+        return {'success': False, 'error': 'interest_reserve_amount cannot be negative.'}
+
     if propose_only:
         from .services.mutation_service import MutationService
         return MutationService.create_proposal(
