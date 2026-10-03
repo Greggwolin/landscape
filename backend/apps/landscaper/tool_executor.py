@@ -16345,6 +16345,7 @@ AUTO_EXECUTE_TOOLS = {
     'update_parcel_sale_assumptions',  # Parcel pricing - user explicitly requested
     'bulk_update_parcel_sale_assumptions',  # Parcel pricing batch - user explicitly requested
     'update_land_use_pricing',  # Land use pricing - user explicitly requested, triggers recalc
+    'add_cost_estimate_items',  # Cost library adds - refuses without confirm=true from the user
 }
 
 
@@ -20113,3 +20114,4 @@ from .tools import navigation_tools  # noqa: E402, F401
 from .tools import report_artifact_tools  # noqa: E402, F401
 from .tools import master_lease_tools  # noqa: E402, F401
 from .tools import renovation_tools  # noqa: E402, F401
+from .tools import cost_estimate_tools  # noqa: E402, F401

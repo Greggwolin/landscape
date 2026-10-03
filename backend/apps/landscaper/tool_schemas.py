@@ -5002,6 +5002,53 @@ LANDSCAPER_TOOLS = [
             "required": ["report_code"],
         },
     },
+    # ── Cost estimate → cost library (2026-09-29) ─────────────────────────────
+    {
+        "name": "review_cost_estimate",
+        "description": (
+            "Read a contractor's or engineer's cost estimate (a spreadsheet of line items with "
+            "unit, unit price and quantity) and compare every line with the cost library: already "
+            "there at the same price, there at a different price, or new. Use when a cost "
+            "estimate, bid or take-off is uploaded, or the user asks whether an estimate's prices "
+            "are in the cost library. Read-only. Returns the lines with their status and any "
+            "doubts about a row."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "The uploaded estimate's document id"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "add_cost_estimate_items",
+        "description": (
+            "Add line items from a reviewed cost estimate to the cost library. Only after "
+            "review_cost_estimate has been shown to the user AND the user has said which rows to "
+            "add. Never overwrites a library price: an item already there at another price is "
+            "added as a further price point with its own source and date. Rows identical to one "
+            "already stored are skipped."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer"},
+                "rows": {
+                    "description": "Sheet row numbers to add (from review_cost_estimate), or the string 'new_and_changed' for every New and Different-price row",
+                    "anyOf": [
+                        {"type": "array", "items": {"type": "integer"}},
+                        {"type": "string", "enum": ["new_and_changed"]},
+                    ],
+                },
+                "source": {"type": "string", "description": "Who priced it — the contractor or engineer. Ask the user; never guess."},
+                "as_of_date": {"type": "string", "description": "Date of the pricing, YYYY-MM-DD. Ask if not stated."},
+                "market_geography": {"type": "string", "description": "Defaults to the project's city, state"},
+                "confirm": {"type": "boolean", "description": "Must be true — the user has approved these rows"},
+            },
+            "required": ["doc_id", "rows", "source", "confirm"],
+        },
+    },
     # ── Excel Model Audit tools ────────────────────────────────────────────────
     {
         "name": "classify_excel_file",
