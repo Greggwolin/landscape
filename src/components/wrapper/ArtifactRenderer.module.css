@@ -946,13 +946,23 @@
    Uppercase muted label on top, bold big value below. Applies inside
    the active-artifact card.
    (LSCMD-REPORT-SUBTITLE-VARIANT-0520) */
+/* 2026-10-02 (Gregg): smaller figures so they never truncate, each in its own
+   light tile. The tiles wrap to the next line rather than squeeze, so the
+   column count the artifact asks for is a maximum, not a fixed grid. */
 :global(.w-rail-card.is-artifact-active) .kvGrid {
-  gap: 16px 24px;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)) !important;
 }
 :global(.w-rail-card.is-artifact-active) .kvPair {
   flex-direction: column;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: 2px;
+  padding: 8px 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: visible;
 }
 :global(.w-rail-card.is-artifact-active) .kvLabel {
   font-size: 10px;
@@ -962,7 +972,7 @@
   color: #64748b;
 }
 :global(.w-rail-card.is-artifact-active) .kvValue {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   color: #0f172a;
   text-align: left;

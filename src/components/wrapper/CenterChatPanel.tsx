@@ -865,7 +865,12 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     noKeyboard: true,
   });
 
-  if (!chatOpen && !isChatRoute) return null;
+  // On the project surface a folded chat stays mounted (so a reply in progress,
+  // the thread and the draft survive) and shows as a slim strip with a ☰ to
+  // reopen it. Gregg, 2026-10-02. Elsewhere a closed chat is simply gone, as
+  // before.
+  const chatFolded = !chatOpen && !isChatRoute && isProjectRoot;
+  if (!chatOpen && !isChatRoute && !isProjectRoot) return null;
 
   const getPageContext = () => {
     if (activeContentContext && isProjectRoot) return activeContentContext;
@@ -883,7 +888,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   return (
     <div
       {...getRootProps()}
-      className="wrapper-chat-center"
+      className={`wrapper-chat-center${chatFolded ? ' is-folded' : ''}`}
       style={{
         outline: isDragActive ? '2px dashed var(--cui-primary)' : '2px dashed transparent',
         outlineOffset: '-2px',
@@ -891,6 +896,20 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         transition: 'outline-color 0.15s ease, background-color 0.15s ease',
       }}
     >
+      {chatFolded && (
+        <div className="chat-fold-strip">
+          <button
+            type="button"
+            className="w-btn w-btn-icon"
+            onClick={openChat}
+            title="Open Landscaper chat"
+            aria-label="Open Landscaper chat"
+          >
+            <span style={{ fontSize: '18px' }}>☰</span>
+          </button>
+        </div>
+      )}
+
       {/* Hidden file input for react-dropzone */}
       <input {...getInputProps()} />
 
@@ -945,7 +964,20 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           duplication and forces the breadcrumb to truncate. */}
       <WrapperHeader
         leading={
-          <LandscaperIcon style={{ width: 32, height: 32, flexShrink: 0 }} />
+          <>
+            {isProjectRoot && (
+              <button
+                type="button"
+                className="w-btn w-btn-icon"
+                onClick={closeChat}
+                title="Collapse chat"
+                aria-label="Collapse chat"
+              >
+                <span style={{ fontSize: '18px' }}>☰</span>
+              </button>
+            )}
+            <LandscaperIcon style={{ width: 32, height: 32, flexShrink: 0 }} />
+          </>
         }
         title={
           <span className="wrapper-header-title" style={{ fontWeight: 600 }}>

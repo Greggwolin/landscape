@@ -200,6 +200,10 @@ LAND_ONLY_TOOLS = [
     # Capitalization (capital stack + distribution waterfall) artifact (LAND +
     # income; deterministic server-rendered). CAP1 — LSCMD-CAP-CAPSCHED-0724.
     "get_capitalization_schedule",
+    # Loan summary artifact (one loan, laid out as the Star Valley Senior Loan
+    # Summary). HQ162.
+    "get_loan_summary",
+    "get_loan_budget",
     # The pricing REGISTER — where land-use prices, their escalation and their
     # as-of date are SET. LAND only: land-use pricing is a land-dev concept.
     # PR1 — 2026-09-13, D-2026-09-13-SURFACES.
@@ -253,6 +257,10 @@ INCOME_PROPERTY_TOOLS = [
     "review_budget_variance",
     "get_cashflow_schedule",
     "get_capitalization_schedule",
+    # Loan summary artifact (one loan, laid out as the Star Valley Senior Loan
+    # Summary). HQ162.
+    "get_loan_summary",
+    "get_loan_budget",
     # get_pricing_register is deliberately NOT here. Land-use pricing is a land
     # development concept — a multifamily deal has no rate card of lot products —
     # so the register is gated LAND only, in LAND_ONLY_TOOLS above. It was in both

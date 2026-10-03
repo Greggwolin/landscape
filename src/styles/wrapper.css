@@ -1436,6 +1436,25 @@
    panel — threads list, message stream, etc. Scroll behavior preserved
    (scrollable via wheel/trackpad/keyboard); only the visual gutter is
    hidden, matching the Claude chat aesthetic. */
+/* Folded chat (Gregg, 2026-10-02): a slim strip with a ☰ to reopen it. The
+   chat itself stays mounted underneath so nothing in progress is lost. */
+.wrapper-chat-center.is-folded {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+}
+.wrapper-chat-center.is-folded > :not(.chat-fold-strip) {
+  display: none !important;
+}
+.wrapper-chat-center .chat-fold-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 4px;
+  height: 42px;
+  justify-content: center;
+}
+
 .wrapper-chat-center *::-webkit-scrollbar {
   width: 0;
   height: 0;

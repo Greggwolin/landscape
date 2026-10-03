@@ -916,7 +916,15 @@ function SectionBlockRenderer({
   return (
     <section className={styles.section}>
       <h3 className={styles.sectionHeader}>{block.title}</h3>
-      <div className={styles.sectionBody}>
+      <div
+        className={styles.sectionBody}
+        style={block.columns && block.columns > 1 ? {
+          display: 'grid',
+          gridTemplateColumns: block.column_template || `repeat(${block.columns}, minmax(0, 1fr))`,
+          gap: 24,
+          alignItems: 'start',
+        } : undefined}
+      >
         <BlockListRenderer
           blocks={block.children}
           sourcePointers={sourcePointers}

@@ -131,6 +131,37 @@ def fetch_cashflow_containers(project_id: int) -> List[Dict[str, Any]]:
     ]
 
 
+def _financing_knob(financing: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    state = financing or {}
+    on = bool(state.get('on'))
+    loans = int(state.get('loan_count') or 0)
+    if on:
+        note = (
+            f'Financing is on: {loans} loan{"s" if loans != 1 else ""} drawn, '
+            'charged interest and released by sales, and the returns are shown '
+            'levered and unlevered. Ask for the cash flow without financing to '
+            'get the unlevered card.'
+        )
+    elif loans:
+        note = (
+            'Financing is off: these are unlevered cash flows although the '
+            f'project has {loans} loan{"s" if loans != 1 else ""}. Ask for the '
+            'cash flow with financing to see them.'
+        )
+    else:
+        note = (
+            'No loan on the record — the cash flow and the returns are unlevered '
+            'until one exists.'
+        )
+    return {
+        'on': on,
+        'explicit': bool(state.get('explicit')),
+        'loan_count': loans,
+        'note': note,
+        'findings': list(state.get('findings') or []),
+    }
+
+
 def build_cashflow_view_config(
     *,
     project_id: int,
@@ -139,6 +170,7 @@ def build_cashflow_view_config(
     period_type: Optional[str] = None,
     total_periods: Optional[int] = None,
     container_ids: Optional[List[int]] = None,
+    financing: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """The specification the renderer draws from, read off the schema."""
     blocks = {b.get('id'): b for b in schema.get('blocks', [])}
@@ -250,6 +282,10 @@ def build_cashflow_view_config(
             'figure per period, so a breakdown would have to come from the engine '
             'rather than be split on screen.'
         ),
+        # The Financing knob: whether this cash flow carries the loans, and why.
+        # Like the container filter, switching it is a re-run of the engine and
+        # a separate card, asked for by name — not a toggle over these rows.
+        'financing': _financing_knob(financing),
         'truncate_at': 36,
         'generated_at': datetime.now(timezone.utc).isoformat(),
         'project_id': project_id,

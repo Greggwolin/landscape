@@ -1,0 +1,355 @@
+/* The Debt screen (board D-20). CoreUI tokens only — no hard-coded colours —
+   so it follows the surface's theme. Typed values are blue, computed values
+   take the body colour. */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--cui-body-color);
+  background: var(--cui-body-bg);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px 0;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.tab {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.tabOn {
+  color: var(--cui-body-color);
+  border-color: var(--cui-border-color);
+  background: var(--cui-body-bg);
+  font-weight: 600;
+  cursor: default;
+}
+
+.tabOff {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.message {
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+}
+
+.hint {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+}
+
+.empty {
+  padding: 24px 12px;
+  color: var(--cui-secondary-color);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 8px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 4px 0 12px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.barLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: auto;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.badgeOn {
+  color: var(--cui-body-color);
+  border-color: var(--cui-primary);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+/* Sized to content; headings of figure columns may wrap, the stub column's
+   heading does not (UI conventions, rule 2). */
+.table {
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 12px;
+  width: auto;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--cui-border-color);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.table th.num {
+  text-align: right;
+  white-space: normal;
+}
+
+.table td {
+  padding: 2px 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--cui-border-color-translucent, var(--cui-border-color));
+}
+
+.table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+.rowOn td {
+  background: var(--cui-tertiary-bg);
+}
+
+.editable {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: text;
+}
+
+.typed {
+  color: var(--cui-primary);
+}
+
+.cellInput {
+  height: 24px;
+  padding: 1px 4px;
+  min-width: 70px;
+}
+
+.muted {
+  color: var(--cui-secondary-color);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--cui-link-color, var(--cui-primary));
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.detail {
+  width: 340px;
+  flex-shrink: 0;
+  overflow: auto;
+  border-left: 1px solid var(--cui-border-color);
+  padding: 8px;
+  font-size: 12px;
+}
+
+.detailTitle {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 2px 4px 8px;
+}
+
+.group {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+
+.groupTitle {
+  padding: 4px 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--cui-border-color);
+  margin-bottom: 2px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px;
+}
+
+/* Free text and controls inside a tile sit on the same 12px margin as the
+   tile's title and rows (Gregg, 2026-10-02: Security was flush to the edge). */
+.groupNote {
+  padding: 6px 12px;
+}
+
+/* The loans list: room inside the card and between rows (Gregg, 2026-10-02:
+   "its too tight"). */
+.ledgerWrap {
+  padding: 8px 12px 4px;
+}
+.ledger th {
+  padding: 6px 10px;
+}
+.ledger td {
+  padding: 7px 10px;
+}
+
+.rowLabel {
+  color: var(--cui-secondary-color);
+}
+
+.rowValue {
+  text-align: right;
+  min-width: 90px;
+}
+
+.shareInput {
+  width: 64px;
+  height: 24px;
+  padding: 1px 4px;
+  text-align: right;
+}
+
+.prompt {
+  max-width: 760px;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--cui-primary);
+  border-radius: 4px;
+  background: var(--cui-tertiary-bg);
+  font-size: 12px;
+}
+
+.prompt p {
+  margin: 0 0 8px;
+}
+
+/* Gregg, 2026-10-02: the loan's detail tiles open under the loan line (not in a
+   right-hand column), laid out side by side, with a Close button. */
+.tiles {
+  margin: 8px 12px;
+  padding: 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  background: var(--cui-tertiary-bg);
+  font-size: 12px;
+}
+
+.tilesHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+}
+
+.tileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.tileCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tileGrid .group {
+  margin-bottom: 0;
+  background: var(--cui-body-bg);
+}
+
+.lcfTable tbody tr {
+  cursor: default;
+}
+
+.lcfStub {
+  position: sticky;
+  left: 0;
+  background: var(--cui-body-bg);
+  white-space: nowrap;
+  min-width: 180px;
+}
+
+.lcfSub td.lcfStub {
+  padding-left: 20px;
+}
+
+.lcfTotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.lcfGrand td {
+  font-weight: 700;
+  border-top: 2px solid var(--cui-body-color);
+}
+
+/* Gregg, 2026-10-02: each section sits in its own card. */
+.card {
+  margin: 0 12px 12px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  background: var(--cui-card-bg, var(--cui-body-bg));
+  overflow: hidden;
+}
+
+.card > .bar:first-child {
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.foldBtn {
+  border: none;
+  background: transparent;
+  color: var(--cui-body-color);
+  font-size: 12px;
+  padding: 0 4px 0 0;
+  cursor: pointer;
+}

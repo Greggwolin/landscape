@@ -62,8 +62,11 @@ class LoanViewSet(viewsets.ModelViewSet):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, project_id=project_id)
         loan = serializer.save(project=project, created_at=timezone.now(), updated_at=timezone.now())
+        # A new loan starts on the acquisition date unless one was typed; the
+        # user can overwrite it like any other field.
+        self._default_start_date(loan)
         try:
-            self._apply_sizing(loan, project)
+            self._apply_sizing(loan, project, self._typed_bases())
         except Exception as e:
             logger.exception(
                 "Sizing failed for new loan %s (project %s): %s",
@@ -72,17 +75,81 @@ class LoanViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         loan = serializer.save(updated_at=timezone.now())
+        # A loan saved before the start-date default existed (Peoria loan 63)
+        # takes the acquisition date the first time it is saved without one.
+        self._default_start_date(loan)
         try:
-            self._apply_sizing(loan, loan.project)
+            self._apply_sizing(loan, loan.project, self._typed_bases())
         except Exception as e:
             logger.exception(
                 "Sizing failed for loan %s (project %s): %s",
                 loan.loan_id, loan.project_id, e
             )
 
+    def _typed_bases(self) -> dict:
+        """A value or cost basis the user typed on the loan form (HQ132). Absent
+        or empty keys leave the default basis in place."""
+        data = getattr(self.request, 'data', {}) or {}
+        return {k: data.get(k) for k in ('ltv_basis_amount', 'ltc_basis_amount') if data.get(k) not in (None, '')}
+
     @staticmethod
-    def _apply_sizing(loan: Loan, project: Project) -> None:
-        sizing = LoanSizingService.calculate_commitment(loan, project)
+    def _default_start_date(loan: Loan) -> None:
+        if loan.loan_start_date:
+            return
+        try:
+            from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+            start = LandDevCashFlowService(int(loan.project_id)).acquisition_date()
+            if start:
+                loan.loan_start_date = start
+                loan.save(update_fields=['loan_start_date'])
+        except Exception:
+            logger.exception("Default start date failed for loan %s", loan.loan_id)
+
+    @action(detail=False, methods=['get'], url_path='sizing-basis')
+    def sizing_basis(self, request, project_id=None):
+        """What the loan form multiplies LTV and LTC against, and the start date
+        a loan with none takes — read from the same functions the save uses, so
+        the form and the saved loan cannot disagree (HQ132).
+
+        GET /api/projects/{project_id}/loans/sizing-basis/?loan_type=&structure_type=&loan_id=
+        Read-only: the loan (when given) is copied in memory, never saved.
+        """
+        from types import SimpleNamespace
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+        project = get_object_or_404(
+            filter_qs_by_owner_or_staff(Project.objects.filter(project_id=project_id), request, 'created_by')
+        )
+        loan_id = request.query_params.get('loan_id')
+        if loan_id:
+            loan = get_object_or_404(self.get_queryset(), loan_id=loan_id)
+        else:
+            loan = SimpleNamespace(loan_id=None, project_id=int(project_id), closing_costs_appraisal=0,
+                                   closing_costs_legal=0, closing_costs_other=0)
+        for key in ('loan_type', 'structure_type'):
+            if request.query_params.get(key):
+                setattr(loan, key, request.query_params[key])
+        bases = LoanSizingService.sizing_bases(loan, project)
+        start = LandDevCashFlowService(int(project_id)).acquisition_date()
+        notes = []
+        if bases['value_basis'] <= 0:
+            notes.append('No value basis: the acquisition ledger has no purchase price. Enter one, or a value basis.')
+        if bases['cost_basis'] <= 0:
+            notes.append('No cost basis: no purchase price or budget on the record for what this loan funds.')
+        if not start:
+            notes.append('No acquisition date on the record: enter a start date.')
+        return Response({
+            'value_basis': float(bases['value_basis']),
+            'cost_basis': float(bases['cost_basis']),
+            'price_source': bases['price_source'],
+            'basis_rule': bases['basis_rule'],
+            'default_start_date': start.isoformat() if start else None,
+            'notes': notes,
+        })
+
+    @staticmethod
+    def _apply_sizing(loan: Loan, project: Project, overrides: dict | None = None) -> None:
+        sizing = LoanSizingService.calculate_commitment(loan, project, overrides)
         loan.commitment_amount = sizing['commitment_amount']
         loan.loan_amount = sizing['loan_amount']
         loan.calculated_commitment_amount = sizing['calculated_commitment_amount']
@@ -273,6 +340,20 @@ class LoanBudgetSummaryView(APIView):
         loan = get_object_or_404(Loan, project_id=project_id, loan_id=loan_id)
         summary = LoanSizingService.build_budget_summary(loan, project)
         return Response(summary, status=status.HTTP_200_OK)
+
+
+class InterestReserveCheckView(APIView):
+    """Does this loan charge interest in months the project has no cash to
+    pay it? If so the screen offers to build in an interest reserve."""
+
+    def get(self, request, project_id: int, loan_id: int):
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+        loan = get_object_or_404(Loan, project_id=project_id, loan_id=loan_id)
+        try:
+            return Response(LandDevCashFlowService(int(project_id)).interest_coverage(loan))
+        except Exception as e:  # noqa: BLE001 — a failed check must not block saving
+            logger.exception("Interest coverage check failed for loan %s", loan_id)
+            return Response({'loan_id': loan.loan_id, 'uncovered_months': 0, 'error': str(e)})
 
 
 class InterestReserveCalculationView(APIView):

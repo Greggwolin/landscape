@@ -1282,8 +1282,13 @@ class WhatIfEngine:
         """
         try:
             from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+            from apps.financial.services.cashflow_routing import resolve_financing
             service = LandDevCashFlowService(self.project_id)
-            result = service.calculate(include_financing=False)
+            # Same Financing knob as the cash-flow artifact: a project with a
+            # loan is measured levered, one without is measured exactly as before.
+            result = service.calculate(
+                include_financing=resolve_financing(self.project_id),
+            )
             summary = result.get('summary', {})
             service_metrics = {
                 'irr': summary.get('irr'),

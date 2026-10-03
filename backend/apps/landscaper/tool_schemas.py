@@ -1572,8 +1572,8 @@ LANDSCAPER_TOOLS = [
                 "loan_maturity_date": {"type": "string"},
                 "index_rate_pct": {"type": "number", "description": "Current index rate (e.g. SOFR) in percent, for floating-rate loans"},
                 "unused_fee_pct": {"type": "number"},
-                "interest_reserve_amount": {"type": "number"},
-                "interest_reserve_inflator": {"type": "number"},
+                "interest_reserve_amount": {"type": "number", "description": "Interest reserve held back from the commitment (loan-in-process, not funded at closing); never negative"},
+                "interest_reserve_inflator": {"type": "number", "description": "Reserve contingency as a MULTIPLIER between 1.0 and 2.0: a 20% contingency is 1.2, not 20"},
                 "repayment_acceleration": {"type": "string"},
                 "draw_trigger_type": {"type": "string"},
                 "collateral_basis_type": {"type": "string"},
@@ -1954,6 +1954,18 @@ LANDSCAPER_TOOLS = [
                         "to them."
                     ),
                 },
+                "include_financing": {
+                    "type": "boolean",
+                    "description": (
+                        "Optional. The Financing switch. Omit it and the cash "
+                        "flow includes the project's loans (draws, interest, "
+                        "releases, and levered plus unlevered returns) whenever "
+                        "a land project has one. Pass false only when the user "
+                        "asks for the cash flow WITHOUT financing / unlevered; "
+                        "pass true when they ask for it WITH financing. An "
+                        "explicit choice makes its own card."
+                    ),
+                },
             },
         },
     },
@@ -1977,6 +1989,49 @@ LANDSCAPER_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {},
+        },
+    },
+    {
+        "name": "get_loan_budget",
+        "description": (
+            "Render one loan's budget as a DETERMINISTIC artifact in the right panel: the "
+            "loan budget split between borrower and lender, the summary of proceeds "
+            "(origination, interest reserve and improvements held back as loan-in-process, "
+            "and the closing funds available) and the equity to close, after closing and in "
+            "total — no terms and no headline figures. Call it when the user asks for the "
+            "loan budget, the loan's sources and uses, or how much equity the loan leaves to "
+            "close. Built server-side and returned already created — do NOT call "
+            "create_artifact and do NOT compose the tables; announce it in one sentence. "
+            "loan_id is optional; without it the most senior loan is used."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "loan_id": {"type": "integer", "description": "The loan (optional)."},
+            },
+        },
+    },
+    {
+        "name": "get_loan_summary",
+        "description": (
+            "Render one loan's summary as a DETERMINISTIC artifact in the right panel, laid "
+            "out as a lender's loan summary sheet: max and average outstanding; leverage, "
+            "rate and other terms; release terms; the loan budget split between borrower "
+            "and lender; the summary of proceeds (origination, interest reserve and "
+            "improvements held back as loan-in-process, and the closing funds available); "
+            "and the equity to close, after closing and in total. Call it when the user asks "
+            "for the loan summary, the loan terms, or 'show me the loan' (for the loan budget "
+            "alone use get_loan_budget), the summary of proceeds, sources and uses "
+            "of the loan, how much equity is needed to close, or 'show me the loan'. Built "
+            "server-side and returned already created — do NOT call create_artifact and do "
+            "NOT compose the tables; announce it in one sentence. loan_id is optional; "
+            "without it the most senior loan is used."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "loan_id": {"type": "integer", "description": "The loan to summarise (optional)."},
+            },
         },
     },
     {

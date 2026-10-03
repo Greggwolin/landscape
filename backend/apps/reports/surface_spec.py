@@ -146,6 +146,14 @@ UNRESOLVED: Dict[str, str] = {
     'review_budget_variance': (
         'build_variance_artifact_schema takes a computed variance result, and '
         'it has no view specification either — its definition is the schema.'
+    ),    'get_loan_summary': (
+        'build_loan_summary_schema is handed one loan, its budget summary and its '
+        'schedule by its tool, and it has no view specification — its definition '
+        'is the schema (HQ162).'
+    ),
+    'get_loan_budget': (
+        'build_loan_budget_schema is handed one loan budget summary by its tool, '
+        'and it has no view specification — its definition is the schema.'
     ),
 }
 

@@ -16,21 +16,22 @@ class DebtScheduleView(APIView):
 
     def get(self, request, project_id: int, loan_id: int):
         loan = get_object_or_404(Loan, loan_id=loan_id, project_id=project_id)
+        # Schedule what the loan IS: its effective amount and start date from the
+        # sizing rule when nothing was saved (HQ137). An in-memory copy — never saved.
+        from apps.calculations.loan_sizing_service import with_effective_terms
+        from apps.projects.models import Project
+        loan = with_effective_terms(loan, get_object_or_404(Project, project_id=project_id))
 
+        # A take-out is captured but not modelled: say so alongside the
+        # schedule rather than refusing to show one.
+        findings = []
         if loan.takes_out_loan_id:
-            return Response(
-                {
-                    'error': 'TERM take-out logic not implemented for debt schedule',
-                    'loan_id': loan.loan_id,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            findings.append(LandDevCashFlowService._take_out_finding(loan))
 
-        container_ids = list(
-            LoanContainer.objects.filter(loan_id=loan.loan_id).values_list('division_id', flat=True)
-        )
-        if not container_ids:
-            container_ids = None
+        # Project-wide schedules; the loan's own container rows (and shares)
+        # decide what it draws on and what releases it, through the same
+        # function the cash flow and the construction-loan run use.
+        container_ids = None
 
         service = LandDevCashFlowService(project_id)
         project_config = service._get_project_config()
@@ -48,7 +49,7 @@ class DebtScheduleView(APIView):
         ) or 0
         loan_start_period = service._get_period_index_for_date(
             service._generate_periods(project_config['start_date'], max(required_periods, 1)),
-            loan.loan_start_date,
+            service.loan_start_date_for(loan),
         )
         min_periods_for_loan = loan_start_period + loan_term_months + 1
         required_periods = max(required_periods, min_periods_for_loan)
@@ -67,7 +68,8 @@ class DebtScheduleView(APIView):
             dcf_assumptions.get('price_growth_rate'),
             dcf_assumptions.get('cost_inflation_rate'),
         )
-        period_data = service._build_period_costs_for_financing(
+        period_data = service.build_loan_period_data(
+            loan,
             cost_schedule,
             absorption_schedule,
             periods,
@@ -75,8 +77,8 @@ class DebtScheduleView(APIView):
 
         engine = DebtServiceEngine()
 
-        if loan.structure_type == 'REVOLVER':
-            params = service._build_revolver_params(loan, periods)
+        if LandDevCashFlowService.uses_release_calculator(loan):
+            params = service._build_revolver_params(loan, periods, period_data)
             try:
                 result = engine.calculate_revolver(params, period_data)
             except NotImplementedError as exc:
@@ -88,6 +90,8 @@ class DebtScheduleView(APIView):
                 'loan_id': loan.loan_id,
                 'loan_name': loan.loan_name,
                 'structure_type': loan.structure_type,
+                'schedule_kind': 'release',
+                'findings': findings,
                 'calculation_summary': {
                     'commitment_amount': result.commitment_amount,
                     'interest_reserve_funded': result.interest_reserve_funded,
@@ -103,6 +107,12 @@ class DebtScheduleView(APIView):
                         'period_index': p.period_index,
                         'date': p.date,
                         'beginning_balance': p.beginning_balance,
+                        # The costs of the funded containers (x share) in this
+                        # period — what the draw is taken against.
+                        'costs_funded': (
+                            period_data[p.period_index].total_costs
+                            if p.period_index < len(period_data) else 0.0
+                        ),
                         'cost_draw': p.cost_draw,
                         'accrued_interest': p.accrued_interest,
                         'interest_reserve_draw': p.interest_reserve_draw,
@@ -117,13 +127,15 @@ class DebtScheduleView(APIView):
             }
             return Response(response, status=status.HTTP_200_OK)
 
-        if loan.structure_type == 'TERM':
-            params = service._build_term_params(loan, periods)
+        if (loan.structure_type or '').upper() == 'TERM':
+            params = service._build_term_params(loan, periods, period_data)
             result = engine.calculate_term(params, len(periods))
             response = {
                 'loan_id': loan.loan_id,
                 'loan_name': loan.loan_name,
                 'structure_type': loan.structure_type,
+                'schedule_kind': 'payment',
+                'findings': findings,
                 'calculation_summary': {
                     'loan_amount': result.loan_amount,
                     'total_interest': result.total_interest,
@@ -131,6 +143,11 @@ class DebtScheduleView(APIView):
                     'balloon_amount': result.balloon_amount,
                     'monthly_payment_io': result.monthly_payment_io,
                     'monthly_payment_amort': result.monthly_payment_amort,
+                    # Loan-in-process: the reserve is held back at closing and
+                    # drawn monthly to pay interest.
+                    'interest_reserve': result.interest_reserve,
+                    'interest_paid_by_reserve': result.interest_paid_by_reserve,
+                    'funded_at_closing': result.funded_at_closing,
                 },
                 'periods': [
                     {
@@ -144,6 +161,8 @@ class DebtScheduleView(APIView):
                         'is_io_period': p.is_io_period,
                         'is_balloon': p.is_balloon,
                         'balloon_amount': p.balloon_amount,
+                        'interest_reserve_draw': p.interest_reserve_draw,
+                        'interest_reserve_balance': p.interest_reserve_balance,
                     }
                     for p in result.periods
                 ],

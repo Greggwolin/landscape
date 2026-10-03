@@ -155,6 +155,9 @@ class Loan(models.Model):
     # Release pricing
     release_price_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     minimum_release_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    # LOT | ACRE | CASH_SWEEP (100% of net proceeds of each collateral sale).
+    # NULL is read as per lot, how releases were priced before 2026-09-29.
+    release_basis = models.CharField(max_length=20, null=True, blank=True)
     repayment_acceleration = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, default=1.0)
 
     # Collateral basis (lotbank revolvers)

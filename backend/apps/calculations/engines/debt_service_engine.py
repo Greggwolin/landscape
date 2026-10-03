@@ -8,6 +8,24 @@ from typing import Dict, List, Optional, Tuple
 import numpy_financial as npf
 
 
+def reserve_multiplier(inflator: Optional[float]) -> float:
+    """The factor a reserve is sized by, from the stored contingency.
+
+    The contingency is stored as a multiplier (1.2 = a 20% cushion) and
+    shown on screen as a percent. The reserve is sized so the cushion is
+    left unused: reserve = interest / (1 - cushion). A value outside
+    1.0-2.0 cannot be a multiplier (on 2026-10-02 a "20" sized a negative
+    reserve), so it is refused rather than sized.
+    """
+    value = 1.0 if inflator is None else float(inflator)
+    if not 1.0 <= value < 2.0:
+        raise ValueError(
+            f'Reserve contingency {value} is not between 0% and 99% '
+            '(stored as a multiplier: 1.2 = 20%).'
+        )
+    return 1.0 / (2.0 - value)
+
+
 @dataclass
 class RevolverLoanParams:
     """Parameters for a construction revolver calculation."""
@@ -23,6 +41,24 @@ class RevolverLoanParams:
     loan_start_period: int
     loan_term_months: int
     draw_trigger_type: Optional[str] = None
+    # Due on sale: the period the loan's last collateral sells. Whatever is
+    # still owed is retired then. None keeps the old behaviour.
+    payoff_period: Optional[int] = None
+    # 'costs': advances follow the costs, several over the term (A&D, and the
+    # revolver as built). 'single': one advance at the start (a term loan run
+    # through this calculator because it has release prices).
+    advance_mode: str = 'costs'
+    # Revolver (Gregg, 2026-09-29, 6a): money repaid by releases can be drawn
+    # again; only the balance outstanding is limited by the commitment. False
+    # is the A&D behaviour the Star Valley baseline was built on: total
+    # advances stop at the commitment and releases never free up room.
+    revolving: bool = False
+    # How a sale repays the loan: 'LOT' (price per lot, as built), 'ACRE'
+    # (price per acre), or 'CASH_SWEEP' (100% of the sale's net proceeds).
+    release_basis: str = 'LOT'
+    # A commitment fixed elsewhere (loan-to-value governs, or entered by hand).
+    # The calculator never sizes above it. None: the calculator sizes by LTC.
+    commitment_cap: Optional[float] = None
 
 
 @dataclass
@@ -37,6 +73,11 @@ class TermLoanParams:
     origination_fee_pct: float
     loan_start_period: int
     payment_frequency: str
+    # Interest reserve held back from the commitment as loan-in-process
+    # (Gregg, 2026-10-02). Not funded at closing: the loan funds
+    # loan_amount - interest_reserve, and each month the reserve pays the
+    # interest by advancing the loan. Zero keeps the old schedule exactly.
+    interest_reserve: float = 0.0
 
 
 @dataclass
@@ -48,6 +89,10 @@ class PeriodCosts:
     total_costs: float
     lots_sold_by_product: Dict[int, int]
     cost_per_lot_by_product: Dict[int, float]
+    # For releases priced per acre, and for a cash sweep of each sale's net
+    # proceeds. Zero when not supplied, which leaves per-lot releases unchanged.
+    acres_sold: float = 0.0
+    sale_proceeds: float = 0.0
 
 
 @dataclass
@@ -101,6 +146,11 @@ class TermPeriod:
     is_io_period: bool
     is_balloon: bool
     balloon_amount: float
+    # Interest the reserve paid this month (a loan advance, so it is in the
+    # balance), and the reserve still undrawn after it. scheduled_payment is
+    # what the project pays: interest the reserve did not cover, plus principal.
+    interest_reserve_draw: float = 0.0
+    interest_reserve_balance: float = 0.0
 
 
 @dataclass
@@ -112,10 +162,15 @@ class TermResult:
     balloon_amount: float
     monthly_payment_io: float
     monthly_payment_amort: float
+    interest_reserve: float = 0.0
+    interest_paid_by_reserve: float = 0.0
+    funded_at_closing: float = 0.0
 
 
 class DebtServiceEngine:
-    MAX_ITERATIONS = 15
+    # The reserve/interest loop converges by damped oscillation; 15 rounds
+    # stopped Peoria loan 63 about $2 short of the $1 tolerance (2026-09-29).
+    MAX_ITERATIONS = 50
     CONVERGENCE_TOLERANCE = 1.0
 
     def calculate_revolver(
@@ -198,15 +253,23 @@ class DebtServiceEngine:
         interest_only_months = max(params.interest_only_months or 0, 0)
         amort_months = max(params.amortization_months or 0, 0)
 
-        monthly_payment_io = loan_amount * monthly_rate if loan_amount else 0.0
-        monthly_payment_amort = 0.0
-        if amort_months > 0 and loan_amount > 0:
-            monthly_payment_amort = float(npf.pmt(monthly_rate, amort_months, -loan_amount))
+        # The reserve is loan-in-process: held back from the commitment, not
+        # funded at closing. The loan starts at what it funds.
+        reserve_total = min(max(float(params.interest_reserve or 0.0), 0.0), max(loan_amount, 0.0))
+        reserve_remaining = reserve_total
+        funded_at_closing = loan_amount - reserve_total
 
-        balance = loan_amount
+        monthly_payment_io = funded_at_closing * monthly_rate if funded_at_closing else 0.0
+        monthly_payment_amort = 0.0
+        if amort_months > 0 and loan_amount > 0 and reserve_total == 0:
+            monthly_payment_amort = float(npf.pmt(monthly_rate, amort_months, -loan_amount))
+        amort_payment_set = reserve_total == 0
+
+        balance = funded_at_closing
         total_interest = 0.0
         total_principal = 0.0
         balloon_amount = 0.0
+        interest_paid_by_reserve = 0.0
 
         for period_index in range(num_periods):
             date = ''
@@ -257,14 +320,34 @@ class DebtServiceEngine:
             interest_component = beginning_balance * monthly_rate
             total_interest += interest_component
 
+            # The reserve pays the interest while it lasts, by advancing the
+            # loan: the balance grows by what it pays.
+            reserve_draw = min(interest_component, reserve_remaining) if interest_component > 0 else 0.0
+            reserve_remaining -= reserve_draw
+            interest_paid_by_reserve += reserve_draw
+            balance = beginning_balance + reserve_draw
+            beginning_for_amort = balance
+
             if amort_months == 0 or months_into_loan < interest_only_months:
-                scheduled_payment = interest_component
+                scheduled_payment = interest_component - reserve_draw
                 principal_component = 0.0
                 is_io_period = True
             else:
-                scheduled_payment = monthly_payment_amort
-                principal_component = scheduled_payment - interest_component
-                balance = max(beginning_balance - principal_component, 0.0)
+                if not amort_payment_set:
+                    # With a reserve the balance at the start of amortization
+                    # is what was funded plus the interest the reserve paid.
+                    monthly_payment_amort = float(npf.pmt(monthly_rate, amort_months, -beginning_for_amort))
+                    amort_payment_set = True
+                # Once the loan is paid off the payments stop, and the last
+                # payment is only what is left. Before this, an amortisation
+                # shorter than the term kept charging the full payment every
+                # month to maturity on a zero balance.
+                principal_component = min(
+                    max(monthly_payment_amort - interest_component, 0.0),
+                    max(beginning_for_amort, 0.0),
+                )
+                scheduled_payment = interest_component - reserve_draw + principal_component
+                balance = max(beginning_for_amort - principal_component, 0.0)
                 total_principal += principal_component
 
             ending_balance = balance
@@ -288,6 +371,8 @@ class DebtServiceEngine:
                     is_io_period=is_io_period,
                     is_balloon=is_balloon,
                     balloon_amount=balloon,
+                    interest_reserve_draw=reserve_draw,
+                    interest_reserve_balance=reserve_remaining,
                 )
             )
 
@@ -299,7 +384,34 @@ class DebtServiceEngine:
             balloon_amount=balloon_amount,
             monthly_payment_io=monthly_payment_io,
             monthly_payment_amort=monthly_payment_amort,
+            interest_reserve=reserve_total,
+            interest_paid_by_reserve=interest_paid_by_reserve,
+            funded_at_closing=funded_at_closing,
         )
+
+    def size_term_reserve(
+        self,
+        params: TermLoanParams,
+        num_periods: int,
+        inflator: Optional[float],
+    ) -> Tuple[float, int]:
+        """Size a term loan's interest reserve iteratively (it is circular:
+        the reserve's own advances bear interest). The reserve covers the
+        interest over the loan's life to payoff, with the contingency left
+        unused. Returns (reserve, iterations)."""
+        multiplier = reserve_multiplier(inflator)
+        reserve = 0.0
+        iterations = 0
+        for iteration in range(self.MAX_ITERATIONS):
+            iterations = iteration + 1
+            trial = TermLoanParams(**{**params.__dict__, 'interest_reserve': reserve})
+            result = self.calculate_term(trial, num_periods)
+            new_reserve = min(result.total_interest * multiplier, params.loan_amount)
+            if abs(new_reserve - reserve) < self.CONVERGENCE_TOLERANCE:
+                reserve = new_reserve
+                break
+            reserve = new_reserve
+        return reserve, iterations
 
     def _iterate_reserve_and_fee(
         self,
@@ -335,7 +447,7 @@ class DebtServiceEngine:
 
         # Convert inflator to effective multiplier.
         # inflator=1.2 -> 20% cushion -> multiplier = 1/(2-1.2) = 1.25
-        effective_multiplier = 1.0 / (2.0 - params.interest_reserve_inflator)
+        effective_multiplier = reserve_multiplier(params.interest_reserve_inflator)
 
         prev_reserve = 0.0
         commitment = 0.0
@@ -345,6 +457,8 @@ class DebtServiceEngine:
             iterations = iteration + 1
 
             commitment = (base_costs + params.closing_costs + prev_reserve) * ltc / denom
+            if params.commitment_cap is not None and params.commitment_cap > 0:
+                commitment = min(commitment, params.commitment_cap)
             origination_fee = commitment * fee_pct
 
             schedule = self._generate_revolver_schedule(
@@ -361,6 +475,8 @@ class DebtServiceEngine:
             if abs(new_reserve - prev_reserve) < self.CONVERGENCE_TOLERANCE:
                 prev_reserve = new_reserve
                 commitment = (base_costs + params.closing_costs + prev_reserve) * ltc / denom
+                if params.commitment_cap is not None and params.commitment_cap > 0:
+                    commitment = min(commitment, params.commitment_cap)
                 origination_fee = commitment * fee_pct
                 break
 
@@ -379,10 +495,12 @@ class DebtServiceEngine:
         """
         Generate the period-by-period loan schedule.
 
-        Interest reserve is a segregated escrow funded from commitment
-        capacity.  Each month, the reserve pays accrued interest so it
-        does NOT capitalize onto the loan balance.  Only when the reserve
-        is exhausted does unpaid interest capitalize.
+        The interest reserve is loan-in-process (Gregg, 2026-10-02): part of
+        the commitment held back at closing, never funded then. Each month
+        it pays the accrued interest by advancing the loan, so the balance
+        grows by what it pays and later interest accrues on it (as in the
+        Star Valley Lotbank model the calculator was built from). Interest
+        the reserve no longer covers is paid by the project.
 
         Release payments use pro-rata commitment allocation:
             release_price = (commitment / total_parcels) * release_pct * acceleration
@@ -408,6 +526,13 @@ class DebtServiceEngine:
             )
         else:
             release_price_per_lot = 0.0
+        basis = (params.release_basis or 'LOT').upper()
+        total_acres = sum(p.acres_sold for p in period_data)
+        release_price_per_acre = (
+            max(commitment / total_acres * params.release_price_pct * params.repayment_acceleration,
+                params.release_price_minimum)
+            if total_acres > 0 else 0.0
+        )
 
         # --- Pass 1: Pre-allocate cost draws using reverse-fill ordering ---
         # Available commitment capacity for cost draws (after reserve/fee/closing)
@@ -423,6 +548,11 @@ class DebtServiceEngine:
         # Reverse-fill: allocate from last period backward
         draw_by_period: Dict[int, float] = {}
         remaining_capacity = available_for_costs
+        if params.advance_mode == 'single':
+            # One advance at the start: the whole cost capacity at closing.
+            draw_by_period[params.loan_start_period] = available_for_costs
+            remaining_capacity = 0.0
+            cost_periods = []
         for period_index, period_cost in reversed(cost_periods):
             draw = min(period_cost, remaining_capacity)
             draw_by_period[period_index] = draw
@@ -435,7 +565,29 @@ class DebtServiceEngine:
             if period_index not in draw_by_period:
                 draw_by_period[period_index] = 0.0
 
+        # Revolving: the borrower's equity goes in first — the same amount the
+        # loan-to-cost leaves to the borrower — then the loan funds each cost
+        # as far as the room under the commitment allows. Releases reduce the
+        # balance and so free room to draw again.
+        equity_remaining = 0.0
+        if params.revolving and params.advance_mode != 'single':
+            term_costs = sum(c for _, c in cost_periods)
+            ltc = params.loan_to_cost_pct
+            denom = 1.0 - ltc * params.origination_fee_pct
+            ltc_commitment = (sum(p.total_costs for p in period_data) + params.closing_costs
+                              + interest_reserve) * ltc / denom if denom else 0.0
+            ltc_capacity = max(ltc_commitment - interest_reserve
+                               - ltc_commitment * params.origination_fee_pct
+                               - params.closing_costs, 0.0)
+            equity_remaining = max(term_costs - ltc_capacity, 0.0)
+        cost_by_period = {i: c for i, c in cost_periods}
+
         # --- Pass 2: Generate period-by-period schedule ---
+        # The interest reserve is NOT funded at closing (Gregg, 2026-10-02):
+        # it is part of the commitment held back as loan-in-process, like an
+        # unfunded construction cost. ``reserve_balance`` is that undrawn
+        # amount. Each month it pays the interest by advancing the loan, so
+        # the balance grows by what it pays.
         reserve_balance = 0.0
         ending_balance = 0.0
         cumulative_parcels = 0
@@ -449,7 +601,7 @@ class DebtServiceEngine:
             origination_cost = 0.0
             if period_index == params.loan_start_period:
                 origination_cost = origination_fee + params.closing_costs
-                reserve_balance += interest_reserve
+                reserve_balance = interest_reserve
                 balance += origination_cost
 
             cost_draw = 0.0
@@ -460,9 +612,20 @@ class DebtServiceEngine:
             release_payments_by_product: Dict[int, float] = {}
             parcels_this_period = 0
 
-            # Cost draws: only during loan term
-            if params.loan_start_period <= period_index < term_end:
-                cost_draw = draw_by_period.get(period_index, 0.0)
+            past_payoff = params.payoff_period is not None and period_index > params.payoff_period
+
+            # Cost draws: only during loan term, never after the loan is retired
+            if params.loan_start_period <= period_index < term_end and not past_payoff:
+                if params.revolving and params.advance_mode != 'single':
+                    period_cost = cost_by_period.get(period_index, 0.0)
+                    equity_part = min(period_cost, equity_remaining)
+                    equity_remaining -= equity_part
+                    # Room under the commitment: what is not owed and not
+                    # held back as the reserve still undrawn.
+                    room = commitment - reserve_balance - balance
+                    cost_draw = min(period_cost - equity_part, max(room, 0.0))
+                else:
+                    cost_draw = draw_by_period.get(period_index, 0.0)
                 balance += cost_draw
 
             # Interest accrues on beginning balance whenever balance > 0
@@ -470,19 +633,32 @@ class DebtServiceEngine:
             if period_index >= params.loan_start_period and beginning_balance > 0:
                 accrued_interest = beginning_balance * monthly_rate
 
-                # Reserve pays interest first — does NOT capitalize
+                # The reserve pays the interest first. Its payment is an
+                # advance of the loan: it adds to the balance (loan-in-process
+                # being drawn), and the undrawn reserve falls by the same.
                 if reserve_balance > 0 and accrued_interest > 0:
                     interest_reserve_draw = min(accrued_interest, reserve_balance)
                     reserve_balance -= interest_reserve_draw
+                balance += interest_reserve_draw
 
-                # Only the portion NOT covered by reserve capitalizes
-                interest_capitalized = accrued_interest - interest_reserve_draw
-                balance += interest_capitalized
+                # Interest the reserve no longer covers is paid by the project
+                # (HQ145 rule 3, decided 2026-10-02) — it does not capitalize.
+                # Gregg's Star Valley model capitalizes it instead, but sizes
+                # the reserve to cover all interest so it never arises there;
+                # this calculator sizes the same way, so in practice it doesn't
+                # arise here either. interest_capitalized stays 0.
+                interest_capitalized = 0.0
 
             # Release payments: whenever parcels sell (even past term_end)
             if period_index >= params.loan_start_period:
                 parcels_this_period = sum(period.lots_sold_by_product.values())
-                if parcels_this_period > 0 and release_price_per_lot > 0:
+                if basis == 'CASH_SWEEP' and period.sale_proceeds > 0:
+                    release_payments = min(period.sale_proceeds, max(balance, 0.0))
+                    balance -= release_payments
+                elif basis == 'ACRE' and period.acres_sold > 0 and release_price_per_acre > 0:
+                    release_payments = min(release_price_per_acre * period.acres_sold, max(balance, 0.0))
+                    balance -= release_payments
+                elif basis not in ('CASH_SWEEP', 'ACRE') and parcels_this_period > 0 and release_price_per_lot > 0:
                     uncapped_release = release_price_per_lot * parcels_this_period
                     release_payments = min(uncapped_release, max(balance, 0.0))
                     balance -= release_payments
@@ -493,6 +669,11 @@ class DebtServiceEngine:
                         release_payments_by_product[product_id] = (
                             release_price_per_lot * lots_sold * cap_ratio
                         )
+
+                # Due on sale: the last collateral sale retires what is left.
+                if params.payoff_period is not None and period_index == params.payoff_period and balance > 0:
+                    release_payments += balance
+                    balance = 0.0
 
             cumulative_parcels += parcels_this_period
             ending_balance = max(balance, 0.0)

@@ -32,6 +32,11 @@ export interface SectionBlock {
   title: string;
   /** Default false (expanded). */
   collapsed?: boolean;
+  /** HQ162: lay the children side by side in this many columns (the loan
+   *  summary's two-column sheet). Absent or 1 = stacked, as before. */
+  columns?: number;
+  /** Optional CSS grid template for those columns (e.g. "2fr 3fr"); equal widths when absent. */
+  column_template?: string;
   children: Block[];
 }
 

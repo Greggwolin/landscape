@@ -3014,6 +3014,7 @@ INCOME_PROPERTY_TYPE_CODES = ('MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU')
 def _fetch_cashflow_schedule(
     project_id: int,
     container_ids: Optional[List[int]] = None,
+    include_financing: bool = False,
 ) -> Dict[str, Any]:
     """
     Fetch cash flow schedule for a project, routing by project_type_code.
@@ -3032,7 +3033,7 @@ def _fetch_cashflow_schedule(
     from apps.financial.services.cashflow_routing import fetch_cashflow_schedule
     return fetch_cashflow_schedule(
         project_id,
-        include_financing=False,
+        include_financing=bool(include_financing),
         container_ids=container_ids or None,
     )
 
@@ -7721,11 +7722,38 @@ def handle_get_loans(
                         record[key] = str(record[key])
                 records.append(record)
 
-            return {
-                'success': True,
-                'count': len(records),
-                'records': records
-            }
+        # What each loan IS (HQ137): its amount, bases and start date from the
+        # sizing rule where nothing was saved — the figures the Debt screen and
+        # the cash flow use. The stored columns above stay as recorded.
+        try:
+            from apps.calculations.loan_sizing_service import effective_loan_terms
+            from apps.financial.models_debt import Loan
+            from apps.projects.models import Project
+            project = Project.objects.get(project_id=project_id)
+            for record in records:
+                terms = effective_loan_terms(Loan.objects.get(loan_id=record['loan_id']), project)
+                record['effective'] = {
+                    'commitment_amount': float(terms['commitment_amount']),
+                    'value_basis': float(terms['ltv_basis_amount']),
+                    'cost_basis': float(terms['ltc_basis_amount']),
+                    'governing_constraint': terms['governing_constraint'],
+                    'loan_start_date': str(terms['loan_start_date']) if terms['loan_start_date'] else None,
+                    'basis_rule': terms['basis_rule'],
+                    'defaults': [k for k, flag in (
+                        ('value basis', terms['value_basis_is_default']),
+                        ('cost basis', terms['cost_basis_is_default']),
+                        ('start date', terms['start_is_default']),
+                    ) if flag],
+                    'amount_is_saved': terms['amount_is_saved'],
+                }
+        except Exception as e:  # noqa: BLE001 — the stored loans still return
+            logger.warning(f"get_loans: effective terms unavailable: {e}")
+
+        return {
+            'success': True,
+            'count': len(records),
+            'records': records
+        }
 
     except Exception as e:
         logger.error(f"Error getting loans: {e}")
@@ -7748,6 +7776,19 @@ def handle_update_loan(
 
     if not loan_name and not loan_id:
         return {'success': False, 'error': 'loan_name or loan_id required'}
+
+    # Same guards as the loan screens (2026-10-02): the contingency is a
+    # multiplier (1.2 = 20%) and a reserve is never negative.
+    inflator = tool_input.get('interest_reserve_inflator')
+    if inflator is not None and not (1.0 <= float(inflator) < 2.0):
+        return {
+            'success': False,
+            'error': ('interest_reserve_inflator must be a multiplier between 1.0 and 2.0 '
+                      '(a 20% contingency is 1.2). Ask the user, then retry.'),
+        }
+    reserve = tool_input.get('interest_reserve_amount')
+    if reserve is not None and float(reserve) < 0:
+        return {'success': False, 'error': 'interest_reserve_amount cannot be negative.'}
 
     if propose_only:
         from .services.mutation_service import MutationService
@@ -9205,8 +9246,12 @@ def handle_get_cashflow_schedule(
             fetch_cashflow_schedule_data,
         )
         container_ids = _coerce_container_ids(tool_input.get('container_ids'))
+        _fin = tool_input.get('include_financing')
+        financing = None if _fin is None else (
+            _fin.strip().lower() in {'true', '1', 'yes'} if isinstance(_fin, str) else bool(_fin)
+        )
         data = fetch_cashflow_schedule_data(
-            int(project_id), container_ids=container_ids or None
+            int(project_id), container_ids=container_ids or None, financing=financing,
         )
         rows = data['rows']
 
@@ -9241,6 +9286,9 @@ def handle_get_cashflow_schedule(
             container_ids=container_ids or None,
             user_id=kwargs.get('user_id'),
             thread_id=kwargs.get('thread_id'),
+            results_unlevered=data.get('results_unlevered'),
+            financing_state=data.get('financing'),
+            financing=financing,
         )
 
         # What this cash flow could be narrowed to, and what it is. Read from the
@@ -9279,6 +9327,9 @@ def handle_get_cashflow_schedule(
                 'available_containers': available_containers,
                 'container_ids': container_ids or None,
                 'scope': scope_label,
+                'financing_on': (data.get('financing') or {}).get('on', False),
+                'loan_count': (data.get('financing') or {}).get('loan_count', 0),
+                'financing_findings': (data.get('financing') or {}).get('findings', []),
                 'instruction': (
                     'The cash-flow schedule artifact has ALREADY been created and '
                     'is open in the right panel. Do NOT call create_artifact. Reply '
@@ -9481,6 +9532,126 @@ def handle_open_clarification(
             'yourself, and do NOT proceed on assumed values.'
         ),
     }
+
+
+def _project_has_loan(tool_input: Dict[str, Any], project_id: int) -> bool:
+    """True when the project has the asked-for loan (or any loan)."""
+    try:
+        from apps.financial.models_debt import Loan
+        loans = Loan.objects.filter(project_id=project_id)
+        loan_id = (tool_input or {}).get('loan_id')
+        return (loans.filter(loan_id=loan_id) if loan_id else loans).exists()
+    except Exception:  # noqa: BLE001 — let the helper report the real error
+        return True
+
+
+def _loan_artifact(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    kind: str,
+    **kwargs
+) -> Dict[str, Any]:
+    """Render one loan's summary as a DETERMINISTIC artifact, laid out as the
+    Star Valley Senior Loan Summary sheet (HQ162): max and average outstanding;
+    leverage, rate, other terms and release on the left; the loan budget
+    (total / borrower / lender), the summary of proceeds (the loan-in-process
+    lines) and the equity on the right. Server-side render — the model must NOT
+    compose the tables. Reads the same loan-budget summary as the classic loan
+    budget and the loan's own schedule; a project with no loan returns a clean
+    'no loan' result."""
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+    try:
+        from apps.financial.models_debt import Loan
+        from apps.projects.models import Project
+        from apps.calculations.loan_sizing_service import LoanSizingService
+        from apps.financial.views_debt_schedule import DebtScheduleView
+
+        loans = Loan.objects.filter(project_id=project_id).order_by('seniority', 'loan_id')
+        loan_id = tool_input.get('loan_id')
+        loan = loans.filter(loan_id=loan_id).first() if loan_id else loans.first()
+        if loan is None:
+            return {
+                'success': True, 'artifact_created': False,
+                'message': 'This project has no loan on the record yet.',
+                'instruction': _EMPTY_ARTIFACT_RELAY,
+            }
+        project = Project.objects.get(project_id=project_id)
+        summary = LoanSizingService.build_budget_summary(loan, project)
+        try:
+            schedule = DebtScheduleView().get(None, project_id, loan.loan_id).data or {}
+        except Exception:  # noqa: BLE001 — the summary still renders without the stats
+            logger.exception('get_loan_summary: schedule run failed for loan %s', loan.loan_id)
+            schedule = {}
+
+        from .tools.loan_summary_artifact_builder import create_loan_summary_artifact
+        envelope = create_loan_summary_artifact(
+            project_id=int(project_id),
+            project_name=getattr(project, 'project_name', None),
+            loan=loan,
+            summary=summary,
+            schedule=schedule,
+            user_id=kwargs.get('user_id'),
+            thread_id=kwargs.get('thread_id'),
+            kind=kind,
+        )
+        if envelope and envelope.get('success') is not False:
+            return {
+                'success': True,
+                'artifact_created': True,
+                'artifact': envelope,
+                'loan_name': loan.loan_name,
+                'commitment_amount': summary.get('commitment_amount'),
+                'closing_funds_available': summary.get('net_loan_proceeds'),
+                'instruction': (
+                    f"The loan {'budget' if kind == 'budget' else 'summary'} artifact has ALREADY been created and is open in "
+                    'the right panel. Do NOT call create_artifact. Reply with one short '
+                    'sentence naming loan_name and stating commitment_amount and '
+                    'closing_funds_available from this result.'
+                ),
+            }
+        return {'success': False, 'error': (envelope or {}).get('error', 'artifact not created')}
+    except Exception as e:  # noqa: BLE001
+        logger.exception('get_loan_summary failed')
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_loan_summary')
+def handle_get_loan_summary(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """The loan on one page (HQ162) — see _loan_artifact."""
+    if not _project_has_loan(tool_input, project_id):
+        # The empty exit lives here, not only in the shared helper, so the relay
+        # coverage test can see it on the registered handler.
+        return {
+            'success': True, 'artifact_created': False,
+            'message': 'This project has no loan on the record yet.',
+            'instruction': _EMPTY_ARTIFACT_RELAY,
+        }
+    return _loan_artifact(tool_input, project_id, 'summary', **kwargs)
+
+
+@register_tool('get_loan_budget')
+def handle_get_loan_budget(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """The loan budget artifact (Gregg, 2026-10-02): the budget and proceeds
+    sections of the loan summary only — loan budget (total / borrower /
+    lender), summary of proceeds, equity. See _loan_artifact."""
+    if not _project_has_loan(tool_input, project_id):
+        # The empty exit lives here, not only in the shared helper, so the relay
+        # coverage test can see it on the registered handler.
+        return {
+            'success': True, 'artifact_created': False,
+            'message': 'This project has no loan on the record yet.',
+            'instruction': _EMPTY_ARTIFACT_RELAY,
+        }
+    return _loan_artifact(tool_input, project_id, 'budget', **kwargs)
 
 
 @register_tool('get_capitalization_schedule')

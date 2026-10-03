@@ -8,7 +8,7 @@ cash-flow services use the same calculations.
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from apps.calculations.engines.debt_service_engine import DebtServiceEngine
 from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
@@ -34,6 +34,181 @@ def _q2(value: Decimal) -> Decimal:
 
 def _as_float(value: Decimal) -> float:
     return float(_q2(value))
+
+
+# Activity order for the budget breakdown, matching the budget screen.
+_ACTIVITY_ORDER = (
+    "Acquisition",
+    "Planning & Engineering",
+    "Improvements",
+    "Operations",
+    "Disposition",
+    "Financing",
+)
+
+
+def _loan_scope_rows(loan: Any):
+    """(division_id, share, collateral_type) for each container the loan funds.
+
+    Empty for an unsaved loan or one with no container rows — both mean the
+    loan is project-wide.
+    """
+    loan_id = getattr(loan, "loan_id", None)
+    if loan_id is None:
+        return []
+    from apps.financial.models_debt import LoanContainer
+
+    out = []
+    for division_id, pct, collateral_type in LoanContainer.objects.filter(
+        loan_id=loan_id
+    ).values_list("division_id", "allocation_pct", "collateral_type"):
+        if division_id is None:
+            continue
+        share = _to_decimal(pct) / Decimal("100") if pct is not None else Decimal("1")
+        out.append((int(division_id), share, (collateral_type or "").upper()))
+    return out
+
+
+def development_budget_basis(loan: Any, project_id: int) -> Dict[str, Any]:
+    """The development budget a loan is sized against.
+
+    Every budget line on a funded container — or on anything underneath one
+    (a parcel line under a funded phase) — times the loan's share of that
+    container. A project-wide loan takes every line. Lines with no dates count:
+    a static estimate is still cost; only the timing of draws needs dates.
+
+    Returns ``{"total": Decimal, "by_activity": {activity: Decimal},
+    "funds_acquisition": bool, "project_wide": bool}``.
+    """
+    from django.db import connection
+    from apps.containers.ancestry import DIVISION_ANCESTRY_CTE
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+    rows = _loan_scope_rows(loan)
+    project_wide = not rows
+    shares: Dict[int, float] = {}
+    funds_acquisition = project_wide
+    for division_id, share, collateral_type in rows:
+        shares[division_id] = shares.get(division_id, 0.0) + float(share)
+        if collateral_type in LandDevCashFlowService.ACQUISITION_COLLATERAL_TYPES:
+            funds_acquisition = True
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            WITH {DIVISION_ANCESTRY_CTE}
+            SELECT b.division_id, a.tier1_id, a.tier2_id,
+                   COALESCE(NULLIF(TRIM(b.activity), ''), 'Unassigned') AS activity,
+                   b.amount
+            FROM landscape.core_fin_fact_budget b
+            LEFT JOIN division_ancestry a ON a.division_id = b.division_id
+            WHERE b.project_id = %s AND b.amount > 0
+            """,
+            [project_id],
+        )
+        budget_rows = cursor.fetchall()
+
+    total, by_activity = budget_basis_from_rows(budget_rows, shares, project_wide)
+    return {
+        "total": total,
+        "by_activity": by_activity,
+        "funds_acquisition": funds_acquisition,
+        "project_wide": project_wide,
+    }
+
+
+def budget_basis_from_rows(budget_rows, shares: Dict[int, float], project_wide: bool):
+    """Sum ``(division_id, tier1_id, tier2_id, activity, amount)`` rows at the
+    loan's share. Pure, so the sizing rule is testable without a database."""
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+    total = Decimal("0")
+    by_activity: Dict[str, Decimal] = {}
+    for division_id, tier1_id, tier2_id, activity, amount in budget_rows:
+        if project_wide:
+            share = 1.0
+        else:
+            ancestry = {division_id: (tier1_id, tier2_id)} if division_id is not None else {}
+            share = LandDevCashFlowService._share_for_division(division_id, shares, ancestry)
+        if share <= 0:
+            continue
+        contribution = _to_decimal(amount) * Decimal(str(share))
+        total += contribution
+        by_activity[activity] = by_activity.get(activity, Decimal("0")) + contribution
+    return total, by_activity
+
+
+def purchase_price_basis(project: Any) -> Dict[str, Any]:
+    """The land purchase price and where it came from.
+
+    The acquisition ledger wins — the same rows the cash flow puts in period 0
+    (``is_applied_to_purchase`` and a positive amount). Then the project's own
+    acquisition price, then its asking price. None of them: zero, and the
+    caller says there is no price on the record rather than sizing off it.
+    """
+    project_id = getattr(project, "project_id", None)
+    if project_id is not None:
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(amount), 0)
+                FROM landscape.tbl_acquisition
+                WHERE project_id = %s
+                  AND COALESCE(is_applied_to_purchase, true)
+                  AND amount > 0
+                """,
+                [project_id],
+            )
+            ledger = _to_decimal(cursor.fetchone()[0])
+        if ledger > 0:
+            return {"amount": ledger, "source": "acquisition ledger"}
+    for field, label in (("acquisition_price", "acquisition price"), ("asking_price", "asking price")):
+        value = _to_decimal(getattr(project, field, None))
+        if value > 0:
+            return {"amount": value, "source": label}
+    return {"amount": Decimal("0"), "source": None}
+
+
+def acquisition_closing_price(project: Any) -> Dict[str, Any]:
+    """The acquisition price: the first CLOSING amount in the acquisition ledger
+    (the same event the loan's default start date comes from). Falls back to
+    ``purchase_price_basis`` when the ledger has no priced CLOSING."""
+    project_id = getattr(project, "project_id", None)
+    if project_id is not None:
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT amount FROM landscape.tbl_acquisition
+                WHERE project_id = %s AND event_type = 'CLOSING' AND amount > 0
+                ORDER BY event_date NULLS LAST, acquisition_id
+                LIMIT 1
+                """,
+                [project_id],
+            )
+            row = cursor.fetchone()
+        if row and _to_decimal(row[0]) > 0:
+            return {"amount": _to_decimal(row[0]), "source": "acquisition closing"}
+    return purchase_price_basis(project)
+
+
+def is_bridge_term(loan: Any) -> bool:
+    """A term loan of type bridge (Gregg, 2026-09-30: "since its a term>bridge
+    loan, it should default to the acqusition price for the value /cost")."""
+    return ((getattr(loan, "structure_type", "") or "").upper() == "TERM"
+            and (getattr(loan, "loan_type", "") or "").upper() == "BRIDGE")
+
+
+def _positive(value: Any) -> Optional[Decimal]:
+    d = _to_decimal(value)
+    return d if d > 0 else None
+
+
+def _is_land(project: Any) -> bool:
+    return (getattr(project, "project_type_code", "") or "").upper() == "LAND"
 
 
 class LoanSizingService:
@@ -65,7 +240,68 @@ class LoanSizingService:
         }
 
     @staticmethod
-    def calculate_commitment(loan: Any, project: Any) -> Dict[str, Any]:
+    def sizing_bases(loan: Any, project: Any, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """The value basis (for LTV) and cost basis (for LTC) a loan is sized on.
+
+        A term loan of type bridge: both are the acquisition price (the first
+        CLOSING in the ledger), Gregg 2026-09-30. Every other loan keeps the
+        rule it had: value = the purchase price on record (acquisition ledger
+        first); cost = for land, the purchase when the loan funds it plus
+        closing costs plus the development budget of the containers it funds,
+        otherwise purchase plus closing costs. A basis the user typed
+        (``overrides``: ltv_basis_amount / ltc_basis_amount) wins over either.
+        The loan form reads this same function, so it and the save agree.
+        """
+        overrides = overrides or {}
+        closing_costs_total = (
+            _to_decimal(getattr(loan, "closing_costs_appraisal", None))
+            + _to_decimal(getattr(loan, "closing_costs_legal", None))
+            + _to_decimal(getattr(loan, "closing_costs_other", None))
+        )
+        budget_basis = None
+        if is_bridge_term(loan):
+            price = acquisition_closing_price(project)
+            value_basis = price["amount"]
+            cost_basis = price["amount"]
+            rule = "acquisition price (term bridge loan)"
+        else:
+            # Value basis for LTV: the purchase price on record (acquisition
+            # ledger first). There is no separate appraised-value field.
+            price = purchase_price_basis(project)
+            value_basis = price["amount"]
+            # Land: LTC is sized on the purchase (when the loan funds it) plus the
+            # development budget of the containers it funds. Income property keeps
+            # its purchase-plus-closing basis until its capital budget is wired.
+            if _is_land(project) and getattr(project, "project_id", None) is not None:
+                budget_basis = development_budget_basis(loan, project.project_id)
+                purchase = value_basis if budget_basis["funds_acquisition"] else Decimal("0")
+                cost_basis = purchase + closing_costs_total + budget_basis["total"]
+                rule = "purchase (if funded) + closing costs + development budget of funded containers"
+            else:
+                cost_basis = value_basis + closing_costs_total
+                rule = "purchase price + closing costs"
+        default_value, default_cost = value_basis, cost_basis
+        typed_value = _positive(overrides.get("ltv_basis_amount"))
+        typed_cost = _positive(overrides.get("ltc_basis_amount"))
+        if typed_value is not None:
+            value_basis = typed_value
+        if typed_cost is not None:
+            cost_basis = typed_cost
+        return {
+            "value_basis": value_basis,
+            "cost_basis": cost_basis,
+            "default_value_basis": default_value,
+            "default_cost_basis": default_cost,
+            "value_basis_typed": typed_value is not None,
+            "cost_basis_typed": typed_cost is not None,
+            "price_source": price["source"],
+            "basis_rule": rule,
+            "budget_basis": budget_basis,
+            "closing_costs_total": closing_costs_total,
+        }
+
+    @staticmethod
+    def calculate_commitment(loan: Any, project: Any, overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Derive commitment from LTV/LTC and compute holdbacks/net proceeds.
         """
@@ -75,15 +311,25 @@ class LoanSizingService:
         has_ltv = ltv_pct >= 0
         has_ltc = ltc_pct >= 0
 
-        value_basis = _to_decimal(getattr(project, "asking_price", None))
+        bases = LoanSizingService.sizing_bases(loan, project, overrides)
+        price = {"source": bases["price_source"]}
+        value_basis = bases["value_basis"]
+        cost_basis = bases["cost_basis"]
+        budget_basis = bases["budget_basis"]
 
-        closing_costs_total = (
-            _to_decimal(getattr(loan, "closing_costs_appraisal", None))
-            + _to_decimal(getattr(loan, "closing_costs_legal", None))
-            + _to_decimal(getattr(loan, "closing_costs_other", None))
-        )
-        # TODO: Include capex budget basis once capital budget source is integrated.
-        cost_basis = value_basis + closing_costs_total
+        # A ratio with nothing to multiply is not a $0 loan. Skip it and say
+        # why, so "the lesser of LTV and LTC" is never won by a missing basis.
+        sizing_notes = []
+        if has_ltv and value_basis <= 0:
+            has_ltv = False
+            sizing_notes.append(
+                "Loan-to-value ignored: no purchase price or value on the record."
+            )
+        if has_ltc and cost_basis <= 0:
+            has_ltc = False
+            sizing_notes.append(
+                "Loan-to-cost ignored: no purchase price or budget on the record for what this loan funds."
+            )
 
         ltv_amount = (ltv_pct / Decimal("100")) * value_basis if has_ltv else None
         ltc_amount = (ltc_pct / Decimal("100")) * cost_basis if has_ltc else None
@@ -120,6 +366,12 @@ class LoanSizingService:
             "ltc_basis_amount": _q2(cost_basis),
             "ltv_amount": _q2(ltv_amount) if ltv_amount is not None else None,
             "ltc_amount": _q2(ltc_amount) if ltc_amount is not None else None,
+            "purchase_price_source": price["source"],
+            "basis_rule": bases["basis_rule"],
+            "sizing_notes": sizing_notes,
+            "development_budget_basis": (
+                _q2(budget_basis["total"]) if budget_basis is not None else None
+            ),
             **holdbacks,
         }
 
@@ -128,12 +380,18 @@ class LoanSizingService:
         """
         Calculate recommended interest reserve amount.
 
-        TERM: monthly interest * reserve months * inflator.
-        REVOLVER: reuse iterative reserve sizing from debt engine.
+        Land TERM: iterative, the reserve as loan-in-process (size_term_reserve).
+        Other TERM: monthly interest * reserve months * inflator.
+        REVOLVER / A&D / release-priced: iterative sizing from the debt engine.
         """
         structure_type = (getattr(loan, "structure_type", "") or "").upper()
+        land_term = (
+            _is_land(project)
+            and structure_type == "TERM"
+            and not LandDevCashFlowService.uses_release_calculator(loan)
+        )
 
-        if structure_type == "REVOLVER":
+        if LandDevCashFlowService.uses_release_calculator(loan) or land_term:
             service = LandDevCashFlowService(project.project_id)
             project_config = service._get_project_config()
             dcf_assumptions = service._get_dcf_assumptions()
@@ -154,12 +412,29 @@ class LoanSizingService:
                 dcf_assumptions.get("price_growth_rate"),
                 dcf_assumptions.get("cost_inflation_rate"),
             )
-            period_data = service._build_period_costs_for_financing(
+            period_data = service.build_loan_period_data(
+                loan,
                 cost_schedule,
                 absorption_schedule,
                 periods,
             )
-            params = service._build_revolver_params(loan, periods)
+            if land_term:
+                # Loan-in-process, sized iteratively over the loan's life to
+                # payoff (Gregg, 2026-09-29 / 2026-10-02): the reserve's own
+                # advances bear interest, so the size is circular.
+                term_params = service._build_term_params(loan, periods, period_data)
+                reserve, iterations = DebtServiceEngine().size_term_reserve(
+                    term_params, len(periods), getattr(loan, "interest_reserve_inflator", None),
+                )
+                return {
+                    "recommended_reserve": round(reserve, 2),
+                    "calculation_basis": {
+                        "method": "TERM_ITERATIVE",
+                        "iterations": iterations,
+                        "inflator": float(getattr(loan, "interest_reserve_inflator", None) or 1.0),
+                    },
+                }
+            params = service._build_revolver_params(loan, periods, period_data)
             result = DebtServiceEngine().calculate_revolver(params, period_data)
             return {
                 "recommended_reserve": round(result.interest_reserve_funded, 2),
@@ -208,9 +483,19 @@ class LoanSizingService:
         """Build read-only loan budget breakdown for modal display."""
         sizing = LoanSizingService.calculate_commitment(loan, project)
         commitment = _to_decimal(sizing["commitment_amount"])
-        acquisition = _to_decimal(getattr(project, "asking_price", None))
+        acquisition = purchase_price_basis(project)["amount"]
         capex = Decimal("0")
-        # TODO: Replace with actual capex budget once project budget source is integrated.
+        activity_rows = []
+        if _is_land(project) and getattr(project, "project_id", None) is not None:
+            basis = development_budget_basis(loan, project.project_id)
+            if not basis["funds_acquisition"]:
+                acquisition = Decimal("0")
+            capex = basis["total"]
+            order = {name: i for i, name in enumerate(_ACTIVITY_ORDER)}
+            activity_rows = sorted(
+                basis["by_activity"].items(),
+                key=lambda kv: (order.get(kv[0], len(order)), kv[0]),
+            )
 
         origination_fee = _to_decimal(sizing["origination_fee_amount"])
         interest_reserve = _to_decimal(sizing["interest_reserve_amount"])
@@ -228,17 +513,26 @@ class LoanSizingService:
         remaining_net_proceeds -= acquisition_lender_alloc
         capex_lender_alloc = min(capex, remaining_net_proceeds)
 
+        # The development budget, one row per activity, when there is one to
+        # show; otherwise the single improvements row as before. The lender's
+        # allocation is spread over the activities in order.
+        if activity_rows:
+            capex_rows = []
+            remaining_capex_alloc = capex_lender_alloc
+            for activity, amount in activity_rows:
+                lender = min(amount, remaining_capex_alloc)
+                remaining_capex_alloc -= lender
+                capex_rows.append({"label": activity, "total": amount, "lender": lender})
+        else:
+            capex_rows = [{"label": line_item_b_label, "total": capex, "lender": capex_lender_alloc}]
+
         raw_budget_rows = [
             {
                 "label": line_item_a_label,
                 "total": acquisition,
                 "lender": acquisition_lender_alloc,
             },
-            {
-                "label": line_item_b_label,
-                "total": capex,
-                "lender": capex_lender_alloc,
-            },
+            *capex_rows,
             {
                 "label": "Origination Fee",
                 "total": origination_fee,
@@ -290,10 +584,14 @@ class LoanSizingService:
                 "pct_of_loan": pct_of_loan(interest_reserve),
                 "total": _as_float(-interest_reserve),
             },
+            # Loan-in-process improvements are the LENDER's share of the
+            # improvements (held back, drawn as built) — not the whole budget.
+            # HQ162: a land-only loan funds no improvements, so this is zero and
+            # the rows add back to the closing funds.
             {
                 "label": f"LIP: {line_item_b_label}",
-                "pct_of_loan": pct_of_loan(capex),
-                "total": _as_float(-capex),
+                "pct_of_loan": pct_of_loan(capex_lender_alloc),
+                "total": _as_float(-capex_lender_alloc),
             },
             {
                 "label": "Closing Funds Available",
@@ -302,11 +600,16 @@ class LoanSizingService:
             },
         ]
 
-        project_costs_at_close = total_budget
+        # Equity (HQ162, laid out as the Star Valley Senior Loan Summary): what
+        # is paid at closing is the land / acquisition; the loan's closing funds
+        # come off it; the borrower's share of everything after closing is the
+        # post-closing equity. Equity total = the borrower column of the budget.
+        project_costs_at_close = acquisition
         loan_proceeds = net_proceeds
         transaction_offering_cost = Decimal("0")
         option_deposit = Decimal("0")
         total_equity_to_close = project_costs_at_close - loan_proceeds + transaction_offering_cost - option_deposit
+        equity_post_closing = total_borrower - (acquisition - acquisition_lender_alloc)
 
         equity_to_close = [
             {"label": "Project Costs at Close", "total": _as_float(project_costs_at_close)},
@@ -316,6 +619,8 @@ class LoanSizingService:
         if is_land:
             equity_to_close.append({"label": "- Option Deposit", "total": _as_float(-option_deposit)})
         equity_to_close.append({"label": "Total Equity to Close", "total": _as_float(total_equity_to_close)})
+        equity_to_close.append({"label": "Equity: Post Closing", "total": _as_float(equity_post_closing)})
+        equity_to_close.append({"label": "Equity: Total", "total": _as_float(total_equity_to_close + equity_post_closing)})
 
         return {
             "project_id": getattr(project, "project_id", None),
@@ -337,3 +642,75 @@ class LoanSizingService:
             "summary_of_proceeds": summary_of_proceeds,
             "equity_to_close": equity_to_close,
         }
+
+
+# ---------------------------------------------------------------------------
+# A loan's effective terms (HQ137)
+# ---------------------------------------------------------------------------
+def _typed_bases_on_record(loan: Any, default_bases: Dict[str, Any]) -> Dict[str, Decimal]:
+    """A stored basis counts as typed only when it differs from today's default;
+    a stored default (or the $0 a loan saved before the ledger was priced
+    carries) is not an override. The loan form applies the same reading."""
+    typed: Dict[str, Decimal] = {}
+    for key, default in (("ltv_basis_amount", default_bases["default_value_basis"]),
+                         ("ltc_basis_amount", default_bases["default_cost_basis"])):
+        stored = _positive(getattr(loan, key, None))
+        if stored is not None and abs(stored - _to_decimal(default)) > Decimal("0.5"):
+            typed[key] = stored
+    return typed
+
+
+def effective_loan_terms(loan: Any, project: Any) -> Dict[str, Any]:
+    """What a loan IS right now: its amount, bases and start date, worked out by
+    the same functions the save uses (``sizing_bases`` / ``calculate_commitment``
+    / the acquisition date). Nothing is written — a default shows as a default
+    until someone saves the loan. Each figure says whether it was typed or is a
+    default, so a screen can mark it."""
+    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+
+    defaults = LoanSizingService.sizing_bases(loan, project)
+    typed = _typed_bases_on_record(loan, defaults)
+    sizing = LoanSizingService.calculate_commitment(loan, project, typed)
+    stored_start = getattr(loan, "loan_start_date", None)
+    start = stored_start
+    if not start and getattr(project, "project_id", None) is not None:
+        try:
+            start = LandDevCashFlowService(int(project.project_id)).acquisition_date()
+        except Exception:  # noqa: BLE001 — a missing date is shown as missing, not guessed
+            start = None
+    stored_amount = _to_decimal(getattr(loan, "commitment_amount", None) or getattr(loan, "loan_amount", None))
+    return {
+        "commitment_amount": sizing["commitment_amount"],
+        "loan_amount": sizing["loan_amount"],
+        "net_loan_proceeds": sizing["net_loan_proceeds"],
+        "governing_constraint": sizing["governing_constraint"],
+        "commitment_sizing_method": sizing["commitment_sizing_method"],
+        "ltv_basis_amount": sizing["ltv_basis_amount"],
+        "ltc_basis_amount": sizing["ltc_basis_amount"],
+        "ltv_amount": sizing["ltv_amount"],
+        "ltc_amount": sizing["ltc_amount"],
+        "basis_rule": sizing["basis_rule"],
+        "price_source": sizing["purchase_price_source"],
+        "sizing_notes": sizing["sizing_notes"],
+        "loan_start_date": start,
+        # True where the figure comes from the default rule, not from the record.
+        "value_basis_is_default": "ltv_basis_amount" not in typed,
+        "cost_basis_is_default": "ltc_basis_amount" not in typed,
+        "start_is_default": not stored_start and start is not None,
+        "amount_is_saved": abs(stored_amount - sizing["commitment_amount"]) <= Decimal("0.5"),
+    }
+
+
+def with_effective_terms(loan: Any, project: Any) -> Any:
+    """An in-memory copy of the loan carrying its effective amount, bases and
+    start date, for calculations (cash flow, draws, coverage). NEVER save it."""
+    import copy
+
+    terms = effective_loan_terms(loan, project)
+    clone = copy.copy(loan)
+    for key in ("commitment_amount", "loan_amount", "net_loan_proceeds", "governing_constraint",
+                "commitment_sizing_method", "ltv_basis_amount", "ltc_basis_amount", "loan_start_date"):
+        setattr(clone, key, terms[key])
+    clone.calculated_commitment_amount = terms["commitment_amount"]
+    clone._effective_terms_copy = True  # marks the copy; see the docstring
+    return clone

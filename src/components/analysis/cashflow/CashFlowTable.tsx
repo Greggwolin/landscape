@@ -12,6 +12,7 @@
 import React, { useMemo } from 'react';
 import { CTable, CCard, CCardBody } from '@coreui/react';
 import type { AggregatedSchedule } from '@/lib/financial-engine/cashflow/aggregation';
+import { dropEmptyAggregatedPeriods } from '@/lib/cashflow/emptyPeriods';
 
 interface Props {
   schedule: AggregatedSchedule;
@@ -149,7 +150,9 @@ function SectionLabel({ label, colSpan }: SectionLabelProps) {
 // MAIN COMPONENT
 // ============================================================================
 
-export default function CashFlowTable({ schedule }: Props) {
+export default function CashFlowTable({ schedule: rawSchedule }: Props) {
+  // Empty periods do not render (Gregg, 2026-10-02).
+  const schedule = useMemo(() => dropEmptyAggregatedPeriods(rawSchedule), [rawSchedule]);
   const { periods, sections } = schedule;
 
   // Check if we're in overall mode (single "Total" period - no need for extra Total column)

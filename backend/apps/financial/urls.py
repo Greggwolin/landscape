@@ -57,6 +57,7 @@ from .views_debt import (
     DebtBalanceSummaryViewSet,
     LoanBudgetSummaryView,
     InterestReserveCalculationView,
+    InterestReserveCheckView,
 )
 from .views_debt_schedule import DebtScheduleView
 from .views_operations import operations_data, operations_inputs, operations_settings
@@ -148,6 +149,11 @@ urlpatterns = [
         name='loan-list'
     ),
     path(
+        'projects/<int:project_id>/loans/sizing-basis/',
+        LoanViewSet.as_view({'get': 'sizing_basis'}),
+        name='loan-sizing-basis',
+    ),
+    path(
         'projects/<int:project_id>/loans/<int:loan_id>/',
         LoanViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
         name='loan-detail'
@@ -196,6 +202,11 @@ urlpatterns = [
         'projects/<int:project_id>/loans/<int:loan_id>/budget-summary/',
         LoanBudgetSummaryView.as_view(),
         name='loan-budget-summary',
+    ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/interest-reserve/check/',
+        InterestReserveCheckView.as_view(),
+        name='loan-interest-reserve-check',
     ),
     path(
         'projects/<int:project_id>/loans/<int:loan_id>/interest-reserve/calculate/',

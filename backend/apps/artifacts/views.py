@@ -2643,7 +2643,9 @@ def _refresh_artifact_after_write(*, artifact, user_id):
             _params = artifact.params_json or {}
             _container_ids = [int(i) for i in (_params.get('container_ids') or [])]
             payload = build_cashflow_refresh_payload(
-                project_id, container_ids=_container_ids or None
+                project_id,
+                container_ids=_container_ids or None,
+                financing=_params.get('financing'),
             )
             if payload is None:
                 return {

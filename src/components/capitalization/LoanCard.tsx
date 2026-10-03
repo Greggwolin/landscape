@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CCard, CCardBody, CCardHeader } from '@coreui/react';
 import type { Loan } from '@/types/assumptions';
 import {
-  useAcquisitionPriceSummary,
   useCalculateInterestReserve,
+  useLoanSizingBasis,
   useCreateLoan,
   useDeleteLoan,
   useUpdateLoan,
@@ -210,25 +210,30 @@ const getFacilityStructure = (loan: DraftLoan): string => {
   return loan.facility_structure || loan.structure_type || 'TERM';
 };
 
+// The value and cost bases come from the server (useLoanSizingBasis), the same
+// functions the save sizes with, or from a basis the user typed (HQ132). The old
+// preview used the project's asking price, which Peoria does not have, so every
+// sized field stayed $0 while the save sized off the acquisition ledger.
 const calculateLoanSizingPreview = (
   loanData: DraftLoan,
-  askingPrice: number
+  bases: { value: number; cost: number }
 ): LoanSizingPreview => {
   const ltvPct = coerceNumeric(loanData.loan_to_value_pct);
   const ltcPct = coerceNumeric(loanData.loan_to_cost_pct);
   const hasLtv = ltvPct != null;
   const hasLtc = ltcPct != null;
 
-  const valueBasis = Math.max(askingPrice, 0);
+  const valueBasis = Math.max(bases.value, 0);
   const closingCostsTotal =
     (coerceNumeric(loanData.closing_costs_appraisal) || 0) +
     (coerceNumeric(loanData.closing_costs_legal) || 0) +
     (coerceNumeric(loanData.closing_costs_other) || 0);
-  // TODO: include capex budget in LTC cost basis when budget source is wired.
-  const costBasis = valueBasis + closingCostsTotal;
+  const costBasis = Math.max(bases.cost, 0);
 
-  const ltvAmount = hasLtv ? (ltvPct / 100) * valueBasis : null;
-  const ltcAmount = hasLtc ? (ltcPct / 100) * costBasis : null;
+  // A ratio with nothing to multiply sizes nothing (as on the server): it is
+  // skipped, and the form names the missing basis instead of showing $0.
+  const ltvAmount = hasLtv && valueBasis > 0 ? (ltvPct / 100) * valueBasis : null;
+  const ltcAmount = hasLtc && costBasis > 0 ? (ltcPct / 100) * costBasis : null;
 
   let commitment = coerceNumeric(loanData.commitment_amount) ?? coerceNumeric(loanData.loan_amount) ?? 0;
   let governingConstraint: GoverningConstraint = 'MANUAL';
@@ -388,7 +393,6 @@ export default function LoanCard({
   const createLoan = useCreateLoan(projectId);
   const updateLoan = useUpdateLoan(projectId);
   const deleteLoan = useDeleteLoan(projectId);
-  const { data: acquisitionSummary } = useAcquisitionPriceSummary(projectId, Boolean(projectId));
 
   const [isEditing, setIsEditing] = useState(defaultExpanded || false);
   const [showSchedule, setShowSchedule] = useState(false);
@@ -416,14 +420,45 @@ export default function LoanCard({
   }, [loan, defaultExpanded]);
 
   const facilityStructure = getFacilityStructure(formData);
-  const isRevolver = facilityStructure === 'REVOLVER';
+  // A&D advances like a revolver (several draws), so it shows the same fields.
+  const isRevolver = facilityStructure === 'REVOLVER' || facilityStructure === 'A_AND_D';
   const isFloating = (formData.interest_type || 'Fixed') === 'Floating';
   const existingLoan = loan && loan.loan_id ? loan : null;
   const calculateReserve = useCalculateInterestReserve(projectId, existingLoan?.loan_id ?? null);
-  const askingPrice = coerceNumeric(acquisitionSummary?.asking_price) || 0;
+  const { data: sizingBasis } = useLoanSizingBasis(projectId, {
+    loanId: existingLoan?.loan_id ?? null,
+    loanType: formData.loan_type,
+    structureType: facilityStructure,
+  });
+  // A basis the user typed wins over the server's default. A loan loads its
+  // stored basis as typed only when it differs from today's default — a stored
+  // default (or the $0 loan 63 was saved with) is not an override.
+  const [typedBasis, setTypedBasis] = useState<{ value: number | null; cost: number | null }>({ value: null, cost: null });
+  useEffect(() => {
+    if (!sizingBasis) return;
+    const stored = (v: unknown, dflt: number) => {
+      const n = coerceNumeric(v as number | string | null | undefined);
+      return n != null && n > 0 && Math.abs(n - dflt) > 0.5 ? n : null;
+    };
+    setTypedBasis({
+      value: stored(loan?.ltv_basis_amount, sizingBasis.value_basis),
+      cost: stored(loan?.ltc_basis_amount, sizingBasis.cost_basis),
+    });
+  }, [loan, sizingBasis]);
+  const bases = {
+    value: typedBasis.value ?? sizingBasis?.value_basis ?? 0,
+    cost: typedBasis.cost ?? sizingBasis?.cost_basis ?? 0,
+  };
+  // A loan with no start date opens on the acquisition date; it stays editable.
+  useEffect(() => {
+    if (isEditing && !formData.loan_start_date && sizingBasis?.default_start_date) {
+      setFormData((prev) => (prev.loan_start_date ? prev : { ...prev, loan_start_date: sizingBasis.default_start_date }));
+    }
+  }, [isEditing, formData.loan_start_date, sizingBasis?.default_start_date]);
   const sizingPreview = useMemo(
-    () => calculateLoanSizingPreview(formData, askingPrice),
-    [formData, askingPrice]
+    () => calculateLoanSizingPreview(formData, bases),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formData, bases.value, bases.cost]
   );
   const isAutoSized = sizingPreview.sizingMethod !== 'MANUAL';
 
@@ -502,7 +537,11 @@ export default function LoanCard({
     });
 
     filtered.structure_type = getFacilityStructure(sourceData);
-    const preview = calculateLoanSizingPreview(sourceData, askingPrice);
+    const preview = calculateLoanSizingPreview(sourceData, bases);
+    // A typed basis goes to the save, which sizes with it; an untyped one is
+    // left to the server's default so it follows the acquisition ledger.
+    if (typedBasis.value != null) filtered.ltv_basis_amount = typedBasis.value;
+    if (typedBasis.cost != null) filtered.ltc_basis_amount = typedBasis.cost;
     if (preview.sizingMethod !== 'MANUAL') {
       filtered.commitment_amount = preview.commitment;
       filtered.loan_amount = preview.commitment;
@@ -736,6 +775,7 @@ export default function LoanCard({
                     <select value={facilityStructure} onChange={handleSelectChange('facility_structure')}>
                       <option value="TERM">TERM</option>
                       <option value="REVOLVER">REVOLVER</option>
+                      <option value="A_AND_D">A&amp;D</option>
                     </select>
                   </AssumptionRow>
                   <AssumptionRow label="Type" error={errors.loan_type} className="input-type">
@@ -744,6 +784,7 @@ export default function LoanCard({
                       <option value="PERMANENT">Permanent</option>
                       <option value="BRIDGE">Bridge</option>
                       <option value="MEZZANINE">Mezzanine</option>
+                      <option value="LAND">Land</option>
                     </select>
                   </AssumptionRow>
                 </div>
@@ -771,11 +812,27 @@ export default function LoanCard({
                     />
                   </AssumptionRow>
                   <AssumptionRow label="Value Basis" className="input-currency">
-                    <input type="text" value={formatCurrency(sizingPreview.valueBasis)} readOnly disabled />
+                    <NumberDisplayInput
+                      format="currency"
+                      value={sizingPreview.valueBasis || null}
+                      onChange={(value) => setTypedBasis((b) => ({ ...b, value: value && value > 0 ? value : null }))}
+                    />
                   </AssumptionRow>
                   <AssumptionRow label="Cost Basis" className="input-currency">
-                    <input type="text" value={formatCurrency(sizingPreview.costBasis)} readOnly disabled />
+                    <NumberDisplayInput
+                      format="currency"
+                      value={sizingPreview.costBasis || null}
+                      onChange={(value) => setTypedBasis((b) => ({ ...b, cost: value && value > 0 ? value : null }))}
+                    />
                   </AssumptionRow>
+                  {sizingBasis && (
+                    <div className="loan-sizing-source" title={sizingBasis.basis_rule} style={{ fontSize: 11, color: 'var(--cui-secondary-color)', padding: '2px 8px 4px' }}>
+                      {typedBasis.value != null || typedBasis.cost != null
+                        ? 'Typed basis — clear it to return to the default.'
+                        : `Basis: ${sizingBasis.basis_rule}.`}
+                      {sizingBasis.notes.map((n) => <div key={n} className="loan-sizing-note" style={{ color: 'var(--cui-warning)' }}>{n}</div>)}
+                    </div>
+                  )}
                   <AssumptionRow label="LTV Amount" className="input-currency">
                     <input
                       type="text"
@@ -1061,12 +1118,20 @@ export default function LoanCard({
                 <div className="loan-assumption-body">
                   {isRevolver && (
                     <>
-                      <AssumptionRow label="Reserve Inflator" error={errors.interest_reserve_inflator} className="input-narrow">
+                      {/* Contingency: entered as a percent (20), stored as a multiplier (1.2). */}
+                      <AssumptionRow label="Reserve Contingency %" error={errors.interest_reserve_inflator} className="input-narrow">
                         <NumberDisplayInput
                           format="decimal"
                           decimals={2}
-                          value={formData.interest_reserve_inflator}
-                          onChange={(value) => setNumberField('interest_reserve_inflator', value)}
+                          value={
+                            formData.interest_reserve_inflator == null
+                              ? null
+                              : Math.round((Number(formData.interest_reserve_inflator) - 1) * 10000) / 100
+                          }
+                          onChange={(value) => setNumberField(
+                            'interest_reserve_inflator',
+                            value == null ? null : Math.round((1 + value / 100) * 10000) / 10000,
+                          )}
                         />
                       </AssumptionRow>
                       <AssumptionRow label="Repayment Accel" error={errors.repayment_acceleration} className="input-narrow">

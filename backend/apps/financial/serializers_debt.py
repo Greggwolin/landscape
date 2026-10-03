@@ -2,6 +2,8 @@
 Serializers for unified debt/loan models.
 """
 
+from decimal import Decimal
+
 from django.db import transaction
 from rest_framework import serializers
 
@@ -44,6 +46,28 @@ class LoanFinanceStructureSerializer(serializers.ModelSerializer):
         read_only_fields = ['loan_fs_id', 'created_at']
 
 
+def _effective_terms_payload(loan) -> dict:
+    """The loan's effective amount, bases and start date (HQ137): the sizing
+    rule's figures where nothing was saved, each flagged when it is a default.
+    Read-only; never written back on view."""
+    from decimal import Decimal
+    from datetime import date
+    from apps.calculations.loan_sizing_service import effective_loan_terms
+    try:
+        terms = effective_loan_terms(loan, loan.project)
+    except Exception:  # noqa: BLE001 — the stored record still serializes
+        return None
+    out = {}
+    for k, v in terms.items():
+        if isinstance(v, Decimal):
+            out[k] = float(v)
+        elif isinstance(v, date):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out
+
+
 class LoanListSerializer(serializers.ModelSerializer):
     # Return numeric values for JS arithmetic (not Decimal strings)
     commitment_amount = serializers.FloatField(allow_null=True, default=0)
@@ -58,6 +82,13 @@ class LoanListSerializer(serializers.ModelSerializer):
     closing_costs_appraisal = serializers.FloatField(allow_null=True)
     closing_costs_legal = serializers.FloatField(allow_null=True)
     closing_costs_other = serializers.FloatField(allow_null=True)
+    # The containers the loan funds and its share of each — the ledger's
+    # "Funds" column. Additive: existing consumers ignore it.
+    containers = LoanContainerSerializer(many=True, read_only=True, source='loan_containers')
+    effective = serializers.SerializerMethodField()
+
+    def get_effective(self, obj):
+        return _effective_terms_payload(obj)
 
     class Meta:
         model = Loan
@@ -97,6 +128,14 @@ class LoanListSerializer(serializers.ModelSerializer):
             'closing_costs_appraisal',
             'closing_costs_legal',
             'closing_costs_other',
+            'release_price_pct',
+            'minimum_release_amount',
+            'release_basis',
+            'rate_floor_pct',
+            'rate_cap_pct',
+            'takes_out_loan_id',
+            'containers',
+            'effective',
         ]
 
 
@@ -112,6 +151,10 @@ class LoanDetailSerializer(serializers.ModelSerializer):
         source='loan_finance_structures'
     )
     takes_out_loan = LoanListSerializer(read_only=True)
+    effective = serializers.SerializerMethodField()
+
+    def get_effective(self, obj):
+        return _effective_terms_payload(obj)
 
     class Meta:
         model = Loan
@@ -135,6 +178,14 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
     )
     finance_structure_ids = serializers.ListField(
         child=serializers.IntegerField(),
+        write_only=True,
+        required=False
+    )
+    # The containers a loan funds WITH its share of each, e.g.
+    # [{"division_id": 21, "allocation_pct": 60, "collateral_type": null}].
+    # Takes precedence over container_ids when both are sent.
+    container_allocations = serializers.ListField(
+        child=serializers.DictField(),
         write_only=True,
         required=False
     )
@@ -163,6 +214,62 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
             [LoanContainer(loan=loan, division_id=division_id) for division_id in container_ids]
         )
 
+    def validate(self, attrs):
+        # Gregg, 2026-09-29: a land loan has no additional advances — one
+        # advance at closing — so its structure is Term. A&D and revolvers are
+        # the loans that advance more than once.
+        attrs = super().validate(attrs)
+        instance = getattr(self, 'instance', None)
+        loan_type = attrs.get('loan_type', getattr(instance, 'loan_type', None))
+        structure = attrs.get('structure_type', getattr(instance, 'structure_type', None))
+        if (loan_type or '').upper() == 'LAND' and (structure or 'TERM').upper() != 'TERM':
+            raise serializers.ValidationError({
+                'structure_type': (
+                    'A land loan has one advance at closing and no additional '
+                    'advances, so its structure is Term. Use A&D or Revolver for a '
+                    'loan that advances more than once.'
+                )
+            })
+        # The reserve contingency is stored as a multiplier (1.2 = 20%) and
+        # entered on screen as a percent. A typed "20" saved as 20.0 sized a
+        # negative reserve on 2026-10-02; refuse anything that is not one.
+        inflator = attrs.get('interest_reserve_inflator')
+        if inflator is not None and not (Decimal('1') <= Decimal(str(inflator)) < Decimal('2')):
+            raise serializers.ValidationError({
+                'interest_reserve_inflator': (
+                    'Reserve contingency must be between 0% and 99% '
+                    '(stored as a multiplier: 1.2 = 20%).'
+                )
+            })
+        reserve = attrs.get('interest_reserve_amount')
+        if reserve is not None and Decimal(str(reserve)) < 0:
+            raise serializers.ValidationError({
+                'interest_reserve_amount': 'An interest reserve cannot be negative.'
+            })
+        return attrs
+
+    def _sync_container_allocations(self, loan, allocations):
+        LoanContainer.objects.filter(loan=loan).delete()
+        rows = []
+        seen = set()
+        # Last entry wins for a repeated container (one row per loan+container).
+        for item in reversed(list(allocations or [])):
+            division_id = item.get('division_id')
+            if division_id in (None, ''):
+                continue
+            if int(division_id) in seen:
+                continue
+            seen.add(int(division_id))
+            pct = item.get('allocation_pct')
+            rows.append(LoanContainer(
+                loan=loan,
+                division_id=int(division_id),
+                allocation_pct=(None if pct in (None, '') else Decimal(str(pct))),
+                collateral_type=item.get('collateral_type') or None,
+            ))
+        if rows:
+            LoanContainer.objects.bulk_create(rows)
+
     def _sync_finance_structures(self, loan, finance_structure_ids):
         LoanFinanceStructure.objects.filter(loan=loan).delete()
         if not finance_structure_ids:
@@ -177,9 +284,12 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         container_ids = validated_data.pop('container_ids', None)
+        allocations = validated_data.pop('container_allocations', None)
         finance_structure_ids = validated_data.pop('finance_structure_ids', None)
         loan = super().create(validated_data)
-        if container_ids is not None:
+        if allocations is not None:
+            self._sync_container_allocations(loan, allocations)
+        elif container_ids is not None:
             self._sync_containers(loan, container_ids)
         if finance_structure_ids is not None:
             self._sync_finance_structures(loan, finance_structure_ids)
@@ -188,9 +298,12 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         container_ids = validated_data.pop('container_ids', None)
+        allocations = validated_data.pop('container_allocations', None)
         finance_structure_ids = validated_data.pop('finance_structure_ids', None)
         loan = super().update(instance, validated_data)
-        if container_ids is not None:
+        if allocations is not None:
+            self._sync_container_allocations(loan, allocations)
+        elif container_ids is not None:
             self._sync_containers(loan, container_ids)
         if finance_structure_ids is not None:
             self._sync_finance_structures(loan, finance_structure_ids)

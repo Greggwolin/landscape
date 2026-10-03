@@ -87,6 +87,8 @@ class LandDevCashFlowService:
         self.project_id = project_id
         self._project_config: Optional[Dict] = None
         self._dcf_assumptions: Optional[Dict] = None
+        self._division_ancestry: Optional[Dict[int, Tuple[Optional[int], Optional[int]]]] = None
+        self._financing_findings: List[Dict[str, Any]] = []
 
     def calculate(
         self,
@@ -119,6 +121,7 @@ class LandDevCashFlowService:
         # chosen ids drops it, and a filtered cash flow that quietly omits real
         # money is worse than no filter at all.
         container_ids = expand_division_scope(self.project_id, container_ids)
+        self._financing_findings = []
 
         # Step 1: Load project configuration and DCF assumptions
         project_config = self._get_project_config()
@@ -208,6 +211,11 @@ class LandDevCashFlowService:
             'sections': sections,
             'summary': summary,
             'generatedAt': date.today().isoformat(),
+            # Only present when a loan could not be modelled as written (a
+            # take-out). Absent otherwise, so a run with no such loan returns
+            # exactly the envelope it always did.
+            **({'financingFindings': list(self._financing_findings)}
+               if self._financing_findings else {}),
         }
 
     # =========================================================================
@@ -1126,6 +1134,7 @@ class LandDevCashFlowService:
                 'closingCosts': closing_costs,
                 'subdivisionCosts': subdivision_costs,
                 'units': int(units) if units else 1,
+                'acres': float(parcel.get('acres_gross') or 0),
             }
 
         # Fallback: calculate from pricing table (minimal implementation)
@@ -1425,42 +1434,52 @@ class LandDevCashFlowService:
         periods: List[Dict],
         container_ids: Optional[List[int]],
     ) -> Optional[Dict]:
-        """Build financing section from loan schedules (revolvers and term loans)."""
-        revolver_loans = self._fetch_loans(structure_type='REVOLVER', container_ids=container_ids)
-        term_loans = self._fetch_loans(structure_type='TERM', container_ids=container_ids)
+        """Build financing section from loan schedules (revolvers and term loans).
+
+        Each revolver draws on the costs of the containers it funds, times its
+        share of each, and is released only by sales in those containers
+        (``build_loan_period_data``). A loan with no container assignment is
+        project-wide and sees every cost and every sale, which is what every
+        loan saw before loans could be tied to containers.
+        """
+        # Revolvers and A&D loans, and any term loan with a release price, run
+        # through the release-and-reserve calculator (Gregg, 2026-09-29, 5a);
+        # a term loan without one keeps fixed payments.
+        all_loans = self._fetch_loans(structure_type=None, container_ids=container_ids)
+        revolver_loans = [l for l in all_loans if self.uses_release_calculator(l)]
+        term_loans = [l for l in all_loans if not self.uses_release_calculator(l)]
 
         if not revolver_loans and not term_loans:
             return None
 
-        period_data = self._build_period_costs_for_financing(
-            cost_schedule,
-            absorption_schedule,
-            periods,
-        )
-
         engine = DebtServiceEngine()
         line_items = []
+        findings: List[Dict[str, Any]] = []
         period_count = len(periods)
 
         for loan in revolver_loans:
             if loan.takes_out_loan_id:
-                raise NotImplementedError(
-                    f"Loan {loan.loan_id} has takes_out_loan_id; take-out logic not implemented."
-                )
+                findings.append(self._take_out_finding(loan))
 
-            params = self._build_revolver_params(loan, periods)
+            period_data = self.build_loan_period_data(
+                loan, cost_schedule, absorption_schedule, periods,
+            )
+            params = self._build_revolver_params(loan, periods, period_data)
             revolver_result = engine.calculate_revolver(params, period_data)
 
             period_amounts = []
             total_amount = 0.0
             for period in revolver_result.periods:
-                amount = (
-                    period.cost_draw
-                    - period.accrued_interest
-                    + period.interest_reserve_draw
-                    - period.release_payments
-                    - period.origination_cost
-                )
+                # The loan's cash to and from the project: what it advances
+                # for costs (at closing, net proceeds: the commitment less the
+                # reserve held back, the fee and closing costs) less what
+                # releases repay, less any interest the reserve no longer
+                # covers (the project pays it). Interest the reserve pays and
+                # the financed fee are in the balance the releases repay, so
+                # they are not charged again here (before 2026-10-02 interest
+                # the reserve paid was never repaid, and fees were charged twice).
+                project_interest = period.accrued_interest - period.interest_reserve_draw
+                amount = period.cost_draw - period.release_payments - project_interest
                 if amount != 0:
                     period_amounts.append({
                         'periodIndex': period.period_index,
@@ -1482,11 +1501,12 @@ class LandDevCashFlowService:
 
         for loan in term_loans:
             if loan.takes_out_loan_id:
-                raise NotImplementedError(
-                    f"Loan {loan.loan_id} has takes_out_loan_id; take-out logic not implemented."
-                )
+                findings.append(self._take_out_finding(loan))
 
-            params = self._build_term_params(loan, periods)
+            term_period_data = self.build_loan_period_data(
+                loan, cost_schedule, absorption_schedule, periods,
+            )
+            params = self._build_term_params(loan, periods, term_period_data)
             term_result = engine.calculate_term(params, period_count)
             initial_net_proceeds = self._resolve_net_loan_proceeds(loan, params.loan_amount)
 
@@ -1523,7 +1543,8 @@ class LandDevCashFlowService:
         subtotals = self._calculate_subtotals(line_items, period_count)
         section_total = sum(item['total'] for item in line_items)
 
-        return {
+        self._financing_findings = findings
+        section = {
             'sectionId': 'financing',
             'sectionName': 'FINANCING',
             'lineItems': line_items,
@@ -1531,11 +1552,39 @@ class LandDevCashFlowService:
             'sectionTotal': section_total,
             'sortOrder': 99,
         }
+        if findings:
+            section['findings'] = findings
+        return section
 
-    def _build_revolver_params(self, loan: Loan, periods: List[Dict]) -> RevolverLoanParams:
-        """Translate Loan model to revolver parameters for calculation engine."""
+    @staticmethod
+    def _take_out_finding(loan: Loan) -> Dict[str, Any]:
+        """A take-out is captured on the loan but not modelled. Say so, to the
+        caller, rather than crashing the run or writing a log line nobody reads."""
+        taken_out = getattr(loan, 'takes_out_loan', None)
+        taken_out_name = getattr(taken_out, 'loan_name', None) or f'loan {loan.takes_out_loan_id}'
+        return {
+            'code': 'take_out_not_modelled',
+            'loanId': loan.loan_id,
+            'takesOutLoanId': loan.takes_out_loan_id,
+            'message': (
+                f"{taken_out_name} is taken out by {loan.loan_name}; take-out is "
+                f"not modelled — balances are shown as if it were not."
+            ),
+        }
+
+    def _build_revolver_params(
+        self,
+        loan: Loan,
+        periods: List[Dict],
+        period_data: Optional[List[PeriodCosts]] = None,
+    ) -> RevolverLoanParams:
+        """Translate Loan model to revolver parameters for calculation engine.
+
+        Given the loan's own period data, the loan is due on sale: whatever is
+        owed is retired in the period its last collateral sells.
+        """
         loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
-        loan_start_period = self._get_period_index_for_date(periods, loan.loan_start_date)
+        loan_start_period = self._get_period_index_for_date(periods, self.loan_start_date_for(loan))
 
         closing_costs = (
             float(loan.closing_costs_appraisal or 0)
@@ -1555,17 +1604,44 @@ class LandDevCashFlowService:
             loan_start_period=loan_start_period,
             loan_term_months=loan_term_months or len(periods),
             draw_trigger_type=loan.draw_trigger_type,
+            payoff_period=self._last_collateral_sale(period_data, loan_start_period),
+            # One advance at closing for a term loan and for any land loan
+            # (land loans have no additional advances — Gregg, 2026-09-29).
+            advance_mode=(
+                'single'
+                if (loan.structure_type or '').upper() == 'TERM'
+                or (getattr(loan, 'loan_type', '') or '').upper() == 'LAND'
+                else 'costs'
+            ),
+            revolving=(loan.structure_type or '').upper() == 'REVOLVER',
+            release_basis=(getattr(loan, 'release_basis', None) or 'LOT').upper(),
+            commitment_cap=self._fixed_commitment(loan),
         )
 
-    def _build_term_params(self, loan: Loan, periods: List[Dict]) -> TermLoanParams:
-        """Translate Loan model to term parameters for calculation engine."""
+    def _build_term_params(
+        self,
+        loan: Loan,
+        periods: List[Dict],
+        period_data: Optional[List[PeriodCosts]] = None,
+    ) -> TermLoanParams:
+        """Translate Loan model to term parameters for calculation engine.
+
+        Due on sale: the term is cut to end in the first period the sales of
+        the loan's collateral cover it (the last collateral sale at the
+        latest), so the balance balloons there (``_term_payoff_period``).
+        """
         loan_term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years)
-        loan_start_period = self._get_period_index_for_date(periods, loan.loan_start_date)
+        loan_start_period = self._get_period_index_for_date(periods, self.loan_start_date_for(loan))
+        loan_amount = float(loan.loan_amount or loan.commitment_amount or 0)
+        payoff = self._term_payoff_period(period_data, loan_start_period, loan_amount)
+        if payoff is not None:
+            to_sale = payoff - loan_start_period + 1
+            loan_term_months = min(loan_term_months or to_sale, to_sale)
 
         amort_months = self._normalize_term_months(loan.amortization_months, loan.amortization_years)
 
         return TermLoanParams(
-            loan_amount=float(loan.loan_amount or loan.commitment_amount or 0),
+            loan_amount=loan_amount,
             interest_rate_annual=float(loan.interest_rate_pct or 0) / 100.0,
             amortization_months=amort_months or 0,
             interest_only_months=int(loan.interest_only_months or 0),
@@ -1573,6 +1649,8 @@ class LandDevCashFlowService:
             origination_fee_pct=float(loan.origination_fee_pct or 0) / 100.0,
             loan_start_period=loan_start_period,
             payment_frequency=loan.payment_frequency or 'MONTHLY',
+            # Held back as loan-in-process, drawn monthly to pay interest.
+            interest_reserve=max(float(getattr(loan, 'interest_reserve_amount', None) or 0), 0.0),
         )
 
     @staticmethod
@@ -1594,9 +1672,48 @@ class LandDevCashFlowService:
         cost_schedule: Dict,
         absorption_schedule: Dict,
         periods: List[Dict],
+        loan_scope: Optional[Dict[str, Any]] = None,
     ) -> List[PeriodCosts]:
-        """Build PeriodCosts inputs for the debt service engine."""
+        """Build PeriodCosts inputs for the debt service engine.
+
+        ``loan_scope`` None is the project-wide case: every cost, every sale.
+        Given a scope (``_loan_scope``), only the costs of the funded
+        containers — times the loan's share of each — and only the sales in
+        them reach the engine.
+        """
         period_count = len(periods)
+        if loan_scope is not None:
+            phase_ids = set()
+            for period_sale in absorption_schedule.get('periodSales', []):
+                for parcel in period_sale.get('parcels', []):
+                    if parcel.get('containerId'):
+                        phase_ids.add(parcel.get('containerId'))
+            phase_to_division = self._fetch_phase_division_mapping(list(phase_ids))
+            period_totals_s, lots_s, cost_per_lot_s = self._scoped_financing_inputs(
+                cost_schedule, absorption_schedule, period_count,
+                phase_to_division, loan_scope,
+            )
+            shares = loan_scope.get('shares') or {}
+            ancestry = loan_scope.get('ancestry') or {}
+            acres_s, proceeds_s = self._sales_by_period(
+                absorption_schedule, period_count,
+                lambda parcel: self._share_for_division(
+                    phase_to_division.get(parcel.get('containerId')), shares, ancestry,
+                ),
+            )
+            return [
+                PeriodCosts(
+                    period_index=idx,
+                    date=periods[idx]['endDate'].isoformat() if periods[idx].get('endDate') else '',
+                    total_costs=period_totals_s[idx],
+                    lots_sold_by_product=lots_s.get(idx, {}),
+                    cost_per_lot_by_product=cost_per_lot_s,
+                    acres_sold=acres_s[idx],
+                    sale_proceeds=proceeds_s[idx],
+                )
+                for idx in range(period_count)
+            ]
+
         period_totals = cost_schedule.get('periodTotals', [])
 
         phase_ids = set()
@@ -1653,6 +1770,9 @@ class LandDevCashFlowService:
             else:
                 cost_per_lot_by_division[division_id] = total_cost / lot_count
 
+        acres_all, proceeds_all = self._sales_by_period(
+            absorption_schedule, period_count, lambda parcel: 1.0,
+        )
         period_data: List[PeriodCosts] = []
         for idx in range(period_count):
             period = periods[idx]
@@ -1663,10 +1783,281 @@ class LandDevCashFlowService:
                     total_costs=float(period_totals[idx]) if idx < len(period_totals) else 0.0,
                     lots_sold_by_product=lots_by_period.get(idx, {}),
                     cost_per_lot_by_product=cost_per_lot_by_division,
+                    acres_sold=acres_all[idx],
+                    sale_proceeds=proceeds_all[idx],
                 )
             )
 
         return period_data
+
+    @staticmethod
+    def _sales_by_period(absorption_schedule: Dict, period_count: int, weight):
+        """Acres sold and net sale proceeds per period, for releases priced
+        per acre and for a cash sweep. ``weight(parcel)`` is the loan's share
+        of that parcel's collateral: 0 leaves it out; proceeds are taken at the
+        share, acres whole (a per-acre price is already the loan's share)."""
+        acres = [0.0] * period_count
+        proceeds = [0.0] * period_count
+        for period_sale in absorption_schedule.get('periodSales', []):
+            idx = period_sale.get('periodIndex')
+            if idx is None or not (0 <= idx < period_count):
+                continue
+            for parcel in period_sale.get('parcels', []):
+                w = float(weight(parcel) or 0.0)
+                if w <= 0:
+                    continue
+                acres[idx] += float(parcel.get('acres') or 0.0)
+                proceeds[idx] += float(parcel.get('netRevenue') or 0.0) * w
+        return acres, proceeds
+
+    # -- Loan dates ---------------------------------------------------------
+
+    def acquisition_date(self) -> Optional[date]:
+        """When the land was bought: the first CLOSING in the acquisition
+        ledger, else the first dated event applied to the purchase."""
+        if not hasattr(self, '_acquisition_date_cache'):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COALESCE(
+                      (SELECT MIN(event_date) FROM landscape.tbl_acquisition
+                        WHERE project_id = %s AND event_type = 'CLOSING' AND event_date IS NOT NULL),
+                      (SELECT MIN(event_date) FROM landscape.tbl_acquisition
+                        WHERE project_id = %s AND COALESCE(is_applied_to_purchase, true)
+                          AND event_date IS NOT NULL)
+                    )
+                    """,
+                    [self.project_id, self.project_id],
+                )
+                row = cursor.fetchone()
+                self._acquisition_date_cache = row[0] if row else None
+        return self._acquisition_date_cache
+
+    def loan_start_date_for(self, loan: Loan) -> Optional[date]:
+        """The loan's own start date when typed; otherwise the acquisition date."""
+        return getattr(loan, 'loan_start_date', None) or self.acquisition_date()
+
+    @staticmethod
+    def _fixed_commitment(loan: Loan) -> Optional[float]:
+        """The commitment when something other than loan-to-cost fixed it
+        (loan-to-value governs, or an amount was entered by hand); the
+        calculator will not size above it. None when LTC governs."""
+        governing = (getattr(loan, 'governing_constraint', '') or '').upper()
+        amount = float(getattr(loan, 'commitment_amount', None) or 0)
+        if governing in ('LTV', 'MANUAL') and amount > 0:
+            return amount
+        return None
+
+    @staticmethod
+    def _last_collateral_sale(
+        period_data: Optional[List[PeriodCosts]],
+        loan_start_period: int,
+    ) -> Optional[int]:
+        """The period the loan's last collateral sells, or None when nothing
+        it holds sells (or the data was not supplied)."""
+        if not period_data:
+            return None
+        sales = [p.period_index for p in period_data if p.lots_sold_by_product]
+        if not sales:
+            return None
+        last = max(sales)
+        return last if last >= loan_start_period else None
+
+    @staticmethod
+    def _term_payoff_period(
+        period_data: Optional[List[PeriodCosts]],
+        loan_start_period: int,
+        loan_amount: float,
+    ) -> Optional[int]:
+        """When a term loan with no release price is retired: the first period
+        the sale proceeds of its collateral, counted from the loan's start,
+        cover the loan; the last collateral sale at the latest.
+
+        Retiring it only at the last collateral sale (as first built) held the
+        debt while earlier sales were paid out, then called the balloon from a
+        later, smaller year — Peoria loan 63 at $52M: $335M of 2029 proceeds
+        distributed, a $47M balloon in 2033, and a levered flow with two IRRs
+        (-51% and +81%). A loan cannot be outstanding while the collateral
+        securing it has already been sold for more than it owes (HQ129).
+        """
+        last = LandDevCashFlowService._last_collateral_sale(period_data, loan_start_period)
+        if last is None or loan_amount <= 0:
+            return last
+        covered = 0.0
+        for p in period_data or []:
+            if p.period_index < loan_start_period:
+                continue
+            covered += p.sale_proceeds or 0.0
+            if covered >= loan_amount:
+                return min(p.period_index, last)
+        return last
+
+    # -- Loans tied to containers ------------------------------------------
+
+    # A container row with one of these collateral types says the loan also
+    # funds the land purchase, which is carried on no container.
+    ACQUISITION_COLLATERAL_TYPES = ('ACQUISITION', 'LAND')
+
+    def build_loan_period_data(
+        self,
+        loan: Loan,
+        cost_schedule: Dict,
+        absorption_schedule: Dict,
+        periods: List[Dict],
+    ) -> List[PeriodCosts]:
+        """The costs this loan draws on and the sales that release it.
+
+        One function for every caller — the cash-flow financing section, the
+        construction-loan run that stores the draw schedule, and the reserve
+        recommendation — so the three cannot disagree about the same loan.
+        """
+        return self._build_period_costs_for_financing(
+            cost_schedule,
+            absorption_schedule,
+            periods,
+            loan_scope=self._loan_scope(loan),
+        )
+
+    def _loan_scope(self, loan: Loan) -> Optional[Dict[str, Any]]:
+        """Which containers a loan funds and its share of each.
+
+        None means project-wide: the loan has no container rows. A row with no
+        ``allocation_pct`` is a 100% share.
+        """
+        loan_id = getattr(loan, 'loan_id', None)
+        if loan_id is None:
+            return None
+        rows = list(
+            LoanContainer.objects.filter(loan_id=loan_id)
+            .values_list('division_id', 'allocation_pct', 'collateral_type')
+        )
+        shares: Dict[int, float] = {}
+        unassigned_share = 0.0
+        for division_id, pct, collateral_type in rows:
+            if division_id is None:
+                continue
+            share = float(pct) / 100.0 if pct is not None else 1.0
+            shares[int(division_id)] = shares.get(int(division_id), 0.0) + share
+            if (collateral_type or '').upper() in self.ACQUISITION_COLLATERAL_TYPES:
+                unassigned_share = max(unassigned_share, share)
+        if not shares:
+            return None
+        return {
+            'shares': shares,
+            'ancestry': self._get_division_ancestry(),
+            'unassigned_share': unassigned_share,
+        }
+
+    def _get_division_ancestry(self) -> Dict[int, Tuple[Optional[int], Optional[int]]]:
+        """division_id -> (village id, phase id) above it, for this project."""
+        if self._division_ancestry is None:
+            from apps.containers.ancestry import DIVISION_ANCESTRY_CTE
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    WITH {DIVISION_ANCESTRY_CTE}
+                    SELECT division_id, tier1_id, tier2_id
+                    FROM division_ancestry
+                    WHERE project_id = %s
+                    """,
+                    [self.project_id],
+                )
+                self._division_ancestry = {
+                    row[0]: (row[1], row[2]) for row in cursor.fetchall()
+                }
+        return self._division_ancestry
+
+    @staticmethod
+    def _share_for_division(
+        division_id: Optional[int],
+        shares: Dict[int, float],
+        ancestry: Dict[int, Tuple[Optional[int], Optional[int]]],
+    ) -> float:
+        """The loan's share of a division: its own row, else its phase's, else
+        its village's. The most specific assignment wins."""
+        if division_id is None:
+            return 0.0
+        if division_id in shares:
+            return shares[division_id]
+        tier1_id, tier2_id = ancestry.get(division_id, (None, None))
+        if tier2_id is not None and tier2_id in shares:
+            return shares[tier2_id]
+        if tier1_id is not None and tier1_id in shares:
+            return shares[tier1_id]
+        return 0.0
+
+    @classmethod
+    def _scoped_financing_inputs(
+        cls,
+        cost_schedule: Dict,
+        absorption_schedule: Dict,
+        period_count: int,
+        phase_to_division: Dict[int, int],
+        loan_scope: Dict[str, Any],
+    ) -> Tuple[List[float], Dict[int, Dict[int, int]], Dict[int, float]]:
+        """Per-period costs, lots sold and cost per lot for ONE loan.
+
+        Pure — no database — so the scoping rule is testable on its own.
+        Costs: each budget line whose container is funded (directly, or through
+        the phase or village above it) contributes its per-period amounts times
+        the loan's share. Lines on no container (the land purchase) count only
+        when the loan is marked as funding the acquisition. Sales: only parcels
+        whose phase is funded release the loan.
+        """
+        shares = loan_scope.get('shares') or {}
+        ancestry = loan_scope.get('ancestry') or {}
+        unassigned_share = float(loan_scope.get('unassigned_share') or 0.0)
+
+        def share_of(division_id: Optional[int]) -> float:
+            return cls._share_for_division(division_id, shares, ancestry)
+
+        period_totals = [0.0] * period_count
+        cost_by_phase: Dict[int, float] = {}
+        total_cost = 0.0
+        for category in cost_schedule.get('categorySummary', {}).values():
+            for item in category.get('items', []):
+                container_id = item.get('containerId')
+                share = unassigned_share if container_id is None else share_of(container_id)
+                if share <= 0:
+                    continue
+                for pv in item.get('periods', []):
+                    idx = pv.get('periodIndex')
+                    if idx is not None and 0 <= idx < period_count:
+                        period_totals[idx] += float(pv.get('amount') or 0) * share
+                amount = float(item.get('totalAmount') or 0) * share
+                total_cost += amount
+                if container_id is not None:
+                    phase_id = ancestry.get(container_id, (None, None))[1]
+                    if phase_id is not None:
+                        cost_by_phase[phase_id] = cost_by_phase.get(phase_id, 0.0) + amount
+
+        lots_by_period: Dict[int, Dict[int, int]] = {}
+        lots_by_division: Dict[int, int] = {}
+        for period_sale in absorption_schedule.get('periodSales', []):
+            idx = period_sale.get('periodIndex')
+            if idx is None:
+                continue
+            for parcel in period_sale.get('parcels', []):
+                division_id = phase_to_division.get(parcel.get('containerId'))
+                if division_id is None or share_of(division_id) <= 0:
+                    continue
+                units = int(parcel.get('units') or 0)
+                if units <= 0:
+                    continue
+                lots_by_period.setdefault(idx, {})
+                lots_by_period[idx][division_id] = lots_by_period[idx].get(division_id, 0) + units
+                lots_by_division[division_id] = lots_by_division.get(division_id, 0) + units
+
+        total_lots = sum(lots_by_division.values())
+        default_cost_per_lot = total_cost / total_lots if total_lots else 0.0
+        cost_per_lot: Dict[int, float] = {}
+        for division_id, lot_count in lots_by_division.items():
+            phase_cost = cost_by_phase.get(division_id)
+            cost_per_lot[division_id] = (
+                phase_cost / lot_count if phase_cost else default_cost_per_lot
+            )
+
+        return period_totals, lots_by_period, cost_per_lot
 
     def _fetch_phase_division_mapping(self, phase_ids: List[int]) -> Dict[int, int]:
         """Map phase_id to division_id (tier 2) for product grouping."""
@@ -1714,7 +2105,7 @@ class LandDevCashFlowService:
 
         for loan in all_loans:
             term_months = self._normalize_term_months(loan.loan_term_months, loan.loan_term_years) or 0
-            loan_start = self._get_period_index_for_date(temp_periods, loan.loan_start_date)
+            loan_start = self._get_period_index_for_date(temp_periods, self.loan_start_date_for(loan))
             min_periods = loan_start + term_months + 1
             if min_periods > required_periods:
                 required_periods = min_periods
@@ -1723,12 +2114,131 @@ class LandDevCashFlowService:
 
         return required_periods
 
-    def _fetch_loans(self, structure_type: str, container_ids: Optional[List[int]]) -> List[Loan]:
-        """Fetch loans for project, optionally filtered by container assignments."""
-        loans = Loan.objects.filter(project_id=self.project_id, structure_type=structure_type)
+    CALCULATOR_STRUCTURES = ('REVOLVER', 'A_AND_D')
+
+    # What the release-and-reserve calculator needs to size a reserve.
+    RELEASE_BASIS_CHOICES = (
+        ('LOT', 'Per lot'),
+        ('ACRE', 'Per acre'),
+        ('CASH_SWEEP', 'Cash sweep (100% of net sale proceeds)'),
+    )
+    RESERVE_INPUTS = (
+        ('loan_to_cost_pct', 'Loan to cost (%)'),
+        ('interest_rate_pct', 'Interest rate (%)'),
+        ('origination_fee_pct', 'Origination fee (%)'),
+        ('loan_term_months', 'Term (months)'),
+        ('interest_reserve_inflator', 'Reserve contingency (%)'),
+        ('release_basis', 'Release basis'),
+        ('release_price_pct', 'Release price (% of the loan per lot or acre)'),
+        ('repayment_acceleration', 'Release acceleration'),
+        ('minimum_release_amount', 'Minimum release (per lot or acre)'),
+    )
+    # A cash sweep takes the whole of each sale's net proceeds, so it needs no price.
+    PRICE_INPUTS = ('release_price_pct', 'repayment_acceleration', 'minimum_release_amount')
+
+    def interest_coverage(self, loan: Loan) -> Dict[str, Any]:
+        """Months where this loan charges interest but the project has no
+        cash that month to pay it, before any financing (Gregg, 2026-09-29:
+        on save, offer an interest reserve when there are any)."""
+        loan = self._effective(loan)
+        project_config = self._get_project_config()
+        dcf = self._get_dcf_assumptions()
+        n = self._determine_required_periods(None)
+        n = max(self._extend_periods_for_loans(n, project_config['start_date'], None), n, 1)
+        periods = self._generate_periods(project_config['start_date'], n)
+        cost = self._generate_cost_schedule(n, None, dcf.get('cost_inflation_rate'))
+        absorption = self._generate_absorption_schedule(
+            project_config['start_date'], None,
+            dcf.get('price_growth_rate'), dcf.get('cost_inflation_rate'),
+        )
+        sections = self._build_sections(cost, absorption, n)
+        net_before = self._build_net_cash_flow_array(sections, n)
+        period_data = self.build_loan_period_data(loan, cost, absorption, periods)
+        engine = DebtServiceEngine()
+        interest = [0.0] * n
+        if self.uses_release_calculator(loan):
+            result = engine.calculate_revolver(
+                self._build_revolver_params(loan, periods, period_data), period_data,
+            )
+            for p in result.periods:
+                if 0 <= p.period_index < n:
+                    # Interest the reserve pays needs no project cash.
+                    interest[p.period_index] = max(p.accrued_interest - p.interest_reserve_draw, 0.0)
+        else:
+            result = engine.calculate_term(self._build_term_params(loan, periods, period_data), n)
+            for p in result.periods:
+                if 0 <= p.period_index < n:
+                    # Interest the reserve pays needs no project cash.
+                    interest[p.period_index] = max(p.interest_component - p.interest_reserve_draw, 0.0)
+        uncovered = []
+        for i in range(n):
+            due = interest[i]
+            if due > 0.5:
+                short = due - max(net_before[i], 0.0)
+                if short > 0.5:
+                    uncovered.append((i, short))
+        sweep = (getattr(loan, 'release_basis', None) or '').upper() == 'CASH_SWEEP'
+        wanted = [
+            (key, label) for key, label in self.RESERVE_INPUTS
+            if not (sweep and key in self.PRICE_INPUTS)
+        ]
+        # Only what the loan does not already carry is asked for.
+        missing = [
+            {
+                'key': key, 'label': label,
+                'kind': 'choice' if key == 'release_basis' else 'number',
+                'choices': (
+                    [{'value': v, 'label': l} for v, l in self.RELEASE_BASIS_CHOICES]
+                    if key == 'release_basis' else None
+                ),
+            }
+            for key, label in wanted
+            if getattr(loan, key, None) in (None, '')
+        ]
+        return {
+            'loan_id': loan.loan_id,
+            'uncovered_months': len(uncovered),
+            'uncovered_interest': round(sum(s for _, s in uncovered), 2),
+            'first_uncovered_month': (uncovered[0][0] + 1) if uncovered else None,
+            'has_reserve': float(getattr(loan, 'interest_reserve_amount', None) or 0) > 0,
+            'uses_calculator': self.uses_release_calculator(loan),
+            'missing_inputs': missing,
+            'price_inputs': list(self.PRICE_INPUTS),
+        }
+
+    @classmethod
+    def uses_release_calculator(cls, loan: Loan) -> bool:
+        """Revolver and A&D always; a term loan only when it has a release price."""
+        structure = (getattr(loan, 'structure_type', '') or '').upper()
+        if structure in cls.CALCULATOR_STRUCTURES:
+            return True
+        if structure != 'TERM':
+            return False
+        if (getattr(loan, 'release_basis', None) or '').upper() == 'CASH_SWEEP':
+            return True
+        return float(getattr(loan, 'release_price_pct', None) or 0) > 0
+
+    def _fetch_loans(self, structure_type: Optional[str], container_ids: Optional[List[int]]) -> List[Loan]:
+        """Fetch loans for project (one structure, or all when None), optionally
+        filtered by container assignments."""
+        loans = Loan.objects.filter(project_id=self.project_id)
+        if structure_type:
+            loans = loans.filter(structure_type=structure_type)
+        loans = loans.order_by('seniority', 'loan_id')
         if container_ids:
             loans = loans.filter(loan_containers__division_id__in=container_ids).distinct()
-        return list(loans)
+        # Each loan as it IS: its amount and start date from the sizing rule
+        # when nothing was saved (HQ137) — in-memory copies, never saved.
+        return [self._effective(loan) for loan in loans]
+
+    def _effective(self, loan: Loan) -> Loan:
+        if getattr(loan, '_effective_terms_copy', False):
+            return loan
+        from apps.calculations.loan_sizing_service import with_effective_terms
+        if not hasattr(self, '_project_cache'):
+            from apps.projects.models import Project
+            self._project_cache = Project.objects.get(project_id=self.project_id)
+        return with_effective_terms(loan, self._project_cache)
 
     @staticmethod
     def _get_period_index_for_date(periods: List[Dict], target_date: Optional[date]) -> int:

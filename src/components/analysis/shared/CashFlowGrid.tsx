@@ -16,6 +16,7 @@
 
 import React from 'react';
 import { CTable, CButtonGroup, CButton } from '@coreui/react';
+import { nonEmptyKeyedPeriods } from '@/lib/cashflow/emptyPeriods';
 
 // ============================================================================
 // TYPES
@@ -155,7 +156,7 @@ function TimeScaleSelector({ value, onChange, disabled = false }: TimeScaleSelec
 
 export function CashFlowGrid({
   sections,
-  periods,
+  periods: allPeriods,
   timeScale = 'annual',
   onTimeScaleChange,
   showTimeScaleToggle = true,
@@ -166,6 +167,16 @@ export function CashFlowGrid({
   headerActions,
   labelColumnHeader = 'Category',
 }: CashFlowGridProps) {
+  // Empty periods do not render (Gregg, 2026-10-02). Header rows carry no
+  // figures; informational rows are context, not flows.
+  const periods = React.useMemo(
+    () =>
+      nonEmptyKeyedPeriods(
+        allPeriods,
+        (sections ?? []).flatMap((s) => s.rows.filter((r) => !r.isHeader && !r.isInformational)),
+      ),
+    [allPeriods, sections],
+  );
   // Determine if we should hide total column (e.g., in 'overall' mode where there's only one period)
   const hideTotalColumn = !showTotalColumn || (periods.length === 1 && periods[0].label === 'Total');
 
