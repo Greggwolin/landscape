@@ -7149,8 +7149,71 @@ LAND_USE_PRICING_COLUMNS = [
 ]
 
 
+class _PricingRecalcFailed(Exception):
+    """Raised inside the pricing write's transaction to roll the write back."""
+
+
 @register_tool('update_land_use_pricing', is_mutation=True)
 def handle_update_land_use_pricing(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    All-or-nothing wrapper around the pricing write (QV, 2026-10-13).
+
+    Any INSERT or price UPDATE on land_use_pricing fires the database trigger
+    trg_recalc_on_pricing_change, which DELETES tbl_parcel_sale_assumptions for
+    every parcel of that type. Only a successful recalculate-sfd rebuilds it. The
+    old handler committed the write first and treated a failed (or skipped)
+    recalc as a footnote — leaving the project with its sale figures wiped and
+    the engine reporting far lower revenue. So: the write and the rebuild now
+    happen in ONE transaction, the rebuild is never optional, and if it fails
+    the pricing write and the trigger's deletion are both rolled back.
+    """
+    if propose_only:
+        return _update_land_use_pricing_impl(
+            tool_input, project_id, propose_only=True,
+            source_message_id=source_message_id, **kwargs)
+    forced_input = dict(tool_input or {})
+    forced_input['trigger_recalc'] = True  # skipping it leaves the cache wiped
+    try:
+        with transaction.atomic():
+            result = _update_land_use_pricing_impl(
+                forced_input, project_id, propose_only=False,
+                source_message_id=source_message_id, **kwargs)
+            if not isinstance(result, dict) or not result.get('success'):
+                raise _PricingRecalcFailed(
+                    (result or {}).get('error') if isinstance(result, dict)
+                    else 'pricing update failed')
+            if result.get('failed'):
+                raise _PricingRecalcFailed(
+                    f"{len(result['failed'])} of {result.get('total')} pricing rows "
+                    f"could not be written: {result['failed'][:3]}")
+            if result.get('succeeded'):
+                recalc = result.get('recalculation') or {}
+                if not recalc.get('triggered') or recalc.get('error') or recalc.get('warning'):
+                    raise _PricingRecalcFailed(
+                        'parcel sale figures could not be rebuilt after the pricing '
+                        f"change ({recalc.get('error') or recalc.get('warning') or 'recalculation did not run'})")
+            return result
+    except _PricingRecalcFailed as failure:
+        logger.error(
+            "update_land_use_pricing rolled back for project %s: %s", project_id, failure)
+        return {
+            'success': False,
+            'error': 'pricing_update_rolled_back',
+            'message': (
+                f"Nothing was changed. The pricing update was rolled back because {failure}. "
+                "Tell the user plainly that the change was NOT made and why; do not retry "
+                "with the same input."
+            ),
+        }
+
+
+def _update_land_use_pricing_impl(
     tool_input: Dict[str, Any],
     project_id: int,
     propose_only: bool = True,
@@ -16356,6 +16419,65 @@ _PLANNING_WRITE_TOOLS = frozenset({
 })
 
 
+# ── What-if turns never write real data (QV, 2026-10-13) ─────────────────────
+# Battery run 2026-10-13, "What if lot prices come in 10% below plan?": the model
+# ran whatif_compute, then ALSO called update_land_use_pricing with the lowered
+# prices, meaning to "reset" afterwards. The write was real (BM8 direct write),
+# a database trigger wiped the project's parcel sale cache, the reset's recalc
+# failed, and project 9 read IRR 26.5% instead of 39.1% until repaired by hand.
+# The prompt already said "use whatif_compute instead of update tools"; one run
+# in three ignored it, so the rule is enforced here. BM8 is untouched: when the
+# user DIRECTS a change, there is no what-if tool in the turn and it still writes.
+_WHATIF_COMPUTE_TOOLS = frozenset({'whatif_compute', 'whatif_compound', 'sensitivity_grid'})
+# ai_handler appends this pseudo-name to the turn's tool-name list when the user's
+# message is itself a hypothetical (see ai_handler._is_hypothetical_request). It
+# rides the existing prior_tool_calls plumbing so no executor closure changes.
+HYPOTHETICAL_TURN_MARKER = '__hypothetical_turn__'
+# Mutation-flagged tools that do not touch the user's project inputs.
+_WHATIF_TURN_WRITE_EXEMPT_PREFIXES = (
+    'whatif_', 'scenario_', 'ic_', 'create_artifact', 'update_artifact',
+    'restore_artifact_state', 'open_', 'navigate_', 'save_user_vocab', 'log_',
+)
+
+
+def _whatif_turn_write_refusal(tool_name: str, is_mutation: bool,
+                               prior_tool_calls: Optional[list]) -> Optional[Dict[str, Any]]:
+    """Refusal envelope when `tool_name` would write real project data in a turn
+    that already ran a what-if computation; None when the call may proceed.
+
+    `prior_tool_calls` is the list of tool NAMES run so far this turn (it includes
+    the current call, appended before execute). A caller that passes None gets no
+    protection — every chat entry point in views.py passes it."""
+    if not prior_tool_calls:
+        return None
+    if not (is_mutation or tool_name in AUTO_EXECUTE_TOOLS):
+        return None
+    if tool_name.startswith(_WHATIF_TURN_WRITE_EXEMPT_PREFIXES):
+        return None
+    prior = set(prior_tool_calls)
+    ran = sorted(prior & _WHATIF_COMPUTE_TOOLS)
+    if HYPOTHETICAL_TURN_MARKER in prior:
+        # The user's own message was a hypothetical. Catches the write that comes
+        # BEFORE the what-if tool (seen in verification: update, then whatif_compute).
+        ran = ran or ['the user asked a what-if question']
+    if not ran:
+        return None
+    return {
+        'success': False,
+        'error': 'whatif_turn_no_real_writes',
+        'tool': tool_name,
+        'whatif_tools_run': ran,
+        'message': (
+            f"Refused: '{tool_name}' would change the user's real project data, and "
+            f"this turn is answering a hypothetical ({', '.join(ran)}). "
+            "Nothing was written. Model the change with whatif_compute and "
+            "report only its returned figures. Do NOT retry this tool, and do NOT "
+            "write-then-reset. If the user wants the change made for real, tell them "
+            "to say so (e.g. \"apply it\"); it is then written in the next turn."
+        ),
+    }
+
+
 def _is_delete_call(tool_name: str, tool_input: Any) -> bool:
     """True when a mutation removes data — those still need the user's confirm."""
     if tool_name.startswith(('delete_', 'remove_')):
@@ -16484,6 +16606,15 @@ def execute_tool(
                 'tool': tool_name,
                 'suggested_tools': ['create_project', 'convert_draft_to_project'],
             }
+
+    # QV (2026-10-13): a turn that ran a what-if may not also write real data.
+    refusal = _whatif_turn_write_refusal(
+        tool_name, getattr(handler, '_is_mutation', False), prior_tool_calls)
+    if refusal is not None:
+        logger.warning(
+            "Refused %s: real write attempted in a what-if turn (prior tools: %s)",
+            tool_name, prior_tool_calls)
+        return refusal
 
     # Auto-execute rent roll batch tools without requiring confirmation
     # User explicitly asked for this action (e.g., "read document and populate rent roll")

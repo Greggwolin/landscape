@@ -1641,6 +1641,24 @@ of three:
 3. ANSWER — a quick figure or question ("what's the cap rate", "how many units"). Read the relevant
    tool and report only what it returns. Never fabricate.
 
+   CALCULATED FIGURES (the one exception to "report only what the tool returns"):
+   you MAY state a figure you work out yourself from numbers a tool returned THIS
+   turn — a per-lot or per-acre cost, a share of a total, a subtotal, a difference —
+   but ONLY by writing the arithmetic out on ONE line with the inputs exactly as the
+   tool returned them, then "=" and the result:
+       Cost per lot: $39,709,125 ÷ 3,403 lots = $11,669
+       Soft-cost share: $6,912,750 ÷ $39,709,125 = 17.4%
+       Soft costs: $4,100,000 + $2,812,750 = $6,912,750
+   Use one kind of operation per line (all + / −, or all × / ÷); chain a second line
+   off the first result if you need both. The server re-does the sum and marks the
+   result "(calculated)". A derived figure whose arithmetic is not shown, that uses
+   an input no tool returned this turn, or that does not compute is WITHHELD from
+   the user — so never state a derived figure bare, and never round the inputs.
+   In a table or list the layout can stand in for the "=": a subtotal placed directly
+   above or below the rows it adds up (no blank line between), or a deduction placed
+   between the gross line and the net line, is checked against those neighbouring
+   rows the same way. A subtotal that is not next to its parts is withheld.
+
 INLINE vs CARD -- how to present the answer (size-gated; NEVER both a card AND a chat answer
 for the same content):
 - SIZE decides the surface. If the answer fits in 5 LINES OR FEWER, answer INLINE in chat. If it
@@ -1721,8 +1739,9 @@ factual question:
      'open the rent roll' — call get_rent_roll_schedule: it builds the rent-roll artifact (KPI header +
      unit-level grid) server-side and returns it ALREADY created. When it returns artifact_created:true you
      MUST NOT call create_artifact and MUST NOT compose the table yourself — reply with one short sentence
-     using its unit_count and occupancy fields. For the P&L/NOI use get_operating_statement instead. Only state percentage shares when the budget tool returned that exact
-     percentage field; do not compute or round your own budget percentages. After
+     using its unit_count and occupancy fields. For the P&L/NOI use get_operating_statement instead. State a percentage share bare only when the budget tool returned that exact
+     percentage field; a share you compute yourself must be written as explicit arithmetic
+     (amount ÷ total = share%) per the CALCULATED FIGURES rule, never stated bare. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.
   2. THEN: Search the knowledge base using query_platform_knowledge. This searches BOTH
@@ -2656,6 +2675,10 @@ This runs calculations without changing the database.
 
 Key behaviors:
 - Default to what-if mode when user intent is ambiguous (safer than writing to DB)
+- NEVER answer a hypothetical by writing the change with an update_/bulk_/delete_
+  tool and then "resetting" it afterwards. That alters the user's real project (on
+  2026-10-13 it wiped a project's parcel sale figures). The server now REFUSES any
+  real write in a turn where whatif_compute, whatif_compound or sensitivity_grid ran.
 - What-if changes compound by default across messages in the same session
 - Always restate the active assumptions at the start of what-if responses:
   "Assuming vacancy at 8% and rent growth at 4%: IRR is 7.2%, NPV is $1.2M."
@@ -3832,6 +3855,18 @@ _NUMBERS_PRODUCING_PREFIXES = (
     'get_renovation_breakdown',
     'get_absorption_benchmarks', 'search_irem_benchmarks', 'store_appraisal_valuation',
     'store_construction_benchmarks', 'scenario_', 'whatif_',
+    # QV (2026-10-13 battery): these read tools return real prices, rates and
+    # proceeds, but were missing here — so "What's the absorption schedule?"
+    # answered entirely from get_absorption_schedule was treated as "no numbers
+    # tool ran" and got the "I don't have those figures" tail on a fully sourced
+    # reply (8 of 43 guard fires had nothing unsourced in them). Widening the
+    # list (the calibration rule above) moves those turns onto figure-level
+    # provenance in strict mode; it does not exempt them.
+    'get_absorption_schedule', 'get_sales_schedule', 'get_parcel_sale',
+    'get_pricing_register', 'get_parcels', 'get_lots', 'get_loans',
+    'get_market_assumptions', 'get_competitive_projects', 'get_acquisition_events',
+    'get_location_analysis', 'generate_location_brief', 'get_portfolio_summary',
+    'sensitivity_grid',
 )
 # STRUCTURE-only tools return shape (tiers, splits, schema, completeness, attribute
 # counts, RAG text) but NOT computed money — reading them must NOT license invented
@@ -3848,8 +3883,14 @@ _FINANCIAL_SOURCE_PREFIXES = _NUMBERS_PRODUCING_PREFIXES + _STRUCTURE_ONLY_PREFI
 # Tools whose INPUT body is a rendered card we must inspect for baked-in figures.
 _ARTIFACT_BODY_TOOLS = ('create_artifact', 'update_artifact')
 
+# QV (2026-10-13): the scale suffix must END at a word boundary and may be
+# separated from the digits only by a space/tab. The old pattern (`\s?` then a
+# bare [MmBbKk]) read "$161,385\nMedian Home Value" as $161,385 MILLION — the
+# newline was swallowed and the "M" of "Median" taken as the suffix — so a median
+# income that the demographics tool really returned was withheld as unsourced
+# (battery I3, three runs of three). Same fix in _NUM_TOKEN_RE below.
 _MONEY_OR_PCT_RE = re.compile(
-    r'\$\s?\d[\d,]*(?:\.\d+)?\s?(?:[MmBbKk]|million|billion|thousand)?'
+    r'\$\s?\d[\d,]*(?:\.\d+)?(?:[ \t]?(?:[MmBbKk]|million|billion|thousand)\b)?'
     r'|\b\d+(?:\.\d+)?\s?%'
     r'|\b\d+(?:\.\d+)?x\b',
     re.I,
@@ -3927,7 +3968,7 @@ _SUFFIX_SCALE = {
     'thousand': 1e3, 'million': 1e6, 'billion': 1e9,
 }
 _NUM_TOKEN_RE = re.compile(
-    r'(\d[\d,]*(?:\.\d+)?)\s*(k|m|b|thousand|million|billion|%)?', re.I)
+    r'(\d[\d,]*(?:\.\d+)?)(?:[ \t]*((?:k|m|b|thousand|million|billion)\b|%))?', re.I)
 
 
 def _num_magnitudes(text: str) -> set:
@@ -4005,6 +4046,290 @@ def _figure_is_sourced(mag: float, is_pct: bool, sourced: set) -> bool:
     return False
 
 
+# ── Hypothetical requests (QV, 2026-10-13) ────────────────────────────────────
+# Must equal tool_executor.HYPOTHETICAL_TURN_MARKER (asserted in the tests; not
+# imported here to keep this module free of an import cycle).
+_HYPOTHETICAL_TURN_MARKER = '__hypothetical_turn__'
+_HYPOTHETICAL_RE = re.compile(
+    r'\bwhat[\s-]?if\b|\bwhat (?:happens|would)\b|\bsuppose\b|\bhypothetical'
+    r'|\bassum(?:e|ing)\b|\bshow me the impact\b|\btry changing\b'
+    r'|\brun the numbers with\b|\b(?:downside|upside|stress) (?:case|scenario|test)\b'
+    r'|\bat what\b.{0,80}\b(?:stop|stops|break|breaks|fail|fails)\b',
+    re.I | re.S)
+# An explicit instruction to make it real always wins over hypothetical wording.
+_DIRECTED_WRITE_RE = re.compile(
+    r'\b(?:apply|commit)\b|\bgo ahead\b|\bmake (?:that|the|this) change\b'
+    r'|\bsave (?:it|that|this|those)\b',
+    re.I)
+
+
+def _last_user_text(messages: Optional[list]) -> str:
+    """Text of the most recent user message in a [{'role','content'}] history."""
+    for msg in reversed(list(messages or [])):
+        role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
+        if role != 'user':
+            continue
+        content = (msg.get('content') if isinstance(msg, dict)
+                   else getattr(msg, 'content', '')) or ''
+        return content if isinstance(content, str) else str(content)
+    return ''
+
+
+def _is_hypothetical_request(text: str) -> bool:
+    """True when the user is asking what WOULD happen, not directing a change."""
+    if not text or _DIRECTED_WRITE_RE.search(text):
+        return False
+    return bool(_HYPOTHETICAL_RE.search(text))
+
+
+# ── Verified calculations (QV — Gregg's decision 3a, 2026-10-13) ──────────────
+# The 2026-10-13 battery showed the guard blanking honest arithmetic: "cost per
+# lot: $39,709,125 / 3,403 = [figure withheld]". Both inputs were real; only the
+# quotient was "unsourced" because no tool returned it. Gregg's call: show a
+# figure Landscaper works out from real numbers, marked as calculated, with the
+# inputs beside it.
+#
+# The rule that keeps this from reopening the fabrication hole: a derived figure
+# is legitimized ONLY when the reply shows the arithmetic explicitly on one line
+# (`A op B [op C ...] = R`), every input traces to a number a tool returned this
+# turn (or to an earlier verified calculation), and the server RE-DOES THE SUM
+# and gets R. Anything else — inputs not shown, an input nothing returned, sums
+# that don't compute — is still withheld. The guard never searches for "some
+# pair of returned numbers that happens to produce R": with hundreds of sourced
+# numbers that search would legitimize almost any figure.
+_CALC_NUM = (r'(?:\*\*)?\$?\s?\d[\d,]*(?:\.\d+)?'
+             r'(?:\s?(?:[kmb]\b|thousand\b|million\b|billion\b))?%?(?:\*\*)?')
+_CALC_UNITS = r'(?:\s+[A-Za-z][A-Za-z\-]*){0,3}?'
+_CALC_OP_CORE = r'(?:[÷/×+−–-]|(?<!\*)\*(?!\*)|\bx\b)'
+_CALC_EXPR_RE = re.compile(
+    r'(?P<lhs>' + _CALC_NUM + _CALC_UNITS
+    + r'(?:\s*' + _CALC_OP_CORE + r'\s*' + _CALC_NUM + _CALC_UNITS + r'){1,5})'
+    + r'\s*(?:=|≈)\s*(?P<res>' + _CALC_NUM + r')',
+    re.I)
+_CALC_LEX_RE = re.compile(
+    r'(?P<num>\$?\s?\d[\d,]*(?:\.\d+)?'
+    r'(?:\s?(?:[kmb]\b|thousand\b|million\b|billion\b))?%?)'
+    r'|(?P<op>' + _CALC_OP_CORE + r')',
+    re.I)
+_CALC_TOKEN_RE = re.compile(
+    r'(\d[\d,]*(?:\.\d+)?)\s?(k\b|m\b|b\b|thousand\b|million\b|billion\b)?\s?(%)?',
+    re.I)
+_CALC_OP_NORMAL = {'÷': '/', '×': '*', 'x': '*', 'X': '*', '−': '-', '–': '-'}
+_CALC_LABEL = ' (calculated)'
+
+
+def _calc_parse_number(tok: str):
+    """(value, is_pct, half_unit_of_last_displayed_digit) for one numeric token,
+    or None. '$39.7M' → (39700000.0, False, 50000.0); '17.4%' → (17.4, True, 0.05)."""
+    m = _CALC_TOKEN_RE.search(tok or '')
+    if not m:
+        return None
+    raw = m.group(1)
+    try:
+        v = float(raw.replace(',', ''))
+    except ValueError:
+        return None
+    scale = _SUFFIX_SCALE.get((m.group(2) or '').lower(), 1.0)
+    decimals = len(raw.split('.')[1]) if '.' in raw else 0
+    return v * scale, bool(m.group(3)), 0.5 * (10 ** -decimals) * scale
+
+
+def _calc_input_is_real(v: float, is_pct: bool, sourced: set, verified: set) -> bool:
+    """An arithmetic INPUT must be a returned number (tight tolerance — tighter
+    than `_figure_is_sourced`, whose 0.5 absolute slack would wave through any
+    small integer) or the result of an earlier verified calculation."""
+    candidates = [v, v / 100.0] if is_pct else [v]
+    for c in candidates:
+        for s in sourced:
+            if math.isclose(c, s, rel_tol=0.005, abs_tol=0.005):
+                return True
+    return any(math.isclose(v, x, rel_tol=1e-9, abs_tol=1e-6) for x in verified)
+
+
+def _calc_evaluate(vals: list, ops: list):
+    """Evaluate a homogeneous chain: all +/− or all ×/÷. Mixed chains → None
+    (precedence would be a guess). `vals` are (value, is_pct, half_unit)."""
+    norm = [_CALC_OP_NORMAL.get(o, o) for o in ops]
+    kinds = set(norm)
+    multiplicative = kinds <= {'*', '/'}
+    if not (multiplicative or kinds <= {'+', '-'}):
+        return None
+    nums = [(v / 100.0 if (is_pct and multiplicative) else v) for v, is_pct, _ in vals]
+    acc = nums[0]
+    for o, v in zip(norm, nums[1:]):
+        if o == '+':
+            acc += v
+        elif o == '-':
+            acc -= v
+        elif o == '*':
+            acc *= v
+        else:
+            if v == 0:
+                return None
+            acc /= v
+    return acc
+
+
+def _verified_calculations(text: str, sourced: set) -> Tuple[set, List[int]]:
+    """Find explicit `A op B = R` arithmetic in `text` whose inputs are real and
+    whose sum the server can reproduce.
+
+    Returns (verified result magnitudes, end offsets of each verified result
+    token in `text`). Empty when nothing was sourced this turn."""
+    verified: set = set()
+    ends: List[int] = []
+    if not text or not sourced:
+        return verified, ends
+    for m in _CALC_EXPR_RE.finditer(text):
+        vals, ops = [], []
+        expect_num, ok = True, True
+        for t in _CALC_LEX_RE.finditer(m.group('lhs')):
+            if t.group('num') is not None:
+                parsed = _calc_parse_number(t.group('num'))
+                if not expect_num or parsed is None:
+                    ok = False
+                    break
+                vals.append(parsed)
+                expect_num = False
+            else:
+                if expect_num:
+                    ok = False
+                    break
+                ops.append(t.group('op'))
+                expect_num = True
+        if not ok or expect_num or len(vals) < 2 or len(ops) != len(vals) - 1:
+            continue
+        if not all(_calc_input_is_real(v, is_pct, sourced, verified)
+                   for v, is_pct, _ in vals):
+            continue
+        res = _calc_parse_number(m.group('res'))
+        computed = _calc_evaluate(vals, ops)
+        if res is None or computed is None:
+            continue
+        r, r_is_pct, half_unit = res
+        tol = max(0.005 * abs(r), half_unit)
+        candidates = [computed, computed * 100.0] if r_is_pct else [computed]
+        if not any(abs(c - r) <= tol for c in candidates):
+            continue  # the arithmetic does not compute — stays withheld
+        verified.add(round(r, 4))
+        ends.append(m.end('res'))
+    _verify_neighbour_arithmetic(text, sourced, verified, ends)
+    return verified, ends
+
+
+def _line_figures(line: str, base: int) -> list:
+    """[(kind, value, half_unit, absolute_end_offset)] for each money / percent
+    token on one line. kind is 'money' or 'pct'; multiples ("2.95x") are skipped."""
+    out = []
+    for m in _MONEY_OR_PCT_RE.finditer(line):
+        tok = m.group(0).rstrip()
+        if '$' not in tok and '%' not in tok:
+            continue
+        parsed = _calc_parse_number(tok)
+        if parsed is None:
+            continue
+        v, is_pct, half = parsed
+        out.append(('pct' if is_pct else 'money', v, half, base + m.start() + len(tok)))
+    return out
+
+
+def _verify_neighbour_arithmetic(text: str, sourced: set, verified: set,
+                                 ends: List[int]) -> None:
+    """Tables and lists rarely spell arithmetic out, but they do lay it out: a
+    subtotal sits directly above or below the rows it adds up, and a deduction
+    sits between the gross and the net. Accept an otherwise-unsourced figure when
+    it is EXACTLY (to displayed precision)
+
+      • the sum of the first same-kind figure on each of the 2+ lines directly
+        below it, or directly above it (contiguous, no blank line between), or
+      • the difference of the first same-kind figures on the two lines around it
+        (above/below), the two lines above it, or the two lines below it,
+
+    and every one of those inputs is itself a returned number or an already
+    verified calculation. The inputs are, literally, beside it. This is NOT a
+    search across everything the tools returned — only across adjacent lines of
+    the reply — so a chance match needs an invented number to equal an exact sum
+    of its real neighbours. Mutates `verified` / `ends` in place."""
+    raw_lines = text.split('\n')
+    lines, starts, pos = [], [], 0
+    for ln in raw_lines:
+        # A rule drawn under the rows ("─────", "-----", "|---|---|") is layout,
+        # not a break: drop it so the total below still sits next to its rows.
+        # Truly blank lines are kept — they DO end a block.
+        if not ln.strip() or re.search(r'[A-Za-z0-9]', ln):
+            lines.append(ln)
+            starts.append(pos)
+        pos += len(ln) + 1
+    figs = [_line_figures(ln, st) for ln, st in zip(lines, starts)]
+
+    def first_real(i: int, kind: str):
+        if i < 0 or i >= len(lines):
+            return None
+        for k, v, _half, _end in figs[i]:
+            if k == kind:
+                return v if _calc_input_is_real(v, k == 'pct', sourced, verified) else None
+        return None
+
+    def run_sum_matches(i: int, step: int, kind: str, target: float, half: float) -> bool:
+        total, n, j = 0.0, 0, i + step
+        while 0 <= j < len(lines) and n < 12 and lines[j].strip():
+            x = first_real(j, kind)
+            if x is None:
+                break
+            total += x
+            n += 1
+            tol = max(half * (n if kind == 'pct' else 1), 0.0005 * abs(target))
+            if n >= 2 and abs(total - target) <= tol:
+                return True
+            j += step
+        return False
+
+    for _pass in range(2):  # second pass lets a subtotal feed a grand total
+        for i, row in enumerate(figs):
+            for kind, v, half, end in row:
+                if end in ends:
+                    continue
+                if _figure_is_sourced(v, kind == 'pct', sourced | verified):
+                    continue  # the guard would not have touched it anyway
+                ok = (run_sum_matches(i, 1, kind, v, half)
+                      or run_sum_matches(i, -1, kind, v, half))
+                if not ok:
+                    tol = max(half * (2 if kind == 'pct' else 1), 0.0005 * abs(v))
+                    for a_i, b_i in ((i - 1, i + 1), (i - 2, i - 1), (i + 1, i + 2)):
+                        a, b = first_real(a_i, kind), first_real(b_i, kind)
+                        if a is not None and b is not None and abs(abs(a - b) - v) <= tol:
+                            ok = True
+                            break
+                if ok:
+                    verified.add(round(v, 4))
+                    ends.append(end)
+
+
+def _sourced_with_calculations(content: str, sourced: set) -> set:
+    """`sourced` plus the results of any verified arithmetic shown in `content`.
+    Kill-switch: settings.LANDSCAPER_CALCULATED_FIGURES = False."""
+    if not sourced or not getattr(settings, 'LANDSCAPER_CALCULATED_FIGURES', True):
+        return sourced
+    verified, _ = _verified_calculations(content, sourced)
+    return (sourced | verified) if verified else sourced
+
+
+def _label_verified_calculations(text: str, sourced: set) -> Tuple[str, int]:
+    """Mark each verified calculated figure '(calculated)' so the reader can tell
+    it from a figure read straight off the project. Returns (text, count)."""
+    if not getattr(settings, 'LANDSCAPER_CALCULATED_FIGURES', True):
+        return text, 0
+    _, ends = _verified_calculations(text, sourced)
+    if not ends:
+        return text, 0
+    out = text
+    for end in sorted(set(ends), reverse=True):
+        if out[end:end + 16].lstrip(' *').lower().startswith('(calculated'):
+            continue  # already marked (by the model, or by an earlier pass)
+        out = out[:end] + _CALC_LABEL + out[end:]
+    return out, len(set(ends))
+
+
 # ── Guard post-processing: redact the figures, keep the reply (PD15 Fix 1) ────
 # Before PD15 a guard hit threw the model's ENTIRE reply away and substituted one
 # fixed sentence. PD14 turn 2 showed the harm: the model had produced the correct
@@ -4058,7 +4383,10 @@ def _redact_unsourced_figures(text: str, sourced: set) -> Tuple[str, int]:
             continue  # this figure DOES trace — never touch it
         parts.append(text[cursor:m.start()])
         parts.append(_REDACTION_PLACEHOLDER)
-        cursor = m.end()
+        # QV: the money pattern can swallow one trailing whitespace char — a
+        # newline when the figure ends a line — which glued the next list item
+        # onto the placeholder ("-[figure withheld …]- Net revenue"). Keep it.
+        cursor = m.start() + len(tok.rstrip())
         redacted += 1
     if not redacted:
         return text, 0
@@ -4112,6 +4440,7 @@ def _fabrication_guard_trace(content: str, tool_calls: list,
     """
     called = [_tool_name(tc) for tc in (tool_calls or [])]
     sourced = _collect_sourced_numbers(tool_outputs) if tool_outputs is not None else set()
+    sourced = _sourced_with_calculations(content, sourced)  # QV 3a
     occurrences = []
 
     if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
@@ -4183,7 +4512,10 @@ def reply_states_unsourced_financials(content: str, tool_calls: list,
         sourced = _collect_sourced_numbers(tool_outputs)
         if not sourced:
             return False  # tools returned no numbers (e.g. failure) → don't mass-block
-        return _has_unsourced_figure(content, tool_calls, sourced)
+        # QV 3a: arithmetic the reply shows on real inputs, and that the server
+        # can reproduce, counts as sourced (see _verified_calculations).
+        return _has_unsourced_figure(
+            content, tool_calls, _sourced_with_calculations(content, sourced))
     # No numbers tool this turn: flag a financial claim in the chat text...
     if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
         return True
@@ -4928,7 +5260,13 @@ def get_landscaper_response(
                         # fabrication guard can check whether a numbers tool sourced
                         # the card. Older tool_executor closures that don't accept this
                         # kwarg are all updated in views.py.
-                        prior_tool_calls=[tc['tool'] for tc in tool_calls_made],
+                        # QV: when the user's message is itself a hypothetical, a
+                        # marker rides along so execute_tool refuses real writes
+                        # even if the write comes BEFORE the what-if tool.
+                        prior_tool_calls=(
+                            [tc['tool'] for tc in tool_calls_made]
+                            + ([_HYPOTHETICAL_TURN_MARKER]
+                               if _is_hypothetical_request(_last_user_text(messages)) else [])),
                     )
                     tool_exec_time = time.time() - tool_exec_start
                     result_str = _truncate_tool_result(result, tool_name=tool_name)
@@ -5336,6 +5674,15 @@ def get_landscaper_response(
             # settings.LANDSCAPER_FABRICATION_GUARD_STRICT=False to fall back to the
             # JB13/JB50 blanket exemption (a numbers tool legitimizes the whole reply).
             _strict = getattr(settings, 'LANDSCAPER_FABRICATION_GUARD_STRICT', True)
+            # QV 3a (Gregg, 2026-10-13): a figure the reply works out from real
+            # numbers, with the arithmetic shown and reproducible, is kept and
+            # marked "(calculated)". Labelled before the guard runs so the mark
+            # is present whether or not anything else in the reply is withheld.
+            if _strict:
+                final_content, _calc_count = _label_verified_calculations(
+                    final_content, _collect_sourced_numbers(tool_executions))
+                if _calc_count:
+                    metadata['calculated_figures'] = _calc_count
             if getattr(settings, 'LANDSCAPER_FABRICATION_GUARD', True) and \
                     reply_states_unsourced_financials(
                         final_content, tool_calls_made,
@@ -5380,6 +5727,9 @@ def get_landscaper_response(
                 _escalate = _prior_reply_was_guard_blocked(messages)
                 _sourced = (_collect_sourced_numbers(tool_executions)
                             if _strict else set())
+                # QV 3a: never blank a verified calculation just because some
+                # OTHER figure in the same reply tripped the guard.
+                _sourced = _sourced_with_calculations(final_content, _sourced)
                 final_content, _redacted_count = _compose_guarded_reply(
                     final_content, _sourced, _escalate)
                 guard_envelope['redacted_figures'] = _redacted_count
