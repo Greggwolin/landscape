@@ -406,3 +406,38 @@ def test_a_blocked_prior_reply_lends_nothing():
 def test_without_prior_figures_the_no_tool_regime_still_blocks():
     assert reply_states_unsourced_financials(
         "Residential $357.0M of revenue.", [], tool_outputs=[], prior_sourced=set()) is True
+
+
+# ── the tail says what actually happened (Gregg, 2026-10-13 13:10) ──────────
+
+def test_misquote_tail_when_the_data_was_read():
+    from apps.landscaper.ai_handler import _GUARD_FALLBACK_QUESTION, _prior_reply_was_guard_blocked
+    reply = ("Residential $357.0M (55.9%) of revenue — primarily $175M in lot improvement "
+             "offsets plus $21.8M commissions.")
+    sourced = {357000000.0, 55.9, 166677072.1, 11082293.06}
+    out, n = _compose_guarded_reply(reply, sourced, escalate=False, data_was_read=True)
+    assert n == 2
+    assert "I withheld 2 figures above because they did not match the project data I read" in out
+    assert _GUARD_FALLBACK_QUESTION not in out and "$357.0M" in out
+    # a later turn still sees this reply as blocked, so escalation and lookback behave
+    assert _prior_reply_was_guard_blocked([{'role': 'assistant', 'content': out}]) is True
+
+
+def test_singular_wording_for_one_withheld_figure():
+    out, n = _compose_guarded_reply("Commissions were $21.8M of revenue.", {11082293.06},
+                                    escalate=False, data_was_read=True)
+    assert n == 1 and "I withheld one figure above because it did not match" in out
+
+
+def test_no_data_read_keeps_the_original_question():
+    from apps.landscaper.ai_handler import _GUARD_FALLBACK_QUESTION
+    out, n = _compose_guarded_reply("Commissions were $21.8M of revenue.", set(),
+                                    escalate=False, data_was_read=False)
+    assert n == 1 and _GUARD_FALLBACK_QUESTION in out
+
+
+def test_misquote_tail_does_not_feed_the_lookback():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    out, _ = _compose_guarded_reply("Commissions were $21.8M of revenue.", {1.0},
+                                    escalate=False, data_was_read=True)
+    assert figures_in_prior_clean_replies([{'role': 'assistant', 'content': out}]) == set()

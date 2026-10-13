@@ -4426,17 +4426,42 @@ def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
                    else getattr(msg, 'content', '')) or ''
         content = content if isinstance(content, str) else str(content)
         return (_REDACTION_PLACEHOLDER in content
-                or _GUARD_FALLBACK_QUESTION in content)
+                or _GUARD_FALLBACK_QUESTION in content
+                or any(m in content for m in _GUARD_MISQUOTE_MARK))
     return False
 
 
+def _misquote_note(n: int) -> str:
+    """Tail for the case where the data WAS read this turn but n stated figures
+    did not match it (QV, 2026-10-13). Gregg: the old tail — "I don't have those
+    figures from the project's data yet" — was false in this case, the figures
+    were in the data and the model misquoted them, and a reader cannot tell a
+    misquote from missing data."""
+    figs = 'one figure' if n == 1 else f'{n} figures'
+    were = 'it did' if n == 1 else 'they did'
+    return (f"I withheld {figs} above because {were} not match the project data I "
+            "read for this answer. Everything not marked withheld is confirmed. "
+            "Ask for the withheld item on its own and I'll quote it exactly as "
+            "the project holds it.")
+
+
+_GUARD_MISQUOTE_MARK = 'because it did not match the project data I read', \
+                       'because they did not match the project data I read'
+
+
 def _compose_guarded_reply(content: str, sourced: set,
-                           escalate: bool) -> Tuple[str, int]:
+                           escalate: bool, data_was_read: bool = False) -> Tuple[str, int]:
     """The reply the user sees after a guard hit: their answer with the unsourced
-    figures blanked, then the guard's question (or, on a repeat fire, the
-    plain-language explanation of what was withheld and why)."""
+    figures blanked, then a tail that says what actually happened — a figure the
+    model misquoted when the data was read this turn, no data read at all, or (on
+    a repeat fire) the plain-language explanation of what was withheld and why."""
     redacted_text, redacted_count = _redact_unsourced_figures(content, sourced)
-    tail = _GUARD_ESCALATION_NOTE if escalate else _GUARD_FALLBACK_QUESTION
+    if escalate:
+        tail = _GUARD_ESCALATION_NOTE
+    elif data_was_read and redacted_count:
+        tail = _misquote_note(redacted_count)
+    else:
+        tail = _GUARD_FALLBACK_QUESTION
     body = (redacted_text or '').rstrip()
     if not body:
         return tail, redacted_count
@@ -4534,7 +4559,8 @@ def figures_in_prior_clean_replies(messages: Optional[list]) -> set:
         if (isinstance(meta, dict) and meta.get('fabrication_guard_blocked')) \
                 or _REDACTION_PLACEHOLDER in content \
                 or _GUARD_FALLBACK_QUESTION in content \
-                or _GUARD_ESCALATION_NOTE in content:
+                or _GUARD_ESCALATION_NOTE in content \
+                or any(m in content for m in _GUARD_MISQUOTE_MARK):
             continue
         out |= {v for v, _ in _figure_magnitudes(content)}
     return out
@@ -5789,8 +5815,11 @@ def get_landscaper_response(
                 # OTHER figure in the same reply tripped the guard — nor a figure
                 # vetted in an earlier unblocked reply.
                 _sourced = _sourced_with_calculations(final_content, _sourced | _prior_figs)
+                _data_read = bool(_strict and _collect_sourced_numbers(tool_executions))
                 final_content, _redacted_count = _compose_guarded_reply(
-                    final_content, _sourced, _escalate)
+                    final_content, _sourced, _escalate, data_was_read=_data_read)
+                if _data_read and _redacted_count and not _escalate:
+                    guard_envelope['suggested_user_question'] = _misquote_note(_redacted_count)
                 guard_envelope['redacted_figures'] = _redacted_count
                 guard_envelope['escalated'] = _escalate
                 metadata['fabrication_guard_blocked'] = True
