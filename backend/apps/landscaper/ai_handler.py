@@ -1744,6 +1744,11 @@ factual question:
      (amount ÷ total = share%) per the CALCULATED FIGURES rule, never stated bare. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.
+     For REVENUE BY LAND USE — 'revenue split between residential and commercial', 'how much
+     revenue is commercial', 'revenue by product' — call get_cashflow_results and answer ONLY
+     from its revenue_by_family rows (one basis, named; percentages from the matching
+     SharePct fields). Never add parcels or sale assumptions up yourself: the parcel-level
+     figures are unescalated and the sum will not match the project's revenue.
   2. THEN: Search the knowledge base using query_platform_knowledge. This searches BOTH
      the platform reference library AND user-uploaded documents (CoStar reports, market studies, etc.).
      Do NOT ask the user for permission — just search.
@@ -2288,7 +2293,10 @@ tools to read the data first:
   • get_operating_statement — full structured P&L for operating statements
   • get_units / get_unit_types — rent roll detail
   • get_rental_comparables / get_expense_comparables — comp grids
-  • get_cashflow_results — cash flow / waterfall
+  • get_cashflow_results — cash flow / waterfall / revenue split by land-use
+    family (its revenue_by_family rows). A revenue split between residential
+    and commercial is ALWAYS answered from those rows — never by adding up
+    parcels or sale assumptions yourself.
 
 If the DB read returns empty for a category that should hold data (e.g.
 operating expenses are empty but the project is fully underwritten),

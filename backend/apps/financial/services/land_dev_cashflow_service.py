@@ -937,6 +937,7 @@ class LandDevCashFlowService:
                         p.sale_period,
                         p.custom_sale_date,
                         psa.gross_parcel_price,
+                        psa.gross_sale_proceeds,
                         psa.net_sale_proceeds,
                         psa.total_transaction_costs,
                         psa.improvement_offset_total,
@@ -986,6 +987,7 @@ class LandDevCashFlowService:
                         p.sale_period,
                         p.custom_sale_date,
                         psa.gross_parcel_price,
+                        psa.gross_sale_proceeds,
                         psa.net_sale_proceeds,
                         psa.total_transaction_costs,
                         psa.improvement_offset_total,
@@ -1051,6 +1053,7 @@ class LandDevCashFlowService:
         total_subdivision_costs = sum(s['subdivisionCosts'] for s in parcel_sales)
 
         return {
+            'revenueByFamily': self._rollup_revenue_by_family(parcel_sales),
             'projectId': self.project_id,
             'totalUnits': total_units,
             'totalParcels': len(parcel_sales),
@@ -1061,6 +1064,52 @@ class LandDevCashFlowService:
             'totalClosingCosts': total_closing_costs,
             'totalSubdivisionCosts': total_subdivision_costs,
         }
+
+    @staticmethod
+    def _rollup_revenue_by_family(parcel_sales: List[Dict]) -> List[Dict[str, Any]]:
+        """Revenue by land-use family (Residential / Commercial / Mixed Use …),
+        on BOTH bases the app reports (QV, 2026-10-13):
+
+          * modeledGrossRevenue / modeledNetRevenue — escalated by the price
+            growth rate, exactly the per-parcel figures summed into
+            totalGrossRevenue / totalNetRevenue, so the rows add up to the
+            cash-flow headline (project 9: $638.6M gross).
+          * storedGrossProceeds / storedNetProceeds — the stored, unescalated
+            tbl_parcel_sale_assumptions figures the sales schedule and the
+            returns tool quote as their headline ($392.0M gross on project 9).
+
+        Built so Landscaper can answer "revenue split between residential and
+        commercial" from a tool instead of adding parcels up in its head — on
+        2026-10-13 it stated $1.08 billion that nothing had returned."""
+        by: Dict[str, Dict[str, Any]] = {}
+        for s in parcel_sales:
+            fam = s.get('familyName') or 'Unassigned'
+            row = by.setdefault(fam, {
+                'familyName': fam, 'typeCodes': [], 'parcelCount': 0, 'units': 0,
+                'acres': 0.0, 'modeledGrossRevenue': 0.0, 'modeledNetRevenue': 0.0,
+                'storedGrossProceeds': 0.0, 'storedNetProceeds': 0.0,
+            })
+            if s.get('typeCode') and s['typeCode'] not in row['typeCodes']:
+                row['typeCodes'].append(s['typeCode'])
+            row['parcelCount'] += 1
+            row['units'] += int(s.get('rawUnits') or 0)
+            row['acres'] += float(s.get('acres') or 0)
+            row['modeledGrossRevenue'] += float(s.get('grossRevenue') or 0)
+            row['modeledNetRevenue'] += float(s.get('netRevenue') or 0)
+            row['storedGrossProceeds'] += float(s.get('storedGrossProceeds') or 0)
+            row['storedNetProceeds'] += float(s.get('storedNetProceeds') or 0)
+        rows = sorted(by.values(), key=lambda r: -r['modeledGrossRevenue'])
+        totals = {k: sum(r[k] for r in rows) for k in
+                  ('modeledGrossRevenue', 'modeledNetRevenue',
+                   'storedGrossProceeds', 'storedNetProceeds')}
+        for r in rows:
+            for k, t in totals.items():
+                r[k] = round(r[k], 2)
+                r[k.replace('Revenue', 'Share').replace('Proceeds', 'Share') + 'Pct'] = (
+                    round(100.0 * r[k] / t, 1) if t else None)
+            r['acres'] = round(r['acres'], 2)
+            r['typeCodes'] = sorted(r['typeCodes'])
+        return rows
 
     def _calculate_parcel_sale(
         self,
@@ -1126,6 +1175,14 @@ class LandDevCashFlowService:
                 'closingCosts': closing_costs,
                 'subdivisionCosts': subdivision_costs,
                 'units': int(units) if units else 1,
+                # QV (2026-10-13): carried so revenue can be rolled up by land-use
+                # family on the SAME basis as the headline totals above.
+                'familyName': parcel.get('family_name') or 'Unassigned',
+                'typeCode': parcel.get('type_code'),
+                'acres': acres,
+                'rawUnits': int(units),  # 0 for acreage-priced parcels; 'units' above floors at 1
+                'storedGrossProceeds': float(parcel.get('gross_sale_proceeds') or 0),
+                'storedNetProceeds': float(net_proceeds),
             }
 
         # Fallback: calculate from pricing table (minimal implementation)
@@ -2197,6 +2254,8 @@ class LandDevCashFlowService:
 
         return {
             'totalGrossRevenue': round(total_gross_revenue, 2),
+            # QV (2026-10-13): split by land-use family, same basis as the totals.
+            'revenueByFamily': absorption_schedule.get('revenueByFamily', []),
             'totalRevenueDeductions': round(total_deductions, 2),
             'totalNetRevenue': round(total_net_revenue, 2),
             'totalSubdivisionCosts': round(total_subdivision_costs, 2),

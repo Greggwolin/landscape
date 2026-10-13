@@ -3263,12 +3263,47 @@ def handle_get_cashflow_results(
     target_project = tool_input.get('project_id') or project_id
     try:
         payload = _assemble_cashflow_results_payload(target_project)
-        return {
+        result = {
             'success': True,
             'data': payload,
             'all_fields_calculated': True,
             '_note': 'All values are engine outputs. Do not write these back — update assumptions instead.',
         }
+        # QV (2026-10-13): revenue by land-use family, surfaced at the top level
+        # with its own instruction so a "residential vs commercial" question is
+        # answered from these rows and never from parcels added up by the model.
+        by_family = (payload.get('summary') or {}).get('revenueByFamily') or []
+        if by_family:
+            # One basis per list, so a dollar figure and a percentage can never
+            # be taken from different bases (verification 2026-10-13 saw the
+            # model pair modeled dollars with stored-basis percentages).
+            result['revenue_by_family'] = [{
+                'familyName': r['familyName'], 'typeCodes': r['typeCodes'],
+                'parcelCount': r['parcelCount'], 'units': r['units'], 'acres': r['acres'],
+                'grossRevenue': r['modeledGrossRevenue'], 'grossSharePct': r['modeledGrossSharePct'],
+                'netRevenue': r['modeledNetRevenue'], 'netSharePct': r['modeledNetSharePct'],
+            } for r in by_family]
+            result['revenue_by_family_sales_schedule_basis'] = [{
+                'familyName': r['familyName'],
+                'grossProceeds': r['storedGrossProceeds'], 'grossSharePct': r['storedGrossSharePct'],
+                'netProceeds': r['storedNetProceeds'], 'netSharePct': r['storedNetSharePct'],
+            } for r in by_family]
+            result['revenue_by_family_instruction'] = (
+                'For any revenue split by land use (residential vs commercial, by '
+                'family, by product type) report ONLY revenue_by_family: its '
+                'grossRevenue rows add up to data.summary.totalGrossRevenue and its '
+                'netRevenue rows to totalNetRevenue (the cash-flow basis, price-'
+                'escalated). Pair each dollar figure ONLY with the SharePct beside it '
+                'in the same row. Use revenue_by_family_sales_schedule_basis only if '
+                'the user is comparing against the sales schedule (stored, '
+                'unescalated proceeds) and say so. Never mix the two lists in one '
+                'answer and never sum parcels yourself. If you explain the gap '
+                'between gross and net, the deductions are data.summary.'
+                'totalSubdivisionCosts (lot improvement offsets on front-foot-priced '
+                'residential lots), totalCommissions and totalTransactionCosts — '
+                'do not attribute it to a cost you have not read.'
+            )
+        return result
     except Exception as err:
         logger.error(f"Failed to fetch cashflow results for project {target_project}: {err}")
         return {'success': False, 'error': str(err)}
