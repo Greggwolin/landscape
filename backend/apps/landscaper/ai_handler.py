@@ -1654,6 +1654,10 @@ of three:
    result "(calculated)". A derived figure whose arithmetic is not shown, that uses
    an input no tool returned this turn, or that does not compute is WITHHELD from
    the user — so never state a derived figure bare, and never round the inputs.
+   REPEATED QUESTION: when the user asks again for something you already answered, do NOT
+   say "I just gave you that" and retype it from memory — call the same tool again and
+   answer from its fresh return. A figure restated from memory is withheld unless it was
+   stated, unblanked, in one of your last few replies.
    In a table or list the layout can stand in for the "=": a subtotal placed directly
    above or below the rows it adds up (no blank line between), or a deduction placed
    between the gross line and the net line, is checked against those neighbouring
@@ -4500,8 +4504,45 @@ def _has_unsourced_figure(content: str, tool_calls: list, sourced: set) -> bool:
     return any(not _figure_is_sourced(mag, is_pct, sourced) for mag, is_pct in figs)
 
 
+_PRIOR_REPLY_LOOKBACK = 6
+
+
+def figures_in_prior_clean_replies(messages: Optional[list]) -> set:
+    """Magnitudes of every figure stated in the last few assistant replies that
+    the guard let through untouched (QV, 2026-10-13).
+
+    When the user asks the same question twice, the model restates its earlier
+    answer without re-running the tool, and a strict reading blanks every figure
+    — Gregg saw "I just gave you that answer above:" followed by eight withheld
+    figures. A figure the guard vetted when it was first stated is still that
+    project's number; restating it is not inventing it. Only replies with no
+    placeholder and no guard tail count, so a blanked or fallback reply can
+    never launder a figure back in."""
+    out: set = set()
+    seen = 0
+    for msg in reversed(list(messages or [])):
+        role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
+        if role != 'assistant':
+            continue
+        content = (msg.get('content') if isinstance(msg, dict)
+                   else getattr(msg, 'content', '')) or ''
+        content = content if isinstance(content, str) else str(content)
+        seen += 1
+        if seen > _PRIOR_REPLY_LOOKBACK:
+            break
+        meta = msg.get('metadata') if isinstance(msg, dict) else None
+        if (isinstance(meta, dict) and meta.get('fabrication_guard_blocked')) \
+                or _REDACTION_PLACEHOLDER in content \
+                or _GUARD_FALLBACK_QUESTION in content \
+                or _GUARD_ESCALATION_NOTE in content:
+            continue
+        out |= {v for v, _ in _figure_magnitudes(content)}
+    return out
+
+
 def reply_states_unsourced_financials(content: str, tool_calls: list,
-                                      tool_outputs: Optional[list] = None) -> bool:
+                                      tool_outputs: Optional[list] = None,
+                                      prior_sourced: Optional[set] = None) -> bool:
     """True when the reply OR a created artifact states a project financial figure
     that isn't backed by the tools this turn. tool_calls entries are dicts
     ({'tool': name, 'input': ...}) or objects (.name/.tool/.input).
@@ -4514,6 +4555,7 @@ def reply_states_unsourced_financials(content: str, tool_calls: list,
         (RV provenance). With no `tool_outputs` (legacy callers/tests), the old
         blanket exemption is retained for back-compat."""
     called = [_tool_name(tc) for tc in (tool_calls or [])]
+    prior = prior_sourced or set()
     if any(n.startswith(_NUMBERS_PRODUCING_PREFIXES) for n in called):
         if tool_outputs is None:
             return False  # legacy: a numbers tool ran → figures legitimized
@@ -4521,11 +4563,17 @@ def reply_states_unsourced_financials(content: str, tool_calls: list,
         if not sourced:
             return False  # tools returned no numbers (e.g. failure) → don't mass-block
         # QV 3a: arithmetic the reply shows on real inputs, and that the server
-        # can reproduce, counts as sourced (see _verified_calculations).
+        # can reproduce, counts as sourced (see _verified_calculations). QV: so
+        # does a figure vetted in an earlier, unblocked reply (prior_sourced).
         return _has_unsourced_figure(
-            content, tool_calls, _sourced_with_calculations(content, sourced))
+            content, tool_calls, _sourced_with_calculations(content, sourced | prior))
     # No numbers tool this turn: flag a financial claim in the chat text...
     if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
+        # ...unless every figure is a restatement of one the guard already let
+        # through in a recent reply (QV: the repeated-question case).
+        if prior and _artifact_body_states_financials(tool_calls) is False and all(
+                _figure_is_sourced(v, is_pct, prior) for v, is_pct in _figure_magnitudes(content)):
+            return False
         return True
     # ...or money/percent figures baked into a created/updated artifact body.
     return _artifact_body_states_financials(tool_calls)
@@ -5691,10 +5739,12 @@ def get_landscaper_response(
                     final_content, _collect_sourced_numbers(tool_executions))
                 if _calc_count:
                     metadata['calculated_figures'] = _calc_count
+            _prior_figs = figures_in_prior_clean_replies(messages) if _strict else set()
             if getattr(settings, 'LANDSCAPER_FABRICATION_GUARD', True) and \
                     reply_states_unsourced_financials(
                         final_content, tool_calls_made,
-                        tool_outputs=(tool_executions if _strict else None)):
+                        tool_outputs=(tool_executions if _strict else None),
+                        prior_sourced=_prior_figs):
                 guard_trace = _fabrication_guard_trace(
                     final_content, tool_calls_made,
                     tool_outputs=(tool_executions if _strict else None),
@@ -5736,8 +5786,9 @@ def get_landscaper_response(
                 _sourced = (_collect_sourced_numbers(tool_executions)
                             if _strict else set())
                 # QV 3a: never blank a verified calculation just because some
-                # OTHER figure in the same reply tripped the guard.
-                _sourced = _sourced_with_calculations(final_content, _sourced)
+                # OTHER figure in the same reply tripped the guard — nor a figure
+                # vetted in an earlier unblocked reply.
+                _sourced = _sourced_with_calculations(final_content, _sourced | _prior_figs)
                 final_content, _redacted_count = _compose_guarded_reply(
                     final_content, _sourced, _escalate)
                 guard_envelope['redacted_figures'] = _redacted_count

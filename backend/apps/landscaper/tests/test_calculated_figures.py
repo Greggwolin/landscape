@@ -366,3 +366,43 @@ def test_demographics_answer_is_not_blocked():
     reply = ("**1-MILE RING**\nPopulation: 3,079 | Households: 984\n"
              "Median HH Income: $161,385\nMedian Home Value: $648,178\n")
     assert reply_states_unsourced_financials(reply, tools, tool_outputs=outputs) is False
+
+
+# ── the repeated question (Gregg, 2026-10-13 12:50) ──────────────────────────
+
+PRIOR_CLEAN = {'role': 'assistant', 'content':
+               "Gross Revenue:\nResidential $357.0M 55.9%\nCommercial $256.5M 40.2%"}
+PRIOR_BLOCKED = {'role': 'assistant', 'content':
+                 f"Residential {_REDACTION_PLACEHOLDER}\n---\nI don't have those figures "
+                 "from the project's data yet — want me to open the screen that shows "
+                 "them, or run the calculation? I won't estimate them."}
+
+
+def test_restating_a_vetted_reply_without_a_tool_is_not_blocked():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    prior = figures_in_prior_clean_replies([{'role': 'user', 'content': 'split?'}, PRIOR_CLEAN,
+                                            {'role': 'user', 'content': 'split again?'}])
+    assert prior == {357000000.0, 55.9, 256500000.0, 40.2}
+    restated = "I just gave you that: Residential $357.0M (55.9%), Commercial $256.5M (40.2%) of revenue."
+    assert reply_states_unsourced_financials(restated, [], tool_outputs=[], prior_sourced=prior) is False
+
+
+def test_a_new_figure_in_the_restatement_is_still_blocked():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    prior = figures_in_prior_clean_replies([PRIOR_CLEAN])
+    reply = "Residential $357.0M (55.9%), Commercial $256.5M (40.2%), Mixed Use $25.1M of revenue."
+    assert reply_states_unsourced_financials(reply, [], tool_outputs=[], prior_sourced=prior) is True
+    out, n = _compose_guarded_reply(reply, prior, escalate=False)
+    assert n == 1 and "$357.0M" in out and "$25.1M" not in out
+
+
+def test_a_blocked_prior_reply_lends_nothing():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    assert figures_in_prior_clean_replies([PRIOR_BLOCKED]) == set()
+    assert figures_in_prior_clean_replies(
+        [{'role': 'assistant', 'content': 'x', 'metadata': {'fabrication_guard_blocked': True}}]) == set()
+
+
+def test_without_prior_figures_the_no_tool_regime_still_blocks():
+    assert reply_states_unsourced_financials(
+        "Residential $357.0M of revenue.", [], tool_outputs=[], prior_sourced=set()) is True
