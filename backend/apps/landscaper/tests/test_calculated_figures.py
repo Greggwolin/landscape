@@ -366,3 +366,78 @@ def test_demographics_answer_is_not_blocked():
     reply = ("**1-MILE RING**\nPopulation: 3,079 | Households: 984\n"
              "Median HH Income: $161,385\nMedian Home Value: $648,178\n")
     assert reply_states_unsourced_financials(reply, tools, tool_outputs=outputs) is False
+
+
+# ── the repeated question (Gregg, 2026-10-13 12:50) ──────────────────────────
+
+PRIOR_CLEAN = {'role': 'assistant', 'content':
+               "Gross Revenue:\nResidential $357.0M 55.9%\nCommercial $256.5M 40.2%"}
+PRIOR_BLOCKED = {'role': 'assistant', 'content':
+                 f"Residential {_REDACTION_PLACEHOLDER}\n---\nI don't have those figures "
+                 "from the project's data yet — want me to open the screen that shows "
+                 "them, or run the calculation? I won't estimate them."}
+
+
+def test_restating_a_vetted_reply_without_a_tool_is_not_blocked():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    prior = figures_in_prior_clean_replies([{'role': 'user', 'content': 'split?'}, PRIOR_CLEAN,
+                                            {'role': 'user', 'content': 'split again?'}])
+    assert prior == {357000000.0, 55.9, 256500000.0, 40.2}
+    restated = "I just gave you that: Residential $357.0M (55.9%), Commercial $256.5M (40.2%) of revenue."
+    assert reply_states_unsourced_financials(restated, [], tool_outputs=[], prior_sourced=prior) is False
+
+
+def test_a_new_figure_in_the_restatement_is_still_blocked():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    prior = figures_in_prior_clean_replies([PRIOR_CLEAN])
+    reply = "Residential $357.0M (55.9%), Commercial $256.5M (40.2%), Mixed Use $25.1M of revenue."
+    assert reply_states_unsourced_financials(reply, [], tool_outputs=[], prior_sourced=prior) is True
+    out, n = _compose_guarded_reply(reply, prior, escalate=False)
+    assert n == 1 and "$357.0M" in out and "$25.1M" not in out
+
+
+def test_a_blocked_prior_reply_lends_nothing():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    assert figures_in_prior_clean_replies([PRIOR_BLOCKED]) == set()
+    assert figures_in_prior_clean_replies(
+        [{'role': 'assistant', 'content': 'x', 'metadata': {'fabrication_guard_blocked': True}}]) == set()
+
+
+def test_without_prior_figures_the_no_tool_regime_still_blocks():
+    assert reply_states_unsourced_financials(
+        "Residential $357.0M of revenue.", [], tool_outputs=[], prior_sourced=set()) is True
+
+
+# ── the tail says what actually happened (Gregg, 2026-10-13 13:10) ──────────
+
+def test_misquote_tail_when_the_data_was_read():
+    from apps.landscaper.ai_handler import _GUARD_FALLBACK_QUESTION, _prior_reply_was_guard_blocked
+    reply = ("Residential $357.0M (55.9%) of revenue — primarily $175M in lot improvement "
+             "offsets plus $21.8M commissions.")
+    sourced = {357000000.0, 55.9, 166677072.1, 11082293.06}
+    out, n = _compose_guarded_reply(reply, sourced, escalate=False, data_was_read=True)
+    assert n == 2
+    assert "I withheld 2 figures above because they did not match the project data I read" in out
+    assert _GUARD_FALLBACK_QUESTION not in out and "$357.0M" in out
+    # a later turn still sees this reply as blocked, so escalation and lookback behave
+    assert _prior_reply_was_guard_blocked([{'role': 'assistant', 'content': out}]) is True
+
+
+def test_singular_wording_for_one_withheld_figure():
+    out, n = _compose_guarded_reply("Commissions were $21.8M of revenue.", {11082293.06},
+                                    escalate=False, data_was_read=True)
+    assert n == 1 and "I withheld one figure above because it did not match" in out
+
+
+def test_no_data_read_keeps_the_original_question():
+    from apps.landscaper.ai_handler import _GUARD_FALLBACK_QUESTION
+    out, n = _compose_guarded_reply("Commissions were $21.8M of revenue.", set(),
+                                    escalate=False, data_was_read=False)
+    assert n == 1 and _GUARD_FALLBACK_QUESTION in out
+
+
+def test_misquote_tail_does_not_feed_the_lookback():
+    from apps.landscaper.ai_handler import figures_in_prior_clean_replies
+    out, _ = _compose_guarded_reply("Commissions were $21.8M of revenue.", {1.0},
+                                    escalate=False, data_was_read=True)
+    assert figures_in_prior_clean_replies([{'role': 'assistant', 'content': out}]) == set()

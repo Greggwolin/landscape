@@ -1654,6 +1654,10 @@ of three:
    result "(calculated)". A derived figure whose arithmetic is not shown, that uses
    an input no tool returned this turn, or that does not compute is WITHHELD from
    the user — so never state a derived figure bare, and never round the inputs.
+   REPEATED QUESTION: when the user asks again for something you already answered, do NOT
+   say "I just gave you that" and retype it from memory — call the same tool again and
+   answer from its fresh return. A figure restated from memory is withheld unless it was
+   stated, unblanked, in one of your last few replies.
    In a table or list the layout can stand in for the "=": a subtotal placed directly
    above or below the rows it adds up (no blank line between), or a deduction placed
    between the gross line and the net line, is checked against those neighbouring
@@ -1744,6 +1748,11 @@ factual question:
      (amount ÷ total = share%) per the CALCULATED FIGURES rule, never stated bare. After
      get_budget_rollup, start the answer with exactly:
      "Total development budget: **$[grand_total]**" and then list the returned categories.
+     For REVENUE BY LAND USE — 'revenue split between residential and commercial', 'how much
+     revenue is commercial', 'revenue by product' — call get_cashflow_results and answer ONLY
+     from its revenue_by_family rows (one basis, named; percentages from the matching
+     SharePct fields). Never add parcels or sale assumptions up yourself: the parcel-level
+     figures are unescalated and the sum will not match the project's revenue.
   2. THEN: Search the knowledge base using query_platform_knowledge. This searches BOTH
      the platform reference library AND user-uploaded documents (CoStar reports, market studies, etc.).
      Do NOT ask the user for permission — just search.
@@ -2288,7 +2297,10 @@ tools to read the data first:
   • get_operating_statement — full structured P&L for operating statements
   • get_units / get_unit_types — rent roll detail
   • get_rental_comparables / get_expense_comparables — comp grids
-  • get_cashflow_results — cash flow / waterfall
+  • get_cashflow_results — cash flow / waterfall / revenue split by land-use
+    family (its revenue_by_family rows). A revenue split between residential
+    and commercial is ALWAYS answered from those rows — never by adding up
+    parcels or sale assumptions yourself.
 
 If the DB read returns empty for a category that should hold data (e.g.
 operating expenses are empty but the project is fully underwritten),
@@ -4414,17 +4426,42 @@ def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
                    else getattr(msg, 'content', '')) or ''
         content = content if isinstance(content, str) else str(content)
         return (_REDACTION_PLACEHOLDER in content
-                or _GUARD_FALLBACK_QUESTION in content)
+                or _GUARD_FALLBACK_QUESTION in content
+                or any(m in content for m in _GUARD_MISQUOTE_MARK))
     return False
 
 
+def _misquote_note(n: int) -> str:
+    """Tail for the case where the data WAS read this turn but n stated figures
+    did not match it (QV, 2026-10-13). Gregg: the old tail — "I don't have those
+    figures from the project's data yet" — was false in this case, the figures
+    were in the data and the model misquoted them, and a reader cannot tell a
+    misquote from missing data."""
+    figs = 'one figure' if n == 1 else f'{n} figures'
+    were = 'it did' if n == 1 else 'they did'
+    return (f"I withheld {figs} above because {were} not match the project data I "
+            "read for this answer. Everything not marked withheld is confirmed. "
+            "Ask for the withheld item on its own and I'll quote it exactly as "
+            "the project holds it.")
+
+
+_GUARD_MISQUOTE_MARK = 'because it did not match the project data I read', \
+                       'because they did not match the project data I read'
+
+
 def _compose_guarded_reply(content: str, sourced: set,
-                           escalate: bool) -> Tuple[str, int]:
+                           escalate: bool, data_was_read: bool = False) -> Tuple[str, int]:
     """The reply the user sees after a guard hit: their answer with the unsourced
-    figures blanked, then the guard's question (or, on a repeat fire, the
-    plain-language explanation of what was withheld and why)."""
+    figures blanked, then a tail that says what actually happened — a figure the
+    model misquoted when the data was read this turn, no data read at all, or (on
+    a repeat fire) the plain-language explanation of what was withheld and why."""
     redacted_text, redacted_count = _redact_unsourced_figures(content, sourced)
-    tail = _GUARD_ESCALATION_NOTE if escalate else _GUARD_FALLBACK_QUESTION
+    if escalate:
+        tail = _GUARD_ESCALATION_NOTE
+    elif data_was_read and redacted_count:
+        tail = _misquote_note(redacted_count)
+    else:
+        tail = _GUARD_FALLBACK_QUESTION
     body = (redacted_text or '').rstrip()
     if not body:
         return tail, redacted_count
@@ -4492,8 +4529,46 @@ def _has_unsourced_figure(content: str, tool_calls: list, sourced: set) -> bool:
     return any(not _figure_is_sourced(mag, is_pct, sourced) for mag, is_pct in figs)
 
 
+_PRIOR_REPLY_LOOKBACK = 6
+
+
+def figures_in_prior_clean_replies(messages: Optional[list]) -> set:
+    """Magnitudes of every figure stated in the last few assistant replies that
+    the guard let through untouched (QV, 2026-10-13).
+
+    When the user asks the same question twice, the model restates its earlier
+    answer without re-running the tool, and a strict reading blanks every figure
+    — Gregg saw "I just gave you that answer above:" followed by eight withheld
+    figures. A figure the guard vetted when it was first stated is still that
+    project's number; restating it is not inventing it. Only replies with no
+    placeholder and no guard tail count, so a blanked or fallback reply can
+    never launder a figure back in."""
+    out: set = set()
+    seen = 0
+    for msg in reversed(list(messages or [])):
+        role = msg.get('role') if isinstance(msg, dict) else getattr(msg, 'role', None)
+        if role != 'assistant':
+            continue
+        content = (msg.get('content') if isinstance(msg, dict)
+                   else getattr(msg, 'content', '')) or ''
+        content = content if isinstance(content, str) else str(content)
+        seen += 1
+        if seen > _PRIOR_REPLY_LOOKBACK:
+            break
+        meta = msg.get('metadata') if isinstance(msg, dict) else None
+        if (isinstance(meta, dict) and meta.get('fabrication_guard_blocked')) \
+                or _REDACTION_PLACEHOLDER in content \
+                or _GUARD_FALLBACK_QUESTION in content \
+                or _GUARD_ESCALATION_NOTE in content \
+                or any(m in content for m in _GUARD_MISQUOTE_MARK):
+            continue
+        out |= {v for v, _ in _figure_magnitudes(content)}
+    return out
+
+
 def reply_states_unsourced_financials(content: str, tool_calls: list,
-                                      tool_outputs: Optional[list] = None) -> bool:
+                                      tool_outputs: Optional[list] = None,
+                                      prior_sourced: Optional[set] = None) -> bool:
     """True when the reply OR a created artifact states a project financial figure
     that isn't backed by the tools this turn. tool_calls entries are dicts
     ({'tool': name, 'input': ...}) or objects (.name/.tool/.input).
@@ -4506,6 +4581,7 @@ def reply_states_unsourced_financials(content: str, tool_calls: list,
         (RV provenance). With no `tool_outputs` (legacy callers/tests), the old
         blanket exemption is retained for back-compat."""
     called = [_tool_name(tc) for tc in (tool_calls or [])]
+    prior = prior_sourced or set()
     if any(n.startswith(_NUMBERS_PRODUCING_PREFIXES) for n in called):
         if tool_outputs is None:
             return False  # legacy: a numbers tool ran → figures legitimized
@@ -4513,11 +4589,17 @@ def reply_states_unsourced_financials(content: str, tool_calls: list,
         if not sourced:
             return False  # tools returned no numbers (e.g. failure) → don't mass-block
         # QV 3a: arithmetic the reply shows on real inputs, and that the server
-        # can reproduce, counts as sourced (see _verified_calculations).
+        # can reproduce, counts as sourced (see _verified_calculations). QV: so
+        # does a figure vetted in an earlier, unblocked reply (prior_sourced).
         return _has_unsourced_figure(
-            content, tool_calls, _sourced_with_calculations(content, sourced))
+            content, tool_calls, _sourced_with_calculations(content, sourced | prior))
     # No numbers tool this turn: flag a financial claim in the chat text...
     if content and _MONEY_OR_PCT_RE.search(content) and _FIN_CLAIM_KW.search(content):
+        # ...unless every figure is a restatement of one the guard already let
+        # through in a recent reply (QV: the repeated-question case).
+        if prior and _artifact_body_states_financials(tool_calls) is False and all(
+                _figure_is_sourced(v, is_pct, prior) for v, is_pct in _figure_magnitudes(content)):
+            return False
         return True
     # ...or money/percent figures baked into a created/updated artifact body.
     return _artifact_body_states_financials(tool_calls)
@@ -5683,10 +5765,12 @@ def get_landscaper_response(
                     final_content, _collect_sourced_numbers(tool_executions))
                 if _calc_count:
                     metadata['calculated_figures'] = _calc_count
+            _prior_figs = figures_in_prior_clean_replies(messages) if _strict else set()
             if getattr(settings, 'LANDSCAPER_FABRICATION_GUARD', True) and \
                     reply_states_unsourced_financials(
                         final_content, tool_calls_made,
-                        tool_outputs=(tool_executions if _strict else None)):
+                        tool_outputs=(tool_executions if _strict else None),
+                        prior_sourced=_prior_figs):
                 guard_trace = _fabrication_guard_trace(
                     final_content, tool_calls_made,
                     tool_outputs=(tool_executions if _strict else None),
@@ -5728,10 +5812,14 @@ def get_landscaper_response(
                 _sourced = (_collect_sourced_numbers(tool_executions)
                             if _strict else set())
                 # QV 3a: never blank a verified calculation just because some
-                # OTHER figure in the same reply tripped the guard.
-                _sourced = _sourced_with_calculations(final_content, _sourced)
+                # OTHER figure in the same reply tripped the guard — nor a figure
+                # vetted in an earlier unblocked reply.
+                _sourced = _sourced_with_calculations(final_content, _sourced | _prior_figs)
+                _data_read = bool(_strict and _collect_sourced_numbers(tool_executions))
                 final_content, _redacted_count = _compose_guarded_reply(
-                    final_content, _sourced, _escalate)
+                    final_content, _sourced, _escalate, data_was_read=_data_read)
+                if _data_read and _redacted_count and not _escalate:
+                    guard_envelope['suggested_user_question'] = _misquote_note(_redacted_count)
                 guard_envelope['redacted_figures'] = _redacted_count
                 guard_envelope['escalated'] = _escalate
                 metadata['fabrication_guard_blocked'] = True

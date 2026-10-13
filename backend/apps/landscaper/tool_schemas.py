@@ -100,7 +100,14 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "get_cashflow_results",
-        "description": "Get cash flow / DCF assumptions and results.",
+        "description": (
+            "Get cash flow / DCF assumptions and results: IRR, NPV, equity multiple, "
+            "peak equity, total gross/net revenue, deductions, costs by category — "
+            "and revenue_by_family, the revenue split by land-use family "
+            "(residential vs commercial vs mixed use) with units, acres and share "
+            "percentages. Use it for 'what's the revenue split', 'how much revenue "
+            "is residential', 'revenue by product type'. Read-only."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
