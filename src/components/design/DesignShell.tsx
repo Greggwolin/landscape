@@ -462,6 +462,9 @@ function DesignShellInner() {
           onBeforeUserSend={handleBeforeUserSend}
           onNewChat={handleNewChat}
           availableScreens={availableScreens}
+          designHeader={{
+            context: [designLoc.section?.label, currentProject.project_name].filter(Boolean).join(' · '),
+          }}
         />
 
         {!expanded && (

@@ -18,6 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
+import { DesignNavPanel } from './DesignNavPanel';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
@@ -337,6 +338,45 @@ export function DesignSidebar({
     },
     [onSelectTab, clearActiveArtifacts, onCollapse],
   );
+
+  // Design view: the Slice 1 expanded nav (C2), fed by the same data.
+  if (onCollapse) {
+    const projectThreads = threads.filter((t) => t.projectId === projectId);
+    return (
+      <DesignNavPanel
+        onCollapse={onCollapse}
+        onNewChat={onNewChat}
+        onSearch={openSearch}
+        onNavigate={(page) => { onCollapse(); handleNavigate(page); }}
+        project={{
+          name: projectName,
+          sections: folders.map((f) => ({
+            id: f.id,
+            label: typeof f.label === 'string' ? f.label : f.label.primary,
+            badge: f.id === 'documents' ? 'DMS' : undefined,
+          })),
+          activeSectionId: currentFolder,
+          onSelectSection: (id) => handleSelectFolder(id),
+        }}
+        threads={projectThreads.map((t) => buildThreadItem(t, false)).map((t) => ({ id: t.id, label: t.name, onClick: t.onClick }))}
+        artifacts={artifacts.map((a) => ({ id: a.id, title: a.title, onClick: () => handleSelectArtifact(a.id) }))}
+        user={
+          user
+            ? {
+                name: `${user.first_name} ${user.last_name}`.trim() || user.username,
+                initials:
+                  `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() ||
+                  user.username[0].toUpperCase(),
+                org: user.company || undefined,
+              }
+            : undefined
+        }
+        isAdmin={user?.is_staff === true}
+        recentProjectId={projectId}
+        onLogout={logout}
+      />
+    );
+  }
 
   return (
     <WrapperSidebar

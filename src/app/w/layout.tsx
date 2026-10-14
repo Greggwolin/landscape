@@ -55,6 +55,7 @@ import '@/styles/design.css'; // scoped under .design-shell — inert unless des
 import { readUiModeCookie } from '@/lib/uiMode';
 import { DesignRail } from '@/components/design/DesignRail';
 import { DesignTopBar } from '@/components/design/DesignTopBar';
+import { DesignNavPanel } from '@/components/design/DesignNavPanel';
 import type { DesignNavSection } from '@/components/design/designNav';
 
 // Design view (Slice 1 reference, A-frames): the platform rail. Codes and order
@@ -927,6 +928,29 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           onSelectSection={(sec) => handleNavigate(sec.id)}
           onExpand={() => setDesignNavExpanded(true)}
         />
+      ) : designSkin ? (
+        <DesignNavPanel
+          onCollapse={() => setDesignNavExpanded(false)}
+          onNewChat={handleNewChat}
+          onSearch={openSearch}
+          onNavigate={(page) => { setDesignNavExpanded(false); handleNavigate(page); }}
+          activePage={activePage}
+          threads={sidebarThreadItems.map((t) => ({ id: t.id, label: t.name, onClick: t.onClick }))}
+          user={
+            user
+              ? {
+                  name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
+                  initials:
+                    `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() ||
+                    user.username[0].toUpperCase(),
+                  org: user.company || undefined,
+                }
+              : undefined
+          }
+          isAdmin={user?.is_staff === true}
+          recentProjectId={recentProjects[0]?.id ?? null}
+          onLogout={logout}
+        />
       ) : (
       <WrapperSidebar
         activePage={activePage}
@@ -1011,6 +1035,11 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           // Mirrors the dashboard greeting — same identity in every chat
           // surface the user owns.
           userName={user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : undefined}
+          designHeader={
+            designSkin
+              ? { context: projectId && projectData?.project_name ? projectData.project_name : DESIGN_PAGE_LABEL[activePage] ?? 'Home' }
+              : undefined
+          }
         />
       )}
       {!isChatRoute && (
