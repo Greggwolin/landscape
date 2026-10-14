@@ -1053,3 +1053,14 @@
   background: transparent !important; border-bottom: 1px solid #3f424d !important;
   font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #9397ab; padding: 10px 14px !important;
 }
+
+/* C1 activity line */
+.design-shell .dh-activity { padding: 8px 14px; margin-top: 12px; }
+.design-shell .dh-activity-line { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9397ab; }
+.design-shell .dh-activity-latest { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.design-shell .dh-activity-toggle { background: transparent; border: 0; color: #2f9dd3; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.design-shell .dh-activity-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.design-shell .dh-activity-list li { display: grid; grid-template-columns: 56px 220px 1fr; gap: 10px; padding: 5px 0; border-top: 1px solid rgba(233,233,237,0.06); font-size: 12px; }
+.design-shell .dh-activity-when { color: #75798c; }
+.design-shell .dh-activity-title { color: #e9e9ed; }
+.design-shell .dh-activity-summary { color: #9397ab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

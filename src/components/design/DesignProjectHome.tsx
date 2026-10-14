@@ -29,6 +29,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import ContactsSection from '@/components/projects/contacts/ContactsSection';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { useActivityFeed } from '@/hooks/useActivityFeed';
+
+const TYPE_LABEL: Record<string, string> = {
+  LAND: 'Land', MF: 'Multifamily', OFF: 'Office', RET: 'Retail', IND: 'Industrial', HTL: 'Hotel', MXU: 'Mixed use',
+};
 
 // Loose row shape: /details returns tbl_project.* — render defensively.
 type Details = Record<string, unknown>;
@@ -157,6 +162,24 @@ export function DesignProjectHome({ project }: DesignProjectHomeProps) {
     load();
   }, [load]);
 
+  // Land: units and acres roll up from the parcel table (C1: "544 from parcel
+  // table") — the same rows the Parcels screen shows.
+  const [parcelTotals, setParcelTotals] = useState<{ units: number; acres: number; n: number } | null>(null);
+  useEffect(() => {
+    fetch(`/api/parcels?project_id=${projectId}`, { headers: getAuthHeaders() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((p) => {
+        const rows: Array<Record<string, unknown>> = Array.isArray(p) ? p : p?.data || p?.parcels || [];
+        if (!rows.length) return;
+        setParcelTotals({
+          n: rows.length,
+          units: rows.reduce((t, r) => t + (Number(r.units) || 0), 0),
+          acres: rows.reduce((t, r) => t + (Number(r.acres) || 0), 0),
+        });
+      })
+      .catch(() => {});
+  }, [projectId]);
+
   const commit = useCallback(
     (key: string, value: string) => {
       setEditingKey(null);
@@ -206,14 +229,27 @@ export function DesignProjectHome({ project }: DesignProjectHomeProps) {
   // Lot size: prefer SF with acres suffix (reference shows "7,158,250 SF (164.34 ac)")
   const lotSf = fmtInt(d.lot_size_sf);
   const lotAc = s(d.lot_size_acres);
-  const lotDisplay = lotSf ? `${lotSf} SF` : lotAc ? `${lotAc} ac` : null;
-  const lotSuffix = lotSf && lotAc ? `(${lotAc} ac)` : null;
+  // No recorded lot size: say where the acreage shown comes from instead.
+  const fallbackAc =
+    !lotSf && !lotAc
+      ? isLand && parcelTotals?.acres
+        ? { v: parcelTotals.acres, note: `parcel table · ${parcelTotals.n} parcels` }
+        : d.acres_gross != null && d.acres_gross !== ''
+          ? { v: Number(d.acres_gross), note: 'gross' }
+          : null
+      : null;
+  const lotDisplay = lotSf
+    ? `${lotSf} SF`
+    : lotAc
+      ? `${lotAc} ac`
+      : fallbackAc
+        ? `${fallbackAc.v.toLocaleString('en-US', { maximumFractionDigits: 2 })} ac`
+        : null;
+  const lotSuffix = lotSf && lotAc ? `(${lotAc} ac)` : fallbackAc ? fallbackAc.note : null;
 
   // Type line: "Land · residential" style — from type + code, plain (set at creation)
-  const typeLine =
-    [s(d.project_type ?? project.project_type), s(d.project_type_code ?? project.project_type_code)]
-      .filter(Boolean)
-      .join(' · ') || null;
+  const code = String(d.project_type_code ?? project.project_type_code ?? '').toUpperCase();
+  const typeLine = TYPE_LABEL[code] ?? (s(d.project_type ?? project.project_type) || null);
 
   const apns = [s(d.apn_primary), s(d.apn_secondary)].filter(Boolean).join(', ') || null;
 
@@ -288,7 +324,8 @@ export function DesignProjectHome({ project }: DesignProjectHomeProps) {
           />
           <ProfileRow
             label="Start date"
-            display={fmtDate(d.start_date)}
+            display={fmtDate(d.start_date) ?? fmtDate(d.analysis_start_date)}
+            suffix={!s(d.start_date) && s(d.analysis_start_date) ? 'analysis start' : null}
             editKey="start_date"
             editValue={s(d.start_date)?.slice(0, 10) ?? null}
             {...rowShared}
@@ -296,8 +333,8 @@ export function DesignProjectHome({ project }: DesignProjectHomeProps) {
           {/* Land: unit count derives from the parcel table (computed). MF: editable. */}
           <ProfileRow
             label="Total units"
-            display={fmtInt(d.total_units)}
-            suffix={isLand && fmtInt(d.total_units) ? 'from parcel table' : null}
+            display={isLand && parcelTotals ? fmtInt(parcelTotals.units) : fmtInt(d.total_units)}
+            suffix={isLand && parcelTotals ? 'from parcel table' : null}
             editKey={isLand ? undefined : 'total_units'}
             editValue={s(d.total_units)}
             {...rowShared}
@@ -329,7 +366,7 @@ export function DesignProjectHome({ project }: DesignProjectHomeProps) {
         {/* ── Map — the real MapLibre map, same component ProjectTab mounts ── */}
         <div className="dh-card dh-map">
           <div className="dh-card-head">
-            <span className="dh-card-title">Map</span>
+            <span className="dh-card-title">Map — 3D oblique view</span>
             <span className="dh-head-hint">Click map to set location</span>
           </div>
           <div className="dh-map-body">
@@ -345,6 +382,42 @@ export function DesignProjectHome({ project }: DesignProjectHomeProps) {
       {/* ── Contacts — reference tiles (one card per role, primary person),
              with the real ContactsSection mounted on demand for add/edit ── */}
       <ContactTiles projectId={projectId} />
+
+      <ActivityLine projectId={projectId} />
+    </div>
+  );
+}
+
+/* ── activity line (reference frame C1 foot: "Latest: … · Full activity") ── */
+
+function ActivityLine({ projectId }: { projectId: number }) {
+  const { data } = useActivityFeed(projectId);
+  const [open, setOpen] = useState(false);
+  const items = data?.activities ?? [];
+  if (!items.length) return null;
+  const when = (t: string) =>
+    new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return (
+    <div className="dh-card dh-activity">
+      <div className="dh-activity-line">
+        <span className="dh-activity-latest">
+          Latest: {items.slice(0, 3).map((a) => `${a.title} (${when(a.timestamp)})`).join(' · ')}
+        </span>
+        <button type="button" className="dh-activity-toggle" onClick={() => setOpen((v) => !v)}>
+          {open ? 'Hide activity' : 'Full activity'}
+        </button>
+      </div>
+      {open && (
+        <ul className="dh-activity-list">
+          {items.slice(0, 20).map((a) => (
+            <li key={a.id}>
+              <span className="dh-activity-when">{when(a.timestamp)}</span>
+              <span className="dh-activity-title">{a.title}</span>
+              <span className="dh-activity-summary">{a.summary}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
