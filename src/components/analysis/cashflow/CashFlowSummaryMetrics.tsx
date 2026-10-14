@@ -6,7 +6,7 @@
 'use client';
 
 import React from 'react';
-import { CCard, CCardBody, CRow, CCol } from '@coreui/react';
+import { CCard, CCardBody } from '@coreui/react';
 import type { CashFlowSummary } from '@/lib/financial-engine/cashflow/types';
 
 interface Props {
@@ -88,6 +88,7 @@ function MetricCard({
             fontWeight: 700,
             color: valueColor || 'var(--cui-body-color)',
             fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap',
           }}
         >
           {value}
@@ -112,10 +113,20 @@ export default function CashFlowSummaryMetrics({ summary }: Props) {
   const profitColor =
     summary.grossProfit > 0 ? 'var(--cui-success)' : summary.grossProfit < 0 ? 'var(--cui-danger)' : undefined;
 
+  // QX (2026-10-14): lay the tiles out by the width of the panel they sit in,
+  // not the browser window. CoreUI's xs/md/lg columns key off the viewport, so
+  // inside the ~330px chat-first right panel a 1440px window still forced five
+  // tiles across and every figure wrapped one character per line.
   return (
-    <CRow className="g-3">
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gap: '12px',
+      }}
+    >
       {/* Revenue Breakdown Card */}
-      <CCol xs={12} md={6} lg={3}>
+      <div style={{ gridColumn: 'span 2', minWidth: 0 }}>
         <CCard
           className="h-100"
           style={{
@@ -230,37 +241,37 @@ export default function CashFlowSummaryMetrics({ summary }: Props) {
             </div>
           </CCardBody>
         </CCard>
-      </CCol>
-      <CCol xs={6} md={4} lg={2}>
+      </div>
+      <div style={{ minWidth: 0 }}>
         <MetricCard
           label="Total Costs"
           value={formatCurrency(summary.totalCosts)}
           valueColor="var(--cui-danger)"
         />
-      </CCol>
-      <CCol xs={6} md={4} lg={2}>
+      </div>
+      <div style={{ minWidth: 0 }}>
         <MetricCard
           label="Gross Profit"
           value={formatCurrency(summary.grossProfit)}
           valueColor={profitColor}
           sublabel={`Margin: ${formatPercent(summary.grossMargin)}`}
         />
-      </CCol>
-      <CCol xs={6} md={4} lg={2}>
+      </div>
+      <div style={{ minWidth: 0 }}>
         <MetricCard
           label="IRR"
           value={formatPercent(summary.irr)}
           valueColor={summary.irr && summary.irr > 0.1 ? 'var(--cui-success)' : undefined}
           sublabel="Annualized"
         />
-      </CCol>
-      <CCol xs={6} md={4} lg={2}>
+      </div>
+      <div style={{ minWidth: 0 }}>
         <MetricCard
           label="Equity Multiple"
           value={formatMultiple(summary.equityMultiple)}
           sublabel={summary.peakEquity ? `Peak: ${formatCurrency(summary.peakEquity)}` : undefined}
         />
-      </CCol>
-    </CRow>
+      </div>
+    </div>
   );
 }

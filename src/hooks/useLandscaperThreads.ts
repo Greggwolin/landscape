@@ -237,6 +237,16 @@ export function useLandscaperThreads({
    */
   const [threadNotFound, setThreadNotFound] = useState(false);
   const initializingRef = useRef(false);
+  /**
+   * The in-flight initializeThread, so a sendMessage that arrives while the
+   * URL-pinned thread is still loading can WAIT for it instead of being told
+   * "No active thread" (QX, 2026-10-14). The project-home composer creates a
+   * thread, navigates to ?thread=<id>, and fires the first message ~600 ms
+   * later; on a slow backend the thread fetch takes longer than that, the
+   * recovery call short-circuited on initializingRef, and the first question
+   * of the session was thrown away.
+   */
+  const initPromiseRef = useRef<Promise<void> | null>(null);
   const activeThreadRef = useRef<ChatThread | null>(null);
   /** Guards concurrent sendMessage calls */
   const sendingRef = useRef(false);
@@ -494,88 +504,99 @@ export function useLandscaperThreads({
    *    activeThread stays null, messages stays []. A thread is created
    *    lazily on the first sendMessage call. This is `/w/chat` root.
    */
-  const initializeThread = useCallback(async () => {
-    if (initializingRef.current) return;
+  const initializeThread = useCallback((): Promise<void> => {
+    if (initializingRef.current && initPromiseRef.current) return initPromiseRef.current;
     initializingRef.current = true;
     setIsThreadLoading(true);
 
-    // Capture the current abort signal so we can detect stale-context races.
-    // If context changes while we're awaiting, the context-change effect aborts
-    // this signal and creates a new one. Checking `mySignal.aborted` after each
-    // async gap prevents us from creating threads for a context we've already
-    // navigated away from.
-    const mySignal = abortControllerRef.current.signal;
+    const run = async () => {
 
-    try {
-      // --- Branch 1: URL-pinned thread (Chat Canvas resume) ---
-      if (initialThreadId) {
-        const thread = await loadThreadById(initialThreadId);
-        if (mySignal.aborted) return;
+      // Capture the current abort signal so we can detect stale-context races.
+      // If context changes while we're awaiting, the context-change effect aborts
+      // this signal and creates a new one. Checking `mySignal.aborted` after each
+      // async gap prevents us from creating threads for a context we've already
+      // navigated away from.
+      const mySignal = abortControllerRef.current.signal;
 
-        if (thread) {
-          setActiveThread(thread);
-          setThreadNotFound(false);
-          await loadThreadMessages(thread.threadId);
+      try {
+        // --- Branch 1: URL-pinned thread (Chat Canvas resume) ---
+        if (initialThreadId) {
+          const thread = await loadThreadById(initialThreadId);
           if (mySignal.aborted) return;
-          // Refresh sidebar list so the resumed thread is reflected
+
+          if (thread) {
+            setActiveThread(thread);
+            // Keep the ref in step immediately — a sendMessage awaiting this
+            // init reads the ref before React has flushed the state→ref effect.
+            activeThreadRef.current = thread;
+            setThreadNotFound(false);
+            await loadThreadMessages(thread.threadId);
+            if (mySignal.aborted) return;
+            // Refresh sidebar list so the resumed thread is reflected
+            await loadThreads();
+          } else {
+            // URL pointed at a thread we can't fetch (deleted / bad id / auth).
+            // Don't fall through to get_or_create — that would silently
+            // resurrect a different thread. SHORT-CIRCUIT recovery: a 404
+            // here is permanent (thread is genuinely gone), retrying 5x
+            // floods the console with errors and leaves the user stranded.
+            // `threadNotFound` is the recovery signal — the surface-aware
+            // `onThreadNotFound` handler (CenterChatPanel) routes the user to a
+            // fresh blank chat for its surface (/studio/[id] or /w/chat). We do
+            // NOT set a user-facing `error` here: it rendered as a red banner
+            // that (a) was misleading on project/studio routes that don't
+            // "redirect", and (b) flashed during a normal new-chat recovery
+            // (JB43-STUDIO-CHAT-FIXES-0625).
+            setActiveThread(null);
+            setMessages([]);
+            setThreadNotFound(true);
+            recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
+          }
+          return;
+        }
+        // Reset the flag any time we successfully take a non-URL branch
+        setThreadNotFound(false);
+
+        // --- Branch 3: Unassigned chat, no URL thread → wait for first send ---
+        if (!hasProjectId(projectId)) {
+          // Don't POST anything. activeThread stays null; sendMessage will
+          // create the thread on first user message (Option B semantics).
+          // Still load the sidebar list so past threads are browsable.
           await loadThreads();
-        } else {
-          // URL pointed at a thread we can't fetch (deleted / bad id / auth).
-          // Don't fall through to get_or_create — that would silently
-          // resurrect a different thread. SHORT-CIRCUIT recovery: a 404
-          // here is permanent (thread is genuinely gone), retrying 5x
-          // floods the console with errors and leaves the user stranded.
-          // `threadNotFound` is the recovery signal — the surface-aware
-          // `onThreadNotFound` handler (CenterChatPanel) routes the user to a
-          // fresh blank chat for its surface (/studio/[id] or /w/chat). We do
-          // NOT set a user-facing `error` here: it rendered as a red banner
-          // that (a) was misleading on project/studio routes that don't
-          // "redirect", and (b) flashed during a normal new-chat recovery
-          // (JB43-STUDIO-CHAT-FIXES-0625).
+          if (mySignal.aborted) return;
           setActiveThread(null);
           setMessages([]);
-          setThreadNotFound(true);
-          recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
+          return;
         }
-        return;
-      }
-      // Reset the flag any time we successfully take a non-URL branch
-      setThreadNotFound(false);
 
-      // --- Branch 3: Unassigned chat, no URL thread → wait for first send ---
-      if (!hasProjectId(projectId)) {
-        // Don't POST anything. activeThread stays null; sendMessage will
-        // create the thread on first user message (Option B semantics).
-        // Still load the sidebar list so past threads are browsable.
+        // --- Branch 2: Project-scoped chat, no URL thread → start BLANK ---
+        // A bare project chat (no ?thread) opens a FRESH conversation rather than
+        // auto-resuming the most-recent thread. sendMessage creates the project-
+        // scoped thread on the first user message (mirrors Branch 3). Past threads
+        // stay browsable via the list / selectThread. (JB33-NEW-THREAD-ON-BLANK)
         await loadThreads();
         if (mySignal.aborted) return;
         setActiveThread(null);
         setMessages([]);
         return;
+      } catch (err) {
+        // Silently ignore aborts from unmount/context change
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return;
+        }
+        console.error('[LandscaperThreads] Failed to initialize thread:', err);
+        setError('Failed to initialize chat thread');
+      } finally {
+        setIsThreadLoading(false);
+        initializingRef.current = false;
+        initPromiseRef.current = null;
+        hasInitializedOnceRef.current = true;
       }
+    };
 
-      // --- Branch 2: Project-scoped chat, no URL thread → start BLANK ---
-      // A bare project chat (no ?thread) opens a FRESH conversation rather than
-      // auto-resuming the most-recent thread. sendMessage creates the project-
-      // scoped thread on the first user message (mirrors Branch 3). Past threads
-      // stay browsable via the list / selectThread. (JB33-NEW-THREAD-ON-BLANK)
-      await loadThreads();
-      if (mySignal.aborted) return;
-      setActiveThread(null);
-      setMessages([]);
-      return;
-    } catch (err) {
-      // Silently ignore aborts from unmount/context change
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return;
-      }
-      console.error('[LandscaperThreads] Failed to initialize thread:', err);
-      setError('Failed to initialize chat thread');
-    } finally {
-      setIsThreadLoading(false);
-      initializingRef.current = false;
-      hasInitializedOnceRef.current = true;
-    }
+    const promise = run();
+    initPromiseRef.current = promise;
+    return promise;
   }, [projectId, pageContext, subtabContext, initialThreadId, loadThreads, loadThreadById, loadThreadMessages, fetchWithTimeout, getAuthHeaders, isAuthError]);
 
   /**

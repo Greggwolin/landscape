@@ -1241,17 +1241,22 @@
    so the artifact reads like a Claude.ai document instead of dark
    chat chrome. RP-CFRPT-2605 Phase 3 follow-up. */
 .artifacts-panel-body.artifact-takeover {
-  background: #ffffff;
+  /* QX (2026-10-14): the desk stays dark; the artifact is a white sheet ON
+     it, with the card's own edge, radius and shadow kept. Full-bleed white
+     read as a hole in the theme rather than a document (walk-through item 9).
+     The light palette inside the sheet is deliberate — Landscaper builds
+     artifacts on the fly and they print and export light. */
+  background: var(--cui-body-bg, #0b1220);
   color: #1a1a1a;
-  padding: 0;
+  padding: 10px;
   gap: 0;
 }
 
 .artifacts-panel-body.artifact-takeover .w-rail-card {
   background: #ffffff;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--w-card-radius, 8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
 
 /* Force CoreUI body-color tokens to read as dark-on-light inside the
@@ -1266,6 +1271,39 @@
   --cui-tertiary-bg: #efefee;
   --cui-border-color: #e5e5e2;
   --cui-border-color-translucent: rgba(0, 0, 0, 0.08);
+}
+
+/* The folded chat (QX 1a, 2026-10-14): a strip on the panel's left edge
+   while a wide artifact or screen has the row. One button, which brings the
+   chat back. */
+.chat-folded-strip {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
+  background: var(--w-panel-bg, #1a1e28);
+  border-right: 1px solid var(--w-border);
+}
+.chat-folded-btn {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  border: 0;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 8px 4px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.chat-folded-btn:hover {
+  color: var(--cui-body-color);
+  background: rgba(255, 255, 255, 0.06);
+}
+.prp-toggle-btn--edge {
+  margin-left: 14px;
 }
 
 /* Collapsed strip — mirrors left sidebar collapsed behavior */
