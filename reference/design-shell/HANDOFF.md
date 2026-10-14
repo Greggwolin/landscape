@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-10-14.** This July bundle is replaced by `docs/design-reference/` (Slice 1 reference, format spec, invariants, stylesheet and handoff as of 2026-10-14). Do not build from this folder.
+
 # HANDOFF — Landscape Land Design Sessions
 _Read this first in any new chat. Written 2026-07-14 at the end of the slice-1 design session._
 

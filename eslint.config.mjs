@@ -32,6 +32,7 @@ const eslintConfig = [
       "docs/**/*.tsx",
       // Ignore reference materials
       "reference/**",
+      "docs/design-reference/**",
       // Ignore uploads directories
       "backend/uploads/**",
       "uploads/**",

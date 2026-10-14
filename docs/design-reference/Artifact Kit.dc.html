@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="stylesheet" href="_ds/nocturne-6b8d13e3-1944-4177-99b1-78d2e94e8ae6/styles.css">
+  <script src="_ds/nocturne-6b8d13e3-1944-4177-99b1-78d2e94e8ae6/_ds_bundle.js"></script>
+  <style>
+    html, body { margin: 0; background: #101120 !important; }
+    .tag, .btn { white-space: nowrap; }
+    a { color: var(--color-accent); }
+    a:hover { color: var(--color-accent-400); }
+  </style>
+</helmet>
+
+<section style="padding: 40px; display: flex; flex-direction: column; gap: 24px; background: #101120; min-height: 100vh; font-family: var(--font-body);">
+
+  <div style="max-width: 900px;">
+    <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">Landscape — Artifact Kit</div>
+    <h2 style="color: var(--color-text); margin-top: 6px;">A design language for what Landscaper builds on the fly.</h2>
+    <p style="color: var(--color-neutral-400); font-size: 14px; max-width: 82ch; line-height: 1.6;">Ad-hoc artifacts ("show me the P&amp;L for year 6") can't map to pre-built screens — Landscaper composes them. Today that composition works but looks beneath the hand-built surfaces. This kit is the fix: <strong style="color: var(--color-neutral-200);">a fixed anatomy + six body primitives with hard rules</strong>, so anything assembled from them looks native. Designed <strong style="color: var(--color-neutral-200);">panel-width-first</strong>: the default render target is the right panel (~560px beside a full-width chat, like a Claude/ChatGPT artifact pane), not a full page — expanding the panel relaxes density, never changes structure.</p>
+    <div style="display: flex; gap: 18px; font-size: 12px; color: var(--color-neutral-500); margin-top: 4px;">
+      <span><a href="#k0">K0 anatomy &amp; primitives</a></span>
+      <span><a href="#k1">K1 P&amp;L — Year 6</a></span>
+      <span><a href="#k2">K2 Rent Roll (Detail) — redone</a></span>
+      <span><a href="#k3">K3 editable artifact — commit/discard</a></span>
+      <span><a href="#k4">K4 narrative report</a></span>
+      <span><a href="#k5">K5 map + table</a></span>
+      <span><a href="#k6">K6 workbench collapse</a></span>
+      <span><a href="#k7">K7 period window</a></span>
+      <span><a href="#k8">K8 map authoring</a></span>
+      <span><a href="#k9">K9 project home</a></span>
+      <span><a href="#k10">K10 capital stack</a></span>
+    </div>
+
+    <div style="width: 1200px; background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); padding: 16px 20px; color: var(--color-text); margin-top: 16px;">
+      <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">Screen → panel composition map</div>
+      <div style="font-size: 11.5px; color: var(--color-neutral-500); margin-top: 4px;">Every Slice 1 screen is the full-page (⛶) composition; this is how each renders at 560px. Most are mechanical — only three needed drawing.</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px 20px; margin-top: 10px; font-size: 12px; line-height: 1.8;">
+        <div>
+          <div style="font-weight: 600; border-bottom: 1px solid var(--color-neutral-800); padding-bottom: 3px; margin-bottom: 3px;">Stack &amp; truncate <span style="font-weight: 400; color: var(--color-neutral-500);">— KPI strip + table, done</span></div>
+          <div style="color: var(--color-neutral-400);">C5 Costs · C6 Revenue · C11 income approach (per sub-tab) · C2-MF rent roll (≡ <a href="#k2">K2</a>) · A2/C9 DMS · B1/B4/B5 intake reads</div>
+        </div>
+        <div>
+          <div style="font-weight: 600; border-bottom: 1px solid var(--color-neutral-800); padding-bottom: 3px; margin-bottom: 3px;">Sub-views / drill-down <span style="font-weight: 400; color: var(--color-neutral-500);">— <a href="#k6">K6</a> seg switcher</span></div>
+          <div style="color: var(--color-neutral-400);">C3/C4 Market · C7 Capitalization → <a href="#k10">K10 capital stack</a> · Dev Sales · B2 precedence chain (drill) · Land Uses picker (breadcrumb drill)</div>
+        </div>
+        <div>
+          <div style="font-weight: 600; border-bottom: 1px solid var(--color-neutral-800); padding-bottom: 3px; margin-bottom: 3px;">Special patterns</div>
+          <div style="color: var(--color-neutral-400);">C12 cash flow → <a href="#k7">K7 period window</a> · C2 parcels → <a href="#k8">K8 map authoring</a> · C1 home → <a href="#k9">K9</a> · C10 comps ≡ <a href="#k5">K5</a> · C8 Reports → narrative (<a href="#k4">K4</a>) · A1 map home: full-page only — the map is the page</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 24px; align-items: flex-start;">
+
+    <!-- ══════════ K0 — ANATOMY & PRIMITIVES ══════════ -->
+    <div id="k0" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K0</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">Anatomy — every artifact is header → sections of primitives → footer. No artifact ever starts with a bare table.</span>
+      </div>
+
+      <div data-screen-label="K0 Anatomy" style="width: 560px; background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); padding: 18px 20px; color: var(--color-text); display: flex; flex-direction: column; gap: 14px; font-size: 12.5px;">
+
+        <div>
+          <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">1 · Header — mandatory, always this shape</div>
+          <div style="border: 1px dashed var(--color-neutral-700); border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">kicker · project / subject</span>
+              <span style="margin-left: auto; display: flex; gap: 6px; color: var(--color-neutral-500); font-size: 11px;">pin · copy · save · ✕</span>
+            </div>
+            <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Artifact title — what was asked</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+              <span class="tag tag-accent" style="font-size: 9px;">live</span>
+              <span class="tag tag-outline" style="font-size: 9px;">frozen · Jun 25</span>
+              <span class="tag tag-outline" style="font-size: 9px; border-color: #c9a44a; color: #c9a44a;">scenario — not committed</span>
+              <span style="font-size: 10.5px; color: var(--color-neutral-500);">← binding chip: exactly one, always visible</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">2 · Body — six primitives, nothing else</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px;"><div style="font-weight: 600; font-size: 11.5px;">KPI strip</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">3–6 stats, label-over-value; leads any artifact with a headline number</div></div>
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px;"><div style="font-weight: 600; font-size: 11.5px;">Data table</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">numerics right-aligned; totals rows bold-topped; &gt;20 rows truncate with "showing 20 of N"</div></div>
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px;"><div style="font-weight: 600; font-size: 11.5px;">Section header</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">uppercase kicker + rule; groups primitives; never nests</div></div>
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px;"><div style="font-weight: 600; font-size: 11.5px;">Key-value block</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">2-col label/value grid for assumptions &amp; parameters</div></div>
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px;"><div style="font-weight: 600; font-size: 11.5px;">Chart / map frame</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">titled box, fixed heights (chart 160/240 · map 200/280); axis labels / legend mandatory; map markers number-linked to table rows, and the map always sits <strong>above</strong> the data it depicts → <a href="#k5" style="font-size: 10.5px;">K5</a></div></div>
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px;"><div style="font-weight: 600; font-size: 11.5px;">Annotation</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">muted note for caveats, methodology, source lines</div></div>
+            <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 8px 10px; grid-column: 1 / -1;"><div style="font-weight: 600; font-size: 11.5px;">Narrative</div><div style="font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">flowing prose for reports &amp; synopses — 65ch measure, h3/h4 headings only, inline values are live model references (hover shows source); mixes freely with tables and KPI strips → <a href="#k4" style="font-size: 10.5px;">K4</a></div></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">3 · Footer — provenance, mandatory</div>
+          <div style="border: 1px dashed var(--color-neutral-700); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 8px; display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+            <span>Generated from <span style="color: var(--color-neutral-300);">DCF model v14</span> · Jul 14, 9:02 AM</span>
+            <span style="margin-left: auto;">values trace: <span class="tag tag-outline" style="font-size: 8.5px;">read</span> <span class="tag tag-outline" style="font-size: 8.5px;">assumed</span> <span class="tag tag-outline" style="font-size: 8.5px;">edited</span></span>
+          </div>
+        </div>
+
+        <div style="border-top: 1px solid var(--color-neutral-800); padding-top: 10px; font-size: 11.5px; color: var(--color-neutral-400); line-height: 1.65;">
+          <strong style="color: var(--color-neutral-200);">Hard rules</strong> — not modification_spec options: numerics right-aligned, headers left-aligned, item lists always left-justified (never centered — the question goes away); KPI tile contents centered unless the tile holds a list; currency in $ with thousands separators, unit stated once in the header; one accent color; editable values always dashed-underlined; empty result = annotation primitive explaining why, never a blank table; whenever a map is involved it renders first, directly above the data it shows. <strong style="color: var(--color-neutral-200);">Width contract:</strong> compose for 480px minimum, 560px default; panel expansion widens tables and unstacks KPI strips — it never adds or reorders sections. <strong style="color: var(--color-neutral-200);">Workbench collapse:</strong> multi-region screens (market, dev sales) become sub-views behind a segmented switcher — one region at a time, never side-by-side (<a href="#k6">K6</a>); master-detail column pickers become drill-downs with a breadcrumb.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K1 — P&L YEAR 6 ══════════ -->
+    <div id="k1" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K1</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">"Show me the P&amp;L for year 6 of the projection" — KPI strip + one table + provenance; live-bound, recomputes when the model moves</span>
+      </div>
+
+      <div data-screen-label="K1 P&L Year 6 artifact" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Chadron Terrace · Operations</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⌖ ⧉ 💾 ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">P&amp;L — Projection Year 6 <span style="color: var(--color-neutral-500); font-weight: 400;">(Jul 2031 – Jun 2032)</span></div>
+          <div style="display: flex; gap: 6px; margin-top: 6px;"><span class="tag tag-accent" style="font-size: 9px;">live</span><span style="font-size: 10.5px; color: var(--color-neutral-500);">recomputes with the model · annual view of the monthly projection</span></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-neutral-800);">
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">EGI</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">$3.41M</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">OpEx</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">$1.29M</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">NOI</div><div style="font-size: 17px; font-weight: 600; color: var(--color-accent-200); margin-top: 2px;">$2.12M</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Margin</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">62.1%</div></div>
+        </div>
+
+        <div style="padding: 6px 18px 14px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;"><td style="padding: 8px 0 6px; border-bottom: 1px solid var(--color-neutral-800);">Line item</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Year 6</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">$/unit</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">% EGI</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">vs Y5</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Gross potential rent</td><td style="text-align: right;">$3,682,410</td><td style="text-align: right; color: var(--color-neutral-400);">32,588</td><td style="text-align: right; color: var(--color-neutral-400);">—</td><td style="text-align: right; color: var(--color-accent-200);">+3.0%</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Vacancy &amp; credit loss</td><td style="text-align: right;">($184,121)</td><td style="text-align: right; color: var(--color-neutral-400);">(1,629)</td><td style="text-align: right; color: var(--color-neutral-400);">(5.4%)</td><td style="text-align: right; color: var(--color-neutral-500);">flat</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Other income</td><td style="text-align: right;">$88,940</td><td style="text-align: right; color: var(--color-neutral-400);">787</td><td style="text-align: right; color: var(--color-neutral-400);">2.6%</td><td style="text-align: right; color: var(--color-accent-200);">+2.5%</td></tr>
+            <tr style="font-weight: 600;"><td style="padding: 6px 0; border-top: 1px solid var(--color-neutral-700);">Effective gross income</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">$3,587,229</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">31,745</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">100%</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700); color: var(--color-accent-200);">+3.0%</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Property taxes</td><td style="text-align: right;">($478,200)</td><td style="text-align: right; color: var(--color-neutral-400);">(4,232)</td><td style="text-align: right; color: var(--color-neutral-400);">(13.3%)</td><td style="text-align: right; color: #b06a5a;">+4.1%</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Insurance</td><td style="text-align: right;">($141,250)</td><td style="text-align: right; color: var(--color-neutral-400);">(1,250)</td><td style="text-align: right; color: var(--color-neutral-400);">(3.9%)</td><td style="text-align: right; color: #b06a5a;">+6.0%</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Repairs &amp; maintenance</td><td style="text-align: right;">($226,000)</td><td style="text-align: right; color: var(--color-neutral-400);">(2,000)</td><td style="text-align: right; color: var(--color-neutral-400);">(6.3%)</td><td style="text-align: right; color: var(--color-neutral-500);">+3.0%</td></tr>
+            <tr><td style="padding: 6px 0; color: var(--color-neutral-300);">Payroll · management · utilities · other</td><td style="text-align: right;">($511,340)</td><td style="text-align: right; color: var(--color-neutral-400);">(4,525)</td><td style="text-align: right; color: var(--color-neutral-400);">(14.3%)</td><td style="text-align: right; color: var(--color-neutral-500);">+3.0%</td></tr>
+            <tr style="font-weight: 600;"><td style="padding: 6px 0; border-top: 1px solid var(--color-neutral-700);">Total operating expenses</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">($1,356,790)</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">(12,007)</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">(37.8%)</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700); color: #b06a5a;">+3.6%</td></tr>
+            <tr style="font-weight: 700; font-size: 13px;"><td style="padding: 8px 0; border-top: 2px solid var(--color-neutral-600);">Net operating income</td><td style="text-align: right; border-top: 2px solid var(--color-neutral-600); color: var(--color-accent-200);">$2,230,439</td><td style="text-align: right; border-top: 2px solid var(--color-neutral-600);">19,738</td><td style="text-align: right; border-top: 2px solid var(--color-neutral-600);">62.2%</td><td style="text-align: right; border-top: 2px solid var(--color-neutral-600); color: var(--color-accent-200);">+2.7%</td></tr>
+          </table>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Generated from <span style="color: var(--color-neutral-300);">income approach · monthly projection v14</span> · Jul 14, 9:02 AM</span>
+          <span style="margin-left: auto;">tax reassessment drives the Y6 expense jump — <a href="#k1" style="font-size: 10.5px;">ask why</a></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K2 — RENT ROLL DETAIL, REDONE ══════════ -->
+    <div id="k2" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K2</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">The screenshot-1 artifact redone from the kit — the view-spec ("2 columns hidden") is visible and removable as chips, not buried in the request</span>
+      </div>
+
+      <div data-screen-label="K2 Rent Roll Detail artifact" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Chadron Terrace · Property</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⌖ ⧉ 💾 ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Rent Roll (Detail)</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap;">
+            <span class="tag tag-accent" style="font-size: 9px;">live</span>
+            <span class="tag tag-outline" style="font-size: 9px;">hidden: loss-to-lease ✕</span>
+            <span class="tag tag-outline" style="font-size: 9px;">hidden: market rent ✕</span>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">view-spec chips — same renderer as the Rent Roll screen, ✕ restores a column</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-neutral-800);">
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Units</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">113</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Occupancy</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">90.3%</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Current rent/mo</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">$222,593</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Monthly upside</div><div style="font-size: 17px; font-weight: 600; color: var(--color-accent-200); margin-top: 2px;">$70,237</div></div>
+        </div>
+
+        <div style="padding: 6px 18px 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;"><td style="padding: 8px 0 6px; border-bottom: 1px solid var(--color-neutral-800);">Unit</td><td style="border-bottom: 1px solid var(--color-neutral-800);">Plan</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">SF</td><td style="border-bottom: 1px solid var(--color-neutral-800); padding-left: 16px;">Tenant</td><td style="border-bottom: 1px solid var(--color-neutral-800);">Status</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Current rent</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">$/SF</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">100</td><td style="color: var(--color-neutral-300);">Commercial</td><td style="text-align: right;">1,101</td><td style="padding-left: 16px; color: var(--color-neutral-500);">—</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: #b06a5a; color: #b06a5a;">Vacant</span></td><td style="text-align: right; color: var(--color-neutral-500);">—</td><td style="text-align: right; color: var(--color-neutral-500);">—</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">102</td><td style="color: var(--color-neutral-300);">1BR/1BA</td><td style="text-align: right;">755</td><td style="padding-left: 16px; color: var(--color-neutral-300);">Office</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: var(--color-accent-600); color: var(--color-accent-200);">Occupied</span></td><td style="text-align: right;">$1,716</td><td style="text-align: right; color: var(--color-neutral-400);">$2.27</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">104</td><td style="color: var(--color-neutral-300);">2BR/2BA</td><td style="text-align: right;">1,105</td><td style="padding-left: 16px; color: var(--color-neutral-300);">Beyond Mini Market LLC</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: var(--color-accent-600); color: var(--color-accent-200);">Occupied</span></td><td style="text-align: right;">$1,969</td><td style="text-align: right; color: var(--color-neutral-400);">$1.78</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">202</td><td style="color: var(--color-neutral-300);">1BR/1BA</td><td style="text-align: right;">755</td><td style="padding-left: 16px; color: var(--color-neutral-300);">Crystal Clayton</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: var(--color-accent-600); color: var(--color-accent-200);">Occupied</span></td><td style="text-align: right;">$1,716</td><td style="text-align: right; color: var(--color-neutral-400);">$2.27</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">203</td><td style="color: var(--color-neutral-300);">2BR/2BA</td><td style="text-align: right;">1,105</td><td style="padding-left: 16px; color: var(--color-neutral-300);">Cumari P. Perkins</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: var(--color-accent-600); color: var(--color-accent-200);">Occupied</span></td><td style="text-align: right;">$1,969</td><td style="text-align: right; color: var(--color-neutral-400);">$1.78</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">205</td><td style="color: var(--color-neutral-300);">2BR/2BA</td><td style="text-align: right;">1,105</td><td style="padding-left: 16px; color: var(--color-neutral-300);">Porsha R. McPhearson</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: var(--color-accent-600); color: var(--color-accent-200);">Occupied</span></td><td style="text-align: right;">$1,969</td><td style="text-align: right; color: var(--color-neutral-400);">$1.78</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 600;">206</td><td style="color: var(--color-neutral-300);">1BR/1BA</td><td style="text-align: right;">755</td><td style="padding-left: 16px; color: var(--color-neutral-300);">Maria F. Gonzalez</td><td><span class="tag tag-outline" style="font-size: 8.5px; border-color: var(--color-accent-600); color: var(--color-accent-200);">Occupied</span></td><td style="text-align: right;">$1,716</td><td style="text-align: right; color: var(--color-neutral-400);">$2.27</td></tr>
+          </table>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0 2px; font-size: 11px; color: var(--color-neutral-500);">
+            <span>Showing 7 of 113 units</span>
+            <button class="btn btn-secondary" style="font-size: 10.5px; padding: 2px 10px;">Show all</button>
+            <span style="margin-left: auto;">truncation is a kit rule, not a renderer limit — full grid lives on the <span style="color: var(--color-neutral-300);">Rent Roll screen</span></span>
+          </div>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Generated from <span style="color: var(--color-neutral-300);">rent roll · Chadron 09.17.2025 (V2)</span> · Jul 14, 9:05 AM</span>
+          <span style="margin-left: auto;">edits made on the screen appear here live</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K3 — EDITABLE ARTIFACT ══════════ -->
+    <div id="k3" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K3</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">Editable artifact — the scenario chip + commit bar make "playing with numbers" safe: nothing touches the model until Commit</span>
+      </div>
+
+      <div data-screen-label="K3 Renovation budget editable artifact" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Chadron Terrace · Renovation</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⌖ ⧉ 💾 ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">1BR Renovation Budget — per-unit scope</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+            <span class="tag tag-outline" style="font-size: 9px; border-color: #c9a44a; color: #c9a44a;">scenario — 2 edits, not committed</span>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">dashed underline = editable; edited values flag until committed</span>
+          </div>
+        </div>
+
+        <div style="padding: 12px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Flooring — LVP throughout</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">$4,200</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Appliance package — stainless</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">$3,100</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Cabinet fronts + hardware</span><span style="border-bottom: 1px dashed #c9a44a; cursor: text; color: #c9a44a; font-weight: 600;">$2,850 <span style="font-size: 9.5px; font-weight: 400;">was $2,400</span></span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Countertops — quartz</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">$1,900</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Paint + patch</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">$1,150</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Bath refresh — tub reglaze, fixtures</span><span style="border-bottom: 1px dashed #c9a44a; cursor: text; color: #c9a44a; font-weight: 600;">$2,300 <span style="font-size: 9.5px; font-weight: 400;">was $1,850</span></span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Lighting + electrical</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">$780</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Contingency</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">8%</span></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--color-neutral-800); border-top: 1px solid var(--color-neutral-800);">
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Per unit</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">$17,585 <span style="font-size: 11px; color: #c9a44a;">was $16,610</span></div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">× 45 units</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">$791,325</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Rent premium req'd</div><div style="font-size: 17px; font-weight: 600; margin-top: 2px;">$147/mo <span style="font-size: 11px; color: var(--color-neutral-500);">@ 10% return</span></div></div>
+        </div>
+
+        <div style="padding: 10px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 11px; color: #c9a44a;">2 uncommitted edits — totals shown are the scenario</span>
+          <button class="btn btn-ghost" style="margin-left: auto; font-size: 11.5px;">Discard</button>
+          <button class="btn btn-secondary" style="font-size: 11.5px;">Save as artifact</button>
+          <button class="btn btn-primary" style="font-size: 11.5px;">Commit to model</button>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Generated from <span style="color: var(--color-neutral-300);">renovation scope · library defaults + contractor bid 6/25</span> · Jul 14, 9:11 AM</span>
+          <span style="margin-left: auto;">Commit writes the edited lines to the model, flagged <span class="tag tag-outline" style="font-size: 8.5px;">edited</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K4 — NARRATIVE REPORT ══════════ -->
+    <div id="k4" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K4</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">Narrative primitive — "write me a synopsis of…" anything: project, document, platform intelligence. Prose with live model references, mixed with other primitives</span>
+      </div>
+
+      <div data-screen-label="K4 Narrative report artifact" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Chadron Terrace · Synopsis</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⌖ ⧉ 💾 ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Investment synopsis — where the deal stands</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+            <span class="tag tag-accent" style="font-size: 9px;">live</span>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">underlined figures are model references — they update with it; hover shows source</span>
+          </div>
+        </div>
+
+        <div style="padding: 14px 18px; font-size: 12.5px; line-height: 1.7; color: var(--color-neutral-300); max-width: 65ch;">
+          <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600; margin-bottom: 6px;">The setup</div>
+          <p style="margin: 0 0 10px;">Chadron Terrace is a <span style="border-bottom: 1px dotted var(--color-accent-600); color: var(--color-text);">113-unit</span> 1971-vintage community in Hawthorne, CA, running <span style="border-bottom: 1px dotted var(--color-accent-600); color: var(--color-text);">90.3% occupied</span> with in-place rents averaging <span style="border-bottom: 1px dotted var(--color-accent-600); color: var(--color-text);">$2,150/unit</span> — <span style="border-bottom: 1px dotted var(--color-accent-600); color: var(--color-text);">20.5% below</span> the comp-set market rate. The rent roll (V2, 9/17/25) is the governing source; four suspect cells remain flagged against Landscaper's market estimates.</p>
+          <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600; margin: 12px 0 6px;">What the numbers say</div>
+          <p style="margin: 0 0 10px;">The income approach carries a PV of <span style="border-bottom: 1px dotted var(--color-accent-600); color: var(--color-text);">$38.3M</span>. The loss-to-lease of <span style="border-bottom: 1px dotted var(--color-accent-600); color: var(--color-text);">$67.5K/month</span> is the whole thesis: the 1BR renovation scenario (<span style="border-bottom: 1px dotted #c9a44a; color: #c9a44a;">$17.6K/unit, uncommitted</span>) needs a $147/mo premium to clear a 10% return, against an observed $180–240 spread at renovated comps.</p>
+          <div style="font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600; margin: 12px 0 6px;">Open questions</div>
+          <p style="margin: 0;">Commercial unit 100 has sat vacant through the trailing period; the office unit's below-market lease has no recorded end date; and the Y6 tax reassessment assumption drives most of the late-projection expense growth. All three are open items on the project home.</p>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Synthesized from <span style="color: var(--color-neutral-300);">rent roll V2 · income approach v14 · market comp set</span> · Jul 14, 9:18 AM</span>
+          <span style="margin-left: auto;">exportable — Save as PDF / copy as doc</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K5 — MAP + TABLE ══════════ -->
+    <div id="k5" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K5</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">Map + table at panel width: stacked, number-linked (pin ③ = row ③, selection syncs both ways). Panel expansion puts them side-by-side — never shrinks the map</span>
+      </div>
+
+      <div data-screen-label="K5 Comp sales map artifact" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Chadron Terrace · Valuation</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⌖ ⧉ 💾 ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Comparable sales within 2 miles</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+            <span class="tag tag-accent" style="font-size: 9px;">live</span>
+            <span class="tag tag-outline" style="font-size: 9px;">filter: sold ≤ 24 mo ✕</span>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">same comp set as the Sales Comparison screen</span>
+          </div>
+        </div>
+
+        <div style="margin: 12px 18px 0; border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); overflow: hidden;">
+          <div style="height: 200px; background: var(--color-neutral-900); position: relative;">
+            <div style="position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-neutral-600); font-size: 11px;">map · hybrid basemap</div>
+            <span style="position: absolute; left: 46%; top: 44%; width: 22px; height: 22px; border-radius: 50%; background: var(--color-accent); color: #0d1420; display: grid; place-items: center; font-size: 11px; font-weight: 700; border: 2px solid #0d1420;">S</span>
+            <span style="position: absolute; left: 30%; top: 30%; width: 20px; height: 20px; border-radius: 50%; background: var(--color-surface); color: var(--color-text); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; border: 1px solid var(--color-neutral-600);">1</span>
+            <span style="position: absolute; left: 62%; top: 24%; width: 20px; height: 20px; border-radius: 50%; background: color-mix(in srgb, var(--color-accent) 30%, var(--color-surface)); color: var(--color-text); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; border: 1px solid var(--color-accent);">2</span>
+            <span style="position: absolute; left: 70%; top: 62%; width: 20px; height: 20px; border-radius: 50%; background: var(--color-surface); color: var(--color-text); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; border: 1px solid var(--color-neutral-600);">3</span>
+            <span style="position: absolute; left: 22%; top: 66%; width: 20px; height: 20px; border-radius: 50%; background: var(--color-surface); color: var(--color-text); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; border: 1px solid var(--color-neutral-600);">4</span>
+            <div style="position: absolute; left: 10px; bottom: 8px; font-size: 9.5px; color: var(--color-neutral-400); background: color-mix(in srgb, var(--color-bg) 75%, transparent); padding: 2px 8px; border-radius: var(--radius-sm);">● S subject · numbered pins = table rows · comp 2 selected</div>
+          </div>
+        </div>
+
+        <div style="padding: 8px 18px 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;"><td style="padding: 6px 0; border-bottom: 1px solid var(--color-neutral-800);">#</td><td style="border-bottom: 1px solid var(--color-neutral-800);">Sale</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Units</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Date</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Price/unit</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Cap</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Dist</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 700; color: var(--color-neutral-400);">1</td><td style="color: var(--color-neutral-300);">Lemoli Flats</td><td style="text-align: right;">29</td><td style="text-align: right; color: var(--color-neutral-400);">Feb 26</td><td style="text-align: right;">$318,900</td><td style="text-align: right;">5.1%</td><td style="text-align: right; color: var(--color-neutral-400);">0.4 mi</td></tr>
+            <tr style="background: color-mix(in srgb, var(--color-accent) 10%, transparent);"><td style="padding: 5px 0; font-weight: 700; color: var(--color-accent-200);">2</td><td style="font-weight: 600;">Airo at South Bay</td><td style="text-align: right;">230</td><td style="text-align: right; color: var(--color-neutral-400);">Nov 25</td><td style="text-align: right;">$402,150</td><td style="text-align: right;">4.7%</td><td style="text-align: right; color: var(--color-neutral-400);">1.2 mi</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 700; color: var(--color-neutral-400);">3</td><td style="color: var(--color-neutral-300);">Bell South Bay</td><td style="text-align: right;">264</td><td style="text-align: right; color: var(--color-neutral-400);">Aug 25</td><td style="text-align: right;">$388,600</td><td style="text-align: right;">4.9%</td><td style="text-align: right; color: var(--color-neutral-400);">1.8 mi</td></tr>
+            <tr><td style="padding: 5px 0; font-weight: 700; color: var(--color-neutral-400);">4</td><td style="color: var(--color-neutral-300);">Palm View Village</td><td style="text-align: right;">44</td><td style="text-align: right; color: var(--color-neutral-400);">Jun 25</td><td style="text-align: right;">$296,400</td><td style="text-align: right;">5.4%</td><td style="text-align: right; color: var(--color-neutral-400);">0.6 mi</td></tr>
+            <tr style="font-weight: 600;"><td style="padding: 6px 0; border-top: 1px solid var(--color-neutral-700);" colspan="4">Indicated range · subject @ 113 units</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">$296–402K</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">4.7–5.4%</td><td style="border-top: 1px solid var(--color-neutral-700);"></td></tr>
+          </table>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Generated from <span style="color: var(--color-neutral-300);">sales comparison comp set</span> · Jul 14, 9:24 AM</span>
+          <span style="margin-left: auto;">rule: a map must carry linkage (selection ↔ rows) — otherwise omit it and cite distances</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K6 — WORKBENCH COLLAPSE ══════════ -->
+    <div id="k6" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K6</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px; max-width: 60ch;">The two-layout contract: a multi-region screen (here Market · SFD Pricing) renders in the panel as sub-views behind a seg switcher — same components as the full page, one region at a time. The ⛶ expand action opens the full-page layout</span>
+      </div>
+
+      <div data-screen-label="K6 Workbench collapse — Market panel view" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Peoria Meadows · Property · Market</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⛶ ⌖ ⧉ ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">SFD Pricing</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+            <div style="display: flex; border: 1px solid var(--color-neutral-700); border-radius: var(--radius-sm); overflow: hidden; font-size: 10.5px;">
+              <span style="padding: 4px 10px; background: color-mix(in srgb, var(--color-accent) 18%, transparent); color: var(--color-accent-200); font-weight: 600; white-space: nowrap;">Pricing</span>
+              <span style="padding: 4px 10px; color: var(--color-neutral-400); white-space: nowrap;">Map</span>
+              <span style="padding: 4px 10px; color: var(--color-neutral-400); white-space: nowrap;">Projects</span>
+              <span style="padding: 4px 10px; color: var(--color-neutral-400); white-space: nowrap;">Insights</span>
+            </div>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">4 regions of the full page → 4 sub-views</span>
+          </div>
+        </div>
+
+        <div style="padding: 10px 18px 0; display: flex; gap: 6px; flex-wrap: wrap;">
+          <span class="tag tag-outline" style="font-size: 9px;">radius 3 mi ✕</span>
+          <span class="tag tag-outline" style="font-size: 9px;">last 180 days ✕</span>
+          <span class="tag tag-outline" style="font-size: 9px;">136 comps</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-neutral-800); margin-top: 10px;">
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Median</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">$700,000</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Median $/SF</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">$257</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">25–75th %ile</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">$597–886K</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Avg year built</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">2012</div></div>
+        </div>
+
+        <div style="padding: 6px 18px 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;"><td style="padding: 8px 0 6px; border-bottom: 1px solid var(--color-neutral-800);">Sold</td><td style="border-bottom: 1px solid var(--color-neutral-800);">Address</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Year</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Lot SF</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">Price</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-400);">Jul 13</td><td><span style="color: #b06a5a;">●</span> 26510 N 100th Ln</td><td style="text-align: right;">2026</td><td style="text-align: right;">46,609</td><td style="text-align: right;">$940,990</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-400);">Jul 10</td><td><span style="color: #5a9a6e;">●</span> 27582 N 90th Ln</td><td style="text-align: right;">2005</td><td style="text-align: right;">6,325</td><td style="text-align: right;">$565,000</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-400);">Jul 10</td><td><span style="color: #5a9a6e;">●</span> 27348 N 90th Ln</td><td style="text-align: right;">2005</td><td style="text-align: right;">6,985</td><td style="text-align: right;">$589,900</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-400);">Jul 10</td><td><span style="color: #b06a5a;">●</span> 27420 N 85th Dr</td><td style="text-align: right;">2004</td><td style="text-align: right;">23,936</td><td style="text-align: right;">$905,000</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-400);">Jul 9</td><td><span style="color: #c9a44a;">●</span> 8002 W Rowel Rd</td><td style="text-align: right;">2026</td><td style="text-align: right;">9,100</td><td style="text-align: right;">$702,900</td></tr>
+          </table>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0 2px; font-size: 11px; color: var(--color-neutral-500);">
+            <span>Showing 5 of 136 · ● percentile color carries to the Map sub-view</span>
+            <button class="btn btn-secondary" style="margin-left: auto; font-size: 10.5px; padding: 2px 10px;">Show all</button>
+          </div>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500); line-height: 1.5;">
+          <span>Same rules for Dev Sales: Areas &amp; Phases / Pricing / Parcel Sales become sub-views; Land-Uses-style column pickers become a drill-down (Families ▸ Residential ▸ SFD) with breadcrumb back</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K7 — PERIOD WINDOW ══════════ -->
+    <div id="k7" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K7</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">C12 cash flow at panel width — the 96-period table becomes a period window: 3 periods + Overall pinned, ‹ › pages through time. Truncation in time, not rows</span>
+      </div>
+
+      <div data-screen-label="K7 Cash flow period window" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Peoria 1600 · Valuation · Cash Flow</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⛶ ⌖ ⧉ ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Project Cash Flow</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+            <div style="display: flex; border: 1px solid var(--color-neutral-700); border-radius: var(--radius-sm); overflow: hidden; font-size: 10.5px;">
+              <span style="padding: 4px 10px; background: color-mix(in srgb, var(--color-accent) 18%, transparent); color: var(--color-accent-200); font-weight: 600; white-space: nowrap;">Cash flow</span>
+              <span style="padding: 4px 10px; color: var(--color-neutral-400); white-space: nowrap;">Assumptions</span>
+              <span style="padding: 4px 10px; color: var(--color-neutral-400); white-space: nowrap;">Results</span>
+            </div>
+            <span class="tag tag-accent" style="font-size: 9px; margin-left: auto;">live</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-neutral-800);">
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Net revenue</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">$427.9M</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Total costs</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">$149.6M</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">IRR</div><div style="font-size: 16px; font-weight: 600; color: var(--color-accent-200); margin-top: 2px;">51.2%</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Equity multiple</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">2.93×</div></div>
+        </div>
+
+        <div style="padding: 10px 18px 0; display: flex; align-items: center; gap: 8px; font-size: 11px;">
+          <div style="display: flex; border: 1px solid var(--color-neutral-700); border-radius: var(--radius-sm); overflow: hidden; font-size: 10px;">
+            <span style="padding: 3px 9px; background: color-mix(in srgb, var(--color-accent) 18%, transparent); color: var(--color-accent-200); font-weight: 600;">Annual</span>
+            <span style="padding: 3px 9px; color: var(--color-neutral-400);">Monthly</span>
+          </div>
+          <span style="margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--color-neutral-400);">
+            <button class="btn btn-ghost" style="font-size: 11px; padding: 2px 8px;">‹</button>
+            <span style="font-weight: 600; color: var(--color-neutral-200);">2026 – 2028</span>
+            <button class="btn btn-ghost" style="font-size: 11px; padding: 2px 8px;">›</button>
+            <span style="color: var(--color-neutral-500);">of 2026–33</span>
+          </span>
+        </div>
+
+        <div style="padding: 4px 18px 10px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;"><td style="padding: 8px 0 6px; border-bottom: 1px solid var(--color-neutral-800);">Section</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">2026</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">2027</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800);">2028</td><td style="text-align: right; border-bottom: 1px solid var(--color-neutral-800); color: var(--color-accent-300);">Overall</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-300);">Revenue</td><td style="text-align: right;">$0</td><td style="text-align: right;">$18.4M</td><td style="text-align: right;">$64.2M</td><td style="text-align: right; font-weight: 600;">$427.9M</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-300);">Project costs</td><td style="text-align: right;">($21.6M)</td><td style="text-align: right;">($38.1M)</td><td style="text-align: right;">($27.9M)</td><td style="text-align: right; font-weight: 600;">($149.6M)</td></tr>
+            <tr style="font-weight: 600;"><td style="padding: 5px 0; border-top: 1px solid var(--color-neutral-700);">Net cash flow</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">($21.6M)</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">($19.7M)</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700);">$36.3M</td><td style="text-align: right; border-top: 1px solid var(--color-neutral-700); color: var(--color-accent-200);">$278.3M</td></tr>
+            <tr><td style="padding: 5px 0; color: var(--color-neutral-400);">Cumulative</td><td style="text-align: right; color: #b06a5a;">($21.6M)</td><td style="text-align: right; color: #b06a5a;">($41.3M)</td><td style="text-align: right; color: var(--color-neutral-300);">($5.0M)</td><td style="text-align: right; color: var(--color-accent-200);">$278.3M</td></tr>
+          </table>
+          <div style="font-size: 10.5px; color: var(--color-neutral-500); padding: 6px 0 2px;">Sections expand to line items in place; drill-down cells open the source artifact. Full 96-period grid on the ⛶ screen.</div>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Generated from <span style="color: var(--color-neutral-300);">land DCF · 96 periods · 6 sections</span> · Jul 14, 9:31 AM</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K8 — MAP AUTHORING ══════════ -->
+    <div id="k8" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K8</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">C2 parcel authoring at panel width — map on top (selection, not drawing), attributes of the selected parcel editable below. Geometry editing is expand-only: drawing needs the full-page map</span>
+      </div>
+
+      <div data-screen-label="K8 Parcel authoring panel" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Red Valley Ranch · Property</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⛶ ⌖ ⧉ ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Parcels — Phase 1</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+            <span class="tag tag-accent" style="font-size: 9px;">live</span>
+            <span class="tag tag-outline" style="font-size: 9px;">filter: Phase 1 ✕</span>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">tap a parcel to select · draw &amp; split on ⛶ only</span>
+          </div>
+        </div>
+
+        <div style="margin: 12px 18px 0; border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); overflow: hidden;">
+          <div style="height: 200px; background: var(--color-neutral-900); position: relative;">
+            <div style="position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-neutral-600); font-size: 11px;">map · parcel plan overlay</div>
+            <div style="position: absolute; left: 18%; top: 22%; width: 120px; height: 70px; border: 1px solid var(--color-neutral-600); border-radius: 3px; display: grid; place-items: center; font-size: 10px; color: var(--color-neutral-400);">1.101</div>
+            <div style="position: absolute; left: 44%; top: 30%; width: 130px; height: 84px; border: 2px solid var(--color-accent); background: color-mix(in srgb, var(--color-accent) 14%, transparent); border-radius: 3px; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; color: var(--color-accent-200);">1.102 ✓</div>
+            <div style="position: absolute; left: 30%; top: 62%; width: 110px; height: 58px; border: 1px solid var(--color-neutral-600); border-radius: 3px; display: grid; place-items: center; font-size: 10px; color: var(--color-neutral-400);">1.103</div>
+            <div style="position: absolute; left: 10px; bottom: 8px; font-size: 9.5px; color: var(--color-neutral-400); background: color-mix(in srgb, var(--color-bg) 75%, transparent); padding: 2px 8px; border-radius: var(--radius-sm);">parcel 1.102 selected — attributes below</div>
+          </div>
+        </div>
+
+        <div style="padding: 12px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Use type</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: pointer;">SFD ▾</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Product</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: pointer;">60x125 ▾</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Acres</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">25.00</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Units</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">82</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Phase</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: pointer;">1.2 ▾</span></div>
+          <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--color-neutral-900);"><span style="color: var(--color-neutral-400);">Sale period</span><span style="border-bottom: 1px dashed var(--color-accent-700); cursor: text;">26 · 02/01/2027</span></div>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Attribute edits commit directly, flagged <span class="tag tag-outline" style="font-size: 8.5px;">edited</span> · geometry: <span style="color: var(--color-neutral-300);">⛶ open full map</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K9 — PROJECT HOME PANEL ══════════ -->
+    <div id="k9" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K9</span>
+        <span style="color: var(--color-neutral-300); font-size: 13px;">C1 project home at panel width — not a dashboard: what changed and what needs deciding, each item a chat handoff. The full-page home carries the map and section roll-ups</span>
+      </div>
+
+      <div data-screen-label="K9 Project home panel" style="width: 560px; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); color: var(--color-text); display: flex; flex-direction: column;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid var(--color-neutral-800);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-neutral-500);">Red Valley Ranch · Home</span>
+            <span style="margin-left: auto; display: flex; gap: 10px; color: var(--color-neutral-500); font-size: 12px;">⛶ ⌖ ⧉ ✕</span>
+          </div>
+          <div style="font-size: 16px; font-weight: 600; margin-top: 2px;">Where the deal stands</div>
+          <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+            <span class="tag tag-accent" style="font-size: 9px;">live</span>
+            <span style="font-size: 10.5px; color: var(--color-neutral-500);">Maricopa, AZ · 164 ac · 544 lots · $11.93M contract</span>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--color-neutral-800);">
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Levered IRR</div><div style="font-size: 16px; font-weight: 600; color: var(--color-accent-200); margin-top: 2px;">21.6%</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Peak equity</div><div style="font-size: 16px; font-weight: 600; margin-top: 2px;">$9.6M</div></div>
+          <div style="background: var(--color-bg); padding: 10px 14px; text-align: center;"><div style="font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">Open items</div><div style="font-size: 16px; font-weight: 600; color: #c9a44a; margin-top: 2px;">2</div></div>
+        </div>
+
+        <div style="padding: 12px 18px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">Needs deciding</div>
+          <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 9px 12px; display: flex; align-items: center; gap: 10px; font-size: 12px;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #c9a44a; flex-shrink: 0;"></span>
+            <span style="color: var(--color-neutral-300);">Gross site area — exhibit legend sums 1,090 ac, no boundary survey</span>
+            <button class="btn btn-secondary" style="margin-left: auto; font-size: 10.5px; padding: 2px 10px; flex-shrink: 0;">Resolve in chat</button>
+          </div>
+          <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 9px 12px; display: flex; align-items: center; gap: 10px; font-size: 12px;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #c9a44a; flex-shrink: 0;"></span>
+            <span style="color: var(--color-neutral-300);">Offsite sewer participation — assumed, no agreement in the record</span>
+            <button class="btn btn-secondary" style="margin-left: auto; font-size: 10.5px; padding: 2px 10px; flex-shrink: 0;">Resolve in chat</button>
+          </div>
+
+          <div style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600; margin-top: 6px;">Since you were here — Jul 12</div>
+          <div style="font-size: 12px; color: var(--color-neutral-400); line-height: 1.8;">
+            <div>Plat <span style="color: var(--color-neutral-200);">SUB24-09 recorded</span> — entitlement chain updated, 2 assumptions resolved</div>
+            <div>Rate sheet refresh moved the facility to <span style="color: var(--color-neutral-200);">SOFR+275</span> — levered IRR −0.4pt</div>
+            <div>3 new comps in the Maricopa corridor — sales comparison range narrowed</div>
+          </div>
+        </div>
+
+        <div style="padding: 8px 18px; border-top: 1px solid var(--color-neutral-800); display: flex; gap: 10px; font-size: 10.5px; color: var(--color-neutral-500);">
+          <span>Synthesized from <span style="color: var(--color-neutral-300);">project activity since last visit</span> · Jul 14, 9:38 AM</span>
+          <span style="margin-left: auto;">map + section roll-ups on ⛶</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ K10 — CAPITAL STACK ══════════ -->
+    <div id="k10" style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-width: 560px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="background: var(--color-accent); color: #0d1420; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: var(--radius-sm);">K10</span>
+        <span style="font-size: 13px; font-weight: 600; color: var(--color-text);">Capital stack — debt · equity · waterfall</span>
+      </div>
+      <div style="font-size: 11.5px; color: var(--color-neutral-500); max-width: 62ch; line-height: 1.55;">C7 Capitalization at panel width. Four linked mini-models (loans, waterfall structure, results, partners) can't stack in one column — they become three sub-views. Hard rule: <strong style="color: var(--color-neutral-400);">the waterfall renders as a vertical tier ladder in a panel, never a horizontal table</strong> (that's expand-only), and every tier names who gets what.</div>
+
+      <div data-screen-label="K10 Capital stack panel" style="width: 560px; background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); overflow: hidden; font-family: var(--font-body); color: var(--color-text);">
+        <!-- artifact header -->
+        <div style="padding: 12px 16px 10px; border-bottom: 1px solid var(--color-neutral-800); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+          <div>
+            <div style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent-300); font-weight: 600;">Capitalization</div>
+            <div style="font-size: 15px; font-weight: 600; margin-top: 2px;">Capital stack</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="tag tag-outline" style="font-size: 9.5px;">Peoria Lakes 1600</span>
+            <span style="color: var(--color-neutral-500); font-size: 13px;">⛶</span>
+          </div>
+        </div>
+        <!-- seg switcher -->
+        <div style="display: flex; gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--color-neutral-800);">
+          <span style="font-size: 11px; padding: 4px 12px; border-radius: var(--radius-sm); background: var(--color-neutral-800); color: var(--color-neutral-400);">Debt</span>
+          <span style="font-size: 11px; padding: 4px 12px; border-radius: var(--radius-sm); background: var(--color-neutral-800); color: var(--color-neutral-400);">Equity</span>
+          <span style="font-size: 11px; padding: 4px 12px; border-radius: var(--radius-sm); background: var(--color-accent-900); color: var(--color-accent-200); font-weight: 600;">Waterfall</span>
+        </div>
+        <!-- waterfall sub-view -->
+        <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 11px; color: var(--color-neutral-500);">Distributable proceeds</span>
+            <span style="font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;">$212.4M</span>
+          </div>
+          <!-- tier ladder -->
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm) var(--radius-sm) 0 0;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--color-accent-300);">1</span>
+              <div>
+                <div style="font-size: 12px; font-weight: 600;">Return of capital</div>
+                <div style="font-size: 10.5px; color: var(--color-neutral-500);">100% to LP + GP pro rata until contributed capital returned</div>
+              </div>
+              <span style="font-size: 12px; font-variant-numeric: tabular-nums;">$96.0M</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid var(--color-neutral-800); border-top: none;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--color-accent-300);">2</span>
+              <div>
+                <div style="font-size: 12px; font-weight: 600;">Preferred return — 9.0%</div>
+                <div style="font-size: 10.5px; color: var(--color-neutral-500);">100% to LP + GP pro rata until 9% IRR</div>
+              </div>
+              <span style="font-size: 12px; font-variant-numeric: tabular-nums;">$41.7M</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid var(--color-neutral-800); border-top: none;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--color-accent-300);">3</span>
+              <div>
+                <div style="font-size: 12px; font-weight: 600;">Hurdle 1 — to 12% IRR</div>
+                <div style="font-size: 10.5px; color: var(--color-neutral-500);">80% LP · 20% GP promote</div>
+              </div>
+              <span style="font-size: 12px; font-variant-numeric: tabular-nums;">$28.9M</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid var(--color-neutral-800); border-top: none;">
+              <span style="font-size: 10px; font-weight: 700; color: var(--color-accent-300);">4</span>
+              <div>
+                <div style="font-size: 12px; font-weight: 600;">Hurdle 2 — to 18% IRR</div>
+                <div style="font-size: 10.5px; color: var(--color-neutral-500);">70% LP · 30% GP promote</div>
+              </div>
+              <span style="font-size: 12px; font-variant-numeric: tabular-nums;">$31.2M</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid var(--color-neutral-800); border-top: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm);">
+              <span style="font-size: 10px; font-weight: 700; color: var(--color-accent-300);">5</span>
+              <div>
+                <div style="font-size: 12px; font-weight: 600;">Residual</div>
+                <div style="font-size: 10.5px; color: var(--color-neutral-500);">60% LP · 40% GP</div>
+              </div>
+              <span style="font-size: 12px; font-variant-numeric: tabular-nums;">$14.6M</span>
+            </div>
+          </div>
+          <div style="font-size: 10px; color: var(--color-neutral-600);">Waterfall assumptions read from the project — no platform defaults. Full 4-column tier table at ⛶ expand only.</div>
+          <!-- result split -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px;">
+            <div style="background: var(--color-bg); padding: 10px 14px; text-align: center; border-radius: var(--radius-sm);">
+              <div style="font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">LP total · net IRR</div>
+              <div style="font-size: 15px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums;">$164.8M · 14.2%</div>
+            </div>
+            <div style="background: var(--color-bg); padding: 10px 14px; text-align: center; border-radius: var(--radius-sm);">
+              <div style="font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-neutral-500);">GP total · promote</div>
+              <div style="font-size: 15px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums;">$47.6M · $23.1M</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- debt sub-view, shown separately -->
+      <div style="font-size: 11px; color: var(--color-neutral-500); margin-top: 4px;">Debt sub-view — loan cards with the governing constraint surfaced:</div>
+      <div style="width: 560px; background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: var(--radius-md); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; font-family: var(--font-body); color: var(--color-text);">
+        <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div>
+            <div style="font-size: 12px; font-weight: 600;">Acquisition &amp; Development — Senior</div>
+            <div style="font-size: 10.5px; color: var(--color-neutral-500);">SOFR + 285 · IO 36 mo · <span style="border-bottom: 1px dashed var(--color-accent-700);">full recourse ▾</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="tag tag-outline" style="font-size: 9px;">governs: 65% LTC</span>
+            <span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">$182.6M</span>
+          </div>
+        </div>
+        <div style="border: 1px solid var(--color-neutral-800); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div>
+            <div style="font-size: 12px; font-weight: 600;">Mezzanine</div>
+            <div style="font-size: 10.5px; color: var(--color-neutral-500);">Fixed 11.5% · PIK toggle · non-recourse</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="tag tag-outline" style="font-size: 9px;">governs: 80% LTV</span>
+            <span style="font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">$42.1M</span>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--color-neutral-500); padding: 2px 12px 0;">
+          <span>Equity sub-view: partner stack as labeled 100% bar + contribution rows</span>
+          <span style="font-variant-numeric: tabular-nums;">Total debt $224.7M</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+</body>
+</html>
