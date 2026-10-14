@@ -1015,3 +1015,41 @@
   font-size: 11px; font-weight: 400; color: #9397ab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .ds-v2 .ds-body > .wrapper-chat-center .wrapper-header { min-height: 44px; padding-top: 0; padding-bottom: 0; }
+
+/* ═══ Content density for every live screen inside design view ═══════════
+ * Format spec §4 + §6: tabular inputs edit in place with no cell box — the
+ * value shows a dashed accent underline (picklists add ▾); rows are dense
+ * (the reference draws ~28px rows, 12px type); headers are small caps grey.
+ * Applies to the live grids (budget, sales, rent roll …) rendered inside the
+ * content column, so each screen moves toward its frame without touching its
+ * logic. */
+.ds-v2 .ds-content table { font-size: 12px; }
+.ds-v2 .ds-content table thead th {
+  font-size: 10.5px !important; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #9397ab !important; font-weight: 600 !important; background: #232532 !important;
+  border-bottom: 1px solid #3f424d !important; padding-top: 7px !important; padding-bottom: 7px !important;
+}
+.ds-v2 .ds-content table tbody td {
+  padding-top: 5px !important; padding-bottom: 5px !important; height: auto !important;
+  border-color: rgba(233,233,237,0.06) !important; color: #e9e9ed;
+}
+.ds-v2 .ds-content table tbody tr:hover td { background: rgba(255,255,255,0.025); }
+.ds-v2 .ds-content table td input:not([type="checkbox"]):not([type="radio"]),
+.ds-v2 .ds-content table td select {
+  background: transparent !important; border: 0 !important; border-bottom: 1px dashed #09658d !important;
+  border-radius: 0 !important; box-shadow: none !important; height: auto !important; min-height: 0 !important;
+  padding: 1px 2px !important; font-size: 12px !important; color: #e9e9ed !important;
+}
+.ds-v2 .ds-content table td input:focus,
+.ds-v2 .ds-content table td select:focus { border-bottom: 1px solid #2f9dd3 !important; outline: none; }
+.ds-v2 .ds-content table td select { padding-right: 14px !important; }
+/* Stage / category text in the budget grid was a saturated purple; the
+   reference keeps cell text neutral and lets badges carry colour. */
+.ds-v2 .ds-content table td [style*="color: rgb(1"] { color: #c8cad6 !important; }
+.ds-v2 .ds-content .card, .ds-v2 .ds-content .ccard {
+  background: #232532 !important; border: 1px solid #3f424d !important; border-radius: 8px !important;
+}
+.ds-v2 .ds-content .card-header {
+  background: transparent !important; border-bottom: 1px solid #3f424d !important;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #9397ab; padding: 10px 14px !important;
+}
