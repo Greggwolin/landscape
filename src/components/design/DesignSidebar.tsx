@@ -70,6 +70,8 @@ interface DesignSidebarProps {
    * old `router.push('/w/chat')` that ejected the user out of the shell.
    */
   onNewChat: () => void;
+  /** Design view: collapsing hands back to the two-letter rail (DesignRail). */
+  onCollapse?: () => void;
 }
 
 export function DesignSidebar({
@@ -81,6 +83,7 @@ export function DesignSidebar({
   onSelectFolder,
   onSelectTab,
   onNewChat,
+  onCollapse,
 }: DesignSidebarProps) {
   const router = useRouter();
   const {
@@ -103,11 +106,12 @@ export function DesignSidebar({
   const startWidth = useRef(0);
 
   const handleToggleCollapse = useCallback(() => {
+    if (onCollapse) { onCollapse(); return; }
     setCollapsed((v) => {
       if (v) setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
       return !v;
     });
-  }, []);
+  }, [onCollapse]);
 
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -321,17 +325,17 @@ export function DesignSidebar({
       clearActiveArtifacts(); // selecting a screen replaces any open artifact
       onSelectFolder(folderId);
       const f = folders.find((x) => x.id === folderId);
-      if (f && f.subTabs.length === 0) setCollapsed(true);
+      if (f && f.subTabs.length === 0) { if (onCollapse) onCollapse(); else setCollapsed(true); }
     },
-    [onSelectFolder, folders, clearActiveArtifacts],
+    [onSelectFolder, folders, clearActiveArtifacts, onCollapse],
   );
   const handleSelectTab = useCallback(
     (folderId: string, tabId: string) => {
       clearActiveArtifacts();
       onSelectTab(folderId, tabId);
-      setCollapsed(true);
+      if (onCollapse) onCollapse(); else setCollapsed(true);
     },
-    [onSelectTab, clearActiveArtifacts],
+    [onSelectTab, clearActiveArtifacts, onCollapse],
   );
 
   return (

@@ -80,25 +80,25 @@ interface LocationSubTabProps {
   project: Project;
 }
 
-interface GeoTarget {
+export interface GeoTarget {
   geo_id: string;
   geo_level: string;
   geo_name: string;
 }
 
-interface GeoResponse {
+export interface GeoResponse {
   base: GeoTarget & { usps_city: string | null; usps_state: string | null };
   targets: GeoTarget[];
   notice?: string;
 }
 
-interface SeriesPoint {
+export interface SeriesPoint {
   date: string;
   value: string | null;
   coverage_note: string | null;
 }
 
-interface MarketSeries {
+export interface MarketSeries {
   series_code: string;
   series_name: string;
   category: string;
@@ -147,9 +147,9 @@ type TierKey = 't1' | 't2' | 't3';
 // Constants
 // ---------------------------------------------------------------------------
 
-const GEO_LEVEL_ORDER = ['US', 'STATE', 'MSA', 'MICRO', 'COUNTY', 'CITY'] as const;
+export const GEO_LEVEL_ORDER = ['US', 'STATE', 'MSA', 'MICRO', 'COUNTY', 'CITY'] as const;
 
-const INDICATOR_CONFIG = [
+export const INDICATOR_CONFIG = [
   { id: 'population', label: 'Population', codes: ['POP_US', 'POP_STATE', 'POP_MSA', 'POP_MICRO', 'POP_COUNTY', 'ACS_POPULATION', 'ACS_COUNTY_POPULATION', 'ACS_MICRO_POPULATION', 'POP_'], format: 'number' as const },
   { id: 'employment', label: 'Employment', codes: ['PAYEMS', 'PAYEMS_STATE', 'PAYEMS_MSA', 'PAYEMS_MICRO', 'LAUS_COUNTY_EMP', 'CES_STATE', 'LAUS_EMP', 'LAUS_STATE_EMP', 'LAUS_MSA_EMP', 'LAUS_MICRO_EMP', 'EMP_', 'CE_'], format: 'number' as const },
   { id: 'unemployment', label: 'Unemployment Rate', codes: ['LAUS_UNRATE', 'LAUS_STATE_UNRATE', 'LAUS_MSA_UNRATE', 'LAUS_MICRO_UNRATE', 'LAUS_COUNTY_UNRATE', 'LAUS_PLACE_UNRATE', 'UNRATE'], format: 'percent' as const },
@@ -186,7 +186,7 @@ const TIER_CONFIG_MICRO_T2 = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function scaleByUnits(value: number, units: string | null): number {
+export function scaleByUnits(value: number, units: string | null): number {
   if (!units) return value;
   const u = units.toLowerCase();
   if (u.startsWith('thousands')) return value * 1000;
@@ -194,7 +194,7 @@ function scaleByUnits(value: number, units: string | null): number {
   return value;
 }
 
-function formatIndicatorValue(
+export function formatIndicatorValue(
   value: number | null,
   format: 'number' | 'currency' | 'percent',
 ): string {
@@ -217,7 +217,7 @@ function formatIndicatorValue(
   }
 }
 
-function computeYoYChange(
+export function computeYoYChange(
   data: SeriesPoint[],
 ): { value: number | null; change: string; direction: 'up' | 'down' | 'flat' } {
   if (data.length < 2) {

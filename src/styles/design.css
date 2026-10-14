@@ -813,3 +813,118 @@
 .design-shell .map-tab-popover .maplibregl-popup-content {
   border-radius: var(--ds-radius);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * 2026-10-14 — Slice 1 frame chrome (design view, ds-v2): top bar across the
+ * whole window, then rail (56px) · Landscaper (300px) · content. Values lifted
+ * from the reference frames (C3 / C4): topbar 52px surface, rail #08090A,
+ * Landscaper #2A2B31, content #161826, 1px #3f424d hairlines, 8px radii.
+ * ═══════════════════════════════════════════════════════════════════════ */
+.design-shell.ds-v2 { flex-direction: column; background: #161826; color: #e9e9ed; }
+.ds-v2 .ds-body { flex: 1; min-height: 0; display: flex; }
+
+/* Top bar */
+.ds-v2 .ds-topbar {
+  height: 52px; flex: 0 0 52px; display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; background: #232532; border-bottom: 1px solid #3f424d; min-width: 0;
+}
+.ds-v2 .ds-mark {
+  width: 24px; height: 24px; flex: 0 0 24px; border-radius: 6px; border: 1px solid #2f9dd3;
+  display: grid; place-items: center; color: #2f9dd3; font-weight: 600; font-size: 12px;
+}
+.ds-v2 .ds-project { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-v2 .ds-project-meta { color: #9397ab; font-weight: 400; }
+.ds-v2 .ds-section-chip {
+  font-size: 12px; font-weight: 600; color: #d4ecfc; padding: 4px 10px; border-radius: 6px;
+  background: color-mix(in srgb, #2f9dd3 14%, transparent); white-space: nowrap;
+}
+.ds-v2 .ds-seg { display: flex; border: 1px solid #3f424d; border-radius: 6px; overflow: hidden; }
+.ds-v2 .ds-seg-btn {
+  background: transparent; border: 0; color: #9397ab; font-size: 12px; padding: 5px 12px; cursor: pointer;
+  border-radius: 0 !important;
+}
+.ds-v2 .ds-seg-btn + .ds-seg-btn { border-left: 1px solid #3f424d; }
+.ds-v2 .ds-seg-btn.is-active { background: color-mix(in srgb, #2f9dd3 16%, transparent); color: #d4ecfc; font-weight: 600; }
+.ds-v2 .ds-topbar-actions { margin-left: auto; display: flex; gap: 6px; }
+.ds-v2 .ds-ghost {
+  background: transparent; border: 1px solid #3f424d; color: #c8cad6; font-size: 12px;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.ds-v2 .ds-ghost:hover { border-color: #2f9dd3; color: #d4ecfc; }
+
+/* Collapsed rail (two-letter section codes) */
+.ds-v2 .ds-rail {
+  flex: 0 0 56px; width: 56px; background: #08090A; border-right: 1px solid #3f424d;
+  display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 6px;
+}
+.ds-v2 .ds-rail-btn {
+  width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center;
+  background: transparent; border: 0; color: #9397ab; cursor: pointer; font-size: 15px;
+}
+.ds-v2 .ds-rail-btn:hover { background: rgba(255,255,255,0.05); color: #e9e9ed; }
+.ds-v2 .ds-rail-code { font-size: 12px; font-weight: 600; }
+.ds-v2 .ds-rail-code.is-active { background: color-mix(in srgb, #2f9dd3 16%, transparent); color: #d4ecfc; font-weight: 700; }
+.ds-v2 .ds-rail-rule { width: 24px; border-top: 1px solid #3f424d; margin: 4px 0; }
+
+/* Expanded nav keeps the near-black rail colour */
+.ds-v2 .ds-body > .wrapper-sidebar { background: #08090A; }
+
+/* Landscaper column: fixed 300px, never the surface colour */
+.ds-v2 .ds-body > .wrapper-chat-center {
+  flex: 0 0 300px; width: 300px; max-width: 300px; background: #2A2B31; border-right: 1px solid #3f424d;
+}
+
+/* Content */
+.ds-v2 .ds-content { flex: 1; min-width: 0; overflow: auto; background: #161826; }
+.ds-v2 .ds-content-bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #3f424d; font-weight: 600; font-size: 13px;
+}
+.ds-v2 .ds-toast {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 80;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #e9e9ed;
+  background: #232532; border: 1px solid #3f424d; pointer-events: none;
+}
+
+/* ── Composition building blocks (C3 / C4) ── */
+.ds-v2 .ds-page { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; min-height: 100%; }
+.ds-v2 .ds-page-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.ds-v2 .ds-push { margin-left: auto; }
+.ds-v2 .ds-muted { color: #9397ab; font-size: 12px; }
+.ds-v2 .ds-tag {
+  display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 4px; color: #abdcf9;
+  border: 1px solid color-mix(in srgb, #2f9dd3 55%, transparent); white-space: nowrap;
+}
+.ds-v2 .ds-tag-neutral { color: #c8cad6; border-color: #3f424d; background: rgba(255,255,255,0.04); }
+.ds-v2 .ds-empty { padding: 40px 20px; text-align: center; color: #9397ab; }
+.ds-v2 .ds-tile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1280px) { .ds-v2 .ds-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ds-v2 .ds-card { background: #232532; border: 1px solid #3f424d; border-radius: 8px; min-width: 0; }
+.ds-v2 .ds-card-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 10.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: #9397ab; font-weight: 600;
+}
+.ds-v2 .ds-card-note { padding: 4px 14px 14px; color: #75798c; font-size: 12px; }
+.ds-v2 .ds-kv { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+.ds-v2 .ds-kv td { padding: 5px 14px; border-top: 1px solid rgba(233,233,237,0.06); white-space: nowrap; }
+.ds-v2 .ds-kv td:first-child { color: #c8cad6; width: 100%; white-space: normal; }
+.ds-v2 .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ds-v2 .ds-kv td.num { font-weight: 600; color: #e9e9ed; }
+.ds-v2 .chg { font-weight: 500 !important; font-size: 11px; }
+.ds-v2 .chg-up { color: #63c68d !important; }
+.ds-v2 .chg-down { color: #d9756a !important; }
+.ds-v2 .chg-flat { color: #9397ab !important; }
+.ds-v2 .ds-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ds-v2 .ds-table th {
+  text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #9397ab;
+  font-weight: 600; padding: 6px 14px; border-bottom: 1px solid #3f424d; white-space: nowrap;
+}
+.ds-v2 .ds-table th.num { text-align: right; }
+.ds-v2 .ds-table td { padding: 7px 14px; border-bottom: 1px solid rgba(233,233,237,0.06); white-space: nowrap; }
+.ds-v2 .ds-table tr.ds-group-row td { font-weight: 600; color: #e9e9ed; }
+.ds-v2 .ds-table td.ds-indent { padding-left: 28px; }
+.ds-v2 .ds-table tr.is-selected td { background: color-mix(in srgb, #2f9dd3 10%, transparent); }
+.ds-v2 .ds-table tbody tr { cursor: default; }
+.ds-v2 .ds-split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.ds-v2 .ds-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ds-v2 .ds-scroll { overflow: auto; }
+.ds-v2 .ds-map-card { overflow: hidden; }

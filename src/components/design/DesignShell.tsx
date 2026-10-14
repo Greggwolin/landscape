@@ -67,6 +67,11 @@ import { buildScreenManifest } from '@/lib/studio/screenManifest';
 import ProjectContentRouter from '@/app/projects/[projectId]/ProjectContentRouter';
 import { DesignSidebar } from './DesignSidebar';
 import { DesignProjectHome } from './DesignProjectHome';
+import { DesignRail } from './DesignRail';
+import { DesignTopBar } from './DesignTopBar';
+import { buildDesignNav, locateDesignNav, type DesignNavItem, type DesignNavSection } from './designNav';
+import { DesignMarketEconomy } from './compositions/DesignMarketEconomy';
+import { DesignHousingMarket } from './compositions/DesignHousingMarket';
 
 /**
  * Stage B per-screen compositions (reference frames). A folder id present here
@@ -77,6 +82,9 @@ import { DesignProjectHome } from './DesignProjectHome';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DESIGN_COMPOSITIONS: Record<string, React.ComponentType<{ project: any }>> = {
   home: DesignProjectHome,
+  // Keyed "folder:tab" — the reference's Market section (C3 / C4).
+  'property:location': DesignMarketEconomy,
+  'property:market': DesignHousingMarket,
 };
 
 function DesignShellInner() {
@@ -92,6 +100,7 @@ function DesignShellInner() {
   const { projects, activeProject, isLoading } = useProjectContext();
   const {
     chatOpen,
+    toggleChat,
     activeArtifactId,
     setActiveArtifactId,
     activeLocationBrief,
@@ -105,7 +114,9 @@ function DesignShellInner() {
   // Local zone state (kept out of WrapperUIContext so /w/ semantics are untouched).
   // Rail collapse is owned by WrapperSidebar (inside DesignSidebar); only the
   // right content panel's collapse is tracked here.
-  const [contentOpen, setContentOpen] = useState(true);
+  // Design view nav (Slice 1): the two-letter rail by default; "»" swaps in
+  // the full expanded nav (C2), which hands back to the rail on collapse.
+  const [railExpanded, setRailExpanded] = useState(false);
   // Right panel view: the routed screen, or the artifacts workspace. The
   // artifacts trigger lives in the right-panel header (not the left rail).
   const [rightView, setRightView] = useState<'screen' | 'artifacts'>('screen');
@@ -205,6 +216,27 @@ function DesignShellInner() {
   const availableScreens = useMemo(
     () => buildScreenManifest(folderConfig.folders),
     [folderConfig.folders],
+  );
+
+  const designSections = useMemo(
+    () => buildDesignNav(folderConfig.folders, effectivePropertyType ?? null),
+    [folderConfig.folders, effectivePropertyType],
+  );
+  const designLoc = useMemo(
+    () => locateDesignNav(designSections, currentFolder, currentTab),
+    [designSections, currentFolder, currentTab],
+  );
+  // The expanded nav (WrapperSidebar) takes folder-shaped input: one "folder"
+  // per design section, its items as sub-tabs.
+  const designFolders = useMemo(
+    () =>
+      designSections.map((sec) => ({
+        id: sec.id,
+        label: sec.label,
+        color: '',
+        subTabs: sec.items.length > 1 ? sec.items.map((i) => ({ id: i.id, label: i.label })) : [],
+      })),
+    [designSections],
   );
 
   const hasArtifact =
@@ -353,7 +385,11 @@ function DesignShellInner() {
   // collapse-time refresh to round-trip edited inputs).
   // Stage B: a composed design screen when one exists for this folder;
   // otherwise the same routed legacy screen studio renders.
-  const Composition = DESIGN_COMPOSITIONS[currentFolder];
+  const Composition =
+    DESIGN_COMPOSITIONS[`${currentFolder}:${currentTab ?? ''}`] ??
+    (currentFolder === 'property' && currentTab === 'market' && !isLandType(effectivePropertyType)
+      ? undefined
+      : DESIGN_COMPOSITIONS[currentFolder]);
   const screenRouter = Composition ? (
     <Composition project={routerProject} />
   ) : (
@@ -365,129 +401,96 @@ function DesignShellInner() {
     />
   );
 
+  const goItem = (item: DesignNavItem) => setFolderTab(item.folder, item.tab);
+  const goSection = (sec: DesignNavSection) => {
+    if (sec.id === designLoc.section?.id) return;
+    goItem(sec.items[0]);
+  };
+  const location = [routerProject.jurisdiction_city ?? routerProject.city, routerProject.jurisdiction_state ?? routerProject.state]
+    .filter(Boolean)
+    .join(', ');
+
   return (
-    <div className="design-shell">
-      {/* LEFT — the REAL unified-UI sidebar (global nav, search, threads,
-          recents, footer) with the project folder/sub-tab tree added via the
-          `projectNav` prop. Owns its own collapse + resize. */}
-      <DesignSidebar
-        projectId={projectId}
+    <div className="design-shell ds-v2">
+      <DesignTopBar
         projectName={currentProject.project_name}
-        folders={folderConfig.folders}
-        currentFolder={currentFolder}
-        currentTab={currentTab}
-        onSelectFolder={(folderId) => setFolderTab(folderId)}
-        onSelectTab={(folderId, tabId) => setFolderTab(folderId, tabId)}
-        onNewChat={handleNewChat}
+        typeCode={effectivePropertyType ?? null}
+        location={location || null}
+        section={designLoc.section}
+        activeItem={designLoc.item}
+        onSelectItem={goItem}
+        chatOpen={chatOpen}
+        onToggleChat={toggleChat}
+        onShowArtifacts={() => setRightView('artifacts')}
+        onExpandScreen={() => setExpanded(true)}
       />
-
-      {/* CENTER — Landscaper chat (renders null when chatOpen is false) */}
-      <CenterChatPanel
-        projectId={projectId}
-        projectName={currentProject.project_name}
-        projectTypeCode={effectivePropertyType ?? undefined}
-        initialThreadId={initialThreadId}
-        sessionKey={chatSessionKey}
-        onBeforeUserSend={handleBeforeUserSend}
-        onNewChat={handleNewChat}
-        availableScreens={availableScreens}
-      />
-
-      {/* RIGHT — one panel: the routed screen, OR the artifacts workspace
-          (reached from the header button or auto-opened by a chat artifact).
-          Suppressed while the screen is popped out (`expanded`) so the screen
-          mounts only once — in the overlay below. */}
-      {!expanded && (contentOpen ? (
-        rightView === 'artifacts' || hasArtifact ? (
-          <div className="wrapper-right-panel">
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 12px',
-                borderBottom: '1px solid var(--w-border, #1f2329)',
-              }}
-            >
-              <button
-                type="button"
-                className="w-btn w-btn-ghost w-btn-sm"
-                onClick={backToScreen}
-                title="Back to the current screen"
-              >
-                ← Screen
-              </button>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>Artifacts</span>
-            </div>
-            {activeArtifactId != null ? (
-              <ArtifactWorkspacePanel projectId={projectId} takeoverMode />
-            ) : activeLocationBrief ? (
-              <LocationBriefArtifact config={activeLocationBrief} onClose={backToScreen} />
-            ) : activeMapArtifact ? (
-              <MapArtifactRenderer config={activeMapArtifact} onClose={backToScreen} />
-            ) : activeExcelAudit ? (
-              <ExcelAuditArtifact config={activeExcelAudit} onClose={backToScreen} />
-            ) : (
-              <ArtifactWorkspacePanel projectId={projectId} />
-            )}
-          </div>
+      <div className="ds-body">
+        {railExpanded ? (
+          <DesignSidebar
+            projectId={projectId}
+            projectName={currentProject.project_name}
+            folders={designFolders}
+            currentFolder={designLoc.section?.id ?? ''}
+            currentTab={designLoc.item?.id ?? ''}
+            onSelectFolder={(sectionId) => {
+              const sec = designSections.find((x) => x.id === sectionId);
+              if (sec) goItem(sec.items[0]);
+            }}
+            onSelectTab={(sectionId, itemId) => {
+              const it = designSections.find((x) => x.id === sectionId)?.items.find((x) => x.id === itemId);
+              if (it) goItem(it);
+            }}
+            onNewChat={handleNewChat}
+            onCollapse={() => setRailExpanded(false)}
+          />
         ) : (
-          <RightContentPanel
-            title={contentTitle}
-            subtitle={currentProject.project_name}
-            actions={
-              <>
-                <button
-                  type="button"
-                  className="w-btn w-btn-icon"
-                  title="Artifacts"
-                  aria-label="Show artifacts"
-                  onClick={() => setRightView('artifacts')}
-                >
-                  ◳
-                </button>
-                <button
-                  type="button"
-                  className="w-btn w-btn-icon"
-                  title="Expand to full width"
-                  aria-label="Expand screen to full width"
-                  onClick={() => setExpanded(true)}
-                >
-                  ⤢
-                </button>
-                <button
-                  type="button"
-                  className="w-btn w-btn-icon"
-                  title={chatOpen ? 'Collapse content (chat full width)' : 'Collapse content'}
-                  aria-label="Collapse content panel"
-                  onClick={() => setContentOpen(false)}
-                >
-                  ⇥
-                </button>
-              </>
-            }
-          >
-            {screenRouter}
-          </RightContentPanel>
-        )
-      ) : (
-        <div className="design-content-collapsed">
-          <button
-            type="button"
-            className="design-content-expand"
-            title="Show content panel"
-            aria-label="Show content panel"
-            onClick={() => setContentOpen(true)}
-          >
-            ⇤
-          </button>
-        </div>
-      ))}
+          <DesignRail
+            sections={designSections}
+            activeSectionId={designLoc.section?.id}
+            onSelectSection={goSection}
+            onExpand={() => setRailExpanded(true)}
+          />
+        )}
 
-      {/* Pop-out overlay (right-panel reflow, Phase 1): the SAME routed screen
-          at full window width. Same header (title + subtitle), with a collapse
-          control; Esc also closes. The underlying right panel is suppressed
-          while this is open, so the screen mounts once. */}
+        {/* Landscaper column (renders null when chat is hidden) */}
+        <CenterChatPanel
+          projectId={projectId}
+          projectName={currentProject.project_name}
+          projectTypeCode={effectivePropertyType ?? undefined}
+          initialThreadId={initialThreadId}
+          sessionKey={chatSessionKey}
+          onBeforeUserSend={handleBeforeUserSend}
+          onNewChat={handleNewChat}
+          availableScreens={availableScreens}
+        />
+
+        {!expanded && (
+          rightView === 'artifacts' || hasArtifact ? (
+            <div className="wrapper-right-panel ds-content">
+              <div className="ds-content-bar">
+                <button type="button" className="ds-ghost" onClick={backToScreen}>← Screen</button>
+                <span>Artifacts</span>
+              </div>
+              {activeArtifactId != null ? (
+                <ArtifactWorkspacePanel projectId={projectId} takeoverMode />
+              ) : activeLocationBrief ? (
+                <LocationBriefArtifact config={activeLocationBrief} onClose={backToScreen} />
+              ) : activeMapArtifact ? (
+                <MapArtifactRenderer config={activeMapArtifact} onClose={backToScreen} />
+              ) : activeExcelAudit ? (
+                <ExcelAuditArtifact config={activeExcelAudit} onClose={backToScreen} />
+              ) : (
+                <ArtifactWorkspacePanel projectId={projectId} />
+              )}
+            </div>
+          ) : (
+            <main className="wrapper-right-panel ds-content" aria-label={contentTitle}>
+              {screenRouter}
+            </main>
+          )
+        )}
+      </div>
+
       {expanded && (
         <div className="design-screen-overlay">
           <RightContentPanel
@@ -510,36 +513,17 @@ function DesignShellInner() {
         </div>
       )}
 
-      {/* Ephemeral screen-router confirmation (JB43) — a transient toast, NOT a
-          chat message. Fades after ~2.2s; never persisted, never a thread. */}
       {navToast && (
-        <div
-          key={navToast.n}
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'absolute',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 80,
-            maxWidth: 'min(90%, 420px)',
-            padding: '8px 14px',
-            borderRadius: 8,
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--cui-body-color, #e6e6e6)',
-            background: 'var(--cui-tertiary-bg, #2a2f3a)',
-            border: '1px solid var(--cui-border-color, #3a3f4b)',
-            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.35)',
-            pointerEvents: 'none',
-          }}
-        >
+        <div key={navToast.n} role="status" aria-live="polite" className="ds-toast">
           {navToast.text}
         </div>
       )}
     </div>
   );
+}
+
+function isLandType(code?: string | null): boolean {
+  return (code || '').toUpperCase() === 'LAND';
 }
 
 export function DesignShell() {
