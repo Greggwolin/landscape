@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Deal Ledger</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#fbfaf7; --fg:#1f2324; --muted:#5d6568; --rule:#d9d4c8;
+  --accent:#1f5f8b; --accent-soft:#e6eef4; --warn:#8a4b12; --warn-soft:#f6ebdd; --paper:#ffffff;
+  --display:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;margin:0;padding:28px 16px 56px}
+main{max-width:740px;margin:0 auto}
+h1{font-family:var(--display);font-size:2rem;line-height:1.15;font-weight:700;margin:0 0 .25rem}
+h2{font-family:var(--display);font-size:1.35rem;font-weight:600;margin:2.1rem 0 .6rem}
+p{margin:0 0 .85rem;max-width:68ch}
+.meta{color:var(--muted);font-size:.85rem;margin-bottom:1.4rem}
+.lead{border-left:4px solid var(--accent);background:var(--accent-soft);padding:.9rem 1.1rem;margin:0 0 1.4rem}
+.lead p{margin:0 0 .5rem}.lead p:last-child{margin:0}
+.against{border-left:4px solid var(--warn);background:var(--warn-soft);padding:.9rem 1.1rem;margin:1rem 0}
+.against p{margin:0 0 .5rem}.against p:last-child{margin:0}
+ul,ol{padding-left:1.3rem;margin:0 0 .9rem}li{margin-bottom:.4rem;max-width:66ch}
+.ledger{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:.6rem .9rem;margin:.8rem 0 1.2rem;font-family:var(--mono);font-size:.8rem;line-height:1.45;overflow-x:auto}
+.ledger .row{display:grid;grid-template-columns:5.2rem 1fr;gap:.6rem;padding:.3rem 0;border-top:1px dashed var(--rule)}
+.ledger .row:first-child{border-top:0}
+.ledger .n{color:var(--muted)}
+.ledger b{font-weight:500;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin:.6rem 0 1.2rem;table-layout:auto}
+.tbl{overflow-x:auto}
+th{text-align:left;font-weight:600;border-bottom:2px solid var(--rule);padding:.45rem .6rem;vertical-align:bottom;white-space:normal}
+td{border-bottom:1px solid var(--rule);padding:.5rem .6rem;vertical-align:top}
+td:first-child{font-weight:500;white-space:nowrap}
+.opt{margin:0 0 .5rem;padding-left:0;list-style:none}
+.opt li{display:grid;grid-template-columns:2.6rem 1fr;gap:.5rem}
+.opt b{color:var(--accent)}
+small{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>The Deal Ledger</h1>
+<p class="meta">Design for Gregg · 2026-10-14 · the technical version is the companion file for the coding assistant (QX-AUDIT-TRAIL-DESIGN.md, same folder)</p>
+
+<div class="lead">
+<p><strong>What it is.</strong> One running record, per deal, of every change to any number the model uses: what changed, what it was before, who changed it, when, why, and where it came from (which document and page, which conversation, or typed by hand). Any figure on any screen or report can open its history. Every report is stamped with the position in the record it was printed from, so a number handed to a lender can be reproduced later exactly as shown.</p>
+<p><strong>Why it matters.</strong> Free tools and general assistants can run the same calculations. None of them can answer "where did this number come from, who changed it, and what was it last month" across everyone on the deal. That is the one sentence in the pitch that nothing else can say, and it is the sentence the Peoria walk-through found empty.</p>
+</div>
+
+<h2>What is already there</h2>
+<p>Checked on the live database this afternoon. Three partial records exist and nothing joins them:</p>
+<ul>
+<li>Changes Landscaper makes are logged (206 of them, with old and new value, the reason, and who confirmed). Good; it becomes part of the ledger.</li>
+<li>Document extractions are logged as batches with a rollback. Good; same.</li>
+<li>The budget has empty slots for "source" and "confidence" on every line; nothing fills them. That is the "no evidence recorded" message you saw.</li>
+<li><strong>Anything a person types into a screen is not recorded at all.</strong> Of 378 tables, 230 note when a row last changed, 21 note who, none keep the old value. The parcel you double-click, the budget grid, the assumptions forms, the loan screen: no trail.</li>
+</ul>
+
+<h2>What one entry looks like</h2>
+<p>Peoria, parcel 1.101, lot size. Newest first.</p>
+<div class="ledger">
+<div class="row"><span class="n">#48,214</span><span>Oct 14 10:11 · <b>Gregg</b> · lot product 40×120 → 50×125 · reason: "undo, test only"</span></div>
+<div class="row"><span class="n">#48,213</span><span>Oct 14 10:10 · <b>Gregg</b> · lot product 50×125 → 40×120 · typed in the parcel table</span></div>
+<div class="row"><span class="n">#41,002</span><span>Sep 28 09:14 · <b>Landscaper</b>, confirmed by Gregg · lot product (blank) → 50×125 · from <b>Parcels PDF, page 3</b> · confidence 0.97</span></div>
+<div class="row"><span class="n">#12,880</span><span>Nov 19 2025 · <b>imported before the ledger</b> · parcel created · no earlier history</span></div>
+</div>
+<p>A derived figure (an IRR, a cash-flow cell) opens the same way, listing the stored numbers it was built from, each with its latest entry, and the formula that combined them. Where an engine cannot yet list its inputs, the sheet says so rather than showing a partial chain as if it were complete.</p>
+
+<h2>What you would see</h2>
+<div class="tbl"><table>
+<tr><th>Where</th><th>What appears</th></tr>
+<tr><td>Any figure</td><td>A small ⓘ on hover. Click: a side sheet "Where this number comes from", newest first, with the document page shown when there is one.</td></tr>
+<tr><td>Budget, pricing, parcels</td><td>The Evidence toggle stops being empty. Each line carries a chip: <em>Doc · p.12</em>, <em>Entered by Gregg · Oct 2</em>, <em>Landscaper · confirmed Oct 3</em>, <em>Formula</em>.</td></tr>
+<tr><td>Project home</td><td>An Activity feed: "Oct 14 · Gregg · Parcels · 1.101 lot size 50×125 → 40×120 · per revised tentative map". Filter by person, screen, date, document.</td></tr>
+<tr><td>Every report and export</td><td>A stamp: "Model as of #48,210 · Oct 14 · 3 changes since the Lender package", and a button to pin the current state as a named version.</td></tr>
+<tr><td>Landscaper</td><td>Answers carry the position they were computed from, and "what changed since the lender package?" is answered from the ledger, not from memory.</td></tr>
+<tr><td>Later: parties</td><td>A partner or lender gets a working copy of assumptions over the shared record. Each field shows yours / theirs / agreed; a merge is itself an entry with both prior values. The ledger is the referee. This is the Meyers story, and it is the last slice, not the first.</td></tr>
+</table></div>
+
+<h2>How it gets built</h2>
+<p>Seven slices, each run by you locally before it goes live. The first four are the demo-worthy unit: after them every number you type in front of a prospect has a chain, and the existing Peoria lines read "entered Nov 19 2025, before the ledger" instead of "no evidence".</p>
+<ol>
+<li>The record itself, with Landscaper's changes flowing into it.</li>
+<li>Every writable screen writes to it, with the old value captured. This is the one that touches the most code.</li>
+<li>Document extractions write to it; the budget's empty source slots fill from it.</li>
+<li>The ⓘ sheet on typed-in figures.</li>
+<li>Report stamps and named versions.</li>
+<li>The ⓘ sheet on calculated figures (IRR, cash flow). Hardest, because the app has six separate IRR calculators and they would each need to say what they used.</li>
+<li>Parties and working versions.</li>
+</ol>
+
+<div class="against">
+<p><strong>The case against doing it now.</strong> It is plumbing, and slice 2 touches every screen that saves anything, in an app where "simple" changes cascade. For the Kern conversation, a convincing version is the Evidence chip on the budget and the Activity feed, which are slices 1–3; the rest can follow prospect feedback. What would make me wrong: if prospects turn out not to care who changed what, and only want the numbers, this is three weeks spent on a feature nobody clicks. Kern's own words ("we need a strategy for using AI in decisions") say they will care, because it is the thing that makes the AI's number defensible.</p>
+<p><strong>What it is not.</strong> Not an undo button (though it makes one possible), not permissions between parties (that comes with slice 7), not a signature on a version (could sit on top later).</p>
+</div>
+
+<h2>Decisions you own</h2>
+<p>One at a time; the first decides the size of the first build.</p>
+<ol class="opt">
+<li><b>1</b><span>Which screens record changes in the first build?</span></li>
+<li><b>1a</b><span>The land lane only: parcels, budget, pricing, absorption, loans, assumptions.</span></li>
+<li><b>1b</b><span>Every screen in the app that saves anything.</span></li>
+</ol>
+<ol class="opt">
+<li><b>2</b><span>Held until 1: what the existing numbers show. 2a "entered before the ledger, on date X" · 2b nothing until next touched.</span></li>
+</ol>
+<ol class="opt">
+<li><b>3</b><span>Held until slices 1–4 ship: how parties work (who can create one, whether a lender edits or only comments).</span></li>
+</ol>
+<ol class="opt">
+<li><b>4</b><span>Held: how long the detail is kept. 4a forever · 4b forever for pinned versions, two years for the rest.</span></li>
+</ol>
+<p><small>Sources: live database checked 2026-10-14 ~16:20 Phoenix; the positioning memo and walk-through filed today in the project's assessments folder. Published copy: https://claude.ai/artifact/6nLbBamVoBDJAfEhkYUkje</small></p>
+</main>
+</body>
+</html>
