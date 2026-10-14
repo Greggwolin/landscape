@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peoria Walk-Through Findings</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#fbfaf7; --fg:#1f2324; --muted:#5d6568; --rule:#d9d4c8;
+  --accent:#1f5f8b; --accent-soft:#e6eef4;
+  --block:#8a1f1f; --block-soft:#f7e3e3; --high:#8a4b12; --high-soft:#f6ebdd; --med:#5a5f1a; --med-soft:#eff0da; --ok:#1f6b3a; --ok-soft:#e1f0e6;
+  --display:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.5;margin:0;padding:28px 16px 56px}
+main{max-width:760px;margin:0 auto}
+h1{font-family:var(--display);font-size:2rem;line-height:1.15;font-weight:700;margin:0 0 .25rem}
+h2{font-family:var(--display);font-size:1.3rem;font-weight:600;margin:2rem 0 .6rem}
+p{margin:0 0 .8rem;max-width:70ch}
+.meta{color:var(--muted);font-size:.85rem;margin-bottom:1.4rem}
+.lead{border-left:4px solid var(--accent);background:var(--accent-soft);padding:.8rem 1rem;margin:0 0 1.4rem}
+.lead p{margin:0 0 .4rem}.lead p:last-child{margin:0}
+ol.f{list-style:none;padding:0;margin:0;display:grid;gap:.7rem}
+ol.f li{display:grid;grid-template-columns:2rem 1fr;gap:.6rem;align-items:start}
+ol.f .n{font-family:var(--display);font-size:1.2rem;font-weight:600;color:var(--muted);text-align:right;padding-top:.1rem}
+.tag{display:inline-block;font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:.1rem .45rem;border-radius:3px;margin-right:.4rem;vertical-align:middle}
+.t-block{background:var(--block-soft);color:var(--block)}.t-high{background:var(--high-soft);color:var(--high)}.t-med{background:var(--med-soft);color:var(--med)}.t-ok{background:var(--ok-soft);color:var(--ok)}
+.f b{font-weight:600}
+.f small{color:var(--muted);display:block;margin-top:.15rem}
+.scope{font-size:.9rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Peoria Walk-Through Findings</h1>
+<p class="meta">Live site, signed in as Gregg, Peoria Meadows, 2026-10-14 between 3:13 and 3:35 pm Phoenix time. Screen size set to a 1440-wide laptop. One path only: open the deal, parcels, budget, cash flow and returns, ask the analyst, run a what-if.</p>
+
+<div class="lead">
+<p><strong>Bottom line:</strong> the engine held up and the analyst answered well. The screen between them is what would hurt in front of Kern. Two things would stop the meeting cold; four more would make you apologise. Everything else is clutter.</p>
+<p><strong>Ranked by how badly each one lands in a demo</strong>, worst first.</p>
+</div>
+
+<h2>What would stop the meeting</h2>
+<ol class="f">
+<li><span class="n">1</span><div><span class="tag t-block">Blocker</span><b>The first question to the analyst was thrown away.</b> I typed a question on the project home, pressed Enter, and got a red bar reading "No active thread, please try again." The question vanished and had to be retyped in a second box. It worked the second time. In a demo the first question is the one that counts.<small>Repro: open Peoria from the sidebar, type in the "Ask Landscaper about Peoria Meadows" box, press Enter.</small></div></li>
+<li><span class="n">2</span><div><span class="tag t-block">Blocker</span><b>The cash-flow screen's headline figures render as a vertical stack of single characters.</b> Gross profit, IRR and equity multiple appear as "$ 2 8 1 . 1 4 M" down a column about one letter wide. It reads as broken software, and it is the screen the returns live on.<small>Where: Feasibility Valuation, Cash Flow tab, the tiles beside the Villages/Phases box, at 1440 wide.</small></div></li>
+</ol>
+
+<h2>What would make you apologise</h2>
+<ol class="f" start="3">
+<li><span class="n">3</span><div><span class="tag t-high">High</span><b>The pitch says every number traces to a document or an assumption. The showpiece can't show it.</b> The budget's Evidence toggle reads "No evidence source is recorded on any budget line yet," and the analyst, asked where the $39.7M comes from, answered that it was hand-entered and none of the three uploaded documents sourced it. The answer was honest, which is good; the gap is that the one feature the positioning rests on has nothing behind it on the deal you'd show.</div></li>
+<li><span class="n">4</span><div><span class="tag t-high">High</span><b>On the budget, the money is off the edge of the screen.</b> The register is about twice as wide as the panel it sits in, so the Amount column needs a sideways scroll to see, and there is no total row at the bottom. The only place the total appears is the tile at the top.</div></li>
+<li><span class="n">5</span><div><span class="tag t-high">High</span><b>On the cash flow, only the first year shows and its figures are clipped mid-number.</b> "($104,000,0" and nothing after. The other seven years need a sideways scroll. Meanwhile the middle third of the screen is still holding the project card and chat list, which nobody needs while reading a cash flow.</div></li>
+<li><span class="n">6</span><div><span class="tag t-high">High</span><b>Thirty seconds per answer.</b> Both analyst questions took about half a minute; the cash-flow screen showed "Generating cash flow analysis" for about ten. Fine for work, long for a room.</div></li>
+</ol>
+
+<h2>What a stranger would notice</h2>
+<ol class="f" start="7">
+<li><span class="n">7</span><div><span class="tag t-med">Medium</span><b>The first thing on the project home is a 1,500-acre masterplan shown as one red pin on bare desert.</b> No boundary, no parcels, no plan. For a land developer that is the picture that sets expectations.</div></li>
+<li><span class="n">8</span><div><span class="tag t-med">Medium</span><b>The project home lists internal bug threads as recent conversations</b> ("Project Jurisdiction Configuration Caching Error"), and several of those summaries state the budget as $40.2M across 30 lines while the register, the database and today's answer all say $39.7M across 24. The database has not changed since November 2025, so a prospect reading the home page sees two budget totals. I did not establish when those chat summaries were written.</div></li>
+<li><span class="n">9</span><div><span class="tag t-med">Medium</span><b>Parcels and Budget open as bright white tables inside a dark app.</b> Jarring, and the only way back to the list of artifacts is a small X in the corner; clicking "Artifacts" in the header does nothing while one is open.</div></li>
+<li><span class="n">10</span><div><span class="tag t-med">Medium</span><b>The budget register carries three rows of filter chips and twelve column toggles above the first number,</b> the rows are not in phase order (1.2, 4.2, 1.1, 4.1, 2.1 …), and the Phase and Assigned-To columns show the same value twice.</div></li>
+<li><span class="n">11</span><div><span class="tag t-med">Low</span><b>Small things:</b> the header sat on "Loading project…" for a beat after the page had loaded; the sidebar's project list reshuffled after I opened Peoria (it dropped off the list it had just been on).</div></li>
+</ol>
+
+<h2>What worked</h2>
+<ol class="f" start="12">
+<li><span class="n">12</span><div><span class="tag t-ok">Worked</span><b>The parcel table edits in place</b> (double-click a cell, type). <b>The what-if was coherent:</b> lot prices down 10% gave IRR 39.1% to 30.1%, NPV down $18.3M, peak equity unchanged, with a one-line reason. <b>The provenance answer was honest</b> rather than invented. The Documents panel has a sensible folder structure. Period toggles (monthly / quarterly / annual) are on the cash flow as directed on Sept 29.</div></li>
+</ol>
+
+<h2>Not covered</h2>
+<p class="scope">Ingestion and document upload; the classic tabbed view; the Returns and Sensitivity tabs; the Map stage; Capitalization and debt; a second user looking at the same deal; phone or tablet widths; any deal other than Peoria. Items 1, 2, 4 and 5 were seen at 1440 wide inside the Claude browser pane; a 27-inch monitor would ease 4 and 5 and would not fix 1 or 2.</p>
+<p class="scope">Published copy: https://claude.ai/artifact/NBTHdBTb8Kf4UjeYiQw7UN</p>
+</main>
+</body>
+</html>
