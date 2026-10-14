@@ -27,7 +27,15 @@
  * useProjectContext + direct fallback fetch), so the rail tree and the routed
  * content match the legacy surface for every project type.
  *
- * ── SHELL STATUS (verified 2026-08-18, LSCMD-BC-SHELLSTATUS-0818-BC2) ──────
+ * ── SHELL STATUS UPDATE 2026-10-14 (supersedes the 08-18 note below) ──────
+ * ACTIVE as the project shell of DESIGN VIEW. Gregg asked for every page of the
+ * Slice 1 reference to be live and connected. Design view is the third value of
+ * the ui_mode cookie (Chat / Classic / Design switch in the sidebar): opening
+ * /design/<id> turns it on, middleware then sends every project base route here,
+ * and the /w/ layout paints platform pages in the design skin. Reference files:
+ * OneDrive 1Active/_Landscape/_cowork/design-reference/.
+ *
+ * ── SHELL STATUS (verified 2026-08-18, LSCMD-BC-SHELLSTATUS-0818-BC2) — SUPERSEDED ──
  * REFERENCE — a visual restyle of StudioShell, kept for comparison. Built
  * 2026-07-17 (PR #170/#171); untouched since. Reachable by direct URL only;
  * nothing in the nav links here. Owns five files and no logic of its own —

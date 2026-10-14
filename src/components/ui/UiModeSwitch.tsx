@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import { UI_MODE_COOKIE, DEFAULT_UI_MODE, type UiMode } from '@/lib/uiMode';
+import { DEFAULT_UI_MODE, readUiModeCookie, type UiMode } from '@/lib/uiMode';
 
 /** Match a project base route in either shell and capture the project id. */
-const PROJECT_ROUTE = /^\/(?:w\/)?projects\/(\d+)/;
+const PROJECT_ROUTE = /^\/(?:(?:w\/)?projects|design|studio)\/(\d+)/;
 
 interface UiModeSwitchProps {
   /** When the sidebar is collapsed, render a single compact control. */
@@ -37,11 +37,8 @@ export function UiModeSwitch({ collapsed = false, recentProjectId }: UiModeSwitc
 
   // Read the persisted preference on mount (client-only to avoid hydration mismatch).
   React.useEffect(() => {
-    const m = document.cookie
-      .split('; ')
-      .find((c) => c.startsWith(`${UI_MODE_COOKIE}=`))
-      ?.split('=')[1];
-    if (m === 'classic' || m === 'unified') setMode(m);
+    const m = readUiModeCookie();
+    if (m) setMode(m);
   }, []);
 
   const select = (target: UiMode) => {
@@ -52,7 +49,8 @@ export function UiModeSwitch({ collapsed = false, recentProjectId }: UiModeSwitc
     let destination: string;
     if (projectMatch) {
       const id = projectMatch[1];
-      destination = target === 'classic' ? `/projects/${id}` : `/w/projects/${id}`;
+      destination =
+        target === 'classic' ? `/projects/${id}` : target === 'design' ? `/design/${id}` : `/w/projects/${id}`;
     } else if (target === 'classic') {
       // No project open and classic has no home: open the most-recent project in
       // the classic shell so one click lands the user on real classic content.
@@ -68,18 +66,18 @@ export function UiModeSwitch({ collapsed = false, recentProjectId }: UiModeSwitc
   };
 
   if (collapsed) {
-    // Compact: one button that flips to the other mode.
-    const other: UiMode = mode === 'classic' ? 'unified' : 'classic';
+    // Compact: one button that cycles Chat → Classic → Design.
+    const other: UiMode = mode === 'unified' ? 'classic' : mode === 'classic' ? 'design' : 'unified';
     return (
       <div className="sb-uimode sb-uimode--collapsed">
         <button
           type="button"
           className="ui-mode-chip"
           onClick={() => select(other)}
-          title={mode === 'classic' ? 'Classic view — switch to Chat' : 'Chat view — switch to Classic'}
+          title={mode === 'classic' ? 'Classic view — switch to Design' : mode === 'design' ? 'Design view — switch to Chat' : 'Chat view — switch to Classic'}
           style={chipStyle(true)}
         >
-          {mode === 'classic' ? 'C' : '○'}
+          {mode === 'classic' ? 'C' : mode === 'design' ? 'D' : '○'}
         </button>
       </div>
     );
@@ -117,6 +115,15 @@ export function UiModeSwitch({ collapsed = false, recentProjectId }: UiModeSwitc
         title="Classic tabbed view"
       >
         Classic
+      </button>
+      <button
+        type="button"
+        onClick={() => select('design')}
+        aria-pressed={mode === 'design'}
+        style={segStyle(mode === 'design')}
+        title="Design view (Slice 1 reference look)"
+      >
+        Design
       </button>
     </div>
   );

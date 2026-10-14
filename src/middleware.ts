@@ -8,6 +8,9 @@ import { UI_MODE_COOKIE } from '@/lib/uiMode';
 // the exact base and let specialized deep routes through.
 const LEGACY_PROJECT_BASE = /^\/projects\/(\d+)\/?$/;
 const UNIFIED_PROJECT_BASE = /^\/w\/projects\/(\d+)\/?$/;
+const STUDIO_PROJECT_BASE = /^\/studio\/(\d+)\/?$/;
+// Design view (2026-10-14): any /design/<id> route.
+const DESIGN_ROUTE = /^\/design(\/|$)/;
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -50,7 +53,7 @@ export function middleware(request: NextRequest) {
   // window.location.assign and let middleware read a stale mode on the GET
   // /projects/:id (the "bounces back to chat" bug).
   const setUi = request.nextUrl.searchParams.get('setui');
-  if (setUi === 'classic' || setUi === 'unified') {
+  if (setUi === 'classic' || setUi === 'unified' || setUi === 'design') {
     const cleanUrl = request.nextUrl.clone();
     cleanUrl.searchParams.delete('setui');
     const res = NextResponse.redirect(cleanUrl);
@@ -69,6 +72,34 @@ export function middleware(request: NextRequest) {
   // single ui_mode value is the sole source of truth: each base route redirects
   // in exactly one mode, so the two directions can never form a loop.
   const uiMode = request.cookies.get(UI_MODE_COOKIE)?.value;
+
+  // ── Design view (2026-10-14, Slice 1 reference) ──
+  // Opening the design shell turns design view on, so every later click stays
+  // in it. In design view, every project base route (chat-first, classic or
+  // studio) opens in the design shell; platform pages stay on /w/ and the /w/
+  // layout paints them in the design skin. Leaving is the Chat / Classic switch.
+  if (DESIGN_ROUTE.test(pathname)) {
+    const res = NextResponse.next();
+    if (uiMode !== 'design') {
+      res.cookies.set(UI_MODE_COOKIE, 'design', {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: 'lax',
+      });
+    }
+    return res;
+  }
+  if (uiMode === 'design') {
+    const m =
+      pathname.match(UNIFIED_PROJECT_BASE) ||
+      pathname.match(LEGACY_PROJECT_BASE) ||
+      pathname.match(STUDIO_PROJECT_BASE);
+    if (m) {
+      const url = request.nextUrl.clone(); // keeps ?thread= / ?folder=&tab=
+      url.pathname = `/design/${m[1]}`;
+      return NextResponse.redirect(url);
+    }
+  }
 
   // Legacy base route → chat-first, UNLESS the user opted into classic.
   // Unset/anything-but-classic preserves the prior default behavior.

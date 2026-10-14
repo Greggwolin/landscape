@@ -51,6 +51,8 @@ import {
   type PanelView,
 } from '@/lib/wrapper/navMemory';
 import '@/styles/wrapper.css';
+import '@/styles/design.css'; // scoped under .design-shell — inert unless design view is on
+import { readUiModeCookie } from '@/lib/uiMode';
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 180;
@@ -76,6 +78,11 @@ interface ProjectData {
 }
 
 function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
+  // Design view (2026-10-14): paint the whole /w/ shell in the Slice 1 skin
+  // when the ui_mode cookie says so. Read after mount (cookie is client-only).
+  const [designSkin, setDesignSkin] = useState(false);
+  useEffect(() => { setDesignSkin(readUiModeCookie() === 'design'); }, []);
+
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -877,7 +884,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   }, [projectId]);
 
   return (
-    <div className="wrapper-layout">
+    <div className={designSkin ? 'wrapper-layout design-shell' : 'wrapper-layout'}>
       <WrapperSidebar
         activePage={activePage}
         onNavigate={handleNavigate}
