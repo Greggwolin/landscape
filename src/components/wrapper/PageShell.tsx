@@ -1,5 +1,6 @@
 'use client';
 
+import { readUiModeCookie } from '@/lib/uiMode';
 import React, { useEffect } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { WrapperHeader } from './WrapperHeader';
@@ -57,7 +58,8 @@ export function PageShell({
   // Option A: content pages (deriveTitleFromPathname) default to chat-closed,
   // matching ProjectContentWrapper's shipped behavior (useState(false)).
   useEffect(() => {
-    if (deriveTitleFromPathname) closeChat();
+    // Design view keeps the Landscaper column on every page (Slice 1 rule).
+    if (deriveTitleFromPathname && readUiModeCookie() !== 'design') closeChat();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

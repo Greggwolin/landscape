@@ -51,10 +51,40 @@ const TILES: TileDef[] = [
   { ...byId('income') },
 ];
 
+/**
+ * A rate (unemployment) changes in percentage POINTS year over year — the
+ * reference shows "+0.3 pt". The live screen's helper gives the percent change
+ * of the rate instead, so the point change is worked out here from the same
+ * series: latest value minus the value nearest one year earlier.
+ */
+function pointChange(data: MarketSeries['data']): { value: number | null; change: string; direction: 'up' | 'down' | 'flat' } {
+  const pts = data.filter((d) => d.value != null && Number.isFinite(parseFloat(d.value)));
+  if (pts.length === 0) return { value: null, change: '—', direction: 'flat' };
+  const last = pts[pts.length - 1];
+  const latest = parseFloat(last.value as string);
+  const target = new Date(last.date);
+  target.setFullYear(target.getFullYear() - 1);
+  let prior = pts[0];
+  let best = Infinity;
+  for (const p of pts) {
+    const d = Math.abs(new Date(p.date).getTime() - target.getTime());
+    if (d < best) { best = d; prior = p; }
+  }
+  if (prior === last) return { value: latest, change: '—', direction: 'flat' };
+  const diff = latest - parseFloat(prior.value as string);
+  const direction = diff > 0.05 ? 'up' : diff < -0.05 ? 'down' : 'flat';
+  return { value: latest, change: `${diff > 0 ? '+' : ''}${diff.toFixed(1)} pt`, direction };
+}
+
 interface Row { geoName: string; value: string; change: string; direction: 'up' | 'down' | 'flat' }
 
 function buildRows(tile: TileDef, geo: GeoResponse, series: MarketSeries[]): Row[] {
   const rows: Row[] = [];
+  // A series already shown at a higher tier is the national/state series
+  // attached to a lower geography (seen 2026-10-14: Peoria city carries
+  // PAYEMS and FHFA_HPI_US). Showing it again under the city would state the
+  // national figure as the city's, so each series code is shown once.
+  const used = new Set<string>();
   for (const level of GEO_LEVEL_ORDER) {
     const target = geo.targets.find((t) => t.geo_level === level);
     if (!target) continue;
@@ -66,22 +96,34 @@ function buildRows(tile: TileDef, geo: GeoResponse, series: MarketSeries[]): Row
       );
       if (match) break;
     }
-    if (!match) continue;
-    const { value, change, direction } = computeYoYChange(match.data);
-    const scaled = value !== null ? scaleByUnits(value, match.units) : null;
+    if (!match || used.has(match.series_code)) continue;
+    used.add(match.series_code);
+    // Trailing empty periods (a release not yet filled) would read as "no
+    // value"; measure from the latest period that has one.
+    const filled = match.data.filter((d) => d.value != null && d.value !== '');
+    if (filled.length === 0) continue;
+    const yoy = tile.format === 'percent' ? pointChange(filled) : computeYoYChange(filled);
+    const scaled = yoy.value !== null ? scaleByUnits(yoy.value, match.units) : null;
     rows.push({
       geoName: target.geo_name,
       value: formatIndicatorValue(scaled, tile.format),
-      // Unemployment moves in points, not percent-of-percent.
-      change: tile.format === 'percent' && change !== '—' ? change.replace('%', ' pt') : change,
-      direction,
+      change: yoy.change,
+      direction: yoy.direction,
     });
   }
   return rows;
 }
 
-const money = (n?: number | null) =>
-  n == null ? '' : n >= 1000 ? `$${Math.round(n / 1000).toLocaleString()}k` : `$${n.toLocaleString()}`;
+/** The API returns decimals as strings; never trust the declared number type. */
+const num = (v: unknown): number | null => {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const money = (v: unknown) => {
+  const n = num(v);
+  return n == null ? '' : n >= 1000 ? `$${Math.round(n / 1000).toLocaleString()}k` : `$${n.toLocaleString()}`;
+};
 
 export function DesignMarketEconomy({ project }: { project: AnyProject }) {
   const projectId = Number(project.project_id);
@@ -190,9 +232,9 @@ export function DesignMarketEconomy({ project }: { project: AnyProject }) {
                   <td>{c.display_name || c.comp_name}</td>
                   <td>{c.builder_name || ''}</td>
                   <td>{c.status === 'sold_out' ? 'Sold out' : c.status === 'planned' ? 'Planned' : 'Selling'}</td>
-                  <td className="num">{c.total_units != null ? c.total_units.toLocaleString() : ''}</td>
-                  <td className="num">{c.price_min != null || c.price_max != null ? `${money(c.price_min)}–${money(c.price_max)}` : ''}</td>
-                  <td className="num">{c.absorption_rate_monthly != null ? `${c.absorption_rate_monthly.toFixed(1)}/mo` : ''}</td>
+                  <td className="num">{num(c.total_units)?.toLocaleString() ?? ''}</td>
+                  <td className="num">{[money(c.price_min), money(c.price_max)].filter(Boolean).join('–')}</td>
+                  <td className="num">{num(c.absorption_rate_monthly) != null ? `${num(c.absorption_rate_monthly)!.toFixed(1)}/mo` : ''}</td>
                   <td><span className="ds-tag">{c.data_source.replace('_', ' ')}</span></td>
                 </tr>
               ))}

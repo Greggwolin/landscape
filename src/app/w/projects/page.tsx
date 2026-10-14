@@ -1,5 +1,6 @@
 'use client';
 
+import { readUiModeCookie } from '@/lib/uiMode';
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, MoreVertical, ExternalLink, Archive, Trash2 } from 'lucide-react';
@@ -136,7 +137,8 @@ export default function WrapperProjectsPage() {
   }
 
   // Projects selector opens with chat panel closed — full width for the grid
-  useEffect(() => { closeChat(); }, [closeChat]);
+  // Design view keeps the Landscaper column on every page (Slice 1 rule).
+  useEffect(() => { if (readUiModeCookie() !== 'design') closeChat(); }, [closeChat]);
 
   useEffect(() => {
     let cancelled = false;

@@ -21,8 +21,14 @@ import MarketTab from '@/app/projects/[projectId]/components/tabs/MarketTab';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProject = Record<string, any>;
 
-const k = (n?: number | null) => (n == null ? null : `$${Math.round(n / 1000).toLocaleString()}k`);
-const range = (lo?: number | null, hi?: number | null) => {
+/** The API returns decimals as strings; never trust the declared number type. */
+const num = (v: unknown): number | null => {
+  if (v == null || v === '') return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const k = (v: unknown) => { const n = num(v); return n == null ? null : `$${Math.round(n / 1000).toLocaleString()}k`; };
+const range = (lo?: unknown, hi?: unknown) => {
   const a = k(lo); const b = k(hi);
   return a && b ? `${a}–${b}` : a || b || '';
 };
@@ -36,14 +42,14 @@ function groupByPlan(list: MarketCompetitiveProject[]): Group[] {
     map.set(key, [...(map.get(key) || []), c]);
   }
   return [...map.entries()].map(([name, rows]) => {
-    const los = rows.map((r) => r.price_min).filter((v): v is number => v != null);
-    const his = rows.map((r) => r.price_max).filter((v): v is number => v != null);
+    const los = rows.map((r) => num(r.price_min)).filter((v): v is number => v != null);
+    const his = rows.map((r) => num(r.price_max)).filter((v): v is number => v != null);
     return {
       name, rows,
-      units: rows.reduce((s, r) => s + (r.total_units || 0), 0),
+      units: rows.reduce((s, r) => s + (num(r.total_units) || 0), 0),
       lo: los.length ? Math.min(...los) : undefined,
       hi: his.length ? Math.max(...his) : undefined,
-      abs: rows.reduce((s, r) => s + (r.absorption_rate_monthly || 0), 0),
+      abs: rows.reduce((s, r) => s + (num(r.absorption_rate_monthly) || 0), 0),
     };
   }).sort((a, b) => b.units - a.units);
 }
@@ -123,9 +129,9 @@ export function DesignHousingMarket({ project }: { project: AnyProject }) {
                       >
                         <td className={g.rows.length > 1 ? 'ds-indent' : undefined}>{c.display_name || c.comp_name}</td>
                         <td>{c.builder_name || ''}</td>
-                        <td className="num">{c.total_units != null ? c.total_units.toLocaleString() : ''}</td>
+                        <td className="num">{num(c.total_units)?.toLocaleString() ?? ''}</td>
                         <td className="num">{range(c.price_min, c.price_max)}</td>
-                        <td className="num">{c.absorption_rate_monthly != null ? `${c.absorption_rate_monthly.toFixed(2)}/mo` : ''}</td>
+                        <td className="num">{num(c.absorption_rate_monthly) != null ? `${num(c.absorption_rate_monthly)!.toFixed(2)}/mo` : ''}</td>
                       </tr>
                     ))}
                   </React.Fragment>

@@ -557,11 +557,11 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         // FB-302: Platform Knowledge is a full-width navigator — start with
         // the center chat panel closed so the knowledge tree gets the room.
         // The user can re-open chat via the header toggle.
-        if (page === 'platform-knowledge') closeChat();
+        if (page === 'platform-knowledge' && !designSkin) closeChat();
         router.push(`/w/${routeMap[page] || page}`);
       }
     },
-    [router, projectId, lastProjectId, toggleHelp, closeChat]
+    [router, projectId, lastProjectId, toggleHelp, closeChat, designSkin]
   );
 
   const handleToggleCollapse = useCallback(() => {

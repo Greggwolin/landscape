@@ -928,3 +928,30 @@
 .ds-v2 .ds-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .ds-v2 .ds-scroll { overflow: auto; }
 .ds-v2 .ds-map-card { overflow: hidden; }
+
+/* Landscaper column header/composer at 300px (checked rendered 2026-10-14):
+   the type chip duplicates the top bar and squeezed the title out; the
+   composer textarea opened five lines tall. */
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header { gap: 8px; padding-left: 14px; padding-right: 10px; }
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header-actions > span { display: none; }
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px;
+}
+.ds-v2 .ds-body > .wrapper-chat-center textarea {
+  min-height: 38px !important; height: 38px; max-height: 140px; font-size: 12.5px; line-height: 1.4;
+  border-radius: 8px; background: #161826; border: 1px solid #3f424d;
+}
+.ds-v2 .ds-body > .wrapper-chat-center .border-top { padding: 10px 12px !important; }
+/* C4: the competitive-projects table was clipping its price and absorption
+   columns at 1440 wide (seen rendered 2026-10-14) — give the right column
+   the larger share and let the table scroll sideways instead of clipping. */
+.ds-v2 .ds-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.ds-v2 .ds-split .ds-table td, .ds-v2 .ds-split .ds-table th { padding-left: 10px; padding-right: 10px; }
+.ds-v2 .ds-scroll { overflow-x: auto; }
+.ds-v2 .ds-split .ds-table { font-size: 11.5px; }
+.ds-v2 .ds-split .ds-table td:not(.num) { white-space: normal; }
+.ds-v2 .ds-split .ds-table td.num { white-space: normal; min-width: 0; }
+.ds-v2 .wrapper-btn-primary {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; height: auto;
+  padding: 6px 12px; border-radius: 6px; font-size: 12.5px;
+}
