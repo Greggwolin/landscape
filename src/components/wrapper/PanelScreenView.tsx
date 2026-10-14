@@ -22,17 +22,36 @@
  * without a provider, and the dashboard renders the panel without one — the
  * same reason the map view is gated. See PanelMapView.
  *
- * NOT in this slice: the width rule (a screen stating what it needs and the
- * chat yielding to it, `D-2026-09-18-YIELD`), and in-place editing on the
- * registers. Both land on top of this.
+ * The width rule (`D-2026-09-18-YIELD`) landed 2026-10-14 (QX): the screen
+ * measures how much sideways room its content is asking for and requests it
+ * through the same channel the artifacts use, so the chat gives way to a wide
+ * register or cash flow the way it gives way to the budget artifact. The
+ * sidebar does not move (Rule 11). In-place editing on the registers is still
+ * NOT in this slice.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useWrapperProject } from '@/contexts/WrapperProjectContext';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import ProjectContentRouter from '@/app/projects/[projectId]/ProjectContentRouter';
+import { useArtifactWidthRequest } from './artifactWidthRequest';
+
+/* How much sideways room the screen's content wants beyond what it has.
+ * The classic pages put their tables in `overflow-x: auto` boxes, so an
+ * ancestor's scrollWidth never sees the overflow; walk the descendants and
+ * take the widest shortfall. Cheap: one screen, run on resize/mutation only. */
+function measureNeededWidth(root: HTMLElement): number {
+  let shortfall = 0;
+  const nodes = root.querySelectorAll<HTMLElement>('*');
+  for (let i = 0; i < nodes.length; i++) {
+    const el = nodes[i];
+    const over = el.scrollWidth - el.clientWidth;
+    if (over > shortfall && el.clientWidth > 0) shortfall = over;
+  }
+  return root.clientWidth + shortfall;
+}
 
 /** Folders that are panel TABS, not screens (Rule 9). */
 const TAB_FOLDERS = new Set(['documents', 'map']);
@@ -75,6 +94,37 @@ export function PanelScreenView() {
 
   const screenFolders = folderConfig.folders.filter((f) => !TAB_FOLDERS.has(f.id));
   const activeFolder = screenFolders.find((f) => f.id === currentFolder);
+
+  // The width rule. Measure after the screen settles, and again whenever its
+  // content changes (a tab switch, a table that loads late) or the panel is
+  // resized. Request only when the content is wider than the room it has;
+  // the panel never shrinks on a request, so withdrawing is harmless.
+  const { requestWidth } = useArtifactWidthRequest();
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) return;
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const needed = measureNeededWidth(root);
+        // +24 so the last column is not flush against the panel edge.
+        requestWidth(needed > root.clientWidth + 8 ? needed + 24 : null);
+      });
+    };
+    schedule();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(root);
+    const mo = new MutationObserver(schedule);
+    mo.observe(root, { childList: true, subtree: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+      mo.disconnect();
+      requestWidth(null);
+    };
+  }, [currentFolder, currentTab, requestWidth]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -139,7 +189,7 @@ export function PanelScreenView() {
           </nav>
         )}
       </div>
-      <div className="project-folder-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <div ref={contentRef} className="project-folder-content" style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <ProjectContentRouter
           project={routerProject}
           currentFolder={currentFolder}

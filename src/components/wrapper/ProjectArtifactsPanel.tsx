@@ -121,6 +121,7 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     activeLocationBrief,
     activeExcelAudit,
     activeArtifactId,
+    setActiveArtifactId,
     projectRightPanelView,
     setProjectRightPanelView,
     sidebarWidthPx,
@@ -212,7 +213,11 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     // entering remembers the width the user had, leaving puts it back, so a
     // deliberately dragged panel survives a trip to the map and back.
     const mapMode = projectRightPanelView === 'map' && showViewToggle;
-    const wantsTakeover = takeoverMode || mapMode;
+    // QX (2026-10-14): a screen is a takeover too. Before, a screen opened at
+    // the 25% rail width unless an artifact happened to be active, and the
+    // classic pages inside it were squeezed to a third of the room they need.
+    const screenMode = projectRightPanelView === 'screen' && showViewToggle;
+    const wantsTakeover = takeoverMode || mapMode || screenMode;
 
     if (wantsTakeover && !inTakeoverMode.current) {
       preTakeoverWidth.current = panelWidth;
@@ -379,7 +384,15 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
             <button
               type="button"
               className={`prp-toggle-btn${projectRightPanelView === 'artifacts' ? ' is-active' : ''}`}
-              onClick={() => setProjectRightPanelView('artifacts')}
+              onClick={() => {
+                // QX (2026-10-14): "Artifacts" while an artifact is open means
+                // "back to the list". Before, the click did nothing — the view
+                // was already 'artifacts' and the only way out was the X.
+                if (projectRightPanelView === 'artifacts' && activeArtifactId != null) {
+                  setActiveArtifactId(null);
+                }
+                setProjectRightPanelView('artifacts');
+              }}
             >
               Artifacts
             </button>
