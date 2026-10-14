@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ERPNext and Landscape — integration assessment</title>
+  <style>
+    :root{color-scheme:light;background:#f5f6f8;color:#202936;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:#f5f6f8;color:#202936}main{max-width:980px;margin:40px auto;padding:40px;background:#fff;border:1px solid #dfe4ea;border-radius:16px}h1{font-size:32px;line-height:1.2;letter-spacing:-.6px;margin:8px 0 20px}h2{font-size:20px;margin-top:32px}p,li,td,th{font-size:16px;line-height:1.65}.eyebrow{font-size:13px;color:#596779;letter-spacing:1px;text-transform:uppercase}.lead{font-size:20px;line-height:1.6}.callout{background:#eef4fa;border-left:4px solid #456c98;padding:16px 20px;border-radius:6px}table{border-collapse:collapse;width:100%;margin:18px 0;table-layout:auto}th{text-align:left;background:#f3f5f8}th,td{padding:12px 14px;border-bottom:1px solid #dfe4ea;vertical-align:top}a{color:#245b91}li{margin:10px 0}.muted{color:#596779;font-size:14px}.flow{display:flex;align-items:stretch;gap:12px;margin:22px 0}.box{flex:1;background:#f3f5f8;border:1px solid #dfe4ea;padding:18px;border-radius:9px}.box strong{display:block;margin-bottom:8px}.arrow{align-self:center;font-size:24px;color:#65768a}@media(max-width:700px){main{margin:12px;padding:22px}h1{font-size:27px}.flow{flex-direction:column}.arrow{transform:rotate(90deg)}table{display:block;overflow-x:auto}}@media print{body{background:#fff}main{border:0;margin:0;padding:0}a{color:#202936}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Landscape · October 4, 2026</div>
+  <h1>ERPNext and development accounting: a research comparison</h1>
+  <p class="lead">This is purely a research exercise. Landscape retains its underwriting role. The connection ideas below describe possibilities for comparison; no accounting expansion or trial is planned.</p>
+  <div class="callout"><strong>Existing direction preserved.</strong> Your September 29 decision keeps Landscape focused on underwriting, with saved budget versions rather than dedicated actual-cost columns throughout the app. Connecting accounting information does not require changing that choice.</div>
+
+  <h2>How the two would work together</h2>
+  <div class="flow">
+    <div class="box"><strong>ERPNext</strong>Vendor bills, purchasing, payments, accounting records, and finance staff’s work.</div>
+    <div class="arrow" aria-label="connected to">↔</div>
+    <div class="box"><strong>Landscape</strong>Project structure, underwriting budgets, forecasts, scenarios, financing analysis, and valuation.</div>
+  </div>
+  <p>Landscape users could select a dated set of recorded results as a saved version or use those results to inform an updated forecast. The original underwriting assumptions would remain available.</p>
+
+  <h2>What would have to be done</h2>
+  <ol>
+    <li><strong>Choose and operate a maintained ERPNext edition.</strong> Your current copy is an unfinished development edition from June. The comparison found no separate custom changes. It supplies starting software, but the real estate tailoring still needs to be done. <a href="https://api.github.com/repos/frappe/erpnext/compare/develop...Greggwolin:develop">Verified comparison</a>.</li>
+    <li><strong>Agree how records correspond.</strong> Connect legal entities, projects, areas, phases, cost categories, and vendors. A development project may involve several legal entities, so these connections need explicit rules.</li>
+    <li><strong>Make transfers trustworthy.</strong> Keep links to the original records, detect duplicates, handle corrected or cancelled bills, and check that totals agree. A bill and its later payment must not count twice as the same cost.</li>
+    <li><strong>Choose the visible experience.</strong> Importing selected information is a smaller commitment than putting bill entry, purchasing, approvals, and accounting reports inside Landscape.</li>
+    <li><strong>Tailor the real estate workflows that matter.</strong> Requirements might include retainage, change orders, lender draws, lien waivers, and allocating costs across entities or phases. Each needs a specific review against what ERPNext already supports.</li>
+    <li><strong>Plan ongoing ownership.</strong> Someone must own accounting setup, customer access, backups, software updates, failed transfers, and support. Review the license if customized software will be distributed to customers.</li>
+  </ol>
+
+  <h2>The size depends on the intended role</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Effort</th><th>What users gain</th></tr></thead>
+    <tbody>
+      <tr><td>Selected accounting information brought into Landscape</td><td>Contained first trial</td><td>Real project results available when reviewing or updating underwriting.</td></tr>
+      <tr><td>A reliable accounting companion for customers</td><td>Substantial integration</td><td>Repeatable transfers, separate customer access, and supported ongoing use.</td></tr>
+      <tr><td>Complete accounting workflows inside Landscape</td><td>Major product addition</td><td>Bill entry, purchasing, approvals, and accounting reports under one experience.</td></tr>
+      <tr><td>Internal accounting for your company</td><td>Different scope</td><td>Company operations and bookkeeping; the Landscape connection can remain limited.</td></tr>
+    </tbody>
+  </table>
+  <p>Cost depends on the chosen role, number of customers and legal entities, amount of historical information to transfer, specialized real estate requirements, and continuing operating support. The software’s availability does not remove those costs.</p>
+
+  <h2>What a hypothetical comparison test would examine</h2>
+  <p>A test could use one project, a small set of cost categories, and representative bills. It would check whether a dated set of accounting results agrees with the original records and helps a real underwriting decision. This describes possible research evidence; no trial or product expansion is planned.</p>
+
+  <h2>Features that would usually have little relevance</h2>
+  <p>For a developer hiring contractors and consultants, the following are likely to see little use. These are judgments about fit, assuming the developer does not also run a factory, retail operation, or materials business.</p>
+  <table>
+    <thead><tr><th>Feature</th><th>Why its fit is limited</th><th>When it could matter</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://docs.frappe.io/erpnext/manufacturing">Manufacturing</a></td><td>Production work orders, factory workstations, component lists, and production quality checks serve manufacturing operations.</td><td>Prefabricated or modular construction with an owned manufacturing operation.</td></tr>
+      <tr><td><a href="https://docs.frappe.io/erpnext/point-of-sale">Retail checkout and loyalty rewards</a></td><td>Checkout sessions, retail payments, and reward points have little bearing on development accounting.</td><td>A separate retail business.</td></tr>
+      <tr><td><a href="https://docs.frappe.io/erpnext/serial-and-batch">Detailed physical stock tracking</a></td><td>Serial numbers, material batches, expiry dates, and warehouse handling are often the contractor’s responsibility.</td><td>The developer purchases and stores materials or performs construction directly.</td></tr>
+      <tr><td><a href="https://docs.frappe.io/erpnext/subcontracting">Manufacturing subcontracting</a></td><td>This tracks materials supplied to another business for processing and returned as finished goods. The name does not establish support for construction contracts.</td><td>Components fabricated from owner-supplied materials.</td></tr>
+    </tbody>
+  </table>
+  <p><a href="https://docs.frappe.io/erpnext/timesheets">Timesheets</a> could matter for internal labor allocation or billed management services. <a href="https://docs.frappe.io/erpnext/asset-capitalization">Asset accounting</a> could matter for owned equipment or retained fixed assets. These depend on the business model rather than being universally unnecessary.</p>
+  <p>The strongest overlap is accounting records, vendor bills and payments, purchasing, project cost classification, budgets, and financial reporting. ERPNext’s broad feature list still needs a separate review for development-specific contract and payment requirements.</p>
+
+  <p class="muted">Based on selected Landscape source files, your recorded product decision, the requested ERPNext copy, and official documentation. No live accounting connection was tested. Supporting sources: <a href="https://docs.frappe.io/erpnext/accounting-dimensions">project and cost classification</a>, <a href="https://docs.frappe.io/framework/user/en/api/rest">available connection support</a>, and <a href="https://github.com/frappe/frappe_docker">official operating setup</a>.</p>
+</main>
+</body>
+</html>
