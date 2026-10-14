@@ -34,7 +34,7 @@ The runner intentionally does not default to localhost. If no API URL is configu
 - `--dry-run` is default-safe and does not construct the API client, authenticate, create threads, or send messages.
 - Write-tagged questions are excluded unless `--allow-writes` is passed. Today that excludes J4.
 - Runs are serial by default and sleep between turns. Use `--delay-seconds` to adjust the delay.
-- Runs above `--confirm-threshold` turns require confirmation unless `--yes` is passed.
+- **Spend gate (Gregg's rule, 2026-10-14, chat QV).** Every executed turn spends Anthropic API credits on the `landscape-alpha` key — the Console, not the Max plan. The plan always prints the estimate (`turns × --cost-per-turn`, default $0.15, derived from the $23.73 the 2026-10-13 battery day cost). When the estimate plus what `results/spend_log.jsonl` already shows for today (Phoenix date) passes `--spend-floor-usd` (default $1), the run refuses unless `--approved-by 'Gregg <date time Phoenix>'` is passed. There is no interactive prompt and no `--yes`: a prompt answered by the agent running the script is not Gregg's permission. The flag is a claim, not a check — pass it only after showing him the estimate in chat and getting his yes. Every executed run is appended to the spend log with its estimate and approval; the log lives in the checkout, so a fresh clone starts the day at $0 — the Console cost page is the only complete record.
 - Cleanup runs in `finally`, including on exceptions or Ctrl-C. Cleanup uses `DELETE /api/landscaper/threads/{thread_id}/`, which soft-archives the thread.
 
 ## Output

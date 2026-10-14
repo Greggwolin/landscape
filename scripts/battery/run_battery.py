@@ -27,6 +27,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 QUESTIONS_PATH = SCRIPT_DIR / "questions.yaml"
 RESULTS_DIR = SCRIPT_DIR / "results"
+SPEND_LOG_PATH = RESULTS_DIR / "spend_log.jsonl"
+PHOENIX_TZ = dt.timezone(dt.timedelta(hours=-7))  # Arizona, no daylight saving
+# $/turn: Anthropic Console showed $23.73 on landscape-alpha for 2026-10-13 (UTC), the day of
+# the 165-turn battery plus retests; $23.73 / 165 = $0.144 before counting the retests, so
+# $0.15 is a round-up. Re-derive from the Console cost page when the model or tool set changes.
+DEFAULT_COST_PER_TURN_USD = 0.15
+DEFAULT_SPEND_FLOOR_USD = 1.00
 AI_HANDLER_PATH = REPO_ROOT / "backend" / "apps" / "landscaper" / "ai_handler.py"
 
 RED_LATENCY_SECONDS = 90.0
@@ -557,6 +564,11 @@ def print_plan(args: argparse.Namespace, questions: list[dict[str, Any]]) -> Non
     print(f"Page context: {args.page_context}")
     print(f"Questions selected: {len(questions)}")
     print(f"Estimated turns: {turns}")
+    print(
+        f"Estimated API spend: ${estimated_cost(turns, args):.2f} "
+        f"({turns} x ${args.cost_per_turn:.2f}/turn, landscape-alpha key, not the Max plan); "
+        f"already logged today in this checkout: ${spend_today():.2f}; daily floor ${args.spend_floor_usd:.2f}"
+    )
     print(f"Write-tagged excluded: {', '.join(excluded_writes) if excluded_writes else 'none'}")
     print("")
     for q in questions:
@@ -568,16 +580,68 @@ def print_plan(args: argparse.Namespace, questions: list[dict[str, Any]]) -> Non
         print("Dry run complete. API calls made: 0")
 
 
+def estimated_cost(turns: int, args: argparse.Namespace) -> float:
+    return round(turns * args.cost_per_turn, 2)
+
+
+def spend_today(now: dt.datetime | None = None) -> float:
+    """Sum of estimated spend already logged today (Phoenix date) in this checkout's spend log."""
+    now = now or dt.datetime.now(PHOENIX_TZ)
+    today = now.astimezone(PHOENIX_TZ).date().isoformat()
+    total = 0.0
+    if not SPEND_LOG_PATH.exists():
+        return total
+    for line in SPEND_LOG_PATH.read_text(encoding="utf-8").splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("phoenix_date") == today:
+            total += float(row.get("estimated_cost_usd") or 0.0)
+    return round(total, 2)
+
+
+def log_spend(args: argparse.Namespace, run_id: str, turns: int, cost: float) -> None:
+    now = dt.datetime.now(PHOENIX_TZ)
+    row = {
+        "logged_at": now.isoformat(),
+        "phoenix_date": now.date().isoformat(),
+        "run_id": run_id,
+        "project_id": args.project,
+        "planned_turns": turns,
+        "cost_per_turn_usd": args.cost_per_turn,
+        "estimated_cost_usd": cost,
+        "approved_by": args.approved_by,
+    }
+    SPEND_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with SPEND_LOG_PATH.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row) + "\n")
+
+
 def require_confirmation(args: argparse.Namespace, turns: int) -> None:
-    if not args.execute or args.yes or turns <= args.confirm_threshold:
+    """Gregg's rule, 2026-10-14 (chat QV): key-billed spend past $1 in a day needs his yes.
+
+    Every executed run spends Anthropic API credits on the landscape-alpha key (not the
+    Max plan). When this run's estimate plus today's logged spend passes the floor, the
+    run refuses unless --approved-by names the moment Gregg said yes in chat. There is no
+    interactive prompt: a prompt answered by the agent running the script is not Gregg's
+    permission. The flag is a claim, not a check — pass it only after he has actually said
+    yes, and quote the estimate you showed him.
+    """
+    if not args.execute:
         return
-    if not sys.stdin.isatty():
-        raise BatteryError(
-            f"Run has {turns} turns, above threshold {args.confirm_threshold}; pass --yes to run non-interactively."
-        )
-    answer = input(f"Run {turns} production turns? Type 'yes' to continue: ")
-    if answer.strip().lower() != "yes":
-        raise BatteryError("Execution cancelled.")
+    cost = estimated_cost(turns, args)
+    prior = spend_today()
+    if prior + cost <= args.spend_floor_usd:
+        return
+    if args.approved_by:
+        return
+    raise BatteryError(
+        f"Estimated spend ${cost:.2f} ({turns} turns x ${args.cost_per_turn:.2f}) plus ${prior:.2f} "
+        f"already logged today is over the ${args.spend_floor_usd:.2f} daily floor. "
+        "Show Gregg the estimate, get his yes, then re-run with "
+        "--approved-by 'Gregg <YYYY-MM-DD HH:MM Phoenix>'. This runner never prompts for it."
+    )
 
 
 def cleanup_threads(
@@ -634,8 +698,24 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--reps", type=int, default=1, help="Repetitions for non-critical questions.")
     parser.add_argument("--reps-critical", type=int, default=5, help="Repetitions for critical questions.")
     parser.add_argument("--allow-writes", action="store_true", help="Include write-tagged questions.")
-    parser.add_argument("--yes", action="store_true", help="Skip high-turn confirmation.")
-    parser.add_argument("--confirm-threshold", type=int, default=100, help="Require confirmation above this turn count.")
+    parser.add_argument(
+        "--approved-by",
+        help="Required when estimated spend plus today's logged spend exceeds the daily floor. "
+        "Pass only after Gregg said yes in chat to the printed estimate, e.g. 'Gregg 2026-10-14 16:05 Phoenix'. "
+        "Recorded in the results and the spend log.",
+    )
+    parser.add_argument(
+        "--cost-per-turn",
+        type=float,
+        default=DEFAULT_COST_PER_TURN_USD,
+        help=f"Estimated USD per turn (default {DEFAULT_COST_PER_TURN_USD}, from the 2026-10-13 Console cost).",
+    )
+    parser.add_argument(
+        "--spend-floor-usd",
+        type=float,
+        default=DEFAULT_SPEND_FLOOR_USD,
+        help=f"Daily estimated spend above which --approved-by is required (default {DEFAULT_SPEND_FLOOR_USD}).",
+    )
     parser.add_argument("--delay-seconds", type=float, default=2.0, help="Delay between turns.")
     parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP timeout per request.")
     parser.add_argument("--page-context", default=DEFAULT_PAGE_CONTEXT, help="Thread/message page_context.")
@@ -681,6 +761,8 @@ def main(argv: list[str]) -> int:
     started_at = dt.datetime.now(dt.timezone.utc).isoformat()
     interrupted = False
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    planned_cost = estimated_cost(turns, args)
+    log_spend(args, run_id, turns, planned_cost)
 
     try:
         for q in questions:
@@ -716,6 +798,10 @@ def main(argv: list[str]) -> int:
             "started_at": started_at,
             "completed_at": completed_at,
             "interrupted": interrupted,
+            "planned_turns": turns,
+            "estimated_cost_usd": planned_cost,
+            "cost_per_turn_usd": args.cost_per_turn,
+            "approved_by": args.approved_by,
             "project_id": args.project,
             "page_context": args.page_context,
             "api_base": client.base_url,
