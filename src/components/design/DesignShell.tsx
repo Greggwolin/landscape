@@ -75,6 +75,7 @@ import { DesignHousingMarket } from './compositions/DesignHousingMarket';
 import { DesignParcels } from './compositions/DesignParcels';
 import { DesignCosts } from './compositions/DesignCosts';
 import { DesignCapitalization } from './compositions/DesignCapitalization';
+import { DesignCashFlow } from './compositions/DesignCashFlow';
 
 /**
  * Stage B per-screen compositions (reference frames). A folder id present here
@@ -95,6 +96,8 @@ const DESIGN_COMPOSITIONS: Record<string, React.ComponentType<{ project: any }>>
   // C7 — debt and equity on one page.
   'capital:debt': DesignCapitalization,
   'capital:equity': DesignCapitalization,
+  // C12 — land cash flow, live components re-skinned.
+  'feasibility:cashflow': DesignCashFlow,
 };
 
 function DesignShellInner() {

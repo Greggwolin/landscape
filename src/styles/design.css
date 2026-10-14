@@ -1167,3 +1167,39 @@
 .ds-v2 .ds-cap-row .ds-card-head { flex-wrap: nowrap; }
 .ds-v2 .ds-cap-row .ds-card-head > span:first-child { white-space: nowrap; }
 .ds-v2 .ds-cap-row .ds-card { min-width: 0; overflow: hidden; }
+/* ── C12 Cash Flow skin (2026-10-14) — re-skins the live land cash-flow components ── */
+.ds-v2 .ds-cfskin { display: grid; grid-template-columns: 240px minmax(0,1fr); gap: 12px; align-items: start; }
+.ds-v2 .ds-cfskin-main { min-width: 0; }
+.ds-v2 .ds-cfskin .card { background: #1d1f2b !important; border: 1px solid #3f424d !important; border-radius: 8px; color: #e9e9ed; }
+.ds-v2 .ds-cfskin .card-header { background: transparent !important; border-bottom: 1px solid #3f424d !important; padding: 8px 12px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #75798c; }
+.ds-v2 .ds-cfskin .card-body { font-size: 12px; }
+.ds-v2 .ds-cfskin-assume .card-body button { font-size: 11px !important; text-transform: uppercase; letter-spacing: .04em; color: #2f9dd3 !important; }
+.ds-v2 .ds-cfskin-assume select, .ds-v2 .ds-cfskin-assume input { background: #161826 !important; color: #e9e9ed !important; border: 1px solid #3f424d !important; border-radius: 6px; font-size: 12px !important; }
+/* area / phase filter: one compact block, chips small */
+.ds-v2 .ds-cfskin .rounded.border { border-color: #3f424d !important; border-radius: 8px !important; background: #1d1f2b; }
+.ds-v2 .ds-cfskin .rounded.border > div:first-child { padding: 6px 12px !important; font-size: 11px; }
+.ds-v2 .ds-cfskin .border-t { border-top-color: #3f424d !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 8px 12px !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 > div { display: flex; align-items: center; gap: 8px; margin: 0 !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 h6 { margin: 0 !important; font-size: 11px !important; font-weight: 400 !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 .gap-2 { gap: 4px !important; }
+.ds-v2 .ds-cfskin .border-t .btn-sm { padding: 1px 7px !important; font-size: 11px !important; border-radius: 4px !important; }
+/* headline tiles */
+.ds-v2 .ds-cfskin .row.g-3 { display: grid !important; grid-template-columns: 1.5fr repeat(4, minmax(0,1fr)); gap: 8px; margin: 0 !important; }
+.ds-v2 .ds-cfskin .row.g-3 > div { width: auto !important; max-width: none !important; padding: 0 !important; margin: 0 !important; flex: none !important; }
+.ds-v2 .ds-cfskin .row.g-3 .card { background: #1d1f2b !important; }
+.ds-v2 .ds-cfskin .row.g-3 .card-body { padding: 8px 10px !important; }
+.ds-v2 .ds-cfskin .row.g-3 .card-body span[style*="0.7rem"] { text-transform: none !important; letter-spacing: 0 !important; font-weight: 400 !important; font-size: 11px !important; }
+/* controls row */
+.ds-v2 .ds-cfskin .card.mt-3 > .card-header { padding: 8px 12px !important; gap: 10px !important; text-transform: none; letter-spacing: 0; }
+.ds-v2 .ds-cfskin .card.mt-3 > .card-header span.fw-medium { display: none; }
+.ds-v2 .ds-cfskin .card.mt-3 > .card-header .gap-4 { gap: 10px !important; }
+.ds-v2 .ds-cfskin .btn-group-sm > .btn { padding: 4px 12px; font-size: 12px; background: transparent; color: #c8cad6; border-color: #3f424d; }
+.ds-v2 .ds-cfskin .btn-group-sm > .btn.btn-primary { background: color-mix(in srgb, #2f9dd3 16%, transparent); color: #d4ecfc; border-color: #3f424d; font-weight: 600; }
+.ds-v2 .ds-cfskin .dropdown-toggle { padding: 4px 10px; font-size: 12px; background: transparent; color: #c8cad6; border-color: #3f424d; }
+/* period table: dense, boxless */
+.ds-v2 .ds-cfskin table.table { --cui-table-bg: transparent; --cui-table-color: #e9e9ed; background: transparent !important; font-size: 12px; margin: 0; }
+.ds-v2 .ds-cfskin table.table > :not(caption) > * > * { background: transparent !important; border-width: 0 !important; border-bottom: 1px solid rgba(233,233,237,0.06) !important; padding: 6px 10px !important; box-shadow: none !important; }
+.ds-v2 .ds-cfskin table.table thead th { background: #1d1f2b !important; color: #75798c !important; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600 !important; border-bottom: 1px solid #3f424d !important; }
+.ds-v2 .ds-cfskin .text-end.mt-3 { font-size: 11px; color: #75798c; margin-top: 8px !important; }
+@media (max-width: 1280px) { .ds-v2 .ds-cfskin .row.g-3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
