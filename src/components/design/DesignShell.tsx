@@ -73,6 +73,7 @@ import { buildDesignNav, locateDesignNav, type DesignNavItem, type DesignNavSect
 import { DesignMarketEconomy } from './compositions/DesignMarketEconomy';
 import { DesignHousingMarket } from './compositions/DesignHousingMarket';
 import { DesignParcels } from './compositions/DesignParcels';
+import { DesignCosts } from './compositions/DesignCosts';
 
 /**
  * Stage B per-screen compositions (reference frames). A folder id present here
@@ -88,6 +89,8 @@ const DESIGN_COMPOSITIONS: Record<string, React.ComponentType<{ project: any }>>
   'property:market': DesignHousingMarket,
   // C2 — parcel attribution on the land plan.
   'property:parcels': DesignParcels,
+  // C5 — development budget + acquisition ledger.
+  'budget:budget': DesignCosts,
 };
 
 function DesignShellInner() {
