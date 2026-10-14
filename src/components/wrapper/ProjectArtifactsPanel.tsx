@@ -127,9 +127,8 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     projectRightPanelView,
     setProjectRightPanelView,
     sidebarWidthPx,
-    chatOpen,
-    openChat,
-    closeChat,
+    chatFolded,
+    setChatFolded,
   } = useWrapperUI();
   const SIDEBAR_COLLAPSED_WIDTH = sidebarWidthPx;
 
@@ -200,33 +199,22 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
    * We only ever reopen a chat WE folded — a chat the user closed himself is
    * his business. */
   const [fullWidth, setFullWidth] = useState(false);
-  const chatFoldedByUs = useRef(false);
+  // Bringing the chat back by hand dismisses the automatic fold for THIS
+  // artifact or screen only; the next one opened may fold again. (A drag of
+  // the panel edge is stronger and stays for the session — userSized.)
+  const foldKey = `${projectRightPanelView}:${activeArtifactId ?? ''}`;
+  const [foldDismissedFor, setFoldDismissedFor] = useState<string | null>(null);
   const needsMoreThanChatAllows =
     requestedWidth != null && maxWithChat != null && requestedWidth > maxWithChat;
-  const wantsFold = !userSized && (fullWidth || needsMoreThanChatAllows);
+  const wantsFold =
+    !userSized && (fullWidth || (needsMoreThanChatAllows && foldDismissedFor !== foldKey));
 
   useEffect(() => {
-    if (wantsFold && chatOpen && !chatFoldedByUs.current) {
-      chatFoldedByUs.current = true;
-      closeChat();
-    } else if (!wantsFold && chatFoldedByUs.current) {
-      chatFoldedByUs.current = false;
-      openChat();
-    }
-  }, [wantsFold, chatOpen, closeChat, openChat]);
+    setChatFolded(wantsFold);
+  }, [wantsFold, setChatFolded]);
 
-  // Put the chat back if this panel unmounts while it holds the fold.
-  useEffect(
-    () => () => {
-      if (chatFoldedByUs.current) {
-        chatFoldedByUs.current = false;
-        openChat();
-      }
-    },
-    [openChat]
-  );
-
-  const chatFolded = !chatOpen && chatFoldedByUs.current;
+  // Never leave the chat folded when this panel goes away.
+  useEffect(() => () => setChatFolded(false), [setChatFolded]);
 
   const maxContentWidth =
     viewportWidth == null
@@ -412,11 +400,7 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
             aria-label="Show the chat"
             onClick={() => {
               setFullWidth(false);
-              // A content request may fold it straight back; that is the rule
-              // working, and the user can drag the panel narrower to keep the
-              // chat (a drag is final — see userSized).
-              chatFoldedByUs.current = false;
-              openChat();
+              setFoldDismissedFor(foldKey);
             }}
           >
             ▶ Chat
@@ -484,15 +468,21 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
             </button>
             <button
               type="button"
-              className={`prp-toggle-btn prp-toggle-btn--edge${fullWidth ? ' is-active' : ''}`}
-              title={fullWidth ? 'Give the chat its room back' : 'Give this panel the whole row (the chat folds to a strip)'}
-              aria-pressed={fullWidth}
+              className={`prp-toggle-btn prp-toggle-btn--edge${chatFolded ? ' is-active' : ''}`}
+              title={chatFolded ? 'Give the chat its room back' : 'Give this panel the whole row (the chat folds to a strip)'}
+              aria-pressed={chatFolded}
               onClick={() => {
-                setUserSized(false);
-                setFullWidth((v) => !v);
+                if (chatFolded) {
+                  setFullWidth(false);
+                  setFoldDismissedFor(foldKey);
+                } else {
+                  setUserSized(false);
+                  setFoldDismissedFor(null);
+                  setFullWidth(true);
+                }
               }}
             >
-              {fullWidth ? '⇤ Split' : '⇥ Full width'}
+              {chatFolded ? '⇤ Split' : '⇥ Full width'}
             </button>
             {/* MK22 — Map as a third view. Only on the project surface:
                 PanelMapView calls useWrapperProject, which throws without a

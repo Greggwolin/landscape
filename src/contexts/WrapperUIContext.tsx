@@ -200,6 +200,12 @@ interface WrapperUIContextValue {
   toggleChat: () => void;
   openChat: () => void;
   closeChat: () => void;
+  /** QX 1a (2026-10-14): the chat is folded to a strip because the right
+   *  panel took the row. Separate from chatOpen on purpose — the project
+   *  root page forces chatOpen back to true, so a fold expressed as "closed"
+   *  was undone on the next render. */
+  chatFolded: boolean;
+  setChatFolded: (v: boolean) => void;
   /** When true, <main> shrinks to fit its content (e.g. 320px artifacts sidebar). */
   rightPanelNarrow: boolean;
   setRightPanelNarrow: (v: boolean) => void;
@@ -292,6 +298,7 @@ const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
  */
 export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(true);
+  const [chatFolded, setChatFolded] = useState(false);
   const [rightPanelNarrow, setRightPanelNarrow] = useState(false);
   const [activeMapArtifact, setActiveMapArtifact] = useState<MapArtifactConfig | null>(null);
   const [activeLocationBrief, setActiveLocationBrief] = useState<LocationBriefArtifactConfig | null>(null);
@@ -339,6 +346,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   return (
     <WrapperUIContext.Provider value={{
       chatOpen, toggleChat, openChat, closeChat,
+      chatFolded, setChatFolded,
       rightPanelNarrow, setRightPanelNarrow,
       artifactsOpen, toggleArtifacts,
       projectRightPanelView, setProjectRightPanelView,
