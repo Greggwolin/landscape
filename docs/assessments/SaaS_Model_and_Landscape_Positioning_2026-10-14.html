@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Landscape After the SaaSpocalypse</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#fbfaf7; --fg:#1f2324; --muted:#5d6568; --rule:#d9d4c8;
+  --accent:#1f5f8b; --accent-soft:#e6eef4; --warn:#8a4b12; --warn-soft:#f6ebdd;
+  --display:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;margin:0;padding:28px 16px 56px}
+main{max-width:720px;margin:0 auto}
+h1{font-family:var(--display);font-size:2rem;line-height:1.15;font-weight:700;margin:0 0 .25rem}
+h2{font-family:var(--display);font-size:1.35rem;font-weight:600;margin:2.2rem 0 .6rem}
+h3{font-family:var(--body);font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem}
+p{margin:0 0 .85rem;max-width:68ch}
+.meta{color:var(--muted);font-size:.85rem;letter-spacing:.02em;margin-bottom:1.6rem}
+.verdict{border-left:4px solid var(--accent);background:var(--accent-soft);padding:.9rem 1.1rem;margin:1.2rem 0 1.6rem}
+.verdict p{margin:0 0 .5rem}.verdict p:last-child{margin:0}
+.counter{border-left:4px solid var(--warn);background:var(--warn-soft);padding:.9rem 1.1rem;margin:1rem 0}
+.counter p{margin:0 0 .5rem}.counter p:last-child{margin:0}
+ol,ul{padding-left:1.3rem;margin:0 0 .9rem}li{margin-bottom:.45rem;max-width:66ch}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin:.6rem 0 1.2rem;table-layout:auto}
+.tbl{overflow-x:auto}
+th{text-align:left;font-weight:600;white-space:normal;border-bottom:2px solid var(--rule);padding:.45rem .6rem;vertical-align:bottom}
+td{border-bottom:1px solid var(--rule);padding:.5rem .6rem;vertical-align:top;white-space:normal}
+td:first-child{font-weight:500}
+.parts col.c1{width:20%}.parts col.c2{width:18%}.parts col.c3{width:62%}
+.opt{margin:0 0 .5rem;padding-left:0;list-style:none}
+.opt li{display:grid;grid-template-columns:2.6rem 1fr;gap:.5rem}
+.opt b{font-family:var(--body);color:var(--accent)}
+.src{font-size:.85rem;color:var(--muted)}.src li{margin-bottom:.3rem}
+a{color:var(--accent)}
+small{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Landscape After the SaaSpocalypse</h1>
+<p class="meta">Prepared 2026-10-14 &middot; sources read the same day &middot; for Gregg</p>
+
+<div class="verdict">
+<p><strong>Call:</strong> the expert view has settled into one split, and Landscape straddles it. Software that is a screen over a database with no data of its own is being repriced toward zero. Software that is the <em>record</em> a deal runs on, and that several parties have to trust, is being repriced up. Landscape&rsquo;s 200-plus tools sit on the losing side of that line. Its data model, its memory of the deal, and its potential as the one shared model in a multi-party deal sit on the winning side.</p>
+<p><strong>On your idea:</strong> package by property type, yes. Define Landscape as &ldquo;a platform of toolsets&rdquo;, no. That framing leads with the part anyone can now rebuild in an afternoon, and it contradicts the direction you set in July and again in September: lead with the analyst that knows the deal and stays on it.</p>
+</div>
+
+<h2>1. What the experts are saying now</h2>
+<p>Everyone agrees on the trigger: the January launch of Claude Cowork and its plugins set off a software selloff that Jefferies named the SaaSpocalypse. Roughly $285 billion came off software, legal-tech and financial-services stocks in a single early-February session; the S&amp;P software index fell about 25% between January 12 and late February, then partly recovered. By mid-year the cumulative mark-down was being quoted at $1&ndash;2 trillion, and a second leg hit in April.</p>
+<p>What they disagree on is what it means. Three camps:</p>
+
+<div class="tbl"><table>
+<tr><th>Camp</th><th>Who</th><th>Position</th></tr>
+<tr><td>Restructure, not replace</td><td>Bain, Gartner, Microsoft, the DeepLearning.AI newsletter, most CIO-facing analysts</td><td>Agents eat the interface and the per-seat price, not the business. Software becomes the context layer agents act through. Gartner also expects 40%+ of agent projects to be cancelled by end-2027 on cost and weak controls, so the pace is slower than the headlines.</td></tr>
+<tr><td>System of record wins, workflow tools die</td><td>HarbourVest, Houlihan Lokey, Stax, Euclid Ventures, the vertical-SaaS investor crowd</td><td>The bright line in valuations is now &ldquo;system of record or bolt-on workflow tool.&rdquo; Vertical software with proprietary data, regulated or multi-party workflows, and an audit trail is being repriced upward; generic CRM, project management, reporting and content tools are compressing. Vertical AI companies traded at roughly 3.5x revenue against 2.1x for horizontal SaaS in May.</td></tr>
+<tr><td>Even the record is at risk</td><td>a16z (Sarah Wang, Big Ideas 2026), Lex Zhao at One Way Ventures</td><td>The system of record loses primacy to the agent layer; the agent&rsquo;s accumulated memory becomes the real record and the database behind it becomes a commodity. Build-versus-buy is swinging to build because agents make internal tools cheap.</td></tr>
+</table></div>
+
+<p>Two dissents worth holding onto. Jason Lemkin argues the crash is the market finally pricing in growth deceleration that started in 2021, not AI killing anything. And nobody in any camp claims QuickBooks-class ledgers disappear: they lose the reporting and workflow layer on top, and keep the ledger, the bank feeds, the payroll filings and the audit trail, which is why Intuit is shipping its own agent plugins rather than retreating.</p>
+
+<h2>2. Where Landscape sits on that line</h2>
+<p>Your own experience is the evidence. You built working tools for several functions in weeks without a coding background. That is exactly what the second and third camps are pricing in. So the honest sort of Landscape&rsquo;s parts:</p>
+
+<div class="tbl"><table class="parts"><colgroup><col class="c1"><col class="c2"><col class="c3"></colgroup>
+<tr><th>Part of Landscape</th><th>Which side of the line</th><th>Why</th></tr>
+<tr><td>Calculation engines and the 200-plus tools</td><td>Replicable</td><td>IRR, absorption, waterfalls, cash flow: a competent user with Claude gets 80% of this from a spreadsheet and a prompt. The free CRE tools you are seeing are this layer.</td></tr>
+<tr><td>Document extraction</td><td>Replicable, and shrinking</td><td>Already a commodity in your own July demo plan (deliberately not demoed).</td></tr>
+<tr><td>Chat-first interface and artifacts</td><td>Replicable</td><td>Every vendor has one now; the interface is the layer the experts say is going to zero.</td></tr>
+<tr><td>The structured data model (areas, phases, parcels; scenarios; which operating statement is live)</td><td>Defensible</td><td>Took ten iterations to get right. A home-built tool has no idea which of five operating statements is the real one. This is the &ldquo;record&rdquo; the second camp pays for.</td></tr>
+<tr><td>Persistent knowledge of the deal, corrections retained</td><td>Defensible within a deal</td><td>The one thing the a16z camp says becomes the record. Within-project is real; cross-deal is still thin, and you told me not to oversell it.</td></tr>
+<tr><td>One neutral model several parties trust</td><td>Defensible, and unbuilt</td><td>The Jeff Meyers story: a deal died because the JV builders could not agree who would model it. A personal Claude tool cannot be the shared number. This is the multi-party, auditable workflow that every &ldquo;survives&rdquo; list names.</td></tr>
+</table></div>
+
+<p>The free-tool threat is real but narrower than it looks. Free CRE tools are starting points for one person. They do not accumulate, are not shared, carry no audit trail, and cannot be the number a lender, partner or appraiser signs off on. The user they do take from Landscape is the solo broker or analyst who is satisfied with &ldquo;good enough for me.&rdquo; That means Landscape&rsquo;s buyer is not the individual. It is the deal with more than one party in it, and the firm that needs one place the number lives.</p>
+
+<h2>3. Your proposal: a platform with toolsets per property type</h2>
+<h3>The case for it</h3>
+<ul>
+<li>It matches how buyers think. A land developer does not buy &ldquo;analytics&rdquo;; he buys the land thing.</li>
+<li>The universal container architecture already supports it, so it is packaging, not rebuilding.</li>
+<li>It makes pricing modular and lets you sell one lane (land) before the others are ready.</li>
+</ul>
+<h3>The case against it, argued hardest</h3>
+<ul>
+<li>&ldquo;Toolset&rdquo; invites the exact comparison that loses: your toolset against a free one or a self-built one. It puts the replicable layer on the front of the box.</li>
+<li>It contradicts two directions already on record: 2026-07-21, lead with the knowledge engine and persistent assistant, never a defensive frame; 2026-09-26, you are not pitching a spreadsheet replacement.</li>
+<li>Framed as tools, the expert consensus says you get valued like a workflow tool, which is the compressing category.</li>
+</ul>
+
+<div class="counter">
+<p><strong>Recommendation.</strong> Property-type lanes as the go-to-market package; system of record plus the analyst who knows the deal as the identity. The lane gets the first meeting. The record is why they stay and why the second party in the deal joins.</p>
+<p><strong>Strongest case against my own recommendation.</strong> Nobody buys &ldquo;memory.&rdquo; Buyers pay for a job done, and the a16z camp says the agent layer, not the database, captures the value. If they are right, a well-packaged toolset with a thin record beats a deep record with a weak package. What would have to be true for me to be wrong: solo users turn out to be the whole market and multi-party deals never adopt a shared model. The Meyers story and your 35 years say otherwise, but that is the bet.</p>
+</div>
+
+<h2>4. What changes if you take this view</h2>
+<ol>
+<li><strong>Absorb the free tools instead of competing with them.</strong> Make &ldquo;bring your own model&rdquo; a feature: a user loads the spreadsheet or Claude-built tool he already trusts, and Landscape becomes the record it writes into. This turns the threat into a lead source.</li>
+<li><strong>Build the shared-model story before the next demo.</strong> Two parties on one Peoria Meadows model, each seeing the other&rsquo;s assumptions, with an audit trail of who changed what. That is the feature none of the free tools can have.</li>
+<li><strong>Price for the deal, not the seat.</strong> Per-seat is the model every camp says is dead. Per project, per deal, or per party on a deal fits the record framing and the way CRE already pays for things.</li>
+<li><strong>Stop widening the tool library.</strong> Two hundred tools is a cost of ownership, not a moat. Depth in the lanes you sell beats breadth.</li>
+<li><strong>Keep the July pivot.</strong> Demo-first, Mike Kern first, land first. Nothing here changes that; it changes what the demo claims to be.</li>
+</ol>
+
+<h2>5. Decisions you own</h2>
+<p>One at a time. The first is the one that decides the rest.</p>
+<ol class="opt">
+<li><b>1</b><span>Does the identity change from &ldquo;AI-native analytics platform&rdquo; to &ldquo;the deal&rsquo;s system of record, with an analyst on it&rdquo;?</span></li>
+<li><b>1a</b><span>Yes, record first; property-type lanes are packaging under it.</span></li>
+<li><b>1b</b><span>No, platform of toolsets per property type is the identity.</span></li>
+<li><b>1c</b><span>Hold; keep the current framing until a second developer conversation confirms or contradicts what Kern said.</span></li>
+</ol>
+<ol class="opt">
+<li><b>2</b><span>Held until 1 is answered: whether the shared multi-party model moves ahead of the remaining lanes.</span></li>
+</ol>
+<ol class="opt">
+<li><b>3</b><span>Held until 1 is answered: whether pricing moves off per-seat and to what.</span></li>
+</ol>
+
+<h2>Sources</h2>
+<ul class="src">
+<li><a href="https://fortune.com/2026/09/26/agentic-ai-saas-human-middleware-microsoft/">Fortune, Microsoft VP on SaaS as the operating system for agents (Sept 26, 2026)</a></li>
+<li><a href="https://www.deeplearning.ai/the-batch/claude-cowork-plugins-trigger-a-saas-stock-selloff-but-partnerships-lead-to-slight-rebound">The Batch, Cowork plugins trigger a SaaS selloff</a></li>
+<li><a href="https://inc42.com/buzz/anthropic-saaspocalypse-and-the-indian-it-sell-off/">Inc42, the $285B single-session selloff and the Jefferies &ldquo;SaaSpocalypse&rdquo; label</a></li>
+<li><a href="https://cirra.ai/articles/saaspocalypse-ai-agents-saas-market-impact">Cirra, SaaSpocalypse explained, incl. the One Way Ventures build-vs-buy comment</a></li>
+<li><a href="https://www.harbourvest.com/insights-news/insights/software-industry-great-reset-the-new-moat-that-matters/">HarbourVest, the system-of-record bright line</a></li>
+<li><a href="https://www2.hl.com/ai-in-vertical-software-q1-2026.pdf">Houlihan Lokey, AI in Vertical Software Q1 2026</a></li>
+<li><a href="https://www.stax.com/insights/how-ai-is-reshaping-vertical-saas">Stax, systems of record become systems of action</a></li>
+<li><a href="https://insights.euclid.vc/p/the-vertical-report-2026-full-version">Euclid Ventures, The Vertical Report 2026</a></li>
+<li><a href="https://medium.com/@rsaker/ai-is-eating-enterprise-saas-1259d352f193">Summary of a16z Big Ideas 2026 (Sarah Wang) on the record losing primacy</a></li>
+<li><a href="https://acquinoxadvisors.com/vertical-saas-ma-opportunity-2026/">Acquinox, Bain framework and the flight to quality in vertical software M&amp;A</a></li>
+<li><a href="https://www.webpronews.com/the-saas-reckoning-how-ai-agents-and-market-fatigue-eroded-a-once-invincible-model">WebProNews, incl. Jason Lemkin&rsquo;s deceleration counter-argument</a></li>
+<li><a href="https://www.articsledge.com/post/ai-agents-vs-saas">Artic Sledge, restructure-not-replace view and the Gartner cancellation forecast (Oct 2026)</a></li>
+<li><a href="https://www.ainformat.com/solution/2063">AInformat, vertical vs horizontal revenue multiples, May 2026</a></li>
+</ul>
+<p><small>Internal context used: the July 19 go-to-market pivot, the July 21 and Sept 26 positioning directions, and the Jeff Meyers lunch story as recorded Sept 26.</small></p>
+<p><small>Published copy: https://claude.ai/artifact/M9oZENthHvjx12DS86tAGV</small></p>
+</main>
+</body>
+</html>
