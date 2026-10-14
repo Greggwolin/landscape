@@ -26,6 +26,7 @@ import {
   type CollisionInfo,
 } from '@/components/dms/staging/classifyFile';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { emitLandscapeCommand } from '@/lib/landscape-command-bus';
 
 // ============================================
 // CONTEXT VALUE
@@ -448,6 +449,16 @@ export function UploadStagingProvider({
         console.log(
           `[STAGING] Upload complete: ${staged.file.name} → doc_id=${docResult.doc?.doc_id}`
         );
+
+        // A cost estimate (the tray's cost-library route) goes to Landscaper to
+        // be read line by line and checked against the cost library.
+        if (effectiveRoute === 'library' && docResult.doc?.doc_id) {
+          emitLandscapeCommand('ask_landscaper', {
+            message:
+              `I just uploaded the cost estimate "${staged.file.name}" (document ${docResult.doc.doc_id}). ` +
+              `Review its line items against the cost library and tell me which prices are new or different.`,
+          });
+        }
 
         dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });
       } catch (error) {

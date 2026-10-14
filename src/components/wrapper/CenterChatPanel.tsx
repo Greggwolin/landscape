@@ -10,7 +10,7 @@ import { LandscaperChatThreaded, LandscaperChatHandle } from '@/components/lands
 import { ProjectHomepage } from '@/components/wrapper/ProjectHomepage';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
-import { emitLandscapeCommand } from '@/lib/landscape-command-bus';
+import { emitLandscapeCommand, useLandscapeCommand } from '@/lib/landscape-command-bus';
 import { setPendingPlanExtract, type PlanOverlayPayload } from '@/lib/gis/planExtractBridge';
 import { setPendingDrapeCommand, type DrapeCommand } from '@/lib/gis/drapeCommandBridge';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
@@ -410,6 +410,19 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
   // Ref to the chat component so we can auto-send the initial message
   const chatRef = useRef<LandscaperChatHandle>(null);
+
+  // A request raised elsewhere in the app (e.g. a cost estimate just uploaded)
+  // is sent into this chat so Landscaper acts on it where the user can see it.
+  useLandscapeCommand('ask_landscaper', (payload) => {
+    const text = payload?.message?.trim();
+    if (!text) return;
+    const h = chatRef.current;
+    if (h && typeof h.sendMessage === 'function') {
+      Promise.resolve(h.sendMessage(text)).catch((e) =>
+        console.error('[ask_landscaper] sendMessage failed:', e),
+      );
+    }
+  });
   const pendingMessageRef = useRef<string | null>(null);
 
   // Detect project root: pathname ends with /projects/<id> (no sub-page)

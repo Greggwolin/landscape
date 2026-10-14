@@ -95,6 +95,9 @@ UNIVERSAL_TOOLS = [
     # artifact. Schema is built server-side, so large outputs (rent rolls,
     # cash flows, etc.) aren't bounded by the model's max_tokens budget.
     "render_report_as_artifact",
+    # Cost estimate → cost library (2026-09-29): read a contractor estimate,
+    # compare with the library, add chosen rows on confirmation.
+    "review_cost_estimate", "add_cost_estimate_items",
     # Excel model audit (cross-cutting — any project type)
     "classify_excel_file",
     "run_structural_scan",
