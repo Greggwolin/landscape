@@ -74,6 +74,7 @@ import { DesignMarketEconomy } from './compositions/DesignMarketEconomy';
 import { DesignHousingMarket } from './compositions/DesignHousingMarket';
 import { DesignParcels } from './compositions/DesignParcels';
 import { DesignCosts } from './compositions/DesignCosts';
+import { DesignCapitalization } from './compositions/DesignCapitalization';
 
 /**
  * Stage B per-screen compositions (reference frames). A folder id present here
@@ -91,6 +92,9 @@ const DESIGN_COMPOSITIONS: Record<string, React.ComponentType<{ project: any }>>
   'property:parcels': DesignParcels,
   // C5 — development budget + acquisition ledger.
   'budget:budget': DesignCosts,
+  // C7 — debt and equity on one page.
+  'capital:debt': DesignCapitalization,
+  'capital:equity': DesignCapitalization,
 };
 
 function DesignShellInner() {
@@ -211,7 +215,11 @@ function DesignShellInner() {
     analysisPerspective: currentProject?.analysis_perspective,
     analysisPurpose: currentProject?.analysis_purpose,
     valueAddEnabled: currentProject?.value_add_enabled ?? false,
-    tileConfig: currentProject?.tile_config,
+    // The reference always carries Capitalization; the design view shows it even
+    // when the project's analysis settings hide it elsewhere (2026-10-14).
+    tileConfig: currentProject?.tile_config
+      ? { ...currentProject.tile_config, tile_capitalization: true }
+      : currentProject?.tile_config,
   });
 
   // The one right panel holds two content kinds: a Landscaper artifact when one
