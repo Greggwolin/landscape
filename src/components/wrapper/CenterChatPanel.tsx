@@ -110,7 +110,7 @@ interface CenterChatPanelProps {
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
 export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat, availableScreens }: CenterChatPanelProps) {
-  const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext, setProjectRightPanelView } = useWrapperUI();
+  const { chatOpen, chatFolded, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext, setProjectRightPanelView } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -866,6 +866,8 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   });
 
   if (!chatOpen && !isChatRoute) return null;
+  // QX 1a: folded to a strip by the right panel (the strip lives there).
+  if (chatFolded && !isChatRoute) return null;
 
   const getPageContext = () => {
     if (activeContentContext && isProjectRoot) return activeContentContext;
