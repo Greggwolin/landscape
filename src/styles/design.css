@@ -440,7 +440,8 @@
  * conflict. The block above is kept because it carries what the new sheet
  * does not: the full --w-* token re-map the reused wrapper components read,
  * and the project-home (.dh-*) and header rules. Source of truth for this
- * half: docs/design-reference/design.css + COWORK-FORMAT-SPEC.md.
+ * half: OneDrive 1Active/_Landscape/_cowork/design-reference/ (design.css +
+ * COWORK-FORMAT-SPEC.md) — the only current copy of the hand-off.
  * ═══════════════════════════════════════════════════════════════════════ */
 /**
  * Design Shell — three-zone project workspace (/design/[id]).
