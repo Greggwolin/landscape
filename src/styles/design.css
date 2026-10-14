@@ -1064,3 +1064,55 @@
 .design-shell .dh-activity-when { color: #75798c; }
 .design-shell .dh-activity-title { color: #e9e9ed; }
 .design-shell .dh-activity-summary { color: #9397ab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── C2 Parcels (2026-10-14) ── */
+.ds-v2 .ds-parcels-top { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 12px; align-items: stretch; }
+.ds-v2 .ds-parcels-map { height: 360px; position: relative; border-top: 1px solid #3f424d; }
+.ds-v2 .ds-map-card { overflow: hidden; display: flex; flex-direction: column; }
+.ds-v2 .ds-attr { display: flex; flex-direction: column; }
+.ds-v2 .ds-attr-body { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.ds-v2 .ds-attr-title { font-size: 13px; font-weight: 600; color: #e9e9ed; }
+.ds-v2 .ds-attr-sub { font-size: 12px; color: #75798c; }
+.ds-v2 .ds-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #75798c; }
+.ds-v2 .ds-field select, .ds-v2 .ds-field input {
+  background: #1d1f2b; color: #e9e9ed; border: 1px solid #3f424d; border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; outline: none;
+}
+.ds-v2 .ds-field select:focus, .ds-v2 .ds-field input:focus { border-color: #2f9dd3; }
+.ds-v2 .ds-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ds-v2 .ds-calc { font-size: 12px; color: #c8cad6; border-top: 1px dashed #3f424d; padding-top: 8px; }
+.ds-v2 .ds-apply {
+  background: color-mix(in srgb, #2f9dd3 14%, transparent); color: #d4ecfc;
+  border: 1px solid #2f9dd3; border-radius: 6px; padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.ds-v2 .ds-apply:disabled { opacity: .4; cursor: default; }
+.ds-v2 .ds-attr-msg { font-size: 12px; color: #c8cad6; display: flex; gap: 8px; align-items: center; }
+.ds-v2 .ds-link { background: none; border: 0; padding: 0; color: #2f9dd3; cursor: pointer; font-size: 12px; }
+.ds-v2 .ds-link:hover { text-decoration: underline; }
+.ds-v2 .ds-seg-small .ds-seg-btn { padding: 3px 8px; font-size: 11px; }
+.ds-v2 .ds-nocaps { text-transform: none; letter-spacing: 0; }
+.ds-v2 .ds-selectable tbody tr:not(.ds-group-row) { cursor: pointer; }
+.ds-v2 .ds-selectable tbody tr.is-selected td { background: color-mix(in srgb, #2f9dd3 14%, transparent); }
+@media (max-width: 1100px) { .ds-v2 .ds-parcels-top { grid-template-columns: 1fr; } }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr { user-select: none; }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr:not(.ds-group-row) { cursor: pointer; }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr:not(.ds-group-row):hover td { background: rgba(255,255,255,0.03); }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr.is-selected td { background: rgba(47,157,211,0.18); color: #d4ecfc; }
+.ds-v2 .ds-content .ds-card-head .ds-nocaps { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr.is-selected:not(.ds-group-row) td { background: rgba(47,157,211,0.18); color: #d4ecfc; }
+/* C2 plan exhibit (schematic) */
+.ds-v2 .ds-plan { position: absolute; inset: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; overflow: auto; background: #12131c; align-content: flex-start; }
+.ds-v2 .ds-plan-phase { flex-basis: 180px; min-width: 160px; display: flex; flex-direction: column; gap: 4px; border: 1px dashed #3f424d; border-radius: 6px; padding: 6px; }
+.ds-v2 .ds-plan-phase-label { font-size: 10px; color: #75798c; text-transform: uppercase; letter-spacing: .04em; }
+.ds-v2 .ds-plan-tiles { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.ds-v2 .ds-plan-tile { flex-basis: 64px; min-height: 52px; border: 1px solid transparent; border-radius: 4px; padding: 4px 6px; text-align: left; color: #f4f4f6; cursor: pointer; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.ds-v2 .ds-plan-id { font-size: 11px; font-weight: 600; }
+.ds-v2 .ds-plan-sub { font-size: 9.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-v2 .ds-use-sfd { background: #b0813c; }
+.ds-v2 .ds-use-att { background: #a4583f; }
+.ds-v2 .ds-use-comm { background: #4d7177; }
+.ds-v2 .ds-use-open { background: #5b8a4a; }
+.ds-v2 .ds-use-other { background: #5c5f74; }
+.ds-v2 .ds-use-none { background: transparent; border-color: #75798c; border-style: dashed; color: #c8cad6; }
+.ds-v2 .ds-plan-tile.is-selected { outline: 2px solid #2f9dd3; outline-offset: 1px; box-shadow: inset 0 0 0 999px rgba(47,157,211,0.25); }
+.ds-v2 .ds-plan-tile:hover { filter: brightness(1.12); }

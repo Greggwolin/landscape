@@ -72,6 +72,7 @@ import { DesignTopBar } from './DesignTopBar';
 import { buildDesignNav, locateDesignNav, type DesignNavItem, type DesignNavSection } from './designNav';
 import { DesignMarketEconomy } from './compositions/DesignMarketEconomy';
 import { DesignHousingMarket } from './compositions/DesignHousingMarket';
+import { DesignParcels } from './compositions/DesignParcels';
 
 /**
  * Stage B per-screen compositions (reference frames). A folder id present here
@@ -85,6 +86,8 @@ const DESIGN_COMPOSITIONS: Record<string, React.ComponentType<{ project: any }>>
   // Keyed "folder:tab" — the reference's Market section (C3 / C4).
   'property:location': DesignMarketEconomy,
   'property:market': DesignHousingMarket,
+  // C2 — parcel attribution on the land plan.
+  'property:parcels': DesignParcels,
 };
 
 function DesignShellInner() {
