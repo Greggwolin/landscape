@@ -26,6 +26,8 @@ const MAX_ARTIFACTS_WIDTH = 1600;
  * panel taking the whole window is a different feature (takeover), reached
  * deliberately rather than by opening a wide table. */
 const MIN_CHAT_WIDTH = 380;
+/* The strip the chat folds to when the panel takes the row (QX 1a). */
+const CHAT_STRIP_WIDTH = 40;
 
 // MK24 §5/§6 — widths as a share of the viewport rather than fixed pixels.
 // The map wants the screen; the artifacts rail wants to sit beside the chat.
@@ -125,6 +127,9 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     projectRightPanelView,
     setProjectRightPanelView,
     sidebarWidthPx,
+    chatOpen,
+    openChat,
+    closeChat,
   } = useWrapperUI();
   const SIDEBAR_COLLAPSED_WIDTH = sidebarWidthPx;
 
@@ -170,10 +175,11 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
     return () => window.removeEventListener('resize', measure);
   }, []);
 
-  // The widest the panel may go: everything on the row except the collapsed
-  // sidebar and the chat's floor. Null until the viewport has been measured,
-  // which keeps the first render identical on both sides of hydration.
-  const maxContentWidth =
+  // The widest the panel may go with the chat still open: everything on the
+  // row except the sidebar and the chat's floor. Null until the viewport has
+  // been measured, which keeps the first render identical on both sides of
+  // hydration.
+  const maxWithChat =
     viewportWidth == null
       ? null
       : Math.max(
@@ -181,11 +187,63 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
           MIN_ARTIFACTS_WIDTH
         );
 
+  /* ── The chat gives way (QX, 2026-10-14; D-2026-09-18-YIELD, option 1a) ──
+   *
+   * When the content asks for more room than the chat's floor leaves, the
+   * chat folds to a strip on the panel's left edge and the panel may take the
+   * whole row minus the sidebar. The sidebar never moves (Rule 11). The fold
+   * is undone the moment the content no longer needs it or the artifact /
+   * screen closes, and the strip's button undoes it by hand. "Full width" in
+   * the panel header folds the chat on purpose, for a table that fits but is
+   * easier to read with the room.
+   *
+   * We only ever reopen a chat WE folded — a chat the user closed himself is
+   * his business. */
+  const [fullWidth, setFullWidth] = useState(false);
+  const chatFoldedByUs = useRef(false);
+  const needsMoreThanChatAllows =
+    requestedWidth != null && maxWithChat != null && requestedWidth > maxWithChat;
+  const wantsFold = !userSized && (fullWidth || needsMoreThanChatAllows);
+
+  useEffect(() => {
+    if (wantsFold && chatOpen && !chatFoldedByUs.current) {
+      chatFoldedByUs.current = true;
+      closeChat();
+    } else if (!wantsFold && chatFoldedByUs.current) {
+      chatFoldedByUs.current = false;
+      openChat();
+    }
+  }, [wantsFold, chatOpen, closeChat, openChat]);
+
+  // Put the chat back if this panel unmounts while it holds the fold.
+  useEffect(
+    () => () => {
+      if (chatFoldedByUs.current) {
+        chatFoldedByUs.current = false;
+        openChat();
+      }
+    },
+    [openChat]
+  );
+
+  const chatFolded = !chatOpen && chatFoldedByUs.current;
+
+  const maxContentWidth =
+    viewportWidth == null
+      ? null
+      : chatFolded
+        ? Math.max(viewportWidth - SIDEBAR_COLLAPSED_WIDTH - CHAT_STRIP_WIDTH - 4, MIN_ARTIFACTS_WIDTH)
+        : maxWithChat;
+
   // What actually gets rendered. A width he dragged for himself is final.
   const effectiveWidth =
-    userSized || requestedWidth == null || maxContentWidth == null
+    userSized || maxContentWidth == null
       ? panelWidth
-      : Math.max(panelWidth, Math.min(requestedWidth, maxContentWidth));
+      : fullWidth && chatFolded
+        ? maxContentWidth
+        : requestedWidth == null
+          ? panelWidth
+          : Math.max(panelWidth, Math.min(requestedWidth, maxContentWidth));
 
   // Takeover mode — when activeArtifactId becomes truthy, expand the panel
   // to share the remaining viewport with the chat (50/50 after the
@@ -345,6 +403,26 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
         width: 'max-content',
       }}
     >
+      {chatFolded && (
+        <div className="chat-folded-strip">
+          <button
+            type="button"
+            className="chat-folded-btn"
+            title="Show the chat"
+            aria-label="Show the chat"
+            onClick={() => {
+              setFullWidth(false);
+              // A content request may fold it straight back; that is the rule
+              // working, and the user can drag the panel narrower to keep the
+              // chat (a drag is final — see userSized).
+              chatFoldedByUs.current = false;
+              openChat();
+            }}
+          >
+            ▶ Chat
+          </button>
+        </div>
+      )}
       <div
         className="wrapper-drag-handle"
         onPointerDown={handleResizeStart}
@@ -403,6 +481,18 @@ function ProjectArtifactsPanelInner({ projectId, documentsLabel, includeUnassign
               onClick={() => setProjectRightPanelView('documents')}
             >
               Documents
+            </button>
+            <button
+              type="button"
+              className={`prp-toggle-btn prp-toggle-btn--edge${fullWidth ? ' is-active' : ''}`}
+              title={fullWidth ? 'Give the chat its room back' : 'Give this panel the whole row (the chat folds to a strip)'}
+              aria-pressed={fullWidth}
+              onClick={() => {
+                setUserSized(false);
+                setFullWidth((v) => !v);
+              }}
+            >
+              {fullWidth ? '⇤ Split' : '⇥ Full width'}
             </button>
             {/* MK22 — Map as a third view. Only on the project surface:
                 PanelMapView calls useWrapperProject, which throws without a
