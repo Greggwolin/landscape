@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-10-14.** This July bundle is replaced by the Claude Design hand-off folder kept in OneDrive: `1Active/_Landscape/_cowork/design-reference/` (Slice 1 reference, format spec, invariants, stylesheet and handoff as of 2026-10-14). That folder is the only current copy. Do not build from this one.
+
 # HANDOFF — Landscape Land Design Sessions
 _Read this first in any new chat. Written 2026-07-14 at the end of the slice-1 design session._
 

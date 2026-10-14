@@ -433,3 +433,773 @@
 .design-shell ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * 2026-10-14 — Slice 1 reference stylesheet (Claude Design, "Landscape UI
+ * Audit" thread), appended AFTER the 18 July rules above so it wins every
+ * conflict. The block above is kept because it carries what the new sheet
+ * does not: the full --w-* token re-map the reused wrapper components read,
+ * and the project-home (.dh-*) and header rules. Source of truth for this
+ * half: OneDrive 1Active/_Landscape/_cowork/design-reference/ (design.css +
+ * COWORK-FORMAT-SPEC.md) — the only current copy of the hand-off.
+ * ═══════════════════════════════════════════════════════════════════════ */
+/**
+ * Design Shell — three-zone project workspace (/design/[id]).
+ *
+ * A visual restyle of studio.css. Loaded LAST in the design layout (after
+ * wrapper.css), so its rules win over the reused wrapper/studio classes.
+ *
+ *   LEFT  : DesignSidebar (reused WrapperSidebar; restyled via .design-shell scope)
+ *   CENTER: .wrapper-chat-center (CenterChatPanel)
+ *   RIGHT : .wrapper-right-panel (RightContentPanel → ProjectContentRouter / artifact)
+ *
+ * Everything is scoped under `.design-shell` so studio / /w/ / classic are
+ * untouched. Token values below are the EXACT Nocturne bundle values the
+ * Slice 1 mockup renders (styles.css :root) — not an approximation. They
+ * re-map the CoreUI (--cui-*) and wrapper (--w-*) variables the reused
+ * components already read, so no component markup changes.
+ *
+ * If the Nocturne bundle is available in the app, prefer importing its
+ * styles.css and pointing these at var(--color-*) directly; the literals
+ * here are the fallback so the shell matches even without the bundle.
+ */
+
+/* ── Token layer (verbatim from Nocturne styles.css :root) ───────────────── */
+.design-shell {
+  /* Surfaces (darkest → lightest) */
+  --ds-bg:            #161826;   /* app ground   = --color-bg */
+  --ds-surface:       #232532;   /* panels, cards, chat rail = --color-surface */
+  --ds-surface-2:     #292b31;   /* raised / header strips   = --color-neutral-900 */
+  --ds-border:        #3f424d;   /* hairline borders = --color-neutral-800 */
+  --ds-border-soft:   rgba(233,233,237,0.16); /* = --color-divider */
+
+  /* Text */
+  --ds-text:          #e9e9ed;   /* = --color-text */
+  --ds-text-2:        #9397ab;   /* secondary = --color-neutral-500 */
+  --ds-text-3:        #75798c;   /* muted / captions = --color-neutral-600 */
+
+  /* One accent — Nocturne current accent (cyan-blue, review round 7) */
+  --ds-accent:        #2f9dd3;   /* = --color-accent */
+  --ds-accent-200:    #d4ecfc;   /* text-on-dark accent = --color-accent-200 */
+  --ds-accent-300:    #abdcf9;   /* = --color-accent-300 */
+  --ds-accent-700:    #09658d;   /* = --color-accent-700 */
+  --ds-accent-900:    #102f3f;   /* accent-tinted fill = --color-accent-900 */
+
+  /* Semantic (data only — used sparingly) */
+  --ds-good:          #63c68d;
+  --ds-warn:          #e0a34a;
+  --ds-bad:           #d9756a;
+
+  --ds-radius:        8px;
+  --ds-radius-sm:     6px;
+
+  --ds-rail:          #08090A;   /* collapsed left icon rail — near-black */
+
+  /* ── Re-map the variables the REUSED components read ──────────────────── */
+  --cui-body-bg:            var(--ds-bg);
+  --cui-body-color:         var(--ds-text);
+  --cui-secondary-color:    var(--ds-text-2);
+  --cui-tertiary-bg:        var(--ds-surface);
+  --cui-secondary-bg:       var(--ds-surface-2);
+  --cui-card-bg:            var(--ds-surface);
+  --cui-card-header-bg:     var(--ds-surface-2);
+  --cui-border-color:       var(--ds-border);
+  --cui-border-color-translucent: var(--ds-border-soft);
+  --cui-primary:            var(--ds-accent);
+  --cui-primary-hover:      var(--ds-accent-300);
+  --cui-input-bg:           var(--ds-bg);
+  --cui-success:            var(--ds-good);
+  --cui-warning:            var(--ds-warn);
+  --cui-danger:             var(--ds-bad);
+  --cui-black:              #08090a;
+  --cui-tertiary-color:     var(--ds-text-3);
+  /* Map popovers / markers read these — keep them on-palette */
+  --cui-popover-bg:              var(--ds-surface);
+  --cui-popover-border-color:    var(--ds-border);
+  --cui-popover-header-bg:       var(--ds-surface-2);
+  --cui-popover-header-color:    var(--ds-text);
+  --cui-box-shadow:             0 6px 18px rgba(0,0,0,0.45);
+
+  --w-border:               var(--ds-border);
+  --w-bg-input:             var(--ds-bg);
+  --w-text-primary:         var(--ds-text);
+  --w-text-secondary:       var(--ds-text-2);
+  --w-accent:               var(--ds-accent);
+}
+
+/* ── Shell container ─────────────────────────────────────────────────────── */
+.design-shell {
+  display: flex;
+  position: relative; /* anchor for the ephemeral screen-router toast */
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--ds-bg);
+  color: var(--ds-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Left rail (reused WrapperSidebar) ───────────────────────────────────── */
+.design-shell .wrapper-sidebar {
+  background: var(--ds-rail);
+  border-right: 1px solid var(--ds-border);
+}
+.design-shell .sb-item,
+.design-shell .sb-nav-item {
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-text-2);
+}
+.design-shell .sb-item:hover,
+.design-shell .sb-nav-item:hover {
+  background: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+  color: var(--ds-text);
+}
+.design-shell .sb-item.active,
+.design-shell .sb-nav-item.active {
+  background: color-mix(in srgb, var(--ds-accent) 16%, transparent);
+  color: var(--ds-accent-200);
+  font-weight: 600;
+}
+
+/* ── Center chat ─────────────────────────────────────────────────────────── */
+.design-shell .wrapper-chat-center {
+  background: var(--ds-bg);
+  border-right: 1px solid var(--ds-border);
+}
+
+/* ── Right content panel ─────────────────────────────────────────────────── */
+.design-shell .wrapper-right-panel {
+  background: var(--ds-bg);
+}
+.design-shell .wrapper-right-header {
+  background: var(--ds-surface-2);
+  border-bottom: 1px solid var(--ds-border);
+}
+.design-shell .wrapper-right-body .folder-content-placeholder {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--ds-text-2);
+}
+
+/* Cards / panels the routed screens paint (CoreUI CCard etc.) */
+.design-shell .card,
+.design-shell .ccard,
+.design-shell [class*="Card"] {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+}
+
+/* ── Buttons (wrapper + CoreUI) ──────────────────────────────────────────── */
+.design-shell .w-btn,
+.design-shell .btn {
+  border-radius: var(--ds-radius-sm);
+}
+.design-shell .btn-primary,
+.design-shell .wrapper-btn-primary,
+.design-shell .w-btn-primary {
+  background: var(--ds-accent);
+  border-color: var(--ds-accent);
+  color: #0d1420;
+  font-weight: 600;
+}
+.design-shell .btn-primary:hover,
+.design-shell .wrapper-btn-primary:hover,
+.design-shell .w-btn-primary:hover {
+  background: var(--ds-accent-300);
+}
+.design-shell .w-btn-ghost,
+.design-shell .btn-ghost {
+  background: transparent;
+  border: 1px solid var(--ds-border);
+  color: var(--ds-text-2);
+}
+.design-shell .w-btn-ghost:hover,
+.design-shell .btn-ghost:hover {
+  color: var(--ds-text);
+  background: color-mix(in srgb, var(--ds-accent) 10%, transparent);
+}
+.design-shell .w-btn-icon {
+  color: var(--ds-text-2);
+  border-radius: var(--ds-radius-sm);
+}
+.design-shell .w-btn-icon:hover {
+  color: var(--ds-text);
+  background: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+}
+
+/* ── Badges never pills ──────────────────────────────────────────────────── */
+.design-shell .badge,
+.design-shell .cbadge,
+.design-shell [class*="badge"],
+.design-shell [class*="-pill"] {
+  border-radius: var(--ds-radius-sm) !important;
+}
+
+/* ── Tables (screen grids) ───────────────────────────────────────────────── */
+.design-shell table th {
+  background: color-mix(in srgb, var(--ds-accent) 6%, transparent);
+  color: var(--ds-text-3);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10px;
+  border-bottom: 1px solid var(--ds-border);
+}
+.design-shell table td {
+  border-bottom: 1px solid var(--ds-border-soft);
+}
+.design-shell table tbody tr:hover td {
+  background: color-mix(in srgb, var(--ds-accent) 5%, transparent);
+}
+
+/* ── Editable-field convention: accent-bordered chip; derived plain ──────── */
+.design-shell .field-editable,
+.design-shell [data-editable="true"] {
+  border: 1px solid var(--ds-accent-700);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-bg);
+  padding: 4px 8px;
+}
+.design-shell .field-picklist,
+.design-shell [data-editable="picklist"] {
+  border-bottom: 1px dashed var(--ds-accent-700);
+}
+
+/* ── Inputs / selects / textareas ────────────────────────────────────────── */
+.design-shell input,
+.design-shell select,
+.design-shell textarea {
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-text);
+}
+.design-shell input:focus-visible,
+.design-shell select:focus-visible,
+.design-shell textarea:focus-visible,
+.design-shell button:focus-visible,
+.design-shell a:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+/* ── Selection / scrollbar polish ────────────────────────────────────────── */
+.design-shell ::selection {
+  background: color-mix(in srgb, var(--ds-accent) 30%, transparent);
+}
+.design-shell ::-webkit-scrollbar { width: 10px; height: 10px; }
+.design-shell ::-webkit-scrollbar-thumb {
+  background: var(--ds-border);
+  border-radius: 6px;
+}
+.design-shell ::-webkit-scrollbar-thumb:hover { background: var(--ds-accent-700); }
+
+/* ── Right content collapsed strip (chat full width) ─────────────────────── */
+.design-content-collapsed {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 8px;
+  border-left: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+}
+.design-content-expand {
+  background: none;
+  border: none;
+  color: var(--ds-text-2);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px;
+  border-radius: var(--ds-radius-sm);
+}
+.design-content-expand:hover {
+  color: var(--ds-text);
+  background: var(--ds-surface-2);
+}
+
+/* ── Pop-out overlay (full-window routed screen) ─────────────────────────── */
+.design-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: var(--ds-bg);
+}
+.design-screen-overlay .wrapper-right-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Ephemeral nav toast ─────────────────────────────────────────────────── */
+.design-shell .design-nav-toast {
+  background: var(--ds-surface-2);
+  border: 1px solid var(--ds-border);
+  color: var(--ds-text);
+  border-radius: var(--ds-radius);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Map chrome (MapTab / MapCanvas / MapLibre) ──────────────────────────── */
+/* The map component already consumes --cui-* (remapped above); these rules
+   fix the spots where its look diverges from Nocturne: radii and the
+   solid-indigo active states that should read as accent. */
+.design-shell .map-tab { border-radius: var(--ds-radius); }
+.design-shell .map-tab-sidebar { background: var(--ds-surface); border-right: 1px solid var(--ds-border); }
+
+.design-shell .map-tab-display-controls {
+  background: color-mix(in srgb, var(--ds-surface) 92%, transparent);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.design-shell .map-tab-display-row select,
+.design-shell .map-tab-basemap-selector select,
+.design-shell .map-tab-search-input,
+.design-shell .map-tab-export-btn {
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-text);
+}
+.design-shell .map-tab-bottom-toolbar {
+  background: var(--ds-surface);
+  border-top: 1px solid var(--ds-border);
+}
+
+/* Draw toolbar: active tool is an accent OUTLINE, not a solid fill (Nocturne) */
+.design-shell .draw-tool-btn {
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-text-2);
+}
+.design-shell .draw-tool-btn:hover {
+  border-color: var(--ds-accent);
+  background: color-mix(in srgb, var(--ds-accent) 10%, transparent);
+  color: var(--ds-text);
+}
+.design-shell .draw-tool-btn.active {
+  background: color-mix(in srgb, var(--ds-accent) 16%, transparent);
+  border-color: var(--ds-accent);
+  color: var(--ds-accent-200);
+}
+
+/* MapLibre native controls (zoom / compass / scale) */
+.design-shell .maplibregl-ctrl-group {
+  background: var(--ds-surface) !important;
+  border: 1px solid var(--ds-border) !important;
+  border-radius: var(--ds-radius-sm) !important;
+  overflow: hidden;
+}
+.design-shell .maplibregl-ctrl-group button:hover {
+  background-color: color-mix(in srgb, var(--ds-accent) 12%, transparent) !important;
+}
+.design-shell .maplibregl-ctrl-scale {
+  background: color-mix(in srgb, var(--ds-surface) 88%, transparent) !important;
+  border-color: var(--ds-border) !important;
+  color: var(--ds-text-2) !important;
+}
+
+/* Feature modal + popups: normalize radius (colors inherit remapped --cui-*) */
+.design-shell .feature-modal,
+.design-shell .map-tab-competitor-detail,
+.design-shell .map-tab-popup .maplibregl-popup-content,
+.design-shell .map-tab-popover .maplibregl-popup-content {
+  border-radius: var(--ds-radius);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * 2026-10-14 — Slice 1 frame chrome (design view, ds-v2): top bar across the
+ * whole window, then rail (56px) · Landscaper (300px) · content. Values lifted
+ * from the reference frames (C3 / C4): topbar 52px surface, rail #08090A,
+ * Landscaper #2A2B31, content #161826, 1px #3f424d hairlines, 8px radii.
+ * ═══════════════════════════════════════════════════════════════════════ */
+.design-shell.ds-v2 { flex-direction: column; background: #161826; color: #e9e9ed; }
+.ds-v2 .ds-body { flex: 1; min-height: 0; display: flex; }
+
+/* Top bar */
+.ds-v2 .ds-topbar {
+  height: 52px; flex: 0 0 52px; display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; background: #232532; border-bottom: 1px solid #3f424d; min-width: 0;
+}
+.ds-v2 .ds-mark {
+  width: 24px; height: 24px; flex: 0 0 24px; border-radius: 6px; border: 1px solid #2f9dd3;
+  display: grid; place-items: center; color: #2f9dd3; font-weight: 600; font-size: 12px;
+}
+.ds-v2 .ds-project { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-v2 .ds-project-meta { color: #9397ab; font-weight: 400; }
+.ds-v2 .ds-section-chip {
+  font-size: 12px; font-weight: 600; color: #d4ecfc; padding: 4px 10px; border-radius: 6px;
+  background: color-mix(in srgb, #2f9dd3 14%, transparent); white-space: nowrap;
+}
+.ds-v2 .ds-seg { display: flex; border: 1px solid #3f424d; border-radius: 6px; overflow: hidden; }
+.ds-v2 .ds-seg-btn {
+  background: transparent; border: 0; color: #9397ab; font-size: 12px; padding: 5px 12px; cursor: pointer;
+  border-radius: 0 !important;
+}
+.ds-v2 .ds-seg-btn + .ds-seg-btn { border-left: 1px solid #3f424d; }
+.ds-v2 .ds-seg-btn.is-active { background: color-mix(in srgb, #2f9dd3 16%, transparent); color: #d4ecfc; font-weight: 600; }
+.ds-v2 .ds-topbar-actions { margin-left: auto; display: flex; gap: 6px; }
+.ds-v2 .ds-ghost {
+  background: transparent; border: 1px solid #3f424d; color: #c8cad6; font-size: 12px;
+  padding: 4px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.ds-v2 .ds-ghost:hover { border-color: #2f9dd3; color: #d4ecfc; }
+
+/* Collapsed rail (two-letter section codes) */
+.ds-v2 .ds-rail {
+  flex: 0 0 56px; width: 56px; background: #08090A; border-right: 1px solid #3f424d;
+  display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 6px;
+}
+.ds-v2 .ds-rail-btn {
+  width: 36px; height: 36px; border-radius: 6px; display: grid; place-items: center;
+  background: transparent; border: 0; color: #9397ab; cursor: pointer; font-size: 15px;
+}
+.ds-v2 .ds-rail-btn:hover { background: rgba(255,255,255,0.05); color: #e9e9ed; }
+.ds-v2 .ds-rail-code { font-size: 12px; font-weight: 600; }
+.ds-v2 .ds-rail-code.is-active { background: color-mix(in srgb, #2f9dd3 16%, transparent); color: #d4ecfc; font-weight: 700; }
+.ds-v2 .ds-rail-rule { width: 24px; border-top: 1px solid #3f424d; margin: 4px 0; }
+
+/* Expanded nav keeps the near-black rail colour */
+.ds-v2 .ds-body > .wrapper-sidebar { background: #08090A; }
+
+/* Landscaper column: fixed 300px, never the surface colour */
+.ds-v2 .ds-body > .wrapper-chat-center {
+  flex: 0 0 300px; width: 300px; max-width: 300px; background: #2A2B31; border-right: 1px solid #3f424d;
+}
+
+/* Content */
+.ds-v2 .ds-content { flex: 1; min-width: 0; overflow: auto; background: #161826; }
+.ds-v2 .ds-content-bar {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #3f424d; font-weight: 600; font-size: 13px;
+}
+.ds-v2 .ds-toast {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 80;
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #e9e9ed;
+  background: #232532; border: 1px solid #3f424d; pointer-events: none;
+}
+
+/* ── Composition building blocks (C3 / C4) ── */
+.ds-v2 .ds-page { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; min-height: 100%; }
+.ds-v2 .ds-page-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.ds-v2 .ds-push { margin-left: auto; }
+.ds-v2 .ds-muted { color: #9397ab; font-size: 12px; }
+.ds-v2 .ds-tag {
+  display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 4px; color: #abdcf9;
+  border: 1px solid color-mix(in srgb, #2f9dd3 55%, transparent); white-space: nowrap;
+}
+.ds-v2 .ds-tag-neutral { color: #c8cad6; border-color: #3f424d; background: rgba(255,255,255,0.04); }
+.ds-v2 .ds-empty { padding: 40px 20px; text-align: center; color: #9397ab; }
+.ds-v2 .ds-tile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1280px) { .ds-v2 .ds-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ds-v2 .ds-card { background: #232532; border: 1px solid #3f424d; border-radius: 8px; min-width: 0; }
+.ds-v2 .ds-card-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 10.5px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: #9397ab; font-weight: 600;
+}
+.ds-v2 .ds-card-note { padding: 4px 14px 14px; color: #75798c; font-size: 12px; }
+.ds-v2 .ds-kv { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+.ds-v2 .ds-kv td { padding: 5px 14px; border-top: 1px solid rgba(233,233,237,0.06); white-space: nowrap; }
+.ds-v2 .ds-kv td:first-child { color: #c8cad6; width: 100%; white-space: normal; }
+.ds-v2 .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ds-v2 .ds-kv td.num { font-weight: 600; color: #e9e9ed; }
+.ds-v2 .chg { font-weight: 500 !important; font-size: 11px; }
+.ds-v2 .chg-up { color: #63c68d !important; }
+.ds-v2 .chg-down { color: #d9756a !important; }
+.ds-v2 .chg-flat { color: #9397ab !important; }
+.ds-v2 .ds-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ds-v2 .ds-table th {
+  text-align: left; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #9397ab;
+  font-weight: 600; padding: 6px 14px; border-bottom: 1px solid #3f424d; white-space: nowrap;
+}
+.ds-v2 .ds-table th.num { text-align: right; }
+.ds-v2 .ds-table td { padding: 7px 14px; border-bottom: 1px solid rgba(233,233,237,0.06); white-space: nowrap; }
+.ds-v2 .ds-table tr.ds-group-row td { font-weight: 600; color: #e9e9ed; }
+.ds-v2 .ds-table td.ds-indent { padding-left: 28px; }
+.ds-v2 .ds-table tr.is-selected td { background: color-mix(in srgb, #2f9dd3 10%, transparent); }
+.ds-v2 .ds-table tbody tr { cursor: default; }
+.ds-v2 .ds-split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.ds-v2 .ds-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ds-v2 .ds-scroll { overflow: auto; }
+.ds-v2 .ds-map-card { overflow: hidden; }
+
+/* Landscaper column header/composer at 300px (checked rendered 2026-10-14):
+   the type chip duplicates the top bar and squeezed the title out; the
+   composer textarea opened five lines tall. */
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header { gap: 8px; padding-left: 14px; padding-right: 10px; }
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header-actions > span { display: none; }
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px;
+}
+.ds-v2 .ds-body > .wrapper-chat-center textarea {
+  min-height: 38px !important; height: 38px; max-height: 140px; font-size: 12.5px; line-height: 1.4;
+  border-radius: 8px; background: #161826; border: 1px solid #3f424d;
+}
+.ds-v2 .ds-body > .wrapper-chat-center .border-top { padding: 10px 12px !important; }
+/* C4: the competitive-projects table was clipping its price and absorption
+   columns at 1440 wide (seen rendered 2026-10-14) — give the right column
+   the larger share and let the table scroll sideways instead of clipping. */
+.ds-v2 .ds-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.ds-v2 .ds-split .ds-table td, .ds-v2 .ds-split .ds-table th { padding-left: 10px; padding-right: 10px; }
+.ds-v2 .ds-scroll { overflow-x: auto; }
+.ds-v2 .ds-split .ds-table { font-size: 11.5px; }
+.ds-v2 .ds-split .ds-table td:not(.num) { white-space: normal; }
+.ds-v2 .ds-split .ds-table td.num { white-space: normal; min-width: 0; }
+.ds-v2 .wrapper-btn-primary {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; height: auto;
+  padding: 6px 12px; border-radius: 6px; font-size: 12.5px;
+}
+
+/* Expanded nav (C2 measurements) */
+.ds-v2 .ds-nav {
+  flex: 0 0 232px; width: 232px; background: #08090A; border-right: 1px solid #3f424d;
+  display: flex; flex-direction: column; padding: 12px 10px; gap: 2px; overflow: auto; font-size: 13px;
+}
+.ds-v2 .ds-nav-head { display: flex; align-items: center; gap: 8px; padding: 2px 8px 10px; }
+.ds-v2 .ds-nav-brand { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: #e9e9ed; }
+.ds-v2 .ds-nav-collapse {
+  margin-left: auto; width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center;
+  color: #9397ab; background: transparent; border: 0; cursor: pointer;
+}
+.ds-v2 .ds-nav-collapse:hover { background: rgba(255,255,255,0.05); color: #e9e9ed; }
+.ds-v2 .ds-nav-newchat {
+  font-size: 12.5px; padding: 6px 10px; margin-bottom: 4px; border-radius: 6px; cursor: pointer;
+  background: #232532; border: 1px solid #3f424d; color: #e9e9ed; text-align: center;
+}
+.ds-v2 .ds-nav-search {
+  font-size: 12px; padding: 6px 10px; margin-bottom: 4px; border-radius: 6px; cursor: text; text-align: left;
+  background: #161826; border: 1px solid #3f424d; color: #75798c;
+}
+.ds-v2 .ds-nav-row {
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 5px 8px;
+  border-radius: 6px; border: 0; background: transparent; color: #c8cad6; cursor: pointer; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-v2 .ds-nav-row:hover { background: rgba(255,255,255,0.05); }
+.ds-v2 .ds-nav-row.is-active { background: color-mix(in srgb, #2f9dd3 14%, transparent); color: #d4ecfc; font-weight: 600; }
+.ds-v2 .ds-nav-sec { padding-top: 4.5px; padding-bottom: 4.5px; }
+.ds-v2 .ds-nav-small { font-size: 12px; padding-top: 3.5px; padding-bottom: 3.5px; display: block; }
+.ds-v2 .ds-nav-chev { margin-left: auto; color: #75798c; }
+.ds-v2 .ds-nav-badge { margin-left: auto; font-size: 9.5px; }
+.ds-v2 .ds-nav-rule { border-top: 1px solid #3f424d; margin: 5px 0 4px; }
+.ds-v2 .ds-nav-label {
+  display: flex; align-items: center; width: 100%; padding: 6px 8px 3px; font-size: 10.5px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #9397ab; font-weight: 600; background: transparent; border: 0; text-align: left;
+}
+.ds-v2 .ds-nav-toggle { cursor: pointer; }
+.ds-v2 .ds-nav-note { padding: 2px 8px 4px; font-size: 11.5px; color: #75798c; }
+.ds-v2 .ds-nav-foot { margin-top: auto; padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.ds-v2 .ds-nav-foot .sb-uimode { margin: 0 !important; }
+.ds-v2 .ds-nav-user { border-top: 1px solid #3f424d; padding-top: 8px; display: flex; align-items: center; gap: 8px; }
+.ds-v2 .ds-nav-avatar {
+  width: 26px; height: 26px; border-radius: 50%; background: #3f424d; display: grid; place-items: center;
+  font-size: 10px; color: #c8cad6; flex: 0 0 26px;
+}
+.ds-v2 .ds-nav-user-meta { font-size: 12px; line-height: 1.3; color: #e9e9ed; min-width: 0; }
+.ds-v2 .ds-nav-org { font-size: 10.5px; color: #9397ab; }
+.ds-v2 .ds-nav-logout { margin-left: auto; background: transparent; border: 0; color: #75798c; cursor: pointer; font-size: 13px; }
+
+/* Landscaper column header (reference: "● Landscaper   <context>") */
+.ds-v2 .ds-chat-dot { width: 8px; height: 8px; border-radius: 50%; background: #2f9dd3; flex: 0 0 8px; }
+.ds-v2 .ds-chat-title {
+  display: flex !important; align-items: baseline; gap: 8px; font-size: 13px !important; font-weight: 600;
+  text-transform: none !important; letter-spacing: 0 !important; color: #e9e9ed !important; min-width: 0;
+}
+.ds-v2 .ds-chat-context {
+  font-size: 11px; font-weight: 400; color: #9397ab; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-v2 .ds-body > .wrapper-chat-center .wrapper-header { min-height: 44px; padding-top: 0; padding-bottom: 0; }
+
+/* ═══ Content density for every live screen inside design view ═══════════
+ * Format spec §4 + §6: tabular inputs edit in place with no cell box — the
+ * value shows a dashed accent underline (picklists add ▾); rows are dense
+ * (the reference draws ~28px rows, 12px type); headers are small caps grey.
+ * Applies to the live grids (budget, sales, rent roll …) rendered inside the
+ * content column, so each screen moves toward its frame without touching its
+ * logic. */
+.ds-v2 .ds-content table { font-size: 12px; }
+.ds-v2 .ds-content table thead th {
+  font-size: 10.5px !important; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #9397ab !important; font-weight: 600 !important; background: #232532 !important;
+  border-bottom: 1px solid #3f424d !important; padding-top: 7px !important; padding-bottom: 7px !important;
+}
+.ds-v2 .ds-content table tbody td {
+  padding-top: 5px !important; padding-bottom: 5px !important; height: auto !important;
+  border-color: rgba(233,233,237,0.06) !important; color: #e9e9ed;
+}
+.ds-v2 .ds-content table tbody tr:hover td { background: rgba(255,255,255,0.025); }
+.ds-v2 .ds-content table td input:not([type="checkbox"]):not([type="radio"]),
+.ds-v2 .ds-content table td select {
+  background: transparent !important; border: 0 !important; border-bottom: 1px dashed #09658d !important;
+  border-radius: 0 !important; box-shadow: none !important; height: auto !important; min-height: 0 !important;
+  padding: 1px 2px !important; font-size: 12px !important; color: #e9e9ed !important;
+}
+.ds-v2 .ds-content table td input:focus,
+.ds-v2 .ds-content table td select:focus { border-bottom: 1px solid #2f9dd3 !important; outline: none; }
+.ds-v2 .ds-content table td select { padding-right: 14px !important; }
+/* Stage / category text in the budget grid was a saturated purple; the
+   reference keeps cell text neutral and lets badges carry colour. */
+.ds-v2 .ds-content table td [style*="color: rgb(1"] { color: #c8cad6 !important; }
+.ds-v2 .ds-content .card, .ds-v2 .ds-content .ccard {
+  background: #232532 !important; border: 1px solid #3f424d !important; border-radius: 8px !important;
+}
+.ds-v2 .ds-content .card-header {
+  background: transparent !important; border-bottom: 1px solid #3f424d !important;
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #9397ab; padding: 10px 14px !important;
+}
+
+/* C1 activity line */
+.design-shell .dh-activity { padding: 8px 14px; margin-top: 12px; }
+.design-shell .dh-activity-line { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #9397ab; }
+.design-shell .dh-activity-latest { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.design-shell .dh-activity-toggle { background: transparent; border: 0; color: #2f9dd3; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.design-shell .dh-activity-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.design-shell .dh-activity-list li { display: grid; grid-template-columns: 56px 220px 1fr; gap: 10px; padding: 5px 0; border-top: 1px solid rgba(233,233,237,0.06); font-size: 12px; }
+.design-shell .dh-activity-when { color: #75798c; }
+.design-shell .dh-activity-title { color: #e9e9ed; }
+.design-shell .dh-activity-summary { color: #9397ab; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── C2 Parcels (2026-10-14) ── */
+.ds-v2 .ds-parcels-top { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 12px; align-items: stretch; }
+.ds-v2 .ds-parcels-map { height: 360px; position: relative; border-top: 1px solid #3f424d; }
+.ds-v2 .ds-map-card { overflow: hidden; display: flex; flex-direction: column; }
+.ds-v2 .ds-attr { display: flex; flex-direction: column; }
+.ds-v2 .ds-attr-body { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.ds-v2 .ds-attr-title { font-size: 13px; font-weight: 600; color: #e9e9ed; }
+.ds-v2 .ds-attr-sub { font-size: 12px; color: #75798c; }
+.ds-v2 .ds-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #75798c; }
+.ds-v2 .ds-field select, .ds-v2 .ds-field input {
+  background: #1d1f2b; color: #e9e9ed; border: 1px solid #3f424d; border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; outline: none;
+}
+.ds-v2 .ds-field select:focus, .ds-v2 .ds-field input:focus { border-color: #2f9dd3; }
+.ds-v2 .ds-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ds-v2 .ds-calc { font-size: 12px; color: #c8cad6; border-top: 1px dashed #3f424d; padding-top: 8px; }
+.ds-v2 .ds-apply {
+  background: color-mix(in srgb, #2f9dd3 14%, transparent); color: #d4ecfc;
+  border: 1px solid #2f9dd3; border-radius: 6px; padding: 7px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.ds-v2 .ds-apply:disabled { opacity: .4; cursor: default; }
+.ds-v2 .ds-attr-msg { font-size: 12px; color: #c8cad6; display: flex; gap: 8px; align-items: center; }
+.ds-v2 .ds-link { background: none; border: 0; padding: 0; color: #2f9dd3; cursor: pointer; font-size: 12px; }
+.ds-v2 .ds-link:hover { text-decoration: underline; }
+.ds-v2 .ds-seg-small .ds-seg-btn { padding: 3px 8px; font-size: 11px; }
+.ds-v2 .ds-nocaps { text-transform: none; letter-spacing: 0; }
+.ds-v2 .ds-selectable tbody tr:not(.ds-group-row) { cursor: pointer; }
+.ds-v2 .ds-selectable tbody tr.is-selected td { background: color-mix(in srgb, #2f9dd3 14%, transparent); }
+@media (max-width: 1100px) { .ds-v2 .ds-parcels-top { grid-template-columns: 1fr; } }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr { user-select: none; }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr:not(.ds-group-row) { cursor: pointer; }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr:not(.ds-group-row):hover td { background: rgba(255,255,255,0.03); }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr.is-selected td { background: rgba(47,157,211,0.18); color: #d4ecfc; }
+.ds-v2 .ds-content .ds-card-head .ds-nocaps { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.ds-v2 .ds-content .ds-table.ds-selectable tbody tr.is-selected:not(.ds-group-row) td { background: rgba(47,157,211,0.18); color: #d4ecfc; }
+/* C2 plan exhibit (schematic) */
+.ds-v2 .ds-plan { position: absolute; inset: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; overflow: auto; background: #12131c; align-content: flex-start; }
+.ds-v2 .ds-plan-phase { flex-basis: 180px; min-width: 160px; display: flex; flex-direction: column; gap: 4px; border: 1px dashed #3f424d; border-radius: 6px; padding: 6px; }
+.ds-v2 .ds-plan-phase-label { font-size: 10px; color: #75798c; text-transform: uppercase; letter-spacing: .04em; }
+.ds-v2 .ds-plan-tiles { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.ds-v2 .ds-plan-tile { flex-basis: 64px; min-height: 52px; border: 1px solid transparent; border-radius: 4px; padding: 4px 6px; text-align: left; color: #f4f4f6; cursor: pointer; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.ds-v2 .ds-plan-id { font-size: 11px; font-weight: 600; }
+.ds-v2 .ds-plan-sub { font-size: 9.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-v2 .ds-use-sfd { background: #b0813c; }
+.ds-v2 .ds-use-att { background: #a4583f; }
+.ds-v2 .ds-use-comm { background: #4d7177; }
+.ds-v2 .ds-use-open { background: #5b8a4a; }
+.ds-v2 .ds-use-other { background: #5c5f74; }
+.ds-v2 .ds-use-none { background: transparent; border-color: #75798c; border-style: dashed; color: #c8cad6; }
+.ds-v2 .ds-plan-tile.is-selected { outline: 2px solid #2f9dd3; outline-offset: 1px; box-shadow: inset 0 0 0 999px rgba(47,157,211,0.25); }
+.ds-v2 .ds-plan-tile:hover { filter: brightness(1.12); }
+/* ── C5 Costs (2026-10-14) ── */
+.ds-v2 .ds-filterbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.ds-v2 .ds-figure { font-size: 12px; color: #c8cad6; font-variant-numeric: tabular-nums; }
+.ds-v2 .ds-costs .ds-card + .ds-card { margin-top: 12px; }
+.ds-v2 .ds-cards-row { display: flex; gap: 8px; padding: 4px 14px 12px; flex-wrap: wrap; align-items: stretch; }
+.ds-v2 .ds-cont { display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 120px; padding: 8px 10px; background: #1d1f2b; border: 1px solid #3f424d; border-radius: 6px; color: #c8cad6; cursor: pointer; font-size: 11px; }
+.ds-v2 .ds-cont b { color: #e9e9ed; font-size: 12px; font-weight: 600; }
+.ds-v2 .ds-cont span { color: #75798c; }
+.ds-v2 .ds-cont:hover { border-color: #5c5f74; }
+.ds-v2 .ds-cont.is-active { border-color: #2f9dd3; background: color-mix(in srgb, #2f9dd3 10%, #1d1f2b); }
+.ds-v2 .ds-cont-sep { align-self: center; color: #75798c; }
+.ds-v2 .ds-budget td { vertical-align: middle; }
+.ds-v2 .ds-content .ds-table td.ds-wrap { white-space: normal; min-width: 110px; }
+.ds-v2 .ds-basis { color: #75798c; }
+.ds-v2 .ds-basis-on { color: #e9e9ed; font-weight: 600; }
+.ds-v2 .ds-editable { text-decoration: underline dashed rgba(233,233,237,0.35); text-underline-offset: 3px; }
+.ds-v2 .ds-table tr.ds-subtotal td { border-top: 1px solid #3f424d; }
+.ds-v2 .ds-card-head .ds-apply { padding: 4px 10px; font-size: 12px; }
+.ds-v2 .ds-content .ds-budget th, .ds-v2 .ds-content .ds-budget td { padding-left: 8px; padding-right: 8px; }
+.ds-v2 .ds-content .ds-budget th:first-child, .ds-v2 .ds-content .ds-budget td:first-child { padding-left: 14px; }
+/* ── C7 Capitalization (2026-10-14) ── */
+.ds-v2 .ds-kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 12px; }
+.ds-v2 .ds-kpi { background: #1d1f2b; border: 1px solid #3f424d; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.ds-v2 .ds-kpi span { font-size: 11px; color: #75798c; }
+.ds-v2 .ds-kpi b { font-size: 18px; color: #e9e9ed; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ds-v2 .ds-kpi em, .ds-v2 .ds-cf-strip em { font-style: normal; font-size: 11px; color: #75798c; font-weight: 400; }
+.ds-v2 .ds-cap-loans { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; margin-bottom: 12px; align-items: start; }
+.ds-v2 .ds-cap-edit { justify-self: start; align-self: start; }
+.ds-v2 .ds-loan-head { display: flex; gap: 8px; align-items: center; padding: 12px 14px 6px; flex-wrap: wrap; }
+.ds-v2 .ds-loan-head b { color: #e9e9ed; font-size: 14px; }
+.ds-v2 .ds-kv { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 12px; padding: 6px 14px 10px; margin: 0; font-size: 12px; }
+.ds-v2 .ds-kv dt { color: #75798c; font-weight: 400; }
+.ds-v2 .ds-kv dd { margin: 0; color: #e9e9ed; text-align: right; font-variant-numeric: tabular-nums; }
+.ds-v2 .ds-loan-foot { border-top: 1px solid #3f424d; padding: 8px 14px; font-size: 12px; color: #c8cad6; }
+.ds-v2 .ds-cap-row { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 12px; align-items: start; }
+.ds-v2 .ds-tierbar { display: flex; height: 6px; gap: 2px; margin: 4px 14px 0; border-radius: 3px; overflow: hidden; }
+.ds-v2 .ds-tierbar span { background: #2f9dd3; min-width: 4px; }
+.ds-v2 .ds-tierbar span:nth-child(2) { background: #1f6f97; }
+.ds-v2 .ds-tierbar span:nth-child(3) { background: #8fd0f0; }
+.ds-v2 .ds-cf-strip { display: flex; gap: 28px; align-items: center; padding: 12px 14px; flex-wrap: wrap; }
+.ds-v2 .ds-cf-strip > div { display: flex; flex-direction: column; gap: 2px; }
+.ds-v2 .ds-cf-strip > div span { font-size: 11px; color: #75798c; }
+.ds-v2 .ds-cf-strip > div b { font-size: 14px; color: #e9e9ed; font-variant-numeric: tabular-nums; }
+.ds-v2 .ds-cf-title { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #75798c; font-weight: 600; }
+.ds-v2 .ds-footnote { font-size: 12px; color: #75798c; margin: 10px 2px; }
+@media (max-width: 1280px) { .ds-v2 .ds-cap-row { grid-template-columns: 1fr 1fr; } }
+.ds-v2 .ds-content .ds-cap-row .ds-table th, .ds-v2 .ds-content .ds-cap-row .ds-table td { padding-left: 8px; padding-right: 8px; }
+.ds-v2 .ds-content .ds-cap-row .ds-table th:first-child, .ds-v2 .ds-content .ds-cap-row .ds-table td:first-child { padding-left: 14px; white-space: normal; }
+.ds-v2 .ds-cap-row .ds-card-head { flex-wrap: nowrap; }
+.ds-v2 .ds-cap-row .ds-card-head > span:first-child { white-space: nowrap; }
+.ds-v2 .ds-cap-row .ds-card { min-width: 0; overflow: hidden; }
+/* ── C12 Cash Flow skin (2026-10-14) — re-skins the live land cash-flow components ── */
+.ds-v2 .ds-cfskin { display: grid; grid-template-columns: 240px minmax(0,1fr); gap: 12px; align-items: start; }
+.ds-v2 .ds-cfskin-main { min-width: 0; }
+.ds-v2 .ds-cfskin .card { background: #1d1f2b !important; border: 1px solid #3f424d !important; border-radius: 8px; color: #e9e9ed; }
+.ds-v2 .ds-cfskin .card-header { background: transparent !important; border-bottom: 1px solid #3f424d !important; padding: 8px 12px !important; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #75798c; }
+.ds-v2 .ds-cfskin .card-body { font-size: 12px; }
+.ds-v2 .ds-cfskin-assume .card-body button { font-size: 11px !important; text-transform: uppercase; letter-spacing: .04em; color: #2f9dd3 !important; }
+.ds-v2 .ds-cfskin-assume select, .ds-v2 .ds-cfskin-assume input { background: #161826 !important; color: #e9e9ed !important; border: 1px solid #3f424d !important; border-radius: 6px; font-size: 12px !important; }
+/* area / phase filter: one compact block, chips small */
+.ds-v2 .ds-cfskin .rounded.border { border-color: #3f424d !important; border-radius: 8px !important; background: #1d1f2b; }
+.ds-v2 .ds-cfskin .rounded.border > div:first-child { padding: 6px 12px !important; font-size: 11px; }
+.ds-v2 .ds-cfskin .border-t { border-top-color: #3f424d !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 8px 12px !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 > div { display: flex; align-items: center; gap: 8px; margin: 0 !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 h6 { margin: 0 !important; font-size: 11px !important; font-weight: 400 !important; }
+.ds-v2 .ds-cfskin .border-t .p-3 .gap-2 { gap: 4px !important; }
+.ds-v2 .ds-cfskin .border-t .btn-sm { padding: 1px 7px !important; font-size: 11px !important; border-radius: 4px !important; }
+/* headline tiles */
+.ds-v2 .ds-cfskin .row.g-3 { display: grid !important; grid-template-columns: 1.5fr repeat(4, minmax(0,1fr)); gap: 8px; margin: 0 !important; }
+.ds-v2 .ds-cfskin .row.g-3 > div { width: auto !important; max-width: none !important; padding: 0 !important; margin: 0 !important; flex: none !important; }
+.ds-v2 .ds-cfskin .row.g-3 .card { background: #1d1f2b !important; }
+.ds-v2 .ds-cfskin .row.g-3 .card-body { padding: 8px 10px !important; }
+.ds-v2 .ds-cfskin .row.g-3 .card-body span[style*="0.7rem"] { text-transform: none !important; letter-spacing: 0 !important; font-weight: 400 !important; font-size: 11px !important; }
+/* controls row */
+.ds-v2 .ds-cfskin .card.mt-3 > .card-header { padding: 8px 12px !important; gap: 10px !important; text-transform: none; letter-spacing: 0; }
+.ds-v2 .ds-cfskin .card.mt-3 > .card-header span.fw-medium { display: none; }
+.ds-v2 .ds-cfskin .card.mt-3 > .card-header .gap-4 { gap: 10px !important; }
+.ds-v2 .ds-cfskin .btn-group-sm > .btn { padding: 4px 12px; font-size: 12px; background: transparent; color: #c8cad6; border-color: #3f424d; }
+.ds-v2 .ds-cfskin .btn-group-sm > .btn.btn-primary { background: color-mix(in srgb, #2f9dd3 16%, transparent); color: #d4ecfc; border-color: #3f424d; font-weight: 600; }
+.ds-v2 .ds-cfskin .dropdown-toggle { padding: 4px 10px; font-size: 12px; background: transparent; color: #c8cad6; border-color: #3f424d; }
+/* period table: dense, boxless */
+.ds-v2 .ds-cfskin table.table { --cui-table-bg: transparent; --cui-table-color: #e9e9ed; background: transparent !important; font-size: 12px; margin: 0; }
+.ds-v2 .ds-cfskin table.table > :not(caption) > * > * { background: transparent !important; border-width: 0 !important; border-bottom: 1px solid rgba(233,233,237,0.06) !important; padding: 6px 10px !important; box-shadow: none !important; }
+.ds-v2 .ds-cfskin table.table thead th { background: #1d1f2b !important; color: #75798c !important; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600 !important; border-bottom: 1px solid #3f424d !important; }
+.ds-v2 .ds-cfskin .text-end.mt-3 { font-size: 11px; color: #75798c; margin-top: 8px !important; }
+@media (max-width: 1280px) { .ds-v2 .ds-cfskin .row.g-3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }

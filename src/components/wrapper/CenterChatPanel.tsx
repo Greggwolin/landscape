@@ -95,6 +95,12 @@ interface CenterChatPanelProps {
    */
   onNewChat?: () => void;
   /**
+   * Design view (Slice 1 reference): header reads "● Landscaper · <context>"
+   * instead of the logo + project name + type chip; the top bar already
+   * carries the project, type and the hide-chat control.
+   */
+  designHeader?: { context?: string };
+  /**
    * Studio screen manifest (JB50). Forwarded to LandscaperChatThreaded so each
    * sent message carries `available_screens`. /w/ callers omit it (unchanged).
    */
@@ -109,7 +115,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat, availableScreens }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName, onBeforeUserSend, onNewChat, availableScreens, designHeader }: CenterChatPanelProps) {
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext, setProjectRightPanelView } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
@@ -945,19 +951,30 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           duplication and forces the breadcrumb to truncate. */}
       <WrapperHeader
         leading={
-          <LandscaperIcon style={{ width: 32, height: 32, flexShrink: 0 }} />
+          designHeader ? (
+            <span className="ds-chat-dot" aria-hidden />
+          ) : (
+            <LandscaperIcon style={{ width: 32, height: 32, flexShrink: 0 }} />
+          )
         }
         title={
+          designHeader ? (
+            <span className="wrapper-header-title ds-chat-title">
+              Landscaper
+              {designHeader.context && <span className="ds-chat-context">{designHeader.context}</span>}
+            </span>
+          ) : (
           <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
             {/* While a project's details are still loading (a switch, a
                 pasted link, a refresh) say so, rather than showing a blank
                 header or the user's own name as if this were a home chat. */}
             {projectName || (projectId && !isChatRoute ? 'Loading project…' : userName || 'Landscaper')}
           </span>
+          )
         }
         trailing={
           <>
-            {projectTypeCode && (
+            {projectTypeCode && !designHeader && (
               <span
                 style={{
                   ...getPropertyTypeBadgeStyle(projectTypeCode, 'soft'),
@@ -1029,7 +1046,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
                 )}
               </button>
             )}
-            {!showHomepage && !isChatRoute && !isProjectRoot && (
+            {!showHomepage && !isChatRoute && !isProjectRoot && !designHeader && (
               <button className="w-btn w-btn-ghost w-btn-sm" onClick={closeChat} title="Close chat panel">
                 Close
               </button>

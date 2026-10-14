@@ -18,6 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
+import { DesignNavPanel } from './DesignNavPanel';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
@@ -70,6 +71,8 @@ interface DesignSidebarProps {
    * old `router.push('/w/chat')` that ejected the user out of the shell.
    */
   onNewChat: () => void;
+  /** Design view: collapsing hands back to the two-letter rail (DesignRail). */
+  onCollapse?: () => void;
 }
 
 export function DesignSidebar({
@@ -81,6 +84,7 @@ export function DesignSidebar({
   onSelectFolder,
   onSelectTab,
   onNewChat,
+  onCollapse,
 }: DesignSidebarProps) {
   const router = useRouter();
   const {
@@ -103,11 +107,12 @@ export function DesignSidebar({
   const startWidth = useRef(0);
 
   const handleToggleCollapse = useCallback(() => {
+    if (onCollapse) { onCollapse(); return; }
     setCollapsed((v) => {
       if (v) setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
       return !v;
     });
-  }, []);
+  }, [onCollapse]);
 
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -321,18 +326,57 @@ export function DesignSidebar({
       clearActiveArtifacts(); // selecting a screen replaces any open artifact
       onSelectFolder(folderId);
       const f = folders.find((x) => x.id === folderId);
-      if (f && f.subTabs.length === 0) setCollapsed(true);
+      if (f && f.subTabs.length === 0) { if (onCollapse) onCollapse(); else setCollapsed(true); }
     },
-    [onSelectFolder, folders, clearActiveArtifacts],
+    [onSelectFolder, folders, clearActiveArtifacts, onCollapse],
   );
   const handleSelectTab = useCallback(
     (folderId: string, tabId: string) => {
       clearActiveArtifacts();
       onSelectTab(folderId, tabId);
-      setCollapsed(true);
+      if (onCollapse) onCollapse(); else setCollapsed(true);
     },
-    [onSelectTab, clearActiveArtifacts],
+    [onSelectTab, clearActiveArtifacts, onCollapse],
   );
+
+  // Design view: the Slice 1 expanded nav (C2), fed by the same data.
+  if (onCollapse) {
+    const projectThreads = threads.filter((t) => t.projectId === projectId);
+    return (
+      <DesignNavPanel
+        onCollapse={onCollapse}
+        onNewChat={onNewChat}
+        onSearch={openSearch}
+        onNavigate={(page) => { onCollapse(); handleNavigate(page); }}
+        project={{
+          name: projectName,
+          sections: folders.map((f) => ({
+            id: f.id,
+            label: typeof f.label === 'string' ? f.label : f.label.primary,
+            badge: f.id === 'documents' ? 'DMS' : undefined,
+          })),
+          activeSectionId: currentFolder,
+          onSelectSection: (id) => handleSelectFolder(id),
+        }}
+        threads={projectThreads.map((t) => buildThreadItem(t, false)).map((t) => ({ id: t.id, label: t.name, onClick: t.onClick }))}
+        artifacts={artifacts.map((a) => ({ id: a.id, title: a.title, onClick: () => handleSelectArtifact(a.id) }))}
+        user={
+          user
+            ? {
+                name: `${user.first_name} ${user.last_name}`.trim() || user.username,
+                initials:
+                  `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() ||
+                  user.username[0].toUpperCase(),
+                org: user.company || undefined,
+              }
+            : undefined
+        }
+        isAdmin={user?.is_staff === true}
+        recentProjectId={projectId}
+        onLogout={logout}
+      />
+    );
+  }
 
   return (
     <WrapperSidebar

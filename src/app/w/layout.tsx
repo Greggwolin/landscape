@@ -51,6 +51,30 @@ import {
   type PanelView,
 } from '@/lib/wrapper/navMemory';
 import '@/styles/wrapper.css';
+import '@/styles/design.css'; // scoped under .design-shell — inert unless design view is on
+import { readUiModeCookie } from '@/lib/uiMode';
+import { DesignRail } from '@/components/design/DesignRail';
+import { DesignTopBar } from '@/components/design/DesignTopBar';
+import { DesignNavPanel } from '@/components/design/DesignNavPanel';
+import type { DesignNavSection } from '@/components/design/designNav';
+
+// Design view (Slice 1 reference, A-frames): the platform rail. Codes and order
+// follow the reference (Ho Pj Dc Rp Ad), plus the platform pages the app has
+// that the reference draws separately (map, tools, Landscaper AI, help).
+const DESIGN_PLATFORM_NAV: DesignNavSection[] = [
+  { id: 'dashboard', code: 'Ho', label: 'Home', items: [] },
+  { id: 'map', code: 'Mp', label: 'Map', items: [] },
+  { id: 'projects', code: 'Pj', label: 'Projects', items: [] },
+  { id: 'platform-knowledge', code: 'Dc', label: 'Documents', items: [] },
+  { id: 'reports', code: 'Rp', label: 'Reports', items: [] },
+  { id: 'tools', code: 'Tl', label: 'Tools', items: [] },
+  { id: 'landscaper', code: 'AI', label: 'Landscaper AI', items: [] },
+  { id: 'admin', code: 'Ad', label: 'Admin', items: [] },
+  { id: 'help', code: 'Hp', label: 'Help', items: [] },
+];
+const DESIGN_PAGE_LABEL: Record<string, string> = {
+  chat: 'Chat', ...Object.fromEntries(DESIGN_PLATFORM_NAV.map((n) => [n.id, n.label])),
+};
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 180;
@@ -76,6 +100,12 @@ interface ProjectData {
 }
 
 function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
+  // Design view (2026-10-14): paint the whole /w/ shell in the Slice 1 skin
+  // when the ui_mode cookie says so. Read after mount (cookie is client-only).
+  const [designSkin, setDesignSkin] = useState(false);
+  const [designNavExpanded, setDesignNavExpanded] = useState(false);
+  useEffect(() => { setDesignSkin(readUiModeCookie() === 'design'); }, []);
+
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -98,6 +128,8 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     toggleArtifacts,
     closeChat,
     setSidebarWidthPx,
+    chatOpen,
+    toggleChat,
   } = useWrapperUI();
   const { logout, user } = useAuth();
 
@@ -526,11 +558,11 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         // FB-302: Platform Knowledge is a full-width navigator — start with
         // the center chat panel closed so the knowledge tree gets the room.
         // The user can re-open chat via the header toggle.
-        if (page === 'platform-knowledge') closeChat();
+        if (page === 'platform-knowledge' && !designSkin) closeChat();
         router.push(`/w/${routeMap[page] || page}`);
       }
     },
-    [router, projectId, lastProjectId, toggleHelp, closeChat]
+    [router, projectId, lastProjectId, toggleHelp, closeChat, designSkin]
   );
 
   const handleToggleCollapse = useCallback(() => {
@@ -877,13 +909,55 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   }, [projectId]);
 
   return (
-    <div className="wrapper-layout">
+    <div className={designSkin ? 'wrapper-layout design-shell ds-v2' : 'wrapper-layout'}>
+      {designSkin && (
+        <DesignTopBar
+          projectName={projectId && projectData?.project_name ? projectData.project_name : 'Landscape'}
+          section={{ id: activePage, code: '', label: DESIGN_PAGE_LABEL[activePage] ?? 'Home', items: [] }}
+          onSelectItem={() => {}}
+          chatOpen={chatOpen}
+          onToggleChat={toggleChat}
+          note={projectId ? undefined : 'Landscaper — no project selected'}
+        />
+      )}
+      <DesignBody on={designSkin}>
+      {designSkin && !designNavExpanded ? (
+        <DesignRail
+          sections={DESIGN_PLATFORM_NAV}
+          activeSectionId={activePage}
+          onSelectSection={(sec) => handleNavigate(sec.id)}
+          onExpand={() => setDesignNavExpanded(true)}
+        />
+      ) : designSkin ? (
+        <DesignNavPanel
+          onCollapse={() => setDesignNavExpanded(false)}
+          onNewChat={handleNewChat}
+          onSearch={openSearch}
+          onNavigate={(page) => { setDesignNavExpanded(false); handleNavigate(page); }}
+          activePage={activePage}
+          threads={sidebarThreadItems.map((t) => ({ id: t.id, label: t.name, onClick: t.onClick }))}
+          user={
+            user
+              ? {
+                  name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
+                  initials:
+                    `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() ||
+                    user.username[0].toUpperCase(),
+                  org: user.company || undefined,
+                }
+              : undefined
+          }
+          isAdmin={user?.is_staff === true}
+          recentProjectId={recentProjects[0]?.id ?? null}
+          onLogout={logout}
+        />
+      ) : (
       <WrapperSidebar
         activePage={activePage}
         onNavigate={handleNavigate}
-        collapsed={collapsed}
-        onToggleCollapse={handleToggleCollapse}
-        sidebarWidth={sidebarWidth}
+        collapsed={designSkin ? false : collapsed}
+        onToggleCollapse={designSkin ? () => setDesignNavExpanded(false) : handleToggleCollapse}
+        sidebarWidth={designSkin ? 260 : sidebarWidth}
         onResizeStart={handleResizeStart}
         onNewChat={handleNewChat}
         // On /w/dashboard the center column already lists recent conversations
@@ -929,6 +1003,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         userName={user ? `${user.first_name} ${user.last_name}`.trim() || user.username : undefined}
         userInitials={user ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || user.username[0].toUpperCase() : undefined}
       />
+      )}
       {isDashboardRoute ? (
         <UserDashboard />
       ) : (
@@ -960,6 +1035,11 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           // Mirrors the dashboard greeting — same identity in every chat
           // surface the user owns.
           userName={user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : undefined}
+          designHeader={
+            designSkin
+              ? { context: projectId && projectData?.project_name ? projectData.project_name : DESIGN_PAGE_LABEL[activePage] ?? 'Home' }
+              : undefined
+          }
         />
       )}
       {!isChatRoute && (
@@ -1033,9 +1113,15 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           </div>
         )
       )}
+      </DesignBody>
       <HelpLandscaperPanel />
     </div>
   );
+}
+
+/** Design view wraps the three columns under the top bar; otherwise transparent. */
+function DesignBody({ on, children }: { on: boolean; children: React.ReactNode }) {
+  return on ? <div className="ds-body">{children}</div> : <>{children}</>;
 }
 
 export default function WrapperLayout({ children }: { children: React.ReactNode }) {

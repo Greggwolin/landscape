@@ -595,7 +595,7 @@ counts are since 2026-07-19, when the chat-first surface was settled on (PR #181
 | Chat-first | `/w/...` | **ACTIVE** — build new surfaces here | 16 | default after login |
 | Classic | `/projects/[projectId]` | **LOAD-BEARING** — its `ProjectContentRouter` is imported by `/studio` and `/design` (not by `/w/`, which renders its own independent tree); alpha readiness is measured here | 4 | `?mode=classic` |
 | Studio | `/studio/[projectId]` | **PARKED** — deterministic fallback, kept | 1 | direct URL only |
-| Design | `/design/[projectId]` | **REFERENCE** — visual restyle of studio, kept for comparison | 0 | direct URL only |
+| Design | `/design/[projectId]` | **ACTIVE — design view** (2026-10-14): the Slice 1 reference look. Third value of the `ui_mode` cookie; in design view every project opens here and `/w/` platform pages render in the design skin. Reference: OneDrive `1Active/_Landscape/_cowork/design-reference/` | — | Chat / Classic / Design switch, or open `/design/<id>` |
 
 Studio and design own five files each (page, layout, sidebar, stylesheet, shell) and no logic
 of their own — everything substantive is imported. Keeping them costs almost nothing; deleting
