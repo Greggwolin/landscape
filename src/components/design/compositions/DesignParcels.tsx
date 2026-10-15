@@ -37,7 +37,9 @@ interface Parcel {
 }
 interface LuType { type_id: number; type_name: string; type_code: string; product_selections?: Array<{ code?: string; product_code?: string; name?: string }> }
 interface LuFamily { family_id: number; family_name: string; family_code: string; types: LuType[] }
-interface Labels { l1: string; l2: string; l3: string }
+// useL1 / useL2 follow the project's structure settings: a project with no
+// area level shows no area column, grouping or label (2026-10-15).
+interface Labels { l1: string; l2: string; l3: string; useL1: boolean; useL2: boolean }
 
 const DJANGO = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const n = (v: unknown): number | null => {
@@ -62,7 +64,7 @@ export function DesignParcels({ project }: { project: AnyProject }) {
   const projectId = Number(project.project_id);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [families, setFamilies] = useState<LuFamily[]>([]);
-  const [labels, setLabels] = useState<Labels>({ l1: 'Area', l2: 'Phase', l3: 'Parcel' });
+  const [labels, setLabels] = useState<Labels>({ l1: 'Area', l2: 'Phase', l3: 'Parcel', useL1: true, useL2: true });
   const [grouped, setGrouped] = useState(true);
   const [selected, setSelected] = useState<number[]>([]);
   const [lastClicked, setLastClicked] = useState<number | null>(null);
@@ -93,7 +95,10 @@ export function DesignParcels({ project }: { project: AnyProject }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         const c = d?.config;
-        if (c) setLabels({ l1: c.level1_label || 'Area', l2: c.level2_label || 'Phase', l3: c.level3_label || 'Parcel' });
+        if (c) setLabels({
+          l1: c.level1_label || 'Area', l2: c.level2_label || 'Phase', l3: c.level3_label || 'Parcel',
+          useL1: c.level1_enabled !== false, useL2: c.level2_enabled !== false,
+        });
       })
       .catch(() => {});
   }, [projectId, loadParcels]);
@@ -209,17 +214,23 @@ export function DesignParcels({ project }: { project: AnyProject }) {
     );
   }
 
+  const groupKey = (p: Parcel) => `${labels.useL1 ? p.area_no : ''}|${labels.useL2 ? p.phase_name : ''}`;
+  const groupLabel = (p: Parcel) =>
+    [labels.useL1 && `${labels.l1} ${p.area_no ?? '—'}`, labels.useL2 && `${labels.l2} ${p.phase_name ?? '—'}`].filter(Boolean).join(' · ') ||
+    `All ${labels.l3.toLowerCase()}s`;
+  // leading text columns before Acres: the enabled levels + parcel + family/type/product
+  const lead = (labels.useL1 ? 1 : 0) + (labels.useL2 ? 1 : 0) + 4;
   const rows: Array<{ kind: 'group'; key: string; label: string; ac: number; units: number } | { kind: 'row'; p: Parcel }> = [];
   if (grouped) {
     let key = '';
     for (const p of sorted) {
-      const k = `${p.area_no}|${p.phase_name}`;
+      const k = groupKey(p);
       if (k !== key) {
         key = k;
-        const inPhase = sorted.filter((q) => `${q.area_no}|${q.phase_name}` === k);
+        const inPhase = sorted.filter((q) => groupKey(q) === k);
         rows.push({
           kind: 'group', key: k,
-          label: `${labels.l1} ${p.area_no ?? '—'} · ${labels.l2} ${p.phase_name ?? '—'}`,
+          label: groupLabel(p),
           ac: inPhase.reduce((t, q) => t + (n(q.acres) || 0), 0),
           units: inPhase.reduce((t, q) => t + (n(q.units) || 0), 0),
         });
@@ -230,9 +241,9 @@ export function DesignParcels({ project }: { project: AnyProject }) {
 
   const phaseBlocks: Array<{ key: string; label: string; ac: number; parcels: Parcel[] }> = [];
   for (const p of sorted) {
-    const k = `${p.area_no}|${p.phase_name}`;
+    const k = groupKey(p);
     let b = phaseBlocks.find((x) => x.key === k);
-    if (!b) { b = { key: k, label: `${labels.l2} ${p.phase_name ?? '—'}`, ac: 0, parcels: [] }; phaseBlocks.push(b); }
+    if (!b) { b = { key: k, label: labels.useL2 ? `${labels.l2} ${p.phase_name ?? '—'}` : labels.useL1 ? `${labels.l1} ${p.area_no ?? '—'}` : labels.l3 + 's', ac: 0, parcels: [] }; phaseBlocks.push(b); }
     b.parcels.push(p);
     b.ac += n(p.acres) || 0;
   }
@@ -352,13 +363,13 @@ export function DesignParcels({ project }: { project: AnyProject }) {
           <span className="ds-muted ds-nocaps">
             {totals.attributed} of {parcels.length} {labels.l3.toLowerCase()}s attributed · {fmt(totals.units)} lots · {fmt(totals.acres, 2)} ac
           </span>
-          <span className="ds-tag ds-push">Structure: {labels.l1} → {labels.l2} → {labels.l3}</span>
+          <span className="ds-tag ds-push">Structure: {[labels.useL1 && labels.l1, labels.useL2 && labels.l2, labels.l3].filter(Boolean).join(' → ')}</span>
           <button type="button" className="ds-ghost" onClick={() => setSettings(true)}>Structure &amp; settings</button>
         </header>
         <table className="ds-table ds-selectable">
           <thead>
             <tr>
-              <th>{labels.l1}</th><th>{labels.l2}</th><th>{labels.l3}</th><th>Use family</th><th>Use type</th><th>Product</th>
+              {labels.useL1 && <th>{labels.l1}</th>}{labels.useL2 && <th>{labels.l2}</th>}<th>{labels.l3}</th><th>Use family</th><th>Use type</th><th>Product</th>
               <th className="num">Acres</th><th className="num">Units</th><th className="num">DUA</th><th className="num">FF/acre</th>
             </tr>
           </thead>
@@ -366,7 +377,7 @@ export function DesignParcels({ project }: { project: AnyProject }) {
             {rows.map((r) =>
               r.kind === 'group' ? (
                 <tr key={`g${r.key}`} className="ds-group-row">
-                  <td colSpan={6}>{r.label}</td>
+                  <td colSpan={lead}>{r.label}</td>
                   <td className="num">{fmt(r.ac, 1)}</td><td className="num">{fmt(r.units)}</td><td /><td />
                 </tr>
               ) : (
@@ -375,8 +386,8 @@ export function DesignParcels({ project }: { project: AnyProject }) {
                   className={selected.includes(r.p.parcel_id) ? 'is-selected' : undefined}
                   onClick={(e) => clickRow(r.p.parcel_id, e)}
                 >
-                  <td>{r.p.area_no ?? ''}</td>
-                  <td>{r.p.phase_name ?? ''}</td>
+                  {labels.useL1 && <td>{r.p.area_no ?? ''}</td>}
+                  {labels.useL2 && <td>{r.p.phase_name ?? ''}</td>}
                   <td>{r.p.parcel_name ?? ''}</td>
                   <td>{r.p.family_name ?? ''}</td>
                   <td>{r.p.type_code ?? ''}</td>
