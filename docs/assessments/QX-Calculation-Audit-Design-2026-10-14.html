@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Show the Working</title>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: memo column; three worked examples drawn as indented working; decisions at the end. Light-only by standing rule. */
+:root{
+  --bg:#fbfaf7; --fg:#1f2324; --muted:#5d6568; --rule:#d9d4c8;
+  --accent:#1f5f8b; --accent-soft:#e6eef4; --warn:#8a4b12; --warn-soft:#f6ebdd; --paper:#ffffff;
+  --display:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+main{max-width:740px;margin:0 auto}
+h1{font-family:var(--display);font-size:2rem;line-height:1.15;font-weight:700;margin:0 0 .25rem;text-wrap:balance}
+h2{font-family:var(--display);font-size:1.35rem;font-weight:600;margin:2.1rem 0 .6rem;text-wrap:balance}
+h3{font-family:var(--body);font-size:.95rem;font-weight:600;margin:1.2rem 0 .3rem;color:var(--muted)}
+p{margin:0 0 .85rem;max-width:68ch}
+.meta{color:var(--muted);font-size:.85rem;margin-bottom:1.4rem}
+.lead{border-left:4px solid var(--accent);background:var(--accent-soft);padding:.9rem 1.1rem;margin:0 0 1.4rem}
+.lead p{margin:0 0 .5rem}.lead p:last-child{margin:0}
+.against{border-left:4px solid var(--warn);background:var(--warn-soft);padding:.9rem 1.1rem;margin:1rem 0}
+.against p{margin:0 0 .5rem}.against p:last-child{margin:0}
+ul,ol{padding-left:1.3rem;margin:0 0 .9rem}li{margin-bottom:.4rem;max-width:66ch}
+.work{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:.7rem 1rem;margin:.6rem 0 1.2rem;font-family:var(--mono);font-size:.8rem;line-height:1.5;overflow-x:auto;white-space:pre}
+.work b{font-weight:500;color:var(--accent)}
+.work i{font-style:normal;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:.92rem;margin:.6rem 0 1.2rem;table-layout:auto}
+.tbl{overflow-x:auto}
+th{text-align:left;font-weight:600;border-bottom:2px solid var(--rule);padding:.45rem .6rem;vertical-align:bottom;white-space:normal}
+td{border-bottom:1px solid var(--rule);padding:.5rem .6rem;vertical-align:top}
+td:first-child{font-weight:500;white-space:nowrap}
+.opt{margin:0 0 .5rem;padding-left:0;list-style:none}
+.opt li{display:grid;grid-template-columns:2.6rem 1fr;gap:.5rem}
+.opt b{color:var(--accent)}
+small{color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+<h1>Show the Working</h1>
+<p class="meta">Calculation audit · design for Gregg · 2026-10-14 · replaces this morning's "Deal Ledger" paper, which designed a record of <em>who changed what</em>; this one designs <em>how each number was computed</em>, which is the audit you asked for. The technical version is the companion file for the coding assistant.</p>
+
+<div class="lead">
+<p><strong>What it is.</strong> Every figure the app computes can open its working: the numbers that went into it, the rule that combined them, and the result, down to the stored values a person typed or a document supplied. Double-click a cash-flow cell and see the lines that sum to it; open one of those and see the budget item, the spread pattern and the inflation that produced it; open the IRR tile and see the dated series the rate was solved on. Landscaper answers "how did you get 39.1%?" from the same working, so the words and the screen can never disagree.</p>
+<p><strong>Why it is the novelty.</strong> A spreadsheet shows its formulas but not its reasoning, and ARGUS shows neither. A general assistant can produce a number but cannot prove it. Landscape computing the figure <em>and</em> showing the chain beneath it, in plain words, is the thing a Kern board member can check without trusting anyone. It is also what makes the AI's number defensible, which is the strategy Mike said they need.</p>
+</div>
+
+<h2>What is already there</h2>
+<p>Checked in the code this afternoon, on the path the Cash Flow screen actually runs.</p>
+<ul>
+<li>One engine builds the land cash flow. It already knows, for every line, which budget item or which parcel it came from, and it already computes the spread weights, the inflation factor and the price escalation for each month. <strong>It computes them and throws them away</strong>; only the final amount per month is kept.</li>
+<li>The returns are computed from that same run: the IRR on the actual dates of the monthly flows (your Oct 1 decision), the NPV at the discount rate, the equity multiple as cash in over cash out, peak equity as the deepest point of the running total. Again, the series and the method are known at the moment of computing and not kept.</li>
+<li>The budget schedule already has a working panel: double-click a line and it shows quantity × rate = total. That is the seed. It covers one layer of one schedule.</li>
+<li>Where a number was <em>typed or extracted</em> is not recorded (this morning's finding). That stays true and is a later layer, not this one: the working stops at "stored value: lot price $185,000, parcel 1.101" and does not yet say who put it there.</li>
+</ul>
+
+<h2>What the working looks like</h2>
+<p>Three examples in Peoria's shape, written as the panel would show them. <strong>The dollar figures are made up to show the layout; only the 39.1% is Peoria's real number.</strong> Indentation is "made from". The last line of each branch is a stored value or a rule.</p>
+
+<h3>A cash-flow cell: Phase 1 net revenue, March 2027</h3>
+<div class="work"><b>Net revenue, Phase 1, Mar 2027</b>            $2,412,900
+  = sum of parcel sales closing that month, net of deductions
+  <b>Parcel 1.101</b> net proceeds              $1,980,000
+    = gross price $2,000,000 − commissions $60,000 − closing $20,000 + escalation
+    gross price      <i>stored: 1.101 · 80 lots × $25,000 per lot</i>
+    commissions      <i>stored: 3.0% of gross</i>
+    escalation       × 1.0000  <i>price growth 0% · month 15 of the run</i>
+  <b>Parcel 1.102</b> net proceeds                $432,900
+    …</div>
+
+<h3>A cost cell: Mass grading, Phase 1, August 2026</h3>
+<div class="work"><b>Mass grading, Phase 1, Aug 2026</b>            $412,340
+  = budget line × share landing this month × inflation
+  budget line      $3,200,000   <i>stored: 1,600,000 CY × $2.00 per CY</i>
+  share this month    12.4%     <i>rule: S-curve over 12 months from Jun 2026, month 3 of 12</i>
+  inflation           × 1.039   <i>stored: 3.0% a year, compounded 1.3 years</i></div>
+
+<h3>A returns tile: IRR 39.1%</h3>
+<div class="work"><b>IRR</b>                                      39.1%
+  = the annual rate at which the dated monthly net cash flows sum to zero
+  method   <i>cash dated to the first of each month, days/365 (Excel XIRR convention)</i>
+  series   96 months · first Jan 2026 −$18,400,000 · last Dec 2033 +$3,210,000
+           <i>open the series: each month's net = net revenue − costs − financing for that month</i>
+  check    <i>same rate recomputed by a second method: 39.1%</i></div>
+
+<p>Every underlined-looking "stored:" line is a real value in the database. Later, when the change record exists, that line also says who entered it and when. Nothing in this design has to be redone for that.</p>
+
+<h2>What you would see</h2>
+<div class="tbl"><table>
+<tr><th>Where</th><th>What appears</th></tr>
+<tr><td>Cash-flow schedule</td><td>Double-click any cell. The panel beside the schedule (the one the budget already has) shows the working for that cell, one level open, each line expandable. A "Why this month?" line explains the timing rule.</td></tr>
+<tr><td>Budget schedule</td><td>The existing quantity × rate panel grows a second layer: where the quantity came from (acres, lots, front feet of the parcels it covers) and whether a rate was typed or taken from a cost library.</td></tr>
+<tr><td>Returns tiles (IRR, NPV, multiple, peak equity)</td><td>Click a tile: the method in one sentence, the inputs, and the series it was solved on, with a second-method check beside the IRR.</td></tr>
+<tr><td>Landscaper</td><td>"How did you get 39.1%?" or "why is March 2027 so high?" is answered from the same working the panel shows, in words, with the option to open the panel. Landscaper never derives an explanation on its own.</td></tr>
+<tr><td>Reports and exports</td><td>An optional "Working" appendix: the returns working and any cells the reader flagged, printed. Off by default.</td></tr>
+<tr><td>What-ifs</td><td>Both runs keep their working, so "why did the IRR drop from 39.1% to 30.1%" shows the two series side by side and the lines that moved.</td></tr>
+</table></div>
+
+<h2>How it gets built</h2>
+<p>Five slices. The engine learns to keep its working once; every screen and Landscaper then read it. Each slice is run by you locally before it goes live.</p>
+<ol>
+<li><strong>The engine keeps its working.</strong> Instead of discarding the spread weights, inflation factors, escalation and deductions, each line and each month records what produced it. The cash-flow run gets slower by very little, because the numbers are already computed; they are just no longer thrown away. Nothing on screen changes yet.</li>
+<li><strong>The cash-flow cell panel.</strong> Double-click a cell, see the working. Costs and parcel revenue first; subtotals and the financing lines next.</li>
+<li><strong>The returns tiles.</strong> IRR, NPV, multiple, peak equity each open their method and series, with the IRR cross-checked by a second method on the same series.</li>
+<li><strong>Landscaper reads the working.</strong> One new ability: given a cell or a tile, return its working in words. The answer to "how did you get this" stops being Landscaper's own reasoning.</li>
+<li><strong>The budget's second layer and the report appendix.</strong></li>
+</ol>
+<p>Slices 1 to 3 are the demo. After them, every number on the two screens you would show Kern can be opened to its stored inputs.</p>
+
+<div class="against">
+<p><strong>The case against.</strong> Slice 1 edits the one engine everything depends on, the canonical cascading-change risk in this app. Mitigation: the working is added beside the existing numbers, never in place of them, and the first success test is that every existing figure is unchanged to the cent. What would make me wrong: if prospects trust the number once they see the <em>inputs</em> screen and never open the working, this is a feature for the one skeptic in the room. I think the skeptic is the one who signs.</p>
+<p><strong>What it is not.</strong> Not a record of who typed a value or when (this morning's paper; it becomes the layer beneath this one). Not a formula editor. Not a way to change a number from inside the panel.</p>
+</div>
+
+<h2>Decisions you own</h2>
+<p>One at a time; the first shapes what the panel looks like.</p>
+<ol class="opt">
+<li><b>1</b><span>How much opens on the first double-click?</span></li>
+<li><b>1a</b><span>One level: the lines that make the cell. Each line expands on click. Calmer; two clicks to reach a stored value.</span></li>
+<li><b>1b</b><span>The whole chain, fully expanded, down to the stored values. Everything at once; long for a revenue cell with many parcels.</span></li>
+</ol>
+<ol class="opt">
+<li><b>2</b><span>The IRR series: shown as 96 monthly lines, or by year with "show months"?</span></li>
+<li><b>2a</b><span>By year, with months on request.</span></li>
+<li><b>2b</b><span>Monthly, because that is what the rate was solved on and a year view invites the old yearly-IRR confusion.</span></li>
+</ol>
+<ol class="opt">
+<li><b>3</b><span>Held until slices 1–3 ship: whether the "Working" appendix is offered on reports, and whether it is on or off by default.</span></li>
+</ol>
+<p><small>Sources: the live cash-flow engine and the schedule panel read in the working copy of the app on the Mac, 2026-10-14 ~17:05 Phoenix; the walk-through and this morning's Deal Ledger paper, both filed in the project's assessments folder.</small></p>
+</main>
+
+<p style="font-size:.8rem;color:#5d6568;max-width:740px;margin:1rem auto 0">Published copy: https://claude.ai/artifact/6nLbBamVoBDJAfEhkYUkje</p>
+</body>
+</html>

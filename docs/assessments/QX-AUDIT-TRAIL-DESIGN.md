@@ -1,5 +1,7 @@
 # QX — The Deal Ledger: audit trail and provenance for every figure
 
+**SUPERSEDED 2026-10-14 (same day) by `QX-CALCULATION-AUDIT-DESIGN.md` — Gregg's audit is of calculations, not changes. The change ledger becomes a later layer (§3.6 there). The schema audit in §2 below remains valid and is referenced from the new paper.**
+
 **Status:** design, 2026-10-14. Not built. Plain-English companion: `QX-Audit-Trail-Design-2026-10-14.html` (same folder).
 **Author:** Cowork, chat QX. **Owner of the decisions in §7:** Gregg.
 **Supersedes:** nothing; the 2026-08 "evidence" columns on the budget and the Landscaper mutation log stay and are absorbed (§3).
