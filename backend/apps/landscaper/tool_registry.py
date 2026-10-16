@@ -354,6 +354,14 @@ UNASSIGNED_SAFE_TOOLS = [
     "list_project_profiles",
     # Extraction-mapping config read (FB-303 — platform-level, no project dependency).
     "get_extraction_mappings",
+    # Pre-project document review (2026-10-16). A file attached to a chat with
+    # no project is stored against the chat thread; these three read tools
+    # authorise by thread when there is no project, so "look at the attached
+    # and let's discuss before creating a project" works. They never reach
+    # another project's library from here — see _doc_owner_clause.
+    "get_project_documents",
+    "get_document_content",
+    "get_document_page",
 ]
 
 

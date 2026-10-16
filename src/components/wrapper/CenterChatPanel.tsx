@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
@@ -17,6 +17,7 @@ import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import { useChatAttachment } from '@/components/landscaper/useChatAttachment';
+import FileDropContext from '@/contexts/FileDropContext';
 import { ChatDragOverlay } from '@/components/landscaper/ChatDragOverlay';
 import { artifactHostRoute, deriveDestination } from '@/lib/landscaper/threadDestination';
 import { recordDestination, useThreadRestore } from '@/hooks/useThreadDestination';
@@ -527,7 +528,13 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             return;
           }
           try {
-            const result = h.sendMessage(seed);
+            // Through the pre-send hook so files picked on the dashboard are
+            // uploaded and referenced in the message (2026-10-16). Older
+            // handles without it fall back to the bare send.
+            const result =
+              typeof h.sendWithAttachments === 'function'
+                ? h.sendWithAttachments(seed)
+                : h.sendMessage(seed);
             console.log('[seed-fix] sendMessage invoked');
             // sendMessage doesn't touch the chat's input state (that's
             // owned by the chat's own Send button handler). When we
@@ -841,6 +848,23 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     ensureThread: ensureUnassignedThread,
     source: 'center_chat_panel_drop',
   });
+
+  // Files picked on the home dashboard are queued in FileDropContext and the
+  // user is routed here (/w/chat). Nothing on the chat-first surface ever
+  // consumed that queue, so the files vanished and only the text was sent —
+  // Landscaper then went looking for "the attached files" in other projects'
+  // libraries (2026-10-16, Reno/Red Valley Ranch mix-up). Drain the queue into
+  // pending attachments on the pre-project chat routes only.
+  const fileDrop = useContext(FileDropContext);
+  const queuedFileCount = fileDrop?.pendingFiles.length ?? 0;
+  const consumeQueuedFiles = fileDrop?.consumeFiles;
+  const addAttachmentFiles = attachment.addFiles;
+  useEffect(() => {
+    if (!pathname || !pathname.startsWith('/w/chat')) return;
+    if (queuedFileCount === 0 || !consumeQueuedFiles) return;
+    const files = consumeQueuedFiles();
+    if (files.length > 0) addAttachmentFiles(files);
+  }, [pathname, queuedFileCount, consumeQueuedFiles, addAttachmentFiles]);
 
   // Every dropped file — any type — becomes a pending attachment. No Excel
   // gate; non-Excel files are no longer routed into the FileDropContext void.
