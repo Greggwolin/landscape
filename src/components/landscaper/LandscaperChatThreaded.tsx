@@ -49,6 +49,14 @@ const DB_TABLE_TO_EVENT_TABLES: Record<string, string[]> = {
 
 export interface LandscaperChatHandle {
   sendMessage: (msg: string, options?: SendMessageOptions) => Promise<void>;
+  /**
+   * Send the way the Send button does: run the pre-send hook first (uploads
+   * any pending attachments and appends their '[Attached: …]' references),
+   * then send. The dashboard→chat seed path uses this so files picked on the
+   * home page travel with the message (2026-10-16 — before this, the seed
+   * bypassed the hook and the files were silently dropped).
+   */
+  sendWithAttachments: (msg: string) => Promise<void>;
   /** Pre-fill the chat input without sending — used by 💬 discuss buttons */
   setInputText: (text: string) => void;
 }
@@ -467,8 +475,29 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   const { setIsThinking } = useLandscaperThinking();
   useEffect(() => { setIsThinking(isLoading); }, [isLoading, setIsThinking]);
 
-  // Expose sendMessage and setInputText to parent via imperative handle
-  useImperativeHandle(ref, () => ({ sendMessage, setInputText: setInput }), [sendMessage, setInput]);
+  // Send through the pre-send hook (attachment upload + context suffix), then
+  // send. Shared by the imperative handle; the Send button keeps its own
+  // input-restoring wrapper in handleSend below.
+  const sendWithAttachments = useCallback(
+    async (text: string) => {
+      let contextSuffix = '';
+      if (onBeforeSend) {
+        const result = await onBeforeSend();
+        if (result && typeof result === 'object' && result.contextSuffix) {
+          contextSuffix = result.contextSuffix;
+        }
+      }
+      await sendMessage(contextSuffix ? `${text}\n\n${contextSuffix}` : text);
+    },
+    [onBeforeSend, sendMessage]
+  );
+
+  // Expose sendMessage, sendWithAttachments and setInputText to parent via imperative handle
+  useImperativeHandle(
+    ref,
+    () => ({ sendMessage, sendWithAttachments, setInputText: setInput }),
+    [sendMessage, sendWithAttachments, setInput]
+  );
 
   // Notify parent when URL-pinned thread is permanently missing (404).
   // Parent typically redirects to /w/chat — keeps us off a dead URL.

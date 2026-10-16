@@ -3774,6 +3774,54 @@ def get_project_document_context(project_id: int) -> str:
         return ''
 
 
+def get_thread_document_context(thread_id) -> str:
+    """
+    Pre-project chats (2026-10-16): list the documents attached to THIS chat
+    thread so Landscaper knows what it can read and — just as important —
+    knows when nothing arrived. Always injected for a no-project thread; an
+    empty list is itself the information.
+    """
+    if not thread_id:
+        return ''
+    rows = []
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT doc_id, doc_name, doc_type, mime_type, created_at,
+                       COALESCE(processing_status, 'pending')
+                FROM landscape.core_doc
+                WHERE thread_id = %s::uuid
+                  AND project_id IS NULL
+                  AND deleted_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT 20
+            """, [str(thread_id)])
+            rows = cursor.fetchall()
+    except Exception as e:
+        logger.warning("Failed to load chat document context: %s", e)
+        return ''
+
+    lines = ["\n=== CHAT DOCUMENTS ==="]
+    if not rows:
+        lines.append(
+            "No documents are attached to this chat. If the user says they attached "
+            "or sent files, tell them nothing arrived and ask them to attach the files "
+            "again — do not go looking in project libraries."
+        )
+    else:
+        lines.append(
+            "These documents are attached to this chat and belong to no project yet. "
+            "Read them with get_document_content(doc_id) / get_document_page(doc_id, page_number):"
+        )
+        for doc_id, doc_name, doc_type, mime_type, created_at, status in rows:
+            date_str = created_at.strftime('%Y-%m-%d') if created_at else 'unknown'
+            note = '' if status == 'ready' else f", text extraction {status}"
+            lines.append(f"- doc_id {doc_id}: {doc_name} ({doc_type or mime_type or 'unknown type'}, attached {date_str}{note})")
+    lines.append("=== END CHAT DOCUMENTS ===")
+    return "\n".join(lines)
+
+
 def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
     """Get Anthropic client, returns None if API key not configured."""
     api_key = None
@@ -4752,6 +4800,9 @@ def get_landscaper_response(
             "  4. NEW-PROJECT — gather details conversationally, then call\n"
             "     create_project or create_analysis_draft when ready.\n\n"
             "Capabilities available from the home dashboard:\n"
+            "- Read documents the user attached to THIS chat (listed under CHAT DOCUMENTS "
+            "below, and named in the message as '[Attached: ...]') with "
+            "get_project_documents / get_document_content / get_document_page\n"
             "- Analyze uploaded Excel files (classify, audit formulas, extract assumptions)\n"
             "- Answer questions using platform knowledge and benchmarks\n"
             "- Look up data from ANY of the user's projects via list_projects_summary +\n"
@@ -4762,9 +4813,17 @@ def get_landscaper_response(
             "- Create a new project when the user is ready\n\n"
             "Do NOT tell the user you cannot access their project data without a "
             "project selected — that's outdated. Resolve project names via "
-            "list_projects_summary and read whatever is needed.\n"
+            "list_projects_summary and read whatever is needed.\n\n"
+            "ATTACHED FILES — HARD RULE. When the user refers to files they attached, "
+            "sent, uploaded or dropped into this chat, the ONLY place to look is the "
+            "CHAT DOCUMENTS list below (and any '[Attached: ...]' line in the message). "
+            "If that list is empty, the files did not arrive: say so plainly and ask the "
+            "user to attach them again. NEVER use find_documents or another project's "
+            "library to guess what 'the attached files' are — a document from a different "
+            "project is not the user's attachment, and naming that project is a fabrication.\n"
             "=== END GENERAL CHAT ===\n"
         )
+        full_system += get_thread_document_context(project_context.get('thread_id'))
 
     # Add rich project context (structured data from relevant tables only)
     # Pass page_context so only sections relevant to the current page are included.

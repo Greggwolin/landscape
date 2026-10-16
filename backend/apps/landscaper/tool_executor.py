@@ -2086,10 +2086,12 @@ def handle_get_project_documents(
     project_id: int,
     **kwargs
 ) -> Dict[str, Any]:
-    """List all documents uploaded to a project."""
+    """List all documents uploaded to a project (or attached to this chat
+    when there is no project — pre-project document review, 2026-10-16)."""
     return get_project_documents(
         project_id=project_id,
-        status_filter=tool_input.get('status_filter', 'all')
+        status_filter=tool_input.get('status_filter', 'all'),
+        thread_id=kwargs.get('thread_id'),
     )
 
 
@@ -2111,7 +2113,8 @@ def handle_get_document_content(
         max_length=tool_input.get('max_length', 50000),
         focus=tool_input.get('focus'),
         doc_type=doc_type,
-        doc_name=doc_name
+        doc_name=doc_name,
+        thread_id=kwargs.get('thread_id'),
     )
 
 
@@ -16740,13 +16743,31 @@ def _is_rent_roll_doc(doc_name: Optional[str], doc_type: Optional[str]) -> bool:
     )
 
 
+def _doc_owner_clause(project_id: Optional[int], thread_id: Optional[str]):
+    """
+    SQL fragment + params that says which documents the current chat may read.
+
+    Inside a project: the project's documents. In a pre-project chat (no
+    project yet): only the documents attached to THIS chat thread — never
+    another project's library. With neither, nothing matches. (2026-10-16:
+    pre-project document review had never worked because every read was
+    gated on project_id alone.)
+    """
+    if project_id:
+        return "d.project_id = %s", [project_id]
+    if thread_id:
+        return "d.thread_id = %s::uuid", [str(thread_id)]
+    return "FALSE", []
+
+
 def _select_document_id_for_request(
     cursor,
     project_id: int,
     doc_type: Optional[str] = None,
     doc_name: Optional[str] = None,
     focus: Optional[str] = None,
-    exclude_doc_id: Optional[int] = None
+    exclude_doc_id: Optional[int] = None,
+    thread_id: Optional[str] = None,
 ) -> Optional[int]:
     doc_type = (doc_type or '').strip().lower()
     doc_name = (doc_name or '').strip().lower()
@@ -16768,9 +16789,9 @@ def _select_document_id_for_request(
              WHERE ke.source_type = 'document_chunk' AND ke.source_id = d.doc_id) as embedding_count
         FROM landscape.core_doc d
         LEFT JOIN landscape.dms_extract_queue q ON q.doc_id = d.doc_id
-        WHERE d.project_id = %s
-    """
-    params = [project_id]
+        WHERE d.deleted_at IS NULL AND """
+    owner_sql, params = _doc_owner_clause(project_id, thread_id)
+    query += owner_sql + "\n"
 
     if exclude_doc_id:
         query += " AND d.doc_id <> %s"
@@ -16846,7 +16867,8 @@ _ALL_DOCUMENTS_FILTERS = ('all', 'active')
 
 def get_project_documents(
     project_id: int,
-    status_filter: str = "all"
+    status_filter: str = "all",
+    thread_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     List all documents uploaded to a project. Soft-deleted documents are excluded.
@@ -16893,10 +16915,10 @@ def get_project_documents(
                     END as priority
                 FROM landscape.core_doc d
                 LEFT JOIN landscape.dms_extract_queue q ON q.doc_id = d.doc_id
-                WHERE d.project_id = %s
-                  AND d.deleted_at IS NULL
-            """
-            params = [project_id]
+                WHERE d.deleted_at IS NULL
+                  AND """
+            owner_sql, params = _doc_owner_clause(project_id, thread_id)
+            query += owner_sql + "\n"
 
             requested = (status_filter or 'all').strip().lower()
             filter_ignored = None
@@ -16998,7 +17020,8 @@ def get_document_content(
     max_length: int = 40000,
     focus: str = None,
     doc_type: str = None,
-    doc_name: str = None
+    doc_name: str = None,
+    thread_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Get extracted content from a document.
@@ -17036,7 +17059,8 @@ def get_document_content(
                     project_id=project_id,
                     doc_type=doc_type,
                     doc_name=doc_name,
-                    focus=focus
+                    focus=focus,
+                    thread_id=thread_id,
                 )
 
             if not resolved_doc_id:
@@ -17045,13 +17069,15 @@ def get_document_content(
                     'error': 'No matching document found for the requested type/name.'
                 }
 
-            # First get document metadata and verify project access
-            doc_query = """
+            # First get document metadata and verify access: the project's
+            # documents, or — pre-project — the ones attached to this chat.
+            owner_sql, owner_params = _doc_owner_clause(project_id, thread_id)
+            doc_query = f"""
                 SELECT d.doc_id, d.doc_name, d.doc_type, d.project_id, d.mime_type
                 FROM landscape.core_doc d
-                WHERE d.doc_id = %s AND d.project_id = %s
+                WHERE d.doc_id = %s AND d.deleted_at IS NULL AND {owner_sql}
             """
-            cursor.execute(doc_query, [resolved_doc_id, project_id])
+            cursor.execute(doc_query, [resolved_doc_id, *owner_params])
             doc = cursor.fetchone()
 
             if not doc:
@@ -17069,11 +17095,12 @@ def get_document_content(
                     doc_type='om',
                     doc_name=doc_name,
                     focus=focus,
-                    exclude_doc_id=doc_id
+                    exclude_doc_id=doc_id,
+                    thread_id=thread_id,
                 )
                 if replacement_doc_id:
                     original_doc_id = doc_id
-                    cursor.execute(doc_query, [replacement_doc_id, project_id])
+                    cursor.execute(doc_query, [replacement_doc_id, *owner_params])
                     doc = cursor.fetchone()
                     if doc:
                         doc_id, doc_name, doc_type, proj_id, mime_type = doc
@@ -17384,14 +17411,15 @@ def handle_get_document_page(
 
     try:
         with connection.cursor() as cursor:
-            # Verify doc belongs to project
-            cursor.execute("""
-                SELECT doc_id, doc_name FROM landscape.core_doc
-                WHERE doc_id = %s AND project_id = %s
-            """, [doc_id, project_id])
+            # Verify the doc belongs to the project — or, pre-project, to this chat.
+            owner_sql, owner_params = _doc_owner_clause(project_id, kwargs.get('thread_id'))
+            cursor.execute(f"""
+                SELECT d.doc_id, d.doc_name FROM landscape.core_doc d
+                WHERE d.doc_id = %s AND d.deleted_at IS NULL AND {owner_sql}
+            """, [doc_id, *owner_params])
             doc = cursor.fetchone()
             if not doc:
-                return {'success': False, 'error': f'Document {doc_id} not found in project'}
+                return {'success': False, 'error': f'Document {doc_id} not found in this project or chat'}
 
             doc_name = doc[1]
 
