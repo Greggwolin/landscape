@@ -16743,6 +16743,46 @@ def _is_rent_roll_doc(doc_name: Optional[str], doc_type: Optional[str]) -> bool:
     )
 
 
+def _document_not_extracted_result(doc_id: int, doc_name: str, doc_type: str) -> Dict[str, Any]:
+    """
+    The document exists but its text has not been extracted. Kick extraction
+    off on the back end (2026-10-16 — uploads no longer reliably trigger it,
+    and a stuck one never restarts on its own) and tell the model, in terms
+    it must relay, that it has NOT read this document. On 2026-10-16 the
+    model answered the old "content: None" with an invented summary of a
+    69-page report ("I have the Zonda appraisal report now…"); the figure
+    guard caught the numbers, not the prose.
+    """
+    kicked = {'started': False, 'status': 'unknown', 'reason': ''}
+    try:
+        from apps.knowledge.services.document_processor import start_background_processing
+        kicked = start_background_processing(doc_id)
+    except Exception as e:
+        logger.warning("could not start extraction for doc %s: %s", doc_id, e)
+    if kicked.get('started'):
+        state = "Text extraction has just been started"
+    elif kicked.get('status') in ('queued', 'extracting', 'chunking', 'embedding'):
+        state = "Text extraction is running now"
+    else:
+        state = f"Text extraction is not available ({kicked.get('reason') or 'unknown'})"
+    return {
+        'success': False,
+        'error': 'not_extracted_yet',
+        'doc_id': doc_id,
+        'doc_name': doc_name,
+        'doc_type': doc_type,
+        'extraction': kicked,
+        'message': f"{state} for '{doc_name}'. No text from this document is available yet.",
+        'instruction': (
+            f"You have NOT read '{doc_name}'. Tell the user plainly that its text is still "
+            "being extracted and that you have not seen its contents. Do NOT describe, "
+            "summarise, characterise or guess at anything in it — not its subject, author, "
+            "figures, dates or conclusions. Offer to try again in about a minute "
+            "(a long report can take a few minutes)."
+        ),
+    }
+
+
 def _doc_owner_clause(project_id: Optional[int], thread_id: Optional[str]):
     """
     SQL fragment + params that says which documents the current chat may read.
@@ -17235,16 +17275,7 @@ def get_document_content(
                         'original_doc_id': original_doc_id
                     }
 
-                return {
-                    'success': True,
-                    'doc_id': doc_id,
-                    'doc_name': doc_name,
-                    'doc_type': doc_type,
-                    'content': None,
-                    'message': "No extracted content available. Document may not be indexed yet.",
-                    'doc_swapped': bool(original_doc_id),
-                    'original_doc_id': original_doc_id
-                }
+                return _document_not_extracted_result(doc_id, doc_name, doc_type)
 
             extracted_data, status, confidence, raw_text = result
 
@@ -17446,11 +17477,9 @@ def handle_get_document_page(
                 all_chunks = cursor.fetchall()
 
                 if not all_chunks:
-                    return {
-                        'success': False,
-                        'error': f'No page-level content available for document {doc_id}. '
-                                 f'Try get_document_content instead.'
-                    }
+                    # Nothing extracted at all → same kick + relay instruction
+                    # as get_document_content (2026-10-16).
+                    return _document_not_extracted_result(doc[0], doc[1], None)
 
                 # Estimate page from chunk position (rough: ~2 chunks per page)
                 chunks_per_page = max(1, len(all_chunks) // 20)  # assume ~20 pages

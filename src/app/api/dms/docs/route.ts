@@ -402,15 +402,19 @@ export async function POST(req: NextRequest) {
 
       // Trigger RAG processing (text extraction → chunking → embeddings)
       // Runs for ALL intents — feeds knowledge base, not the workbench.
-      // Fire-and-forget: runs in parallel with the response.
-      fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/`, {
+      // 2026-10-16: ask the back end to run it on its own worker thread
+      // (?background=1) and return at once. The old synchronous call was not
+      // awaited, and on Vercel an unawaited request is frozen when this
+      // response goes out — anything longer than a few seconds never ran
+      // (docs 763, 863 sat at "pending" for hours).
+      fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/?background=1`, {
         method: 'POST',
         headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       })
         .then(async (res) => {
           if (res.ok) {
             const result = await res.json();
-            console.log(`✅ RAG processing complete for doc_id=${doc.doc_id}: ${result.embeddings_created || 0} embeddings created`);
+            console.log(`✅ RAG processing ${result.status || 'started'} for doc_id=${doc.doc_id}`);
           } else {
             console.warn(`⚠️ RAG processing failed for doc_id=${doc.doc_id}: ${res.status} ${res.statusText}`);
           }

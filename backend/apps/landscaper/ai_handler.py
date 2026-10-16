@@ -3812,7 +3812,9 @@ def get_thread_document_context(thread_id) -> str:
     else:
         lines.append(
             "These documents are attached to this chat and belong to no project yet. "
-            "Read them with get_document_content(doc_id) / get_document_page(doc_id, page_number):"
+            "Read them with get_document_content(doc_id) / get_document_page(doc_id, page_number). "
+            "A document marked 'text extraction pending/queued/running' has NOT been read: "
+            "say so and never describe its contents until a read returns text:"
         )
         for doc_id, doc_name, doc_type, mime_type, created_at, status in rows:
             date_str = created_at.strftime('%Y-%m-%d') if created_at else 'unknown'

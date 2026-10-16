@@ -372,6 +372,18 @@ def process_document_now(request, doc_id):
             'embeddings_created': row[3] or 0
         })
 
+    # Background mode (2026-10-16): the upload route cannot wait for a long
+    # extraction, and on Vercel its unawaited request dies with the response.
+    # ?background=1 starts the work on a worker thread and returns 202.
+    wants_background = (
+        request.GET.get('background') in ('1', 'true', 'yes')
+        or request.headers.get('X-Process-Background') == '1'
+    )
+    if wants_background:
+        from ..services.document_processor import start_background_processing
+        started = start_background_processing(doc_id)
+        return JsonResponse({'success': True, **started}, status=202)
+
     # Process now (blocking call)
     result = processor.process_document(doc_id)
 

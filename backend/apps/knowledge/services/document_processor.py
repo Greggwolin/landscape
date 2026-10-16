@@ -278,6 +278,66 @@ class DocumentProcessor:
 processor = DocumentProcessor()
 
 
+# Statuses that mean a run is under way. A run older than this is assumed
+# dead (worker restarted mid-document) and may be started again.
+_IN_FLIGHT_STATUSES = ('queued', 'extracting', 'chunking', 'embedding')
+_IN_FLIGHT_STALE_MINUTES = 15
+
+
+def start_background_processing(doc_id: int) -> Dict[str, Any]:
+    """
+    Kick off text extraction for a document on a worker thread and return at
+    once. Added 2026-10-16: the upload route fired the synchronous /process/
+    call and did not wait for it, and on Vercel that request is frozen the
+    moment the upload response goes out — a 69-page report (doc 863) and a
+    July PDF (doc 763) sat at "pending" forever while a 4-page article got
+    through in the seconds the function stayed alive. Processing now runs
+    inside the back end, which is not torn down after a response.
+
+    Returns {'started': bool, 'status': str, 'reason': str}.
+    """
+    import threading
+    from django.db import connection as _conn
+
+    with _conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT processing_status, processing_started_at,
+                   (processing_started_at IS NOT NULL
+                    AND processing_started_at > NOW() - make_interval(mins => %s)) AS fresh
+            FROM landscape.core_doc
+            WHERE doc_id = %s AND deleted_at IS NULL
+        """, [_IN_FLIGHT_STALE_MINUTES, doc_id])
+        row = cursor.fetchone()
+    if not row:
+        return {'started': False, 'status': 'missing', 'reason': 'Document not found'}
+    status, started_at, fresh = row
+    if status == 'ready':
+        return {'started': False, 'status': 'ready', 'reason': 'Already processed'}
+    if status in _IN_FLIGHT_STATUSES and status != 'queued' and fresh:
+        return {'started': False, 'status': status, 'reason': 'Extraction already running'}
+
+    with _conn.cursor() as cursor:
+        cursor.execute("""
+            UPDATE landscape.core_doc
+            SET processing_status = 'queued', processing_error = NULL
+            WHERE doc_id = %s
+        """, [doc_id])
+
+    def _run():
+        try:
+            processor.process_document(doc_id)
+        except Exception:
+            logger.exception("background processing failed for doc_id=%s", doc_id)
+        finally:
+            try:
+                _conn.close()
+            except Exception:
+                pass
+
+    threading.Thread(target=_run, name=f"doc-process-{doc_id}", daemon=True).start()
+    return {'started': True, 'status': 'queued', 'reason': 'Extraction started'}
+
+
 def queue_document_for_processing(doc_id: int, project_id: int = None, priority: int = 0):
     """
     Add document to processing queue.
