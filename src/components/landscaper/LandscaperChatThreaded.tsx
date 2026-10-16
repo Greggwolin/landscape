@@ -489,10 +489,18 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           if (result.threadId) ownedThreadId = result.threadId;
         }
       }
-      await sendMessage(
-        contextSuffix ? `${text}\n\n${contextSuffix}` : text,
-        ownedThreadId ? { threadId: ownedThreadId } : undefined
-      );
+      // Uploads done, message about to echo into the chat — clear the input
+      // now (it kept the text visible during the upload). Restore on failure.
+      setInput('');
+      try {
+        await sendMessage(
+          contextSuffix ? `${text}\n\n${contextSuffix}` : text,
+          ownedThreadId ? { threadId: ownedThreadId } : undefined
+        );
+      } catch (err) {
+        setInput(text);
+        throw err;
+      }
     },
     [onBeforeSend, sendMessage]
   );
@@ -704,7 +712,9 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       return;
     }
 
-    setInput('');
+    // The input is cleared only once the pre-send hook (attachment upload)
+    // has finished and the message is on its way — while files upload the
+    // text stays visible, so the prompt never vanishes mid-flight.
 
     // Pre-send hook: parent may upload pending attachments and return a
     // contextSuffix to append to the user's message (e.g. doc_id reference).
@@ -725,6 +735,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           throw err;
         }
       }
+      setInput('');
       const finalMessage = contextSuffix
         ? `${currentMessage}\n\n${contextSuffix}`
         : currentMessage;

@@ -536,17 +536,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
                 ? h.sendWithAttachments(seed)
                 : h.sendMessage(seed);
             console.log('[seed-fix] sendMessage invoked');
-            // sendMessage doesn't touch the chat's input state (that's
-            // owned by the chat's own Send button handler). When we
-            // invoke sendMessage via the imperative handle, the input
-            // box keeps whatever setInputText put there. Clear it now
-            // so the user sees an empty input after auto-send, same as
-            // a normal Send-button flow.
-            try {
-              h.setInputText('');
-            } catch {
-              /* harmless */
-            }
+            // The chat clears its own input once attachments are uploaded
+            // and the message echoes into the thread, so the prompt stays on
+            // screen during the upload instead of vanishing.
             Promise.resolve(result).catch((e) => {
               console.error('[seed-fix] sendMessage rejected:', e);
             });

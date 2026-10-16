@@ -854,7 +854,12 @@ export function useLandscaperThreads({
 
       if (!activeThread && options?.threadId && !activeThreadRef.current) {
         // The caller already owns a thread (pre-project upload created it a
-        // moment ago). Adopt it rather than creating another.
+        // moment ago). Adopt it rather than creating another. sendingRef goes
+        // up FIRST, as in the create-thread branch below: setting activeThread
+        // fires the thread-watch effect, and without the guard it reloads the
+        // (still empty) message list and wipes the user's echo while
+        // Landscaper is thinking (Gregg, 2026-10-16).
+        sendingRef.current = true;
         const owned = await loadThreadById(options.threadId);
         if (owned) {
           setActiveThread(owned);
