@@ -102,6 +102,13 @@ export interface ThreadMessage {
 export interface SendMessageOptions {
   /** If true, the user message is hidden from the chat UI (system injection) */
   hidden?: boolean;
+  /**
+   * Send into THIS thread when the hook has no active thread yet. Set by the
+   * attachment pre-send hook, which creates the pre-project thread the files
+   * are filed under; without it a stale closure created a second, empty
+   * thread for the message and the files sat in the first (2026-10-16).
+   */
+  threadId?: string;
 }
 
 interface UseLandscaperThreadsOptions {
@@ -845,7 +852,18 @@ export function useLandscaperThreads({
         setMessages((prev) => [...prev, tempUserMessage]);
       }
 
-      if (!activeThread) {
+      if (!activeThread && options?.threadId && !activeThreadRef.current) {
+        // The caller already owns a thread (pre-project upload created it a
+        // moment ago). Adopt it rather than creating another.
+        const owned = await loadThreadById(options.threadId);
+        if (owned) {
+          setActiveThread(owned);
+          activeThreadRef.current = owned;
+          loadThreads();
+        }
+      }
+
+      if (!activeThread && !activeThreadRef.current) {
         setError(null);
 
         if (!hasProjectId(projectId) && !initialThreadId) {
@@ -1130,7 +1148,7 @@ export function useLandscaperThreads({
         sendingRef.current = false;
       }
     },
-    [activeThread, projectId, pageContext, subtabContext, initialThreadId, onFieldUpdate, onToolResult, loadThreads, initializeThread, fetchWithTimeout, getAuthHeaders, isAuthError]
+    [activeThread, projectId, pageContext, subtabContext, initialThreadId, onFieldUpdate, onToolResult, loadThreads, loadThreadById, initializeThread, fetchWithTimeout, getAuthHeaders, isAuthError]
   );
 
   // Keep ref in sync with state so sendMessage recovery can check current value

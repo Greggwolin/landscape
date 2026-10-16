@@ -72,7 +72,7 @@ export interface UseChatAttachmentResult {
   error: string | null;
   setError: (e: string | null) => void;
   /** Pre-send hook handed to LandscaperChatThreaded's `onBeforeSend`. */
-  handleBeforeSend: () => Promise<{ contextSuffix?: string } | void>;
+  handleBeforeSend: () => Promise<{ contextSuffix?: string; threadId?: string } | void>;
 }
 
 export function useChatAttachment({
@@ -190,7 +190,7 @@ export function useChatAttachment({
    * the error is surfaced and re-thrown so LandscaperChatThreaded restores the
    * user's input.
    */
-  const handleBeforeSend = useCallback(async (): Promise<{ contextSuffix?: string } | void> => {
+  const handleBeforeSend = useCallback(async (): Promise<{ contextSuffix?: string; threadId?: string } | void> => {
     if (pendingAttachments.length === 0) return;
     setUploading(true);
     setError(null);
@@ -205,6 +205,11 @@ export function useChatAttachment({
             'Could not create a chat thread to attach the file to. Try sending a message first, then attach the file again.',
           );
         }
+        // The upload headers read this ref, and the state→ref effect has not
+        // run yet — without this the upload went out with neither a project
+        // nor a thread and the server refused it ("UploadThing returned no
+        // result", 2026-10-16).
+        threadIdRef.current = threadId;
       }
 
       const refs: string[] = [];
@@ -213,7 +218,7 @@ export function useChatAttachment({
         refs.push(`[Attached: ${doc_name} — doc_id ${doc_id}]`);
       }
       setPendingAttachments([]);
-      return { contextSuffix: refs.join('\n') };
+      return { contextSuffix: refs.join('\n'), threadId: threadId ?? undefined };
     } catch (e) {
       console.error('Pending attachment upload failed', e);
       setError(e instanceof Error ? e.message : 'Upload failed');

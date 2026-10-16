@@ -104,7 +104,7 @@ interface LandscaperChatThreadedProps {
    *   `${userText}\n\n${contextSuffix}`
    * so the model sees both the user's prompt and the attached doc context.
    */
-  onBeforeSend?: () => Promise<{ contextSuffix?: string } | void>;
+  onBeforeSend?: () => Promise<{ contextSuffix?: string; threadId?: string } | void>;
   /**
    * Studio screen-router pre-send hook (JB37, revised JB43). Fires inside
    * `handleSend` with the trimmed user text BEFORE the message is sent. Return
@@ -481,13 +481,18 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   const sendWithAttachments = useCallback(
     async (text: string) => {
       let contextSuffix = '';
+      let ownedThreadId: string | undefined;
       if (onBeforeSend) {
         const result = await onBeforeSend();
-        if (result && typeof result === 'object' && result.contextSuffix) {
-          contextSuffix = result.contextSuffix;
+        if (result && typeof result === 'object') {
+          if (result.contextSuffix) contextSuffix = result.contextSuffix;
+          if (result.threadId) ownedThreadId = result.threadId;
         }
       }
-      await sendMessage(contextSuffix ? `${text}\n\n${contextSuffix}` : text);
+      await sendMessage(
+        contextSuffix ? `${text}\n\n${contextSuffix}` : text,
+        ownedThreadId ? { threadId: ownedThreadId } : undefined
+      );
     },
     [onBeforeSend, sendMessage]
   );
@@ -706,11 +711,13 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     // If the hook throws, restore the input and bail.
     const sendWithContext = async () => {
       let contextSuffix = '';
+      let ownedThreadId: string | undefined;
       if (onBeforeSend) {
         try {
           const result = await onBeforeSend();
-          if (result && typeof result === 'object' && result.contextSuffix) {
-            contextSuffix = result.contextSuffix;
+          if (result && typeof result === 'object') {
+            if (result.contextSuffix) contextSuffix = result.contextSuffix;
+            if (result.threadId) ownedThreadId = result.threadId;
           }
         } catch (err) {
           console.error('onBeforeSend failed', err);
@@ -721,7 +728,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       const finalMessage = contextSuffix
         ? `${currentMessage}\n\n${contextSuffix}`
         : currentMessage;
-      await sendMessage(finalMessage);
+      await sendMessage(finalMessage, ownedThreadId ? { threadId: ownedThreadId } : undefined);
     };
 
     sendWithContext().catch(() => {
