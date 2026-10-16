@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Research Tool — Scope</title>
+<style>
+  :root { --ink:#1d2430; --muted:#5b6573; --rule:#d9dee5; --accent:#1f5f8b; --soft:#f3f6f9; --warn:#8a4b00; --warnbg:#fff6e8; }
+  html, body { background:#ffffff; color:var(--ink); }
+  body { font-family: Georgia, "Times New Roman", serif; max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; line-height: 1.5; font-size: 16px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  h2 { font-size: 19px; margin: 32px 0 10px; border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
+  p { margin: 8px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 14px; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+  th { background: var(--soft); font-weight: 600; }
+  td.n { white-space: nowrap; }
+  .box { background: var(--soft); border-left: 4px solid var(--accent); padding: 10px 14px; margin: 14px 0; }
+  .warn { background: var(--warnbg); border-left: 4px solid var(--warn); padding: 10px 14px; margin: 14px 0; }
+  ol, ul { margin: 6px 0 10px 22px; }
+  li { margin: 3px 0; }
+  .q { font-weight: 600; }
+  a { color: var(--accent); }
+  .small { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<h1>Giving Landscaper the ability to research on the web</h1>
+<div class="meta">Scope for your decision · 2026-10-16, 4:45pm · chat VQ · technical version: VQ-WEB-RESEARCH-TOOL-DESIGN.md (same folder)</div>
+
+<h2>The gap, in one sentence</h2>
+<p>Landscaper cannot look anything up outside its own database — no county portals, no news, no agendas. I checked all 184 of its tools today; the only outside sources it can reach are the address geocoder, FRED and the Census. The permit tool and the entitlement-watching tools you show people run here with me, not inside the app.</p>
+
+<h2>What it would have found this afternoon</h2>
+<p>I ran the Sierra Reflections question myself, the way the tool would. One search, two page reads:</p>
+<table>
+<tr><th>What</th><th>Where it came from</th></tr>
+<tr><td>The project was <b>re-entitled in 2025–26</b> under a new tentative map (WTM24-001) and special use permits (WSUP25-0019). The 2020 article's "approved in 2006, deadline June 2022" is stale.</td><td>Washoe County planning commission packet</td></tr>
+<tr><td>Washoe County commissioners acted on it <b>2026-03-10</b>; the regional planning commission (TMRPA) <b>approved it 5–2 on 2026-06-15</b> after about six hours of public comment — traffic, water, schools, environment.</td><td>County application page; This Is Reno and KOLO, 2026-06-16</td></tr>
+<tr><td>759.7 gross acres, 940 single-family lots proposed (1,083 allowed by zoning), five phases, water from TMWA via two 375,000-gallon tanks, sewer through a new lift station, 3.3 million yards of cut, a mercury remediation cap. Owner of record on the county page: World Properties, Inc.</td><td>County "Quick Summary", 2025-09-19</td></tr>
+</table>
+<div class="box">That is the deal picture, and it is materially different from what the article says. None of it needed a login. The report you attached is dated 2026 ("-26" in the filename), which fits: it is likely the market study for this re-entitlement, not the 2020 listing.</div>
+
+<h2>What I propose to build</h2>
+<p>Two plain abilities, inside the app, usable before a project exists:</p>
+<ol>
+<li><span class="q">Search the web</span> — a query, optionally limited to one site (e.g. the county's), returning titles, links and snippets.</li>
+<li><span class="q">Read a page</span> — fetch a web page or PDF and return its text, so Landscaper quotes the actual staff report rather than a headline.</li>
+</ol>
+<p>Plus three rules that make it safe to trust:</p>
+<ul>
+<li><b>Every web fact carries its source</b> — site and date in the sentence, the link once. A search snippet alone only proves "a page with this title exists"; it never becomes a fact until the page is read.</li>
+<li><b>Nothing retrieved means "nothing retrieved."</b> A blocked or empty page is reported as such. (This is the hole the invented "Zonda appraisal" fell through today.)</li>
+<li><b>It fires when you ask for research</b> — "look up", "research", "what does the county say", "is this still approved" — or when your project's own data cannot answer a data question. Not on passing mentions.</li>
+</ul>
+
+<h2>What it costs</h2>
+<table>
+<tr><th>Item</th><th>Cost</th><th>Control</th></tr>
+<tr><td>Searches (Brave)</td><td class="n">about half a cent each; $5 of free credit a month</td><td>Hard cap 100 searches a day (50¢) and 5 per answer — stays under your $1-a-day rule without asking each time; when the day's budget is spent, Landscaper says so</td></tr>
+<tr><td>Page reads</td><td class="n">free</td><td>Cap 8 per answer</td></tr>
+<tr><td>Test run before release (slice 2)</td><td class="n">about $1 in Landscaper calls</td><td>Needs your yes at the time, per the 2026-10-14 rule</td></tr>
+</table>
+<p class="small">Brave's prices verified from a comparison page dated Aug–Oct 2026; I will confirm on Brave's own console at sign-up.</p>
+
+<h2>Build order</h2>
+<table>
+<tr><th>Slice</th><th>What you get</th><th>How you'll know it worked</th></tr>
+<tr><td class="n">1</td><td>The two abilities, the caps, the citation rule</td><td>In a fresh pre-project chat, "research Sierra Reflections at the county" comes back with the case numbers, the June 15 vote and the links</td></tr>
+<tr><td class="n">2</td><td>The jurisdiction playbook — official pages first, then news; report case numbers, dates, body, vote, conditions, next hearing, owner of record; flag conflicts with documents you attached</td><td>A short test battery passes the same bar as the location brief did (≥90% right on fire / offer / stay silent)</td></tr>
+<tr><td class="n">3</td><td>"Save that to the project" — the county staff report lands in the chat's or project's documents and is readable</td><td>It appears in the document list and Landscaper can quote it</td></tr>
+<tr><td class="n">later</td><td>A weekly watch on a saved question, feeding the project's activity log — the in-app version of your entitlement watchers</td><td>Not now; the design leaves room for it</td></tr>
+</table>
+
+<h2>The case against, and what would make me wrong</h2>
+<ul>
+<li>A web tool invites lazy "just Google it" answers that skip the project's own numbers. The fire-only-when-asked rule and a tables-first rule are the guard; the test battery is the proof.</li>
+<li>More sourced-looking text is more to invent around. The citation rule and the "nothing retrieved" rule are the guard; today showed the empty path is where invention starts.</li>
+<li>If most county portals turn out to be search forms a plain fetch cannot drive, slice 1 shrinks to news and PDFs. Washoe is not like that; Maricopa's portal may be — I will check a second jurisdiction before generalising.</li>
+<li>Keeping research outside the app (your 1b) is cheaper and already works. You chose 1a because Landscape is sold as the analyst, and this is the first thing a land buyer asks.</li>
+</ul>
+
+<h2>What needs you</h2>
+<ol>
+<li><span class="q">A Brave Search account and key</span> — it is a third-party sign-up with a card on file (free credit covers normal use). 1a: you open it and give me the key · 1b: I open it under the Landscape email and stop at the free tier.</li>
+<li><span class="q">The ~$1 test-run spend</span> when slice 2 is ready — I will ask then.</li>
+</ol>
+<p>Everything else is engineering, under standing authority. Slice 1 starts on your answer to item 1.</p>
+
+<div class="warn"><b>One correction to what Landscaper told you today:</b> it said the jurisdiction "appears to be Washoe County" from the article. That happens to be right for Sierra Reflections (unincorporated south Washoe, not City of Reno), and the county's own application page confirms it — but it was a guess at the time, not a finding.</div>
+
+<p class="small">Sources read for this scope, 2026-10-16: Washoe County planning commission packet and application page for Sierra Reflections (washoecounty.gov); county Quick Summary PDF dated 2025-09-19; This Is Reno 2026-06-16; KOLO 2026-06-16; costbench Brave Search API pricing page.</p>
+</body>
+</html>
