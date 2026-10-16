@@ -70,6 +70,7 @@ export function DesignParcels({ project }: { project: AnyProject }) {
   const [lastClicked, setLastClicked] = useState<number | null>(null);
   const [settings, setSettings] = useState(false);
   const [view, setView] = useState<'plan' | 'map'>('plan');
+  const [editAcres, setEditAcres] = useState<{ id: number; v: string } | null>(null);
   const [fam, setFam] = useState('');
   const [typ, setTyp] = useState('');
   const [prod, setProd] = useState('');
@@ -214,6 +215,21 @@ export function DesignParcels({ project }: { project: AnyProject }) {
     );
   }
 
+  // Acres are typed straight into the table: click the figure, type, Enter (Esc cancels).
+  const saveAcres = async (id: number, raw: string) => {
+    setEditAcres(null);
+    const v = raw.trim() === '' ? null : Number(raw.replace(/,/g, ''));
+    if (v !== null && (!Number.isFinite(v) || v < 0)) { setMsg('Acres must be a number.'); return; }
+    const prev = parcels.find((p) => p.parcel_id === id);
+    if (prev && n(prev.acres) === v) return;
+    const r = await fetch(`/api/parcels/${id}`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acres: v }),
+    });
+    if (!r.ok) { setMsg(`Could not save acres for ${prev?.parcel_name ?? 'parcel'}.`); return; }
+    loadParcels();
+  };
   const groupKey = (p: Parcel) => `${labels.useL1 ? p.area_no : ''}|${labels.useL2 ? p.phase_name : ''}`;
   const groupLabel = (p: Parcel) =>
     [labels.useL1 && `${labels.l1} ${p.area_no ?? '—'}`, labels.useL2 && `${labels.l2} ${p.phase_name ?? '—'}`].filter(Boolean).join(' · ') ||
@@ -392,7 +408,24 @@ export function DesignParcels({ project }: { project: AnyProject }) {
                   <td>{r.p.family_name ?? ''}</td>
                   <td>{r.p.type_code ?? ''}</td>
                   <td>{r.p.product ?? ''}</td>
-                  <td className="num">{fmt(n(r.p.acres), 1)}</td>
+                  <td className="num ds-editable-cell" onClick={(e) => { e.stopPropagation(); setEditAcres({ id: r.p.parcel_id, v: n(r.p.acres) ? String(n(r.p.acres)) : '' }); }}>
+                    {editAcres?.id === r.p.parcel_id ? (
+                      <input
+                        autoFocus
+                        className="ds-cell-input"
+                        inputMode="decimal"
+                        value={editAcres.v}
+                        onChange={(e) => setEditAcres({ id: r.p.parcel_id, v: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void saveAcres(r.p.parcel_id, editAcres.v);
+                          if (e.key === 'Escape') setEditAcres(null);
+                        }}
+                        onBlur={() => void saveAcres(r.p.parcel_id, editAcres.v)}
+                      />
+                    ) : (
+                      <span className="ds-editable">{n(r.p.acres) ? fmt(n(r.p.acres), 1) : '—'}</span>
+                    )}
+                  </td>
                   <td className="num">{fmt(n(r.p.units))}</td>
                   <td className="num">{n(r.p.units) && n(r.p.acres) ? fmt((n(r.p.units) as number) / (n(r.p.acres) as number), 1) : ''}</td>
                   <td className="num">{n(r.p.frontfeet) && n(r.p.acres) ? fmt((n(r.p.frontfeet) as number) / (n(r.p.acres) as number)) : ''}</td>

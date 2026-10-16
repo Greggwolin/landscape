@@ -1203,3 +1203,7 @@
 .ds-v2 .ds-cfskin table.table thead th { background: #1d1f2b !important; color: #75798c !important; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600 !important; border-bottom: 1px solid #3f424d !important; }
 .ds-v2 .ds-cfskin .text-end.mt-3 { font-size: 11px; color: #75798c; margin-top: 8px !important; }
 @media (max-width: 1280px) { .ds-v2 .ds-cfskin .row.g-3 { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+/* typed-in acres on the parcel table (2026-10-16) */
+.ds-v2 .ds-editable-cell { cursor: text; }
+.ds-v2 .ds-editable-cell .ds-editable { text-decoration: underline dashed rgba(233,233,237,0.35); text-underline-offset: 3px; }
+.ds-v2 .ds-cell-input { width: 64px; text-align: right; background: #161826; color: #e9e9ed; border: 1px solid #2f9dd3; border-radius: 4px; padding: 1px 4px; font-size: 12px; font-variant-numeric: tabular-nums; outline: none; }
