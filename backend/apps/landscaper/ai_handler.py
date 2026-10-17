@@ -2194,7 +2194,7 @@ general-purpose context lookup. Apply these rules strictly:
 The artifact panel is for things the user asked for. Treat it that way.
 
 ═══════════════════════════════════════════════════════════════════════════════
-WEB RESEARCH — web_search / read_web_page (CRITICAL)
+WEB RESEARCH — web_search / read_web_page / save_web_document (CRITICAL)
 ═══════════════════════════════════════════════════════════════════════════════
 
 You can research the public web. Use it when the user asks you to research,
@@ -2227,6 +2227,21 @@ own numbers, and never add web research to an answer nobody asked for.
    record mentions one.
 6. BUDGET: at most 5 searches and 8 page reads per answer. If the research
    needs more, give what you have and offer to continue.
+7. TOO BIG TO READ = SAVE IT. When a document matters and read_web_page says
+   it is too large (county packets often run to hundreds of MB), or only part
+   of it could be read and the answer is in the rest, call save_web_document
+   — do not ask, and never send the user off to fetch it themselves. Where:
+   destination "documents" (the default) for anything about THIS site or deal
+   — staff reports, conditions of approval, agendas, minutes, plats,
+   development agreements; destination "platform_knowledge" only for general
+   reference that applies across deals — a county's development code, design
+   standards, fee schedules, a published market study. Then say in one line
+   that it is being saved and read and that you can answer from it shortly.
+8. LINKS ARE COPIED, NEVER WRITTEN. Every link you give must appear
+   character for character in a tool result from this conversation. Never
+   build, shorten or guess a web address; if you have no exact address, name
+   the page and say you have no link for it. Put each link on its own as a
+   bare address.
 
 ═══════════════════════════════════════════════════════════════════════════════
 EXCEL AUDIT — RESULTS RENDER IN ARTIFACT, NOT IN CHAT
@@ -4495,6 +4510,57 @@ def _redact_unsourced_figures(text: str, sourced: set) -> Tuple[str, int]:
     return ''.join(parts), redacted
 
 
+_URL_RE = re.compile(r"https?://[^\s<>\"'`\]\)]+")
+_URL_TRAIL = '.,;:!?*_'
+
+
+def _clean_url(u: str) -> str:
+    return u.rstrip(_URL_TRAIL)
+
+
+def unverified_links_removed(content: str, tool_outputs: Optional[list],
+                             messages: Optional[list]) -> tuple:
+    """Remove web links the reply wrote itself (VQ, 2026-10-17).
+
+    A link is kept only if it appears, as written, in something Landscaper
+    actually saw: a tool result this turn, or the conversation so far (the
+    user's messages and earlier replies, which passed this check). A guessed
+    county address costs the user a dead click and reads as a source. Returns
+    (content, removed_count)."""
+    if not content or 'http' not in content:
+        return content, 0
+    seen_text = json.dumps(tool_outputs or [], default=str)
+    for msg in (messages or []):
+        c = msg.get('content') if isinstance(msg, dict) else getattr(msg, 'content', '')
+        seen_text += '\n' + (c if isinstance(c, str) else json.dumps(c, default=str))
+    seen = {_clean_url(u) for u in _URL_RE.findall(seen_text)}
+    # Tool results are JSON: slashes may be escaped and spaces percent-encoded.
+    seen |= {u.replace('\\/', '/') for u in seen}
+    removed = 0
+
+    def _ok(u: str) -> bool:
+        cu = _clean_url(u)
+        return cu in seen or cu.replace(' ', '%20') in seen
+
+    def _md(m):
+        nonlocal removed
+        if _ok(m.group(2)):
+            return m.group(0)
+        removed += 1
+        return m.group(1) + ' (no verified link)'
+    out = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", _md, content)
+
+    def _bare(m):
+        nonlocal removed
+        u = m.group(0)
+        if _ok(u):
+            return u
+        removed += 1
+        return '(no verified link)' + u[len(_clean_url(u)):]
+    out = _URL_RE.sub(_bare, out)
+    return out, removed
+
+
 def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
     """True when the immediately previous assistant turn was itself guard-blocked.
 
@@ -4842,7 +4908,7 @@ def get_landscaper_response(
             "     create_project or create_analysis_draft when ready.\n\n"
             "Capabilities available from the home dashboard:\n"
             "- Research the public web (county and agency pages, news, PDFs) with "
-            "web_search / read_web_page — see WEB RESEARCH rules\n"
+            "web_search / read_web_page / save_web_document — see WEB RESEARCH rules\n"
             "- Read documents the user attached to THIS chat (listed under CHAT DOCUMENTS "
             "below, and named in the message as '[Attached: ...]') with "
             "get_project_documents / get_document_content / get_document_page\n"
@@ -5929,6 +5995,16 @@ def get_landscaper_response(
                 metadata['fabrication_guard'] = guard_envelope
         except Exception as _fg_err:  # never let the guard break a response
             logger.error("[FabricationGuard] guard error (passing original content through): %s", _fg_err)
+
+        # Link guard (VQ, 2026-10-17): drop web addresses no tool returned.
+        try:
+            final_content, _links_removed = unverified_links_removed(
+                final_content, tool_executions, messages)
+            if _links_removed:
+                metadata['unverified_links_removed'] = _links_removed
+                logger.warning("[LinkGuard] removed %s unverified link(s)", _links_removed)
+        except Exception as _lg_err:
+            logger.error("[LinkGuard] error (content passed through): %s", _lg_err)
 
         return {
             'content': final_content,

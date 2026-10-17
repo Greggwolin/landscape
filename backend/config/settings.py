@@ -372,6 +372,8 @@ BRAVE_SEARCH_API_KEY = config('BRAVE_SEARCH_API_KEY', default='')
 WEB_RESEARCH_DAILY_SEARCH_CAP = config('WEB_RESEARCH_DAILY_SEARCH_CAP', default=60, cast=int)
 WEB_RESEARCH_TURN_SEARCH_CAP = config('WEB_RESEARCH_TURN_SEARCH_CAP', default=5, cast=int)
 WEB_RESEARCH_PAGE_CAP_PER_TURN = config('WEB_RESEARCH_PAGE_CAP_PER_TURN', default=8, cast=int)
+# The app's UploadThing store — save_web_document copies web files into it (VQ, 2026-10-17).
+UPLOADTHING_TOKEN = config('UPLOADTHING_TOKEN', default='')
 
 # Shared secret for the morning-refresh scheduled-task skill that hits
 # /api/feedback/dashboard-data/. Empty/missing value blocks all access

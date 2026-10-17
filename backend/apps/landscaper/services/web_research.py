@@ -18,9 +18,14 @@ Design: docs/assessments/VQ-WEB-RESEARCH-TOOL-DESIGN.md.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import ipaddress
+import json
+import os
 import re
 import socket
+import tempfile
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -32,6 +37,9 @@ FETCH_TIMEOUT_S = 20
 SEARCH_TIMEOUT_S = 12
 MAX_FETCH_BYTES = 25 * 1024 * 1024
 MAX_PDF_PAGES = 60
+MAX_SAVE_BYTES = 500 * 1024 * 1024
+SAVE_TIMEOUT_S = 60  # per network read, not total
+UPLOADTHING_PREPARE = "https://api.uploadthing.com/v7/prepareUpload"
 FRESHNESS = {"pd", "pw", "pm", "py"}
 
 
@@ -177,6 +185,158 @@ def fetch_page(url: str, max_chars: int = 20000, focus: Optional[str] = None,
     return {"url": url, "final_url": final_url, "title": title, "content_type": kind,
             "text": text, "truncated": truncated, "pages_note": pages_note,
             "chars": len(text)}
+
+
+# ── save (download a whole file, copy it to the app's file store) ─────────
+
+def download_to_file(url: str, max_bytes: int = MAX_SAVE_BYTES,
+                     session: Optional[requests.Session] = None) -> Dict[str, Any]:
+    """Stream a public file to a temp file (never held in memory).
+    Returns {path, size, sha256, content_type, final_url, file_name}."""
+    ok, reason = check_public_url(url)
+    if not ok:
+        raise WebResearchError("url_refused", reason)
+    http = session or requests
+    try:
+        r = http.get(url, timeout=SAVE_TIMEOUT_S, stream=True, allow_redirects=True,
+                     headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+    except requests.RequestException as e:
+        raise WebResearchError("fetch_unreachable", f"The file could not be reached ({type(e).__name__}).")
+    final_url = getattr(r, "url", url) or url
+    if final_url != url:
+        ok, reason = check_public_url(final_url)
+        if not ok:
+            raise WebResearchError("url_refused", "The file redirected somewhere that is not read: " + reason)
+    if r.status_code in (401, 403):
+        raise WebResearchError("fetch_blocked", f"The site refused the request (HTTP {r.status_code}).")
+    if r.status_code == 404:
+        raise WebResearchError("fetch_not_found", "The file was not found (HTTP 404).")
+    if r.status_code >= 400:
+        raise WebResearchError("fetch_failed", f"The site returned HTTP {r.status_code}.")
+    declared = r.headers.get("Content-Length")
+    if declared and declared.isdigit() and int(declared) > max_bytes:
+        raise WebResearchError("save_too_large",
+                               f"The file is {int(declared) // (1024 * 1024)} MB; the limit is {max_bytes // (1024 * 1024)} MB.")
+    ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower() or "application/octet-stream"
+    sha = hashlib.sha256()
+    size = 0
+    fd, path = tempfile.mkstemp(prefix="landscape_web_", suffix=".bin")
+    try:
+        with os.fdopen(fd, "wb") as out:
+            for chunk in r.iter_content(256 * 1024):
+                if not chunk:
+                    continue
+                size += len(chunk)
+                if size > max_bytes:
+                    raise WebResearchError("save_too_large",
+                                           f"The file is larger than {max_bytes // (1024 * 1024)} MB and was not saved.")
+                sha.update(chunk)
+                out.write(chunk)
+    except BaseException:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+        raise
+    if size == 0:
+        os.unlink(path)
+        raise WebResearchError("fetch_empty", "The file was empty.")
+    with open(path, "rb") as f:
+        head = f.read(5)
+    if head == b"%PDF-":
+        ctype = "application/pdf"
+    return {"path": path, "size": size, "sha256": sha.hexdigest(), "content_type": ctype,
+            "final_url": final_url, "file_name": file_name_for(final_url, r.headers.get("Content-Disposition"), ctype)}
+
+
+def file_name_for(url: str, content_disposition: Optional[str], ctype: str) -> str:
+    name = None
+    if content_disposition:
+        m = re.search(r"filename\*?=(?:UTF-8'')?\"?([^\";]+)", content_disposition, re.I)
+        if m:
+            name = m.group(1)
+    if not name:
+        from urllib.parse import unquote
+        name = unquote(urlparse(url).path.rstrip("/").split("/")[-1] or "")
+    name = re.sub(r"[\\/:*?\"<>|\x00-\x1f]", "_", name).strip() or "web-document"
+    if ctype == "application/pdf" and not name.lower().endswith(".pdf"):
+        name += ".pdf"
+    elif "html" in ctype and "." not in name:
+        name += ".html"
+    return name[:200]
+
+
+class _MultipartFile:
+    """A multipart/form-data body that streams one file from disk. Has a
+    length, so requests sends Content-Length instead of chunking."""
+
+    def __init__(self, path: str, field: str, file_name: str, ctype: str):
+        self.boundary = "----landscape" + hashlib.md5(os.urandom(16)).hexdigest()
+        safe = file_name.replace('"', "_")
+        self._pre = (f"--{self.boundary}\r\nContent-Disposition: form-data; name=\"{field}\"; "
+                     f"filename=\"{safe}\"\r\nContent-Type: {ctype}\r\n\r\n").encode()
+        self._post = f"\r\n--{self.boundary}--\r\n".encode()
+        self._file = open(path, "rb")
+        self._size = os.path.getsize(path)
+        self._stage = 0
+        self.len = len(self._pre) + self._size + len(self._post)
+
+    def __len__(self):
+        return self.len
+
+    def read(self, n: int = -1) -> bytes:
+        out = b""
+        while (n < 0 or len(out) < n) and self._stage < 3:
+            want = -1 if n < 0 else n - len(out)
+            if self._stage == 0:
+                out += self._pre
+                self._stage = 1
+            elif self._stage == 1:
+                chunk = self._file.read(want if want > 0 else 1024 * 1024)
+                if chunk:
+                    out += chunk
+                else:
+                    self._file.close()
+                    self._stage = 2
+            else:
+                out += self._post
+                self._stage = 3
+        return out
+
+
+def uploadthing_upload(path: str, file_name: str, ctype: str, token: str,
+                       session: Optional[requests.Session] = None) -> str:
+    """Copy a local file into the app's UploadThing store; returns its URL."""
+    try:
+        cfg = json.loads(base64.b64decode(token.strip().strip('"').strip("'") + "=="))
+        api_key = cfg["apiKey"]
+    except Exception:
+        raise WebResearchError("store_not_configured", "The app's file store is not configured on this server.")
+    http = session or requests
+    size = os.path.getsize(path)
+    r = http.post(UPLOADTHING_PREPARE, timeout=30,
+                  headers={"x-uploadthing-api-key": api_key, "Content-Type": "application/json"},
+                  json={"fileName": file_name, "fileSize": size, "fileType": ctype,
+                        "contentDisposition": "inline", "acl": "public-read"})
+    if r.status_code != 200:
+        raise WebResearchError("store_failed", f"The file store refused the upload (HTTP {r.status_code}).")
+    put_url = (r.json() or {}).get("url")
+    body = _MultipartFile(path, "file", file_name, ctype)
+    try:
+        p = http.put(put_url, data=body, timeout=SAVE_TIMEOUT_S * 5,
+                     headers={"Content-Type": f"multipart/form-data; boundary={body.boundary}"})
+    finally:
+        try:
+            body._file.close()
+        except Exception:
+            pass
+    if p.status_code != 200:
+        raise WebResearchError("store_failed", f"The file store did not accept the file (HTTP {p.status_code}).")
+    j = p.json() or {}
+    url = j.get("ufsUrl") or j.get("url")
+    if not url:
+        raise WebResearchError("store_failed", "The file store returned no address for the file.")
+    return url
 
 
 def html_to_text(html: str) -> Tuple[Optional[str], str]:

@@ -48,11 +48,16 @@ def _download_to_temp(storage_uri: str, mime_type: str) -> str:
 
     if parsed.scheme in ('http', 'https'):
         # Full URL — download via HTTP
-        response = requests.get(storage_uri, timeout=60)
-        response.raise_for_status()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(response.content)
-            return tmp.name
+        # Streamed to disk (2026-10-17): county packets saved from the web run
+        # to hundreds of MB, and holding the whole body in memory first could
+        # take the back end down. The timeout is per read, not total.
+        with requests.get(storage_uri, timeout=60, stream=True) as response:
+            response.raise_for_status()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                for chunk in response.iter_content(1024 * 1024):
+                    if chunk:
+                        tmp.write(chunk)
+                return tmp.name
     else:
         # Relative path — read via Django storage (local disk or S3/R2)
         from django.core.files.storage import default_storage

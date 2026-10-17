@@ -8,14 +8,32 @@
  */
 
 /**
+ * Web addresses and markdown links, matched so they can be shielded from the
+ * markdown clean-up below and rendered as clickable links. The underscore-
+ * italic rule was eating the underscores out of county addresses
+ * ("planning_and_development" became "planninganddevelopment") and every such
+ * link 404'd (2026-10-17).
+ */
+export const LINK_PATTERN = /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)|https?:\/\/[^\s<>"'`)\]]+/g;
+const LINK_TRAIL = /[.,;:!?*]+$/;
+
+/**
  * Remove markdown formatting from response text.
  * Claude sometimes includes markdown even when instructed not to.
  */
 export function sanitizeLandscaperResponse(response: string): string {
   if (!response) return '';
 
-  return (
-    response
+  // Shield links: swap each for a placeholder, clean the text, put them back.
+  const links: string[] = [];
+  const shielded = response.replace(LINK_PATTERN, (match) => {
+    const trail = match.startsWith('[') ? '' : (match.match(LINK_TRAIL)?.[0] ?? '');
+    links.push(trail ? match.slice(0, -trail.length) : match);
+    return `\u0000L${links.length - 1}\u0000${trail}`;
+  });
+
+  return restoreLinks(
+    shielded
       // Remove markdown headers (## Header, ### Header, etc.)
       .replace(/^#{1,6}\s+(.*)$/gm, '$1')
       // Remove markdown bold (preserve content)
@@ -40,8 +58,41 @@ export function sanitizeLandscaperResponse(response: string): string {
       .replace(/^[-*_]{3,}$/gm, '')
       // Normalize excessive blank lines (more than 2 in a row)
       .replace(/\n{3,}/g, '\n\n')
-      .trim()
+      .trim(),
+    links,
   );
+}
+
+function restoreLinks(text: string, links: string[]): string {
+  return text.replace(/\u0000L(\d+)\u0000/g, (_, i) => links[Number(i)] ?? '');
+}
+
+export type LinkSegment = { text: string; href?: string };
+
+/** Split display text into plain runs and links ([label](url) or bare url). */
+export function splitLinks(text: string): LinkSegment[] {
+  const out: LinkSegment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(LINK_PATTERN)) {
+    const start = m.index ?? 0;
+    let full = m[0];
+    let label: string;
+    let href: string;
+    if (m[2]) {
+      label = m[1];
+      href = m[2];
+    } else {
+      const trail = full.match(LINK_TRAIL)?.[0] ?? '';
+      if (trail) full = full.slice(0, -trail.length);
+      label = full;
+      href = full;
+    }
+    if (start > last) out.push({ text: text.slice(last, start) });
+    out.push({ text: label, href });
+    last = start + full.length;
+  }
+  if (last < text.length) out.push({ text: text.slice(last) });
+  return out;
 }
 
 /**
