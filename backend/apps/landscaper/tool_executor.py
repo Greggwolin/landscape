@@ -16675,7 +16675,9 @@ def execute_tool(
     # fabrication guard can verify a numbers tool sourced the card. Other
     # handlers' uniform kwargs are untouched.
     extra = {}
-    if tool_name == 'create_artifact' and prior_tool_calls is not None:
+    if tool_name in ('create_artifact', 'web_search', 'read_web_page') and prior_tool_calls is not None:
+        # create_artifact: the create-time fabrication guard (JB55).
+        # web_search / read_web_page: per-turn spend caps (VQ, 2026-10-16).
         extra['prior_tool_calls'] = prior_tool_calls
     try:
         # BM1: record the call so any proposal it creates can be replayed on confirm.
@@ -20322,6 +20324,7 @@ from .tools import excel_audit_tools  # noqa: E402, F401
 from .tools import map_tools  # noqa: E402, F401
 from .tools import location_brief_tools  # noqa: E402, F401
 from .tools import geocoding_tools  # noqa: E402, F401
+from .tools import web_research_tools  # noqa: E402, F401
 from .tools import plan_extract_tools  # noqa: E402, F401
 from .tools import analysis_tools  # noqa: E402, F401
 from .tools import loopnet_tools  # noqa: E402, F401

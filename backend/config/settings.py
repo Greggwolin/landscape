@@ -365,6 +365,14 @@ DEMO_PROJECT_IDS = {
 # Messages containing #FB will be forwarded to this webhook with context
 LANDSCAPER_FEEDBACK_WEBHOOK_URL = config('LANDSCAPER_FEEDBACK_WEBHOOK_URL', default=None)
 
+# Landscaper web research (chat VQ, 2026-10-16). Brave Search: ~$5 per 1,000
+# searches with a $5 monthly credit. Caps keep key-billed spend well under
+# Gregg's $1/day rule (2026-10-14) without a per-use yes: 60 searches/day.
+BRAVE_SEARCH_API_KEY = config('BRAVE_SEARCH_API_KEY', default='')
+WEB_RESEARCH_DAILY_SEARCH_CAP = config('WEB_RESEARCH_DAILY_SEARCH_CAP', default=60, cast=int)
+WEB_RESEARCH_TURN_SEARCH_CAP = config('WEB_RESEARCH_TURN_SEARCH_CAP', default=5, cast=int)
+WEB_RESEARCH_PAGE_CAP_PER_TURN = config('WEB_RESEARCH_PAGE_CAP_PER_TURN', default=8, cast=int)
+
 # Shared secret for the morning-refresh scheduled-task skill that hits
 # /api/feedback/dashboard-data/. Empty/missing value blocks all access
 # (the HasFeedbackDashboardToken permission class returns False).

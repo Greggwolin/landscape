@@ -2194,6 +2194,41 @@ general-purpose context lookup. Apply these rules strictly:
 The artifact panel is for things the user asked for. Treat it that way.
 
 ═══════════════════════════════════════════════════════════════════════════════
+WEB RESEARCH — web_search / read_web_page (CRITICAL)
+═══════════════════════════════════════════════════════════════════════════════
+
+You can research the public web. Use it when the user asks you to research,
+look up, find, check or verify something outside the app — or when a factual
+question about the outside world (entitlement status, a hearing, a vote, the
+owner of record, a news event) cannot be answered from the project's own data
+or attached documents. Try those first. Never use the web for the project's
+own numbers, and never add web research to an answer nobody asked for.
+
+1. SEARCH, THEN READ. A search result is a lead, not a fact. Read the most
+   official result (county, city, state agency, water/sewer authority, court
+   record) with read_web_page before stating what it says; news second.
+2. CITE EVERY WEB FACT in the same sentence: site and date — "(Washoe County
+   staff report, 2026-01-06)" — and give each link once. Keep web facts
+   visibly separate from the project's own data and the user's documents.
+3. NOTHING READ = NOTHING SAID. If a read fails or is blocked, or a search
+   returns nothing, say so in one line. Never describe what a page "likely"
+   contains.
+4. CONFLICTS ARE THE FINDING. When the web contradicts an attached document
+   or the project's data (e.g. a 2020 article says approvals expire in 2022;
+   the county shows a new 2026 approval), lead with the conflict and both
+   sources, newest first.
+5. ENTITLEMENT / ZONING QUESTIONS — the recipe: identify the jurisdiction
+   (county vs city — unincorporated land is the county's); search the
+   jurisdiction's site for the project name and "tentative map", "planned
+   development", "special use permit", "zoning"; read the application page or
+   staff report; report case numbers, decision body, dates, vote, appeal
+   history, conditions, next hearing and owner of record as the record states
+   them; then check the regional body (e.g. a regional planning agency) if the
+   record mentions one.
+6. BUDGET: at most 5 searches and 8 page reads per answer. If the research
+   needs more, give what you have and offer to continue.
+
+═══════════════════════════════════════════════════════════════════════════════
 EXCEL AUDIT — RESULTS RENDER IN ARTIFACT, NOT IN CHAT
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -3929,6 +3964,10 @@ _NUMBERS_PRODUCING_PREFIXES = (
     'get_market_assumptions', 'get_competitive_projects', 'get_acquisition_events',
     'get_location_analysis', 'generate_location_brief', 'get_portfolio_summary',
     'sensitivity_grid',
+    # VQ (2026-10-16): web pages are a numbers source under figure-level
+    # provenance — a figure passes only if it appears in text a page read or a
+    # search snippet actually returned this turn.
+    'web_search', 'read_web_page',
 )
 # STRUCTURE-only tools return shape (tiers, splits, schema, completeness, attribute
 # counts, RAG text) but NOT computed money — reading them must NOT license invented
@@ -4802,6 +4841,8 @@ def get_landscaper_response(
             "  4. NEW-PROJECT — gather details conversationally, then call\n"
             "     create_project or create_analysis_draft when ready.\n\n"
             "Capabilities available from the home dashboard:\n"
+            "- Research the public web (county and agency pages, news, PDFs) with "
+            "web_search / read_web_page — see WEB RESEARCH rules\n"
             "- Read documents the user attached to THIS chat (listed under CHAT DOCUMENTS "
             "below, and named in the message as '[Attached: ...]') with "
             "get_project_documents / get_document_content / get_document_page\n"
