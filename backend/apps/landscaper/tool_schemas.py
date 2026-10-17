@@ -5315,6 +5315,55 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "web_search",
+        "description": "Search the public web (Brave). Returns titles, links, snippets and page dates — NOT facts: read a result with read_web_page before stating anything from it. USE WHEN the user asks you to research, look up, find, check or verify something outside the app — entitlements, zoning cases, approvals, hearings, ownership of record, news about a site, a builder or a jurisdiction — or when the project's own data and attached documents cannot answer a factual question about the outside world (try those first). DO NOT use for the project's own numbers, for general real-estate knowledge you already have, or as background padding on another answer. Prefer official sources: pass site='<county>.gov' (or the agency domain) for entitlement and zoning questions. Max 5 searches per answer.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Plain search terms, e.g. 'Sierra Reflections tentative map'. Include the project or place name and the jurisdiction."},
+                "site": {"type": "string", "description": "Optional domain to restrict to, e.g. 'washoecounty.gov'."},
+                "count": {"type": "integer", "description": "Results to return, 1-10 (default 6)."},
+                "freshness": {"type": "string", "enum": ["pd", "pw", "pm", "py"], "description": "Optional recency filter: past day / week / month / year."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "read_web_page",
+        "description": "Read one public web page or PDF (staff reports, agendas, ordinances, news articles) and return its text. Use on the most official web_search result before stating facts from it, or on a link the user gave. Returns the page's actual text; quote and cite it. If the read fails, say so — never describe a page you could not read. Max 8 pages per answer.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "Full http(s) address, usually taken from a web_search result."},
+                "focus": {"type": "string", "description": "Optional phrase to centre the excerpt on in long documents, e.g. 'conditions of approval' or 'WTM24-001'."},
+                "max_chars": {"type": "integer", "description": "Text to return, 1,000-40,000 (default 20,000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "save_web_document",
+        "description": (
+            "Download a whole public file (usually a PDF found by web_search/read_web_page) and file it "
+            "where Landscaper can read it in full: this chat's or project's documents (default), or "
+            "platform knowledge for general reference. Use it — without asking — when read_web_page "
+            "says a document that matters is too large, or when only part of it could be read and the "
+            "answer is in the rest. Runs in the background: the file is readable a few minutes later "
+            "with get_document_content. Up to 500 MB. Never use it for pages nobody needs."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "The exact address from a web_search or read_web_page result. Never a constructed address."},
+                "destination": {"type": "string", "enum": ["documents", "platform_knowledge"],
+                                "description": "documents (default): anything about this site or deal — staff reports, conditions, agendas, plats, agreements. platform_knowledge: general reference used across deals — development codes, design standards, fee schedules, published market studies."},
+                "title": {"type": "string", "description": "Optional readable name, e.g. 'WTM24-001 Sierra Reflections staff report (Planning Commission 2026-01-06)'."},
+                "description": {"type": "string", "description": "Optional one-line description (platform knowledge only)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
         "name": "log_alpha_feedback",
         "description": "Log user feedback (bug, suggestion, question) from chat.",
         "input_schema": {
