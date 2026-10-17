@@ -163,6 +163,9 @@ def extract_text_and_page_count_from_url(
         return None, None, f"Extraction failed: {str(e)}"
 
 
+_TABLE_SCAN_MAX_CONTENT_BYTES = 1_000_000
+
+
 def _extract_pdf(file_path: str) -> Optional[str]:
     """Extract text from PDF using PyMuPDF."""
     text, _ = _extract_pdf_with_page_count(file_path)
@@ -178,19 +181,38 @@ def _extract_pdf_with_page_count(file_path: str) -> Tuple[Optional[str], Optiona
     page_count = 0
 
     # Step 1: Extract text with PyMuPDF (good for prose)
+    heavy_pages = set()
     with fitz.open(file_path) as doc:
         page_count = len(doc)
-        for page in doc:
+        for page_idx, page in enumerate(doc):
             text_parts.append(page.get_text())
+            try:
+                if len(page.read_contents()) > _TABLE_SCAN_MAX_CONTENT_BYTES:
+                    heavy_pages.add(page_idx)
+            except Exception:
+                pass
 
     # Step 2: Extract tables with pdfplumber and append to page text
+    # Table pass skips pages with no text layer and drawing sheets (a page
+    # whose drawing instructions exceed 1 MB — plan sheets, not data tables),
+    # and closes each page after use. A 362 MB county packet hung for minutes
+    # on single 10-50 MB plan sheets and peaked at 4.4 GB (2026-10-17).
     if HAS_PDFPLUMBER:
         try:
             with pdfplumber.open(file_path) as pdf:
                 for page_idx, page in enumerate(pdf.pages):
-                    table_text = _extract_tables_from_page(page, page_idx)
-                    if table_text and page_idx < len(text_parts):
-                        text_parts[page_idx] = text_parts[page_idx] + "\n\n" + table_text
+                    try:
+                        if (page_idx >= len(text_parts) or not text_parts[page_idx].strip()
+                                or page_idx in heavy_pages):
+                            continue
+                        table_text = _extract_tables_from_page(page, page_idx)
+                        if table_text:
+                            text_parts[page_idx] = text_parts[page_idx] + "\n\n" + table_text
+                    finally:
+                        try:
+                            page.close()
+                        except Exception:
+                            pass
         except Exception:
             pass  # Fall back to PyMuPDF-only text
 
