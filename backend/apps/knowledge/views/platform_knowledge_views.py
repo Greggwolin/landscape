@@ -185,91 +185,6 @@ def _store_embedding(chunk_id: int, embedding: List[float]) -> None:
         )
 
 
-def ingest_platform_document_core(
-    *, storage_uri: str, doc_name: str, mime_type: Optional[str] = None,
-    publisher: Optional[str] = None, source: Optional[KnowledgeSource] = None,
-    metadata: Optional[Dict[str, Any]] = None, subtitle: Optional[str] = None,
-    edition: Optional[str] = None, year: Optional[int] = None,
-    knowledge_domain: str = 'other', property_types: Optional[List[str]] = None,
-    description: Optional[str] = None, file_hash: Optional[str] = None,
-    file_size_bytes: Optional[int] = None, created_by: str = 'system',
-) -> Dict[str, Any]:
-    """Create a platform knowledge document from a stored file, extract,
-    chunk and embed it. Shared by the ingest endpoint and Landscaper's
-    save_web_document (VQ, 2026-10-17). Returns {'success', ...}."""
-    base_title = doc_name.rsplit('.', 1)[0]
-    document_key = _ensure_unique_key(slugify(base_title)[:90])
-
-    doc = PlatformKnowledge.objects.create(
-        document_key=document_key,
-        title=base_title,
-        subtitle=subtitle,
-        edition=edition,
-        publisher=publisher,
-        source=source,
-        publication_year=year,
-        knowledge_domain=knowledge_domain,
-        property_types=property_types or [],
-        description=description,
-        metadata=metadata or {},
-        total_chapters=0,
-        total_pages=None,
-        file_path=storage_uri,
-        file_hash=file_hash,
-        file_size_bytes=file_size_bytes,
-        ingestion_status=PlatformKnowledge.IngestionStatus.PROCESSING,
-        created_by=created_by
-    )
-
-    text, page_count, error = extract_text_and_page_count_from_url(storage_uri, mime_type)
-    if error or not text:
-        doc.ingestion_status = PlatformKnowledge.IngestionStatus.FAILED
-        if page_count is not None:
-            doc.page_count = page_count
-        doc.save(update_fields=['ingestion_status', 'page_count'])
-        refresh_source_document_counts()
-        return {'success': False, 'error': error or 'No text extracted', 'document_key': doc.document_key}
-
-    chunks = chunk_text(text)
-    if not chunks:
-        doc.ingestion_status = PlatformKnowledge.IngestionStatus.FAILED
-        doc.save(update_fields=['ingestion_status'])
-        refresh_source_document_counts()
-        return {'success': False, 'error': 'No chunks generated', 'document_key': doc.document_key}
-
-    with transaction.atomic():
-        for chunk in chunks:
-            chunk_record = PlatformKnowledgeChunk.objects.create(
-                document=doc,
-                chapter=None,
-                chunk_index=chunk['chunk_index'],
-                content=chunk['content'],
-                content_type=PlatformKnowledgeChunk.ContentType.TEXT,
-                page_number=None,
-                section_path=None,
-                token_count=len(chunk['content'].split())
-            )
-            embedding = generate_embedding(chunk['content'])
-            if embedding:
-                _store_embedding(chunk_record.id, embedding)
-
-    doc.ingestion_status = PlatformKnowledge.IngestionStatus.INDEXED
-    doc.last_indexed_at = timezone.now()
-    doc.chunk_count = len(chunks)
-    doc.page_count = page_count
-    doc.save(update_fields=['ingestion_status', 'last_indexed_at', 'chunk_count', 'page_count'])
-
-    refresh_source_document_counts()
-
-    return {
-        'success': True,
-        'document_key': doc.document_key,
-        'chunk_count': doc.chunk_count,
-        'source_id': doc.source_id,
-        'publisher': doc.publisher,
-    }
-
-
 # Auth-gated 2026-05-16 (LSCMD-AUDIT-CODEX-2 P1). Previously @csrf_exempt
 # function view with no auth — Codex audit follow-up flagged five platform-
 # knowledge endpoints as unauthenticated. Switched to @api_view +
@@ -415,31 +330,76 @@ def ingest_platform_document(request):
         if referenced_sources:
             metadata_payload['referenced_sources'] = referenced_sources
 
-        result = ingest_platform_document_core(
-            storage_uri=storage_uri,
-            doc_name=doc_name,
-            mime_type=mime_type,
-            publisher=publisher_value,
-            source=resolved_source,
-            metadata=metadata_payload,
+        base_title = doc_name.rsplit('.', 1)[0]
+        document_key = _ensure_unique_key(slugify(base_title)[:90])
+
+        doc = PlatformKnowledge.objects.create(
+            document_key=document_key,
+            title=base_title,
             subtitle=data.get('geographic_scope'),
             edition=data.get('edition'),
-            year=data.get('year'),
+            publisher=publisher_value,
+            source=resolved_source,
+            publication_year=data.get('year'),
             knowledge_domain=data.get('knowledge_domain') or 'other',
             property_types=data.get('property_types') or [],
             description=data.get('description'),
+            metadata=metadata_payload,
+            total_chapters=0,
+            total_pages=None,
+            file_path=storage_uri,
             file_hash=data.get('file_hash'),
             file_size_bytes=data.get('file_size_bytes'),
-            created_by=data.get('created_by') or 'system',
+            ingestion_status=PlatformKnowledge.IngestionStatus.PROCESSING,
+            created_by=data.get('created_by') or 'system'
         )
-        if not result.get('success'):
-            return JsonResponse({'error': result.get('error')}, status=500)
+
+        text, page_count, error = extract_text_and_page_count_from_url(storage_uri, mime_type)
+        if error or not text:
+            doc.ingestion_status = PlatformKnowledge.IngestionStatus.FAILED
+            if page_count is not None:
+                doc.page_count = page_count
+            doc.save(update_fields=['ingestion_status', 'page_count'])
+            refresh_source_document_counts()
+            return JsonResponse({'error': error or 'No text extracted'}, status=500)
+
+        chunks = chunk_text(text)
+        if not chunks:
+            doc.ingestion_status = PlatformKnowledge.IngestionStatus.FAILED
+            doc.save(update_fields=['ingestion_status'])
+            refresh_source_document_counts()
+            return JsonResponse({'error': 'No chunks generated'}, status=500)
+
+        with transaction.atomic():
+            for chunk in chunks:
+                chunk_record = PlatformKnowledgeChunk.objects.create(
+                    document=doc,
+                    chapter=None,
+                    chunk_index=chunk['chunk_index'],
+                    content=chunk['content'],
+                    content_type=PlatformKnowledgeChunk.ContentType.TEXT,
+                    page_number=None,
+                    section_path=None,
+                    token_count=len(chunk['content'].split())
+                )
+                embedding = generate_embedding(chunk['content'])
+                if embedding:
+                    _store_embedding(chunk_record.id, embedding)
+
+        doc.ingestion_status = PlatformKnowledge.IngestionStatus.INDEXED
+        doc.last_indexed_at = timezone.now()
+        doc.chunk_count = len(chunks)
+        doc.page_count = page_count
+        doc.save(update_fields=['ingestion_status', 'last_indexed_at', 'chunk_count', 'page_count'])
+
+        refresh_source_document_counts()
+
         return JsonResponse({
             'success': True,
-            'document_key': result['document_key'],
-            'chunk_count': result['chunk_count'],
-            'source_id': result['source_id'],
-            'publisher': result['publisher'],
+            'document_key': doc.document_key,
+            'chunk_count': doc.chunk_count,
+            'source_id': doc.source_id,
+            'publisher': doc.publisher,
         })
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)

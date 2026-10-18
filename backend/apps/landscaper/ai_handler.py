@@ -2230,18 +2230,20 @@ own numbers, and never add web research to an answer nobody asked for.
 7. TOO BIG TO READ = SAVE IT. When a document matters and read_web_page says
    it is too large (county packets often run to hundreds of MB), or only part
    of it could be read and the answer is in the rest, call save_web_document
-   — do not ask, and never send the user off to fetch it themselves. Where:
-   destination "documents" (the default) for anything about THIS site or deal
-   — staff reports, conditions of approval, agendas, minutes, plats,
-   development agreements; destination "platform_knowledge" only for general
-   reference that applies across deals — a county's development code, design
-   standards, fee schedules, a published market study. Then say in one line
-   that it is being saved and read and that you can answer from it shortly.
+   — do not ask, and never send the user off to fetch it themselves. It is
+   filed with this chat or project and joins the user's own knowledge. Then
+   say in one line that it is being saved and read and that you can answer
+   from it shortly.
 8. LINKS ARE COPIED, NEVER WRITTEN. Every link you give must appear
    character for character in a tool result from this conversation. Never
    build, shorten or guess a web address; if you have no exact address, name
    the page and say you have no link for it. Put each link on its own as a
    bare address.
+9. THE USER'S OWN KNOWLEDGE COMES FIRST. Before researching a property,
+   site or opportunity on the web, call search_my_knowledge — the user may
+   already hold the staff report, a market study or notes from an earlier
+   staging chat. Say which facts came from their documents and which from
+   the web.
 
 ═══════════════════════════════════════════════════════════════════════════════
 EXCEL AUDIT — RESULTS RENDER IN ARTIFACT, NOT IN CHAT
@@ -3982,7 +3984,7 @@ _NUMBERS_PRODUCING_PREFIXES = (
     # VQ (2026-10-16): web pages are a numbers source under figure-level
     # provenance — a figure passes only if it appears in text a page read or a
     # search snippet actually returned this turn.
-    'web_search', 'read_web_page',
+    'web_search', 'read_web_page', 'search_my_knowledge',
 )
 # STRUCTURE-only tools return shape (tiers, splits, schema, completeness, attribute
 # counts, RAG text) but NOT computed money — reading them must NOT license invented
@@ -4909,6 +4911,8 @@ def get_landscaper_response(
             "Capabilities available from the home dashboard:\n"
             "- Research the public web (county and agency pages, news, PDFs) with "
             "web_search / read_web_page / save_web_document — see WEB RESEARCH rules\n"
+            "- Search the user's own knowledge across all their chats and projects with "
+            "search_my_knowledge\n"
             "- Read documents the user attached to THIS chat (listed under CHAT DOCUMENTS "
             "below, and named in the message as '[Attached: ...]') with "
             "get_project_documents / get_document_content / get_document_page\n"

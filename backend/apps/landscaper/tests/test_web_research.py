@@ -170,7 +170,7 @@ def test_save_starts_in_background_and_does_not_double_start(monkeypatch):
     first = tools.save_web_document_tool({"url": "https://a.gov/sr.pdf"}, thread_id="t-1")
     again = tools.save_web_document_tool({"url": "https://a.gov/sr.pdf"}, thread_id="t-1")
     tools._IN_FLIGHT.clear()
-    assert first["saving"] and "chat's documents" in first["instruction"]
+    assert first["saving"] and "chat's documents" in first["instruction"] and "your own knowledge" in first["instruction"]
     assert again.get("already_saving")
 
 
@@ -201,6 +201,50 @@ def test_link_guard_trusts_links_already_in_the_conversation():
     assert n == 0 and out.endswith("x_y.pdf")
 
 
-def test_save_tool_reaches_every_chat():
+def test_save_and_knowledge_tools_reach_every_chat():
     from apps.landscaper.tool_registry import UNASSIGNED_SAFE_TOOLS, UNIVERSAL_TOOLS
-    assert "save_web_document" in UNIVERSAL_TOOLS and "save_web_document" in UNASSIGNED_SAFE_TOOLS
+    for name in ("save_web_document", "search_my_knowledge"):
+        assert name in UNIVERSAL_TOOLS and name in UNASSIGNED_SAFE_TOOLS
+
+
+# ── search_my_knowledge (VQ 1c, 2026-10-18) ─────────────────────────────────
+
+def test_my_knowledge_needs_a_user():
+    from apps.landscaper.tools import my_knowledge_tools as mk
+    out = mk.search_my_knowledge_tool({"query": "conditions"}, user_id=None)
+    assert out["success"] is False and out["error"] == "no_user"
+
+
+def test_my_knowledge_query_is_owner_scoped(monkeypatch):
+    """Every document query carries the owner check, bound to this user."""
+    from apps.landscaper.tools import my_knowledge_tools as mk
+    import apps.knowledge.services.embedding_service as es
+    monkeypatch.setattr(es, "generate_embedding", lambda q: [0.1, 0.2])
+    seen = []
+
+    class Cur:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def execute(self, sql, params): seen.append((sql, params))
+        def fetchall(self):
+            return [(864, "staff report.pdf", "Condition 12: fire station", 0.82, None, "Sierra chat", "https://a.gov/sr.pdf")] \
+                if len(seen) == 1 else []
+    monkeypatch.setattr(mk.connection, "cursor", lambda: Cur())
+    out = mk.search_my_knowledge_tool({"query": "fire station"}, user_id=4)
+    assert out["passages"][0]["where"] == "chat: Sierra chat"
+    for sql, params in seen:
+        assert "d.created_by = %(uid)s" in sql and params["uid"] == 4
+
+
+def test_project_search_no_longer_pulls_other_users_staging_documents():
+    import inspect
+    from apps.knowledge.services import embedding_storage
+    src = inspect.getsource(embedding_storage.search_similar)
+    assert "OR d.project_id IS NULL" not in src
+
+
+def test_platform_query_user_docs_are_owner_scoped():
+    import inspect
+    from apps.landscaper import tool_executor
+    src = inspect.getsource(tool_executor.query_platform_knowledge)
+    assert "t.created_by = %s" in src and "_uid" in src

@@ -5,9 +5,9 @@ web_search        — Brave Search API; titles, links, snippets, dates.
 read_web_page     — reads one public page or PDF and returns its text.
 save_web_document — downloads a whole file (e.g. a 300 MB county packet that
                     is too big to read in a turn), copies it into the app's
-                    file store and files it in the chat's/project's documents
-                    — or in platform knowledge — where it is read in the
-                    background (chat VQ, 2026-10-17).
+                    file store and files it in the chat's/project's documents,
+                    i.e. the user's own knowledge, where it is read in the
+                    background (chat VQ, 2026-10-17/18).
 
 Universal and pre-project safe. Neither writes anything. Spend is bounded
 by caps (settings.WEB_RESEARCH_*): searches per turn, pages per turn, and
@@ -204,16 +204,6 @@ def _already_saved(url: str, project_id: Optional[int], thread_id: Optional[str]
     return {'doc_id': row[0], 'doc_name': row[1], 'processing_status': row[2]} if row else None
 
 
-def _platform_already_saved(url: str) -> Optional[str]:
-    with connection.cursor() as cur:
-        cur.execute("""
-            SELECT document_key FROM landscape.tbl_platform_knowledge
-            WHERE metadata->>'source_url' = %s ORDER BY id DESC LIMIT 1
-        """, [url])
-        row = cur.fetchone()
-    return row[0] if row else None
-
-
 def _store_copy(url: str) -> Dict[str, Any]:
     """Download, copy to the file store, and return the stored file's facts."""
     got = download_to_file(url)
@@ -261,70 +251,35 @@ def _save_to_documents(url: str, title: Optional[str], project_id: Optional[int]
         conn.close()
 
 
-def _save_to_platform(url: str, title: Optional[str], description: Optional[str],
-                      user_id: Optional[int]) -> None:
-    from django.db import connection as conn
-    try:
-        f = _store_copy(url)
-        from apps.knowledge.views.platform_knowledge_views import ingest_platform_document_core
-        from urllib.parse import urlparse
-        result = ingest_platform_document_core(
-            storage_uri=f['storage_uri'],
-            doc_name=(title or '').strip() or f['file_name'],
-            mime_type=f['content_type'],
-            publisher=urlparse(f['final_url']).hostname,
-            metadata={'source_url': url, 'source_final_url': f['final_url'],
-                      'saved_by': 'landscaper_web'},
-            description=description,
-            file_hash=f['sha256'],
-            file_size_bytes=f['size'],
-            created_by=str(user_id) if user_id else 'landscaper',
-        )
-        logger.info("save_web_document (platform): %s -> %s", url, result)
-    except Exception:
-        logger.exception("save_web_document (platform) failed for %s", url)
-    finally:
-        with _IN_FLIGHT_LOCK:
-            _IN_FLIGHT.discard(url)
-        conn.close()
-
-
 @register_tool('save_web_document')
 def save_web_document_tool(tool_input: Dict[str, Any] = None, project_id: int = None,
                            thread_id: Optional[str] = None, user_id: Optional[int] = None,
                            **kwargs) -> Dict[str, Any]:
     tool_input = tool_input or {}
     url = (tool_input.get('url') or '').strip()
-    destination = (tool_input.get('destination') or 'documents').strip().lower()
     title = tool_input.get('title')
     ok, reason = check_public_url(url)
     if not ok:
         return _refusal('url_refused', reason,
                         "Nothing was saved. Tell the user why in one line.")
-
-    if destination == 'platform_knowledge':
-        where = "platform knowledge (the shared reference library, available in every project)"
-        existing = _platform_already_saved(url)
-        if existing:
-            return {'success': True, 'already_saved': True, 'url': url, 'destination': destination,
-                    'instruction': ("This file is already in platform knowledge. Say so; search it "
-                                    "with the platform knowledge tool to answer from it.")}
-        target = lambda: _save_to_platform(url, title, tool_input.get('description'), user_id)  # noqa: E731
-    else:
-        if not project_id and not thread_id:
-            return _refusal('no_place_to_save', "There is no chat or project to file the document in.",
-                            "Nothing was saved. Tell the user that in one line.")
-        where = "this project's documents" if project_id else "this chat's documents"
-        existing = _already_saved(url, project_id, thread_id)
-        if existing:
-            return {'success': True, 'already_saved': True, 'url': url, 'destination': 'documents',
-                    'doc_id': existing['doc_id'], 'doc_name': existing['doc_name'],
-                    'processing_status': existing['processing_status'],
-                    'instruction': (
-                        f"Already saved in {where} as \"{existing['doc_name']}\" (status: "
-                        f"{existing['processing_status']}). If the status is ready, read it with "
-                        "get_document_content and answer from it; otherwise say it is still being read.")}
-        target = lambda: _save_to_documents(url, title, project_id, thread_id, user_id)  # noqa: E731
+    if not project_id and not thread_id:
+        return _refusal('no_place_to_save', "There is no chat or project to file the document in.",
+                        "Nothing was saved. Tell the user that in one line.")
+    # Gregg 1c (2026-10-18): the file becomes part of the user's own knowledge —
+    # filed with this chat or project, searchable from all their chats and
+    # projects via search_my_knowledge, never the shared platform library.
+    where = ("this project's documents" if project_id else "this chat's documents") + \
+        " and your own knowledge (searchable from any of your chats and projects)"
+    existing = _already_saved(url, project_id, thread_id)
+    if existing:
+        return {'success': True, 'already_saved': True, 'url': url,
+                'doc_id': existing['doc_id'], 'doc_name': existing['doc_name'],
+                'processing_status': existing['processing_status'],
+                'instruction': (
+                    f"Already saved as \"{existing['doc_name']}\" (status: "
+                    f"{existing['processing_status']}). If the status is ready, answer from it with "
+                    "search_my_knowledge or get_document_content; otherwise say it is still being read.")}
+    target = lambda: _save_to_documents(url, title, project_id, thread_id, user_id)  # noqa: E731
 
     with _IN_FLIGHT_LOCK:
         if url in _IN_FLIGHT:
@@ -336,7 +291,6 @@ def save_web_document_tool(tool_input: Dict[str, Any] = None, project_id: int = 
         'success': True,
         'saving': True,
         'url': url,
-        'destination': destination if destination == 'platform_knowledge' else 'documents',
         'instruction': (
             f"The file is downloading now and will be filed in {where}, then read. Tell the user "
             "that in one line — large county packets take several minutes — and that you can "

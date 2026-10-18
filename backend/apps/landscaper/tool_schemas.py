@@ -5344,23 +5344,40 @@ LANDSCAPER_TOOLS = [
     {
         "name": "save_web_document",
         "description": (
-            "Download a whole public file (usually a PDF found by web_search/read_web_page) and file it "
-            "where Landscaper can read it in full: this chat's or project's documents (default), or "
-            "platform knowledge for general reference. Use it — without asking — when read_web_page "
-            "says a document that matters is too large, or when only part of it could be read and the "
-            "answer is in the rest. Runs in the background: the file is readable a few minutes later "
-            "with get_document_content. Up to 500 MB. Never use it for pages nobody needs."
+            "Download a whole public file (usually a PDF found by web_search/read_web_page) and file it in "
+            "this chat's or project's documents — the user's own knowledge, searchable later from any of "
+            "their chats and projects with search_my_knowledge. Use it — without asking — when "
+            "read_web_page says a document that matters is too large, or when only part of it could be "
+            "read and the answer is in the rest. Runs in the background: readable a few minutes later. "
+            "Up to 500 MB. Never use it for pages nobody needs."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "url": {"type": "string", "description": "The exact address from a web_search or read_web_page result. Never a constructed address."},
-                "destination": {"type": "string", "enum": ["documents", "platform_knowledge"],
-                                "description": "documents (default): anything about this site or deal — staff reports, conditions, agendas, plats, agreements. platform_knowledge: general reference used across deals — development codes, design standards, fee schedules, published market studies."},
                 "title": {"type": "string", "description": "Optional readable name, e.g. 'WTM24-001 Sierra Reflections staff report (Planning Commission 2026-01-06)'."},
-                "description": {"type": "string", "description": "Optional one-line description (platform knowledge only)."},
             },
             "required": ["url"],
+        },
+    },
+    {
+        "name": "search_my_knowledge",
+        "description": (
+            "Search the user's OWN knowledge: every document they have put into Landscape — files "
+            "attached in staging (pre-project) chats, county records saved from the web, project "
+            "documents — across all their chats and projects. Private to this user. Use it FIRST when "
+            "the user asks about a property, site, deal or opportunity they have looked at before, or "
+            "says 'what do we know', 'what did the report say', 'in my documents'; and before searching "
+            "the web for facts the user may already hold. Returns matching passages with the document "
+            "name and where it lives."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to find, in plain words, e.g. 'Sierra Reflections conditions of approval fire station'."},
+                "limit": {"type": "integer", "description": "Passages to return, 1-20 (default 8)."},
+            },
+            "required": ["query"],
         },
     },
     {

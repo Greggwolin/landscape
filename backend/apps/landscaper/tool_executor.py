@@ -12896,6 +12896,7 @@ def query_platform_knowledge(
 
     # Source 2: User-uploaded knowledge docs (knowledge_embeddings via RAG)
     # These are docs uploaded via Platform Knowledge or Project Knowledge intents.
+    _uid = kwargs.get('user_id') or -1
     try:
         from apps.knowledge.services.embedding_service import generate_embedding
         from django.db import connection as db_conn
@@ -12917,10 +12918,21 @@ def query_platform_knowledge(
                     JOIN landscape.core_doc d ON ke.source_id = d.doc_id
                     WHERE ke.source_type = 'document_chunk'
                       AND ke.embedding IS NOT NULL
+                      AND d.deleted_at IS NULL
                       AND (ke.embedding <=> %s::vector) < %s
+                      -- Only this user's documents, or the current project's
+                      -- (VQ 1c, 2026-10-18): this source used to search every
+                      -- user's uploads with no owner check at all.
+                      AND (d.project_id = %s
+                           OR d.created_by = %s
+                           OR EXISTS (SELECT 1 FROM landscape.landscaper_chat_thread t
+                                      WHERE t.id = d.thread_id AND t.created_by = %s)
+                           OR EXISTS (SELECT 1 FROM landscape.tbl_project p
+                                      WHERE p.project_id = d.project_id AND p.created_by_id = %s))
                     ORDER BY ke.embedding <=> %s::vector
                     LIMIT %s
-                """, [embedding_str, embedding_str, max_distance, embedding_str, max_chunks])
+                """, [embedding_str, embedding_str, max_distance,
+                      project_id, _uid, _uid, _uid, embedding_str, max_chunks])
 
                 for row in cursor.fetchall():
                     formatted_chunks.append({
@@ -20325,6 +20337,7 @@ from .tools import map_tools  # noqa: E402, F401
 from .tools import location_brief_tools  # noqa: E402, F401
 from .tools import geocoding_tools  # noqa: E402, F401
 from .tools import web_research_tools  # noqa: E402, F401
+from .tools import my_knowledge_tools  # noqa: E402, F401
 from .tools import plan_extract_tools  # noqa: E402, F401
 from .tools import analysis_tools  # noqa: E402, F401
 from .tools import loopnet_tools  # noqa: E402, F401
