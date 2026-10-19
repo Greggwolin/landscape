@@ -175,6 +175,8 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
         **page,
         'instruction': (
             "This is the page's actual text. Quote and cite it; state only what it says. "
+            + ("The page's document links are in `links` — to open one, use its url exactly; "
+               "never build a file address from a title. " if page.get('links') else "")
             + (" ".join(notes) + " If your answer depends on the part not read, save the whole "
                "file with save_web_document so it can be read in full, and say so. " if notes else "")
             + CITE_RULE

@@ -165,6 +165,7 @@ def fetch_page(url: str, max_chars: int = 20000, focus: Optional[str] = None,
     is_pdf = ctype == "application/pdf" or bytes(body[:5]) == b"%PDF-"
 
     pages_note = None
+    links = []
     if is_pdf:
         text, total_pages, read_pages = pdf_to_text(bytes(body))
         title = None
@@ -175,7 +176,9 @@ def fetch_page(url: str, max_chars: int = 20000, focus: Optional[str] = None,
         if ctype and not (ctype.startswith("text/") or "html" in ctype or "xml" in ctype):
             raise WebResearchError("fetch_unsupported", f"That file type ({ctype}) cannot be read as text.")
         enc = r.encoding or "utf-8"
-        title, text = html_to_text(bytes(body).decode(enc, errors="replace"))
+        html = bytes(body).decode(enc, errors="replace")
+        title, text = html_to_text(html)
+        links = page_links(html, final_url, focus)
         kind = "html"
 
     text = text.strip()
@@ -184,7 +187,7 @@ def fetch_page(url: str, max_chars: int = 20000, focus: Optional[str] = None,
     text, truncated = window_text(text, max_chars, focus)
     return {"url": url, "final_url": final_url, "title": title, "content_type": kind,
             "text": text, "truncated": truncated, "pages_note": pages_note,
-            "chars": len(text)}
+            "chars": len(text), "links": links}
 
 
 # ── save (download a whole file, copy it to the app's file store) ─────────
@@ -337,6 +340,41 @@ def uploadthing_upload(path: str, file_name: str, ctype: str, token: str,
     if not url:
         raise WebResearchError("store_failed", "The file store returned no address for the file.")
     return url
+
+
+_DOC_EXT = re.compile(r"\.(pdf|docx?|xlsx?|csv|zip|pptx?)(?:$|[?#])", re.I)
+
+
+def page_links(html: str, base_url: str, focus: Optional[str] = None, cap: int = 60):
+    """Document links on a page, as absolute addresses (VQ, 2026-10-19).
+
+    The page text alone hides every link, so the model guessed file addresses
+    from the visible titles and got 404s. Files (pdf, office docs) come first;
+    other links are kept only when their text matches the focus phrase."""
+    from urllib.parse import urljoin
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "lxml")
+    focus_words = [w for w in re.findall(r"[a-z0-9]{3,}", (focus or "").lower())]
+    docs, others, seen = [], [], set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if href.startswith(("#", "mailto:", "javascript:", "tel:")):
+            continue
+        absu = requests.utils.requote_uri(urljoin(base_url, href))
+        if absu in seen or not absu.startswith(("http://", "https://")):
+            continue
+        seen.add(absu)
+        text = _clean(a.get_text(" ")) or absu.rsplit("/", 1)[-1]
+        item = {"text": text[:160], "url": absu}
+        if _DOC_EXT.search(absu):
+            docs.append(item)
+        elif focus_words and any(w in text.lower() for w in focus_words):
+            others.append(item)
+    if focus_words:
+        # Put the files that match the focus first; a county district page
+        # lists hundreds of applications.
+        docs.sort(key=lambda d: -sum(w in (d["text"] + d["url"]).lower() for w in focus_words))
+    return (docs + others)[:cap]
 
 
 def html_to_text(html: str) -> Tuple[Optional[str], str]:

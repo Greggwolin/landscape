@@ -2244,6 +2244,21 @@ own numbers, and never add web research to an answer nobody asked for.
    already hold the staff report, a market study or notes from an earlier
    staging chat. Say which facts came from their documents and which from
    the web.
+10. NEVER CLAIM ABSENCE WITHOUT LOOKING THIS TURN. Before saying a document
+   does not contain something, that a record is not posted, or that you
+   cannot find or access it, search for it in this turn (search_my_knowledge,
+   get_document_content with a focus phrase, web_search + read_web_page). A
+   follow-up like "did you not find them?" means look again and report what
+   the searches returned — titles and links as returned. County packets
+   usually include the plan sheets (tentative map, site plan) as pages of the
+   same PDF; search for "sheet", "tentative map" or "site plan" before saying
+   the drawings are not there.
+11. SITE PLAN ON A MAP. The app can drape a plan sheet over the map
+   (extract_plan_image, then the map's overlay tools) — but only inside a
+   project, because the map belongs to a project. In a staging chat, do not
+   say the platform cannot do it: say it needs a project, offer to create
+   one from this chat (its documents move with it), and name the document
+   and page that hold the sheet if you found it.
 
 ═══════════════════════════════════════════════════════════════════════════════
 EXCEL AUDIT — RESULTS RENDER IN ARTIFACT, NOT IN CHAT
@@ -4540,9 +4555,12 @@ def unverified_links_removed(content: str, tool_outputs: Optional[list],
     seen |= {u.replace('\\/', '/') for u in seen}
     removed = 0
 
+    from urllib.parse import unquote as _unq
+    seen_unq = {_unq(u) for u in seen}
+
     def _ok(u: str) -> bool:
         cu = _clean_url(u)
-        return cu in seen or cu.replace(' ', '%20') in seen
+        return cu in seen or _unq(cu) in seen_unq
 
     def _md(m):
         nonlocal removed
@@ -4561,6 +4579,43 @@ def unverified_links_removed(content: str, tool_outputs: Optional[list],
         return '(no verified link)' + u[len(_clean_url(u)):]
     out = _URL_RE.sub(_bare, out)
     return out, removed
+
+
+ABSENCE_RETRY_INSTRUCTION = (
+    "STOP. You just told the user that something is missing, not available, not posted or "
+    "that you cannot access it — without checking in this turn. Check before saying that: "
+    "search_my_knowledge for the user's own documents (saved county packets often include the "
+    "plan sheets — search e.g. 'tentative map sheet', 'site plan', 'conditions of approval'), "
+    "get_document_content with a focus phrase, and web_search + read_web_page for public "
+    "records. Then answer from what the tools actually returned, naming what you searched."
+)
+
+_ABSENCE_PHRASE = re.compile(
+    r"(?i)\b(?:i\s+(?:do\s+not|don't)\s+have"
+    r"|(?:cannot|can't|could\s+not|couldn't|unable\s+to)\s+(?:access|find|locate|retrieve|get\s+to|open)"
+    r"|(?:does|do)\s+(?:not|n't)\s+(?:include|contain|appear|have)"
+    r"|doesn't\s+(?:include|contain|appear|have)|don't\s+appear"
+    r"|(?:is|are)\s*(?:not|n't)\s+(?:yet\s+)?(?:posted|available|public|online)"
+    r"|aren't\s+(?:yet\s+)?(?:posted|available)|isn't\s+(?:yet\s+)?(?:posted|available)"
+    r"|no\s+(?:site\s+plan|drawings?|map|document|record)s?\s+(?:is|are|was|were)\s+(?:attached|included|available))"
+)
+_ABSENCE_SUBJECT = re.compile(
+    r"(?i)\b(document|report|staff\s+report|packet|site\s+plan|plan\s+sheets?|drawings?|tentative\s+map|"
+    r"exhibit|attachment|resolution|minutes|agenda|notice\s+of\s+decision|action\s+order|"
+    r"website|portal|county|file|pdf|record)"
+)
+
+
+def claims_absence_without_looking(text: str) -> bool:
+    """True when a reply says a document/record/page is missing or out of reach.
+    Called only for replies that ran no tool this turn (VQ, 2026-10-19)."""
+    if not text:
+        return False
+    for m in _ABSENCE_PHRASE.finditer(text):
+        window = text[max(0, m.start() - 160): m.end() + 160]
+        if _ABSENCE_SUBJECT.search(window):
+            return True
+    return False
 
 
 def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
@@ -5454,6 +5509,27 @@ def get_landscaper_response(
                 _log_cache_usage('retry', response)
                 logger.info(f"[AI_HANDLER] Retry response stop_reason={response.stop_reason}")
 
+        # Absence guard (VQ, 2026-10-19): a reply that says a document, page or
+        # record is missing / inaccessible / not posted, with no tool run this
+        # turn, is a guess. On 2026-10-19 Landscaper said a saved 638-page county
+        # packet "doesn't include the site plan drawings" (it holds 100+ plan
+        # sheets) and that Board documents were "not posted" — neither checked.
+        # One retry, told to look first.
+        if response.stop_reason == "end_turn" and tool_executor:
+            _abs_text = "".join(getattr(b, 'text', '') or '' for b in response.content)
+            if claims_absence_without_looking(_abs_text):
+                logger.warning("[AI_HANDLER] ABSENCE CLAIM without a tool call this turn. Forcing a check.")
+                retry_messages = list(api_kwargs.get('messages', []))
+                retry_messages.append({"role": "assistant", "content": _abs_text[:400] + "..."})
+                retry_messages.append({"role": "user", "content": ABSENCE_RETRY_INSTRUCTION})
+                retry_kwargs = dict(api_kwargs)
+                retry_kwargs['messages'] = retry_messages
+                try:
+                    response = client.messages.create(**retry_kwargs)
+                    _log_cache_usage('absence_retry', response)
+                except Exception as _abs_err:
+                    logger.error(f"[AI_HANDLER] absence retry failed (keeping first reply): {_abs_err}")
+
         # Tool loop safeguards
         MAX_TOOL_ITERATIONS = 10  # Increased from 5 — rent roll extraction needs ~6-8 steps
         MAX_TOOL_LOOP_SECONDS = 90  # Leave buffer for frontend's 150s timeout
@@ -5801,21 +5877,26 @@ def get_landscaper_response(
         # force a narration turn. This prevents the "silent completion" bug where
         # confirm_column_mapping or other mutation tools execute but no follow-up
         # message is generated for the user.
-        narration_tools = {'confirm_column_mapping', 'compute_rent_roll_delta', 'update_units', 'delete_units'}
-        executed_narration_tools = [tc['tool'] for tc in tool_calls_made if tc['tool'] in narration_tools]
+        # VQ (2026-10-19): any tool, not only these four. A research turn ran two
+        # web searches and came back blank — the user saw an empty reply.
+        narration_tools = {tc['tool'] for tc in tool_calls_made}
+        executed_narration_tools = [tc['tool'] for tc in tool_calls_made]
         if executed_narration_tools and not final_content.strip():
             logger.info(f"[Tool Loop] No narration after tool execution ({executed_narration_tools}), forcing narration turn")
             try:
                 # Build a narration prompt from the last tool results
                 last_tool_summaries = []
                 for exec_info in tool_executions:
-                    if exec_info.get('tool') in narration_tools and exec_info.get('success'):
+                    if exec_info.get('tool') in narration_tools:
+                        state = 'succeeded' if exec_info.get('success') else 'failed'
                         last_tool_summaries.append(
-                            f"Tool '{exec_info['tool']}' succeeded: {str(exec_info.get('result', {}))[:500]}"
+                            f"Tool '{exec_info['tool']}' {state}: "
+                            f"{str(exec_info.get('result', exec_info.get('error', {})))[:1500]}"
                         )
                 narration_prompt = (
-                    "The following tools completed successfully but you didn't produce a response. "
-                    "Please narrate the results concisely (1-3 sentences): "
+                    "These tools ran but you didn't produce a response. Answer the user now from "
+                    "what they actually returned — state what was found (with titles and links "
+                    "exactly as returned) and what was not. Do not call tools: "
                     + "; ".join(last_tool_summaries)
                 )
                 # Append as assistant + user to maintain proper turn structure

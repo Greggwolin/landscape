@@ -248,3 +248,45 @@ def test_platform_query_user_docs_are_owner_scoped():
     from apps.landscaper import tool_executor
     src = inspect.getsource(tool_executor.query_platform_knowledge)
     assert "t.created_by = %s" in src and "_uid" in src
+
+
+# ── absence guard (VQ, 2026-10-19) ──────────────────────────────────────────
+
+@pytest.mark.parametrize("text", [
+    # the three real replies from 2026-10-19
+    "I don't have the approved site plan document — the staff report I read describes the project "
+    "(940 lots, 760 acres) but doesn't include the actual site plan drawings or parcel maps.",
+    "I found references to the March 11, 2026 meeting but cannot access the actual Board resolution "
+    "or final approved conditions document.",
+    "These don't appear to be posted yet on the county's public portal.",
+])
+def test_absence_claims_are_caught(text):
+    from apps.landscaper.ai_handler import claims_absence_without_looking
+    assert claims_absence_without_looking(text)
+
+
+@pytest.mark.parametrize("text", [
+    "The Planning Commission approved it 5-2 on June 15, 2026.",
+    "I don't have a preference — which format do you want?",
+    "Detailed conditions compiled in the right panel from the Planning Commission staff report.",
+    "",
+])
+def test_ordinary_replies_are_not_caught(text):
+    from apps.landscaper.ai_handler import claims_absence_without_looking
+    assert not claims_absence_without_looking(text)
+
+
+def test_page_links_returns_absolute_encoded_file_links_focus_first():
+    html = """<html><body><main><p>Applications</p>
+      <a href="/files/Other Project Packet.pdf">Other Project Packet</a>
+      <a href="sierra/BCC 03-10-26 - Staff Report FINAL - Sierra Reflections Appeal.pdf">Staff Report - Sierra Reflections Appeal</a>
+      <a href="#top">top</a><a href="mailto:x@y.gov">mail</a>
+      <a href="/news/sierra-reflections-hearing">Sierra Reflections hearing news</a>
+      <a href="/about">About us</a></main></body></html>"""
+    links = wr.page_links(html, "https://county.gov/apps/district2.php", focus="Sierra Reflections")
+    urls = [l["url"] for l in links]
+    assert urls[0] == ("https://county.gov/apps/sierra/BCC%2003-10-26%20-%20Staff%20Report%20FINAL"
+                       "%20-%20Sierra%20Reflections%20Appeal.pdf")
+    assert "https://county.gov/files/Other%20Project%20Packet.pdf" in urls
+    assert "https://county.gov/news/sierra-reflections-hearing" in urls
+    assert not any(u.endswith("/about") or u.startswith("mailto") for u in urls)
