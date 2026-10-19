@@ -290,3 +290,55 @@ def test_page_links_returns_absolute_encoded_file_links_focus_first():
     assert "https://county.gov/files/Other%20Project%20Packet.pdf" in urls
     assert "https://county.gov/news/sierra-reflections-hearing" in urls
     assert not any(u.endswith("/about") or u.startswith("mailto") for u in urls)
+
+
+# ── unopened listed documents (VQ, 2026-10-19 Board-conditions miss) ──────
+
+_BOARD_REPLY = (
+    "I cannot find a separate Board of County Commissioners staff report with modified conditions. "
+    "The Board's March 11 approval documents (staff report, resolution, final conditions as approved) "
+    "are not posted on the public portal yet, or are in a section I cannot access."
+)
+_BASE = "https://www.washoecounty.gov/csd/planning_and_development/applications/sierra-reflections/"
+
+
+def _page_exec(opened_url, links):
+    return {'tool': 'read_web_page', 'success': True,
+            'result': {'url': opened_url, 'final_url': opened_url, 'links': links}}
+
+
+def test_unopened_links_found_for_board_miss():
+    from apps.landscaper.ai_handler import claims_absence_without_looking, unopened_document_links
+    district = "https://www.washoecounty.gov/csd/planning_and_development/applications/apps_commish_district_two.php"
+    pres = _BASE + "BCC%2003-10-26%20-%20Attachment%20D%20-%20Staff%20Presentation.pdf"
+    report = _BASE + "BCC%2003-10-26%20-%20Staff%20Report%20FINAL%20-%20Sierra%20Reflections%20Appeal.pdf"
+    tribal = _BASE + "BCC%2003-10-26%20-%20Attachment%20I%20-%20Tribal%20Conditions.pdf"
+    execs = [
+        _page_exec(district, [
+            {'text': 'Staff Report - Sierra Reflections Appeal', 'url': report},
+            {'text': 'Attachment D - Staff Presentation', 'url': pres},
+            {'text': 'Attachment I - Tribal Conditions', 'url': tribal},
+            {'text': 'Maps - Updated 11/11/25', 'url': _BASE + 'Tab%20B.pdf'},
+        ]),
+        _page_exec(pres, []),
+    ]
+    assert claims_absence_without_looking(_BOARD_REPLY)
+    urls = [l['url'] for l in unopened_document_links(execs)]
+    assert report in urls and tribal in urls
+    assert pres not in urls                      # already opened
+    assert _BASE + 'Tab%20B.pdf' not in urls     # not a decision document
+
+
+def test_no_unopened_links_when_all_opened_or_none_listed():
+    from apps.landscaper.ai_handler import unopened_document_links
+    u = _BASE + "BCC%20-%20Staff%20Report.pdf"
+    assert unopened_document_links([_page_exec(u, [{'text': 'Staff Report', 'url': u}])]) == []
+    assert unopened_document_links([{'tool': 'web_search', 'result': {'results': []}}]) == []
+    assert unopened_document_links(None) == []
+
+
+def test_unopened_links_instruction_lists_exact_urls():
+    from apps.landscaper.ai_handler import unopened_links_instruction
+    u = _BASE + "BCC%20-%20Staff%20Report.pdf"
+    msg = unopened_links_instruction([{'text': 'Staff Report', 'url': u}])
+    assert u in msg and 'read_web_page' in msg

@@ -4618,6 +4618,52 @@ def claims_absence_without_looking(text: str) -> bool:
     return False
 
 
+_LINK_SUBJECT = re.compile(
+    r"(?i)(staff\s*report|attachment|exhibit|resolution|minutes|action\s*order|notice\s+of\s+decision|"
+    r"conditions?|agenda|packet|approval|appeal|decision)"
+)
+
+
+def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> list:
+    """Document links a page read returned this turn that were never opened.
+
+    VQ, 2026-10-19: Landscaper read the county page, which listed the Board's
+    staff report and the tribal-conditions attachment, opened only the staff
+    presentation, then told Gregg the Board documents "are not posted". The
+    links were sitting in its own tool result."""
+    opened, listed = set(), []
+    for ex in tool_executions or []:
+        if ex.get('tool') not in ('read_web_page', 'save_web_document'):
+            continue
+        res = ex.get('result') or {}
+        for key in ('url', 'final_url'):
+            if res.get(key):
+                opened.add(str(res[key]))
+        for link in res.get('links') or []:
+            if isinstance(link, dict) and link.get('url'):
+                listed.append(link)
+    out, seen = [], set()
+    for link in listed:
+        u = link['url']
+        if u in opened or u in seen:
+            continue
+        if _LINK_SUBJECT.search(link.get('text', '') + ' ' + u):
+            seen.add(u)
+            out.append(link)
+    return out[:cap]
+
+
+def unopened_links_instruction(links: list) -> str:
+    lines = "\n".join(f"- {l.get('text', '')}: {l['url']}" for l in links)
+    return (
+        "STOP. You told the user a document is missing, not posted or out of reach — but the "
+        "page you read this turn lists documents you never opened:\n" + lines + "\n"
+        "Open the ones that bear on the question with read_web_page (use the url exactly; if a "
+        "file is too big, save_web_document), then answer from what they actually say. Say a "
+        "document is missing only if it is not in that list."
+    )
+
+
 def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
     """True when the immediately previous assistant turn was itself guard-blocked.
 
@@ -5536,6 +5582,7 @@ def get_landscaper_response(
         tool_loop_start = time.time()
         tool_iteration = 0
         loop_broke_early = False
+        unopened_links_nudged = False
 
         # Handle tool use loop
         while response.stop_reason == "tool_use" and tool_executor:
@@ -5808,6 +5855,29 @@ def get_landscaper_response(
                 continuation_truncation_marker = continuation_truncation_marker or _TRUNCATION_MARKER_LONG_ANSWER
                 loop_broke_early = True
                 break
+
+            # Absence-after-looking guard (VQ, 2026-10-19): the turn ran tools,
+            # the reply says something is missing, and a page read this turn
+            # listed matching documents that were never opened. One nudge.
+            if (response.stop_reason == "end_turn" and not unopened_links_nudged):
+                _fin_text = "".join(getattr(b, 'text', '') or '' for b in response.content)
+                if claims_absence_without_looking(_fin_text):
+                    _unopened = unopened_document_links(tool_executions)
+                    if _unopened:
+                        unopened_links_nudged = True
+                        logger.warning(
+                            f"[AI_HANDLER] Absence claim with {len(_unopened)} unopened listed documents. Nudging."
+                        )
+                        claude_messages.append({"role": "assistant", "content": response.content})
+                        claude_messages.append({"role": "user", "content": unopened_links_instruction(_unopened)})
+                        try:
+                            response = client.messages.create(**{**api_kwargs, 'messages': claude_messages})
+                            _log_cache_usage('unopened_links_retry', response)
+                            total_input_tokens += response.usage.input_tokens
+                            total_output_tokens += response.usage.output_tokens
+                        except Exception as _ul_err:
+                            logger.error(f"[AI_HANDLER] unopened-links retry failed: {_ul_err}")
+                            claude_messages = claude_messages[:-2]
 
         # If loop broke early, make one final call WITHOUT tools to get a summary
         if loop_broke_early and tool_executor:
