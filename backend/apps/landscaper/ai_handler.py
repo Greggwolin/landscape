@@ -4625,6 +4625,9 @@ _LINK_SUBJECT = re.compile(
 )
 
 
+_DOC_FILE = re.compile(r"(?i)\.(pdf|docx?|xlsx?|pptx?|zip)(?:$|[?#])")
+
+
 def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> list:
     """Document links a page read returned this turn that were never opened.
 
@@ -4658,17 +4661,20 @@ def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> li
     # search results held the county application page and a file in the
     # Board's own folder. Searches alone never prove absence: when no page was
     # opened this turn, the unread search results are what must be read.
-    if opened:
-        return []
+    # Third miss, same day: it opened one PDF, then guessed file names (404s)
+    # and never opened the application page sitting first in its results. So
+    # the unread results count even when something was opened — index pages
+    # (not files) first, because they carry the real document links.
+    pages, files = [], []
     for ex in tool_executions or []:
         if ex.get('tool') != 'web_search':
             continue
         for r in (ex.get('result') or {}).get('results') or []:
             u = isinstance(r, dict) and r.get('url')
-            if u and u not in seen:
+            if u and u not in seen and u not in opened:
                 seen.add(u)
-                out.append({'text': r.get('title') or u, 'url': u})
-    return out[:min(cap, 5)]
+                (files if _DOC_FILE.search(u) else pages).append({'text': r.get('title') or u, 'url': u})
+    return (pages + files)[:min(cap, 5)]
 
 
 def unopened_links_instruction(links: list) -> str:

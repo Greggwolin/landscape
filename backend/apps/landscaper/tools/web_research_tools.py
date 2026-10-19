@@ -162,7 +162,10 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
             'instruction': (
                 f"Nothing was read from {url}. Tell the user that ({e.message}) and do NOT "
                 "describe, summarise or guess at what the page contains. If another search "
-                "result covers the same thing, read that one instead."
+                "result covers the same thing, read that one instead. If you wrote this address "
+                "yourself, stop guessing file names: open the page that lists the documents (for "
+                "a county case, the application or agenda page in your search results) and use "
+                "the exact urls in its `links`."
             ),
         }
     notes = []

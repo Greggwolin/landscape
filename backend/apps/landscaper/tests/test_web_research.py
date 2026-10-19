@@ -360,12 +360,24 @@ def test_search_only_turn_points_at_unread_results():
     assert urls[0] == app and len(urls) == 2      # deduplicated, in order
 
 
-def test_search_results_ignored_once_a_page_was_opened():
+def test_guessed_file_names_turn_points_at_application_page():
+    """Third miss: one PDF opened, guessed names 404'd, application page never opened."""
     from apps.landscaper.ai_handler import unopened_document_links
-    u = _BASE + "x.pdf"
-    execs = [_page_exec(u, []),
-             {'tool': 'web_search', 'result': {'results': [{'title': 'Other', 'url': _BASE + 'y.pdf'}]}}]
-    assert unopened_document_links(execs) == []
+    app = "https://www.washoecounty.gov/csd/planning_and_development/applications/apps_commish_district_two.php"
+    pres = _BASE + "BCC%2003-10-26%20-%20Attachment%20D%20-%20Staff%20Presentation.pdf"
+    execs = [
+        {'tool': 'web_search', 'result': {'results': [
+            {'title': 'Sierra Reflections', 'url': pres},
+            {'title': 'PC packet', 'url': _BASE + 'pc.pdf'},
+            {'title': 'Applications Commission District Two', 'url': app},
+        ]}},
+        _page_exec(pres, []),
+        {'tool': 'read_web_page', 'success': False, 'result': {'success': False, 'error': 'not_found',
+                                                               'url': _BASE + 'BCC%20Staff%20Report.pdf'}},
+    ]
+    urls = [l['url'] for l in unopened_document_links(execs)]
+    assert urls[0] == app            # the index page comes first
+    assert pres not in urls          # already opened
 
 
 def test_absence_phrases_from_check_again_reply():
@@ -375,3 +387,10 @@ def test_absence_phrases_from_check_again_reply():
         "Sierra Reflections appeal are not publicly posted yet.")
     assert claims_absence_without_looking(
         "No BCC staff report, resolution, ordinance, or minutes are available for the March 2026 appeal")
+
+
+def test_third_miss_reply_is_an_absence_claim():
+    from apps.landscaper.ai_handler import claims_absence_without_looking
+    assert claims_absence_without_looking(
+        "However, I was unable to locate and read the Board's actual staff report or decision "
+        "documents from the March 10, 2026 hearing.")
