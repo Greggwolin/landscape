@@ -4592,7 +4592,8 @@ ABSENCE_RETRY_INSTRUCTION = (
 
 _ABSENCE_PHRASE = re.compile(
     r"(?i)\b(?:i\s+(?:do\s+not|don't)\s+have"
-    r"|(?:cannot|can't|could\s+not|couldn't|unable\s+to)\s+(?:access|find|locate|retrieve|get\s+to|open)"
+    r"|(?:cannot|can't|could\s+not|couldn't|unable\s+to)\s+(?:\w+ly\s+)?(?:access|find|locate|retrieve|get\s+to|open)"
+    r"|(?:have|has)\s*(?:not|n't)\s+(?:yet\s+)?(?:located|found|been\s+able\s+to)"
     r"|(?:does|do)\s+(?:not|n't)\s+(?:include|contain|appear|have)"
     r"|doesn't\s+(?:include|contain|appear|have)|don't\s+appear"
     r"|(?:is|are)\s*(?:not|n't)\s+(?:(?:yet|publicly|currently|being)\s+){0,2}(?:posted|available|public|online)"
@@ -4643,6 +4644,9 @@ def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> li
         for key in ('url', 'final_url'):
             if res.get(key):
                 opened.add(str(res[key]))
+        for od in res.get('opened_documents') or []:
+            if isinstance(od, dict) and od.get('url') and not od.get('error'):
+                opened.add(str(od['url']))
         for link in res.get('links') or []:
             if isinstance(link, dict) and link.get('url'):
                 listed.append(link)

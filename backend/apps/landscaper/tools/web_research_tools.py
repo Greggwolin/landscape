@@ -125,6 +125,67 @@ def _known_links(key: str) -> Dict[str, str]:
         return dict(b['urls']) if b else {}
 
 
+# ── open the listed documents, don't leave it to the model (VQ, 2026-10-19) ─
+# Fifth miss: the model read the county case page, whose links included the
+# Board's staff report, opened only the slide deck, and asked whether to keep
+# looking. Choosing what to open off a listing page is now done here: the one
+# or two documents that best match the reading's focus are opened and returned
+# with the page.
+
+import re as _re
+
+_FILE_LINK = _re.compile(r"(?i)\.(pdf|docx?|xlsx?|pptx?)(?:$|[?#])")
+_STOP = {"the", "and", "for", "with", "from", "this", "that", "into", "what", "when",
+         "which", "about", "county", "any", "all", "did", "does", "2025", "2026"}
+
+
+def _focus_words(focus: Optional[str]):
+    return {w for w in _re.findall(r"[a-z][a-z0-9]{2,}", (focus or "").lower()) if w not in _STOP}
+
+
+def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int = 2):
+    """The listed files that best match the focus: at least two focus words,
+    and within one word of the best match. Ties keep page order."""
+    words = _focus_words(focus)
+    if not words:
+        return []
+    scored = []
+    for i, l in enumerate(links or []):
+        u = l.get('url') or ''
+        if not _FILE_LINK.search(u) or u in already:
+            continue
+        hay = (l.get('text', '') + ' ' + unquote(urlsplit(u).path.rsplit('/', 1)[-1])).lower()
+        score = sum(1 for w in words if w in hay)
+        if score >= 2:
+            scored.append((-score, i, l))
+    if not scored:
+        return []
+    scored.sort()
+    top = -scored[0][0]
+    # Stay in the best match's folder: a case page also lists older cases'
+    # files under the same name ("Staff Report", 2020).
+    folder = urlsplit(scored[0][2]['url']).path.rsplit('/', 1)[0]
+    return [l for neg, _i, l in scored
+            if -neg >= top - 1 and urlsplit(l['url']).path.rsplit('/', 1)[0] == folder][:limit]
+
+
+def _open_listed(page: Dict[str, Any], focus: Optional[str], key: str) -> list:
+    picks = pick_documents_to_open(page.get('links'), focus,
+                                   already={page.get('url'), page.get('final_url')})
+    opened = []
+    for l in picks:
+        item = {'title': l.get('text'), 'url': l['url']}
+        try:
+            doc = fetch_page(l['url'], max_chars=12000, focus=focus)
+            item.update(text=doc['text'], truncated=doc.get('truncated'),
+                        pages_note=doc.get('pages_note'))
+        except WebResearchError as e:
+            item.update(error=e.code, message=e.message)
+        opened.append(item)
+    _remember_links(key, [{'url': o['url'], 'text': o['title']} for o in opened])
+    return opened
+
+
 def _cap(name: str, default: int) -> int:
     try:
         return int(getattr(settings, name, default))
@@ -256,6 +317,12 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
         }
     _remember_links(key, page.get('links') or [])
     _remember_links(key, [{'url': page.get('final_url') or url}])
+    opened_docs = []
+    if page.get('content_type') == 'html' and page.get('links') and tool_input.get('focus') \
+            and tool_input.get('open_documents', True):
+        opened_docs = _open_listed(page, tool_input.get('focus'), key)
+    if opened_docs:
+        page['opened_documents'] = opened_docs
     fix_note = (
         f"You asked for {asked_for}, an address this chat was never given; this was read from "
         f"{url}, the real link closest to it. Cite {url}, and copy links exactly from now on. "
@@ -271,6 +338,11 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
         **page,
         'instruction': (
             fix_note
+            + ("The listed documents that best match your focus were opened for you and are in "
+               "`opened_documents` (title, url, text) — read them and answer from them; those that "
+               "failed carry the reason. Open any other listed document that bears on the question "
+               "with read_web_page, url copied exactly. Do not ask the user whether to keep looking "
+               "while relevant listed documents remain unopened. " if opened_docs else "")
             + "This is the page's actual text. Quote and cite it; state only what it says. "
             + ("The page's document links are in `links` — to open one, use its url exactly; "
                "never build a file address from a title. When the question is about a document of a "

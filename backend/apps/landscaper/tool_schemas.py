@@ -5335,7 +5335,7 @@ LANDSCAPER_TOOLS = [
             "type": "object",
             "properties": {
                 "url": {"type": "string", "description": "Full http(s) address, usually taken from a web_search result."},
-                "focus": {"type": "string", "description": "Optional phrase to centre the excerpt on in long documents, e.g. 'conditions of approval' or 'WTM24-001'."},
+                "focus": {"type": "string", "description": "What you are looking for, e.g. 'Board staff report conditions of approval' or 'WTM24-001'. Centres the excerpt in long documents; on a listing page the one or two listed documents that best match it are opened for you and returned in opened_documents."},
                 "max_chars": {"type": "integer", "description": "Text to return, 1,000-40,000 (default 20,000)."},
             },
             "required": ["url"],

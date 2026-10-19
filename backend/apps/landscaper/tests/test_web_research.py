@@ -433,3 +433,42 @@ def test_links_remembered_per_chat():
     w._remember_links('t-test-1', [{'url': 'https://a.gov/f/x.pdf', 'text': 'X'}])
     assert 'https://a.gov/f/x.pdf' in w._known_links('t-test-1')
     assert w._known_links('t-test-2') == {}
+
+
+# ── listing pages open their best-matching documents (5th miss) ─────────────
+
+_LISTING = [
+    {'text': 'Attachment C - PC Staff Report', 'url': _SR + 'BCC%2003-10-26%20-%20Attachment%20C%20-%20PC%20Staff%20Report.pdf'},
+    {'text': 'Staff Report - Sierra Reflections Appeal', 'url': _SR + 'BCC%2003-10-26%20-%20Staff%20Report%20FINAL%20-%20Sierra%20Reflections%20Appeal.pdf'},
+    {'text': 'Attachment D - Staff Presentation', 'url': _SR + 'BCC%2003-10-26%20-%20Attachment%20D%20-%20Staff%20Presentation.pdf'},
+    {'text': 'Attachment I - Tribal Conditions', 'url': _SR + 'BCC%2003-10-26%20-%20Attachment%20I%20-%20Tribal%20Conditions.pdf'},
+    {'text': 'Board of County Commissioners', 'url': 'https://www.washoecounty.us/bcc/board_committees/index.php'},
+]
+
+
+def test_listing_opens_board_staff_report_first():
+    from apps.landscaper.tools.web_research_tools import pick_documents_to_open
+    for focus in ("WTM24-001 Board County Commissioners appeal staff report conditions",
+                  "Sierra Reflections March 10 2026 BCC staff report attachment"):
+        picks = pick_documents_to_open(_LISTING, focus)
+        assert picks and 'Staff%20Report%20FINAL' in picks[0]['url'], focus
+        assert len(picks) <= 2
+        assert all(p['url'].endswith('.pdf') for p in picks)       # never the index pages
+
+
+def test_listing_opens_nothing_without_a_real_match():
+    from apps.landscaper.tools.web_research_tools import pick_documents_to_open
+    assert pick_documents_to_open(_LISTING, None) == []
+    assert pick_documents_to_open(_LISTING, "zoning map") == []
+    already = {_LISTING[1]['url']}
+    assert all(p['url'] not in already for p in
+               pick_documents_to_open(_LISTING, "Board staff report appeal", already=already))
+
+
+def test_opened_documents_count_as_opened_for_the_absence_nudge():
+    from apps.landscaper.ai_handler import unopened_document_links
+    execs = [{'tool': 'read_web_page', 'result': {
+        'url': 'https://www.washoecounty.gov/x.php', 'links': _LISTING[:2],
+        'opened_documents': [{'url': _LISTING[1]['url'], 'text': '...'}]}}]
+    urls = [l['url'] for l in unopened_document_links(execs)]
+    assert _LISTING[1]['url'] not in urls and _LISTING[0]['url'] in urls
