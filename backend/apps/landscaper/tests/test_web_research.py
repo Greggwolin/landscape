@@ -342,3 +342,36 @@ def test_unopened_links_instruction_lists_exact_urls():
     u = _BASE + "BCC%20-%20Staff%20Report.pdf"
     msg = unopened_links_instruction([{'text': 'Staff Report', 'url': u}])
     assert u in msg and 'read_web_page' in msg
+
+
+def test_search_only_turn_points_at_unread_results():
+    """'check again' turn: three searches, nothing opened, 'not posted' repeated."""
+    from apps.landscaper.ai_handler import unopened_document_links
+    app = "https://www.washoecounty.gov/csd/planning_and_development/applications/apps_commish_district_two.php"
+    execs = [
+        {'tool': 'search_my_knowledge', 'result': {'results': []}},
+        {'tool': 'web_search', 'result': {'results': [
+            {'title': 'Applications Commission District Two', 'url': app},
+            {'title': 'Sierra Reflections', 'url': _BASE + 'BCC%2003-10-26%20-%20Attachment%20D.pdf'},
+        ]}},
+        {'tool': 'web_search', 'result': {'results': [{'title': 'Applications', 'url': app}]}},
+    ]
+    urls = [l['url'] for l in unopened_document_links(execs)]
+    assert urls[0] == app and len(urls) == 2      # deduplicated, in order
+
+
+def test_search_results_ignored_once_a_page_was_opened():
+    from apps.landscaper.ai_handler import unopened_document_links
+    u = _BASE + "x.pdf"
+    execs = [_page_exec(u, []),
+             {'tool': 'web_search', 'result': {'results': [{'title': 'Other', 'url': _BASE + 'y.pdf'}]}}]
+    assert unopened_document_links(execs) == []
+
+
+def test_absence_phrases_from_check_again_reply():
+    from apps.landscaper.ai_handler import claims_absence_without_looking
+    assert claims_absence_without_looking(
+        "The Board of County Commissioners meeting minutes and resolution for the March 10-11, 2026 "
+        "Sierra Reflections appeal are not publicly posted yet.")
+    assert claims_absence_without_looking(
+        "No BCC staff report, resolution, ordinance, or minutes are available for the March 2026 appeal")

@@ -4595,7 +4595,8 @@ _ABSENCE_PHRASE = re.compile(
     r"|(?:cannot|can't|could\s+not|couldn't|unable\s+to)\s+(?:access|find|locate|retrieve|get\s+to|open)"
     r"|(?:does|do)\s+(?:not|n't)\s+(?:include|contain|appear|have)"
     r"|doesn't\s+(?:include|contain|appear|have)|don't\s+appear"
-    r"|(?:is|are)\s*(?:not|n't)\s+(?:yet\s+)?(?:posted|available|public|online)"
+    r"|(?:is|are)\s*(?:not|n't)\s+(?:(?:yet|publicly|currently|being)\s+){0,2}(?:posted|available|public|online)"
+    r"|\bno\s+(?:bcc\s+|board\s+)?(?:staff\s+report|resolution|minutes|action\s+order)s?\b[^.]{0,60}\b(?:is|are)\s+available"
     r"|aren't\s+(?:yet\s+)?(?:posted|available)|isn't\s+(?:yet\s+)?(?:posted|available)"
     r"|no\s+(?:site\s+plan|drawings?|map|document|record)s?\s+(?:is|are|was|were)\s+(?:attached|included|available))"
 )
@@ -4650,17 +4651,36 @@ def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> li
         if _LINK_SUBJECT.search(link.get('text', '') + ' ' + u):
             seen.add(u)
             out.append(link)
-    return out[:cap]
+    if out:
+        return out[:cap]
+    # VQ, 2026-10-19 (second miss): a "check again" turn ran three searches,
+    # opened nothing, and repeated "not posted" from its earlier reply — the
+    # search results held the county application page and a file in the
+    # Board's own folder. Searches alone never prove absence: when no page was
+    # opened this turn, the unread search results are what must be read.
+    if opened:
+        return []
+    for ex in tool_executions or []:
+        if ex.get('tool') != 'web_search':
+            continue
+        for r in (ex.get('result') or {}).get('results') or []:
+            u = isinstance(r, dict) and r.get('url')
+            if u and u not in seen:
+                seen.add(u)
+                out.append({'text': r.get('title') or u, 'url': u})
+    return out[:min(cap, 5)]
 
 
 def unopened_links_instruction(links: list) -> str:
     lines = "\n".join(f"- {l.get('text', '')}: {l['url']}" for l in links)
     return (
-        "STOP. You told the user a document is missing, not posted or out of reach — but the "
-        "page you read this turn lists documents you never opened:\n" + lines + "\n"
-        "Open the ones that bear on the question with read_web_page (use the url exactly; if a "
-        "file is too big, save_web_document), then answer from what they actually say. Say a "
-        "document is missing only if it is not in that list."
+        "STOP. You told the user a document is missing, not posted or out of reach — but this "
+        "turn turned up pages and documents you never opened:\n" + lines + "\n"
+        "Search results and earlier replies in this chat do not prove anything is missing. Open "
+        "the ones that bear on the question with read_web_page (use the url exactly; if a file is "
+        "too big, save_web_document) and follow the document links they list, then answer from "
+        "what they actually say. If an earlier reply in this chat said something was not posted "
+        "and you now find it, say plainly that the earlier reply was wrong."
     )
 
 
