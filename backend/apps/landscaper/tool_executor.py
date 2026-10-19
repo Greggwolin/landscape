@@ -16687,7 +16687,7 @@ def execute_tool(
     # fabrication guard can verify a numbers tool sourced the card. Other
     # handlers' uniform kwargs are untouched.
     extra = {}
-    if tool_name in ('create_artifact', 'web_search', 'read_web_page') and prior_tool_calls is not None:
+    if tool_name in ('create_artifact', 'web_search', 'read_web_page', 'look_up_public_record') and prior_tool_calls is not None:
         # create_artifact: the create-time fabrication guard (JB55).
         # web_search / read_web_page: per-turn spend caps (VQ, 2026-10-16).
         extra['prior_tool_calls'] = prior_tool_calls

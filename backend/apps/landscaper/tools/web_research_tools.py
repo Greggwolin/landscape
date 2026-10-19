@@ -143,10 +143,17 @@ def _focus_words(focus: Optional[str]):
     return {w for w in _re.findall(r"[a-z][a-z0-9]{2,}", (focus or "").lower()) if w not in _STOP}
 
 
-def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int = 2):
+def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int = 2,
+                           subject: Optional[str] = None):
     """The listed files that best match the focus: at least two focus words,
-    and within one word of the best match. Ties keep page order."""
+    and within one word of the best match. Ties keep page order.
+
+    With a subject (the property / case), only files that mention it — in the
+    title, file name or folder — are considered, and they are ranked on the
+    question alone: a case page lists every case in the district, and the
+    subject's own application packet otherwise outranks the document asked for."""
     words = _focus_words(focus)
+    subj = _focus_words(subject)
     if not words:
         return []
     scored = []
@@ -154,7 +161,12 @@ def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int =
         u = l.get('url') or ''
         if not _FILE_LINK.search(u) or u in already:
             continue
-        hay = (l.get('text', '') + ' ' + unquote(urlsplit(u).path.rsplit('/', 1)[-1])).lower()
+        name = unquote(urlsplit(u).path.rsplit('/', 1)[-1])
+        hay = (l.get('text', '') + ' ' + name).lower()
+        if subj:
+            where = (l.get('text', '') + ' ' + unquote(urlsplit(u).path)).lower().replace('-', ' ')
+            if not any(w in where for w in subj):
+                continue
         score = sum(1 for w in words if w in hay)
         if score >= 2:
             scored.append((-score, i, l))
@@ -169,9 +181,11 @@ def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int =
             if -neg >= top - 1 and urlsplit(l['url']).path.rsplit('/', 1)[0] == folder][:limit]
 
 
-def _open_listed(page: Dict[str, Any], focus: Optional[str], key: str) -> list:
+def _open_listed(page: Dict[str, Any], focus: Optional[str], key: str,
+                 subject: Optional[str] = None) -> list:
     picks = pick_documents_to_open(page.get('links'), focus,
-                                   already={page.get('url'), page.get('final_url')})
+                                   already={page.get('url'), page.get('final_url')},
+                                   subject=subject)
     opened = []
     for l in picks:
         item = {'title': l.get('text'), 'url': l['url']}
@@ -320,7 +334,7 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
     opened_docs = []
     if page.get('content_type') == 'html' and page.get('links') and tool_input.get('focus') \
             and tool_input.get('open_documents', True):
-        opened_docs = _open_listed(page, tool_input.get('focus'), key)
+        opened_docs = _open_listed(page, tool_input.get('focus'), key, tool_input.get('subject'))
     if opened_docs:
         page['opened_documents'] = opened_docs
     fix_note = (
@@ -362,18 +376,30 @@ _IN_FLIGHT: set = set()
 _IN_FLIGHT_LOCK = threading.Lock()
 
 
-def _already_saved(url: str, project_id: Optional[int], thread_id: Optional[str]) -> Optional[Dict[str, Any]]:
-    if not project_id and not thread_id:
+def _already_saved(url: str, project_id: Optional[int], thread_id: Optional[str],
+                   user_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    """A copy of this file already filed here — or anywhere in the user's own
+    knowledge (VQ, 2026-10-19: a new chat re-downloaded a 362 MB packet the
+    user had saved two days earlier from another chat)."""
+    if not project_id and not thread_id and not user_id:
         return None
-    owner = "d.project_id = %s" if project_id else "d.thread_id = %s::uuid"
+    from .my_knowledge_tools import OWNED_DOC_SQL
+    clauses, params = [], {'url': url, 'uid': user_id or -1}
+    if project_id:
+        clauses.append("d.project_id = %(pid)s"); params['pid'] = project_id
+    if thread_id:
+        clauses.append("d.thread_id = %(tid)s::uuid"); params['tid'] = str(thread_id)
+    if user_id:
+        clauses.append(OWNED_DOC_SQL)
     with connection.cursor() as cur:
         cur.execute(f"""
             SELECT d.doc_id, d.doc_name, d.processing_status
             FROM landscape.core_doc d
-            WHERE {owner} AND d.deleted_at IS NULL
-              AND d.profile_json->>'source_url' = %s
+            WHERE d.deleted_at IS NULL
+              AND d.profile_json->>'source_url' = %(url)s
+              AND ({' OR '.join(clauses)})
             ORDER BY d.doc_id DESC LIMIT 1
-        """, [project_id or thread_id, url])
+        """, params)
         row = cur.fetchone()
     return {'doc_id': row[0], 'doc_name': row[1], 'processing_status': row[2]} if row else None
 
@@ -444,7 +470,7 @@ def save_web_document_tool(tool_input: Dict[str, Any] = None, project_id: int = 
     # projects via search_my_knowledge, never the shared platform library.
     where = ("this project's documents" if project_id else "this chat's documents") + \
         " and your own knowledge (searchable from any of your chats and projects)"
-    existing = _already_saved(url, project_id, thread_id)
+    existing = _already_saved(url, project_id, thread_id, user_id)
     if existing:
         return {'success': True, 'already_saved': True, 'url': url,
                 'doc_id': existing['doc_id'], 'doc_name': existing['doc_name'],
@@ -472,3 +498,103 @@ def save_web_document_tool(tool_input: Dict[str, Any] = None, project_id: int = 
             "describe what the file contains yet, and do not send them to the county site for it."
         ),
     }
+
+
+# ── look_up_public_record (VQ, 2026-10-19) ─────────────────────────────────
+# Six tries at one county question took six different wrong paths: searches
+# with nothing opened, guessed file names, the slide deck instead of the staff
+# report, a re-download of a packet the user already had. Each was patched; the
+# next try found a new way. This tool runs the research recipe itself, in one
+# call, so the order no longer depends on the model: the user's own documents,
+# one search, the official pages it finds, and the documents those pages list
+# that best match the question.
+
+_OFFICIAL = _re.compile(r"(?i)(\.gov|\.us|\.state\.[a-z]{2}\.us|legistar\.com|granicus\.com|municode\.com)(?:/|$)")
+
+
+def _official(u: str) -> bool:
+    return bool(_OFFICIAL.search(urlsplit(u).netloc + "/"))
+
+
+@register_tool('look_up_public_record')
+def look_up_public_record_tool(tool_input: Dict[str, Any] = None, project_id: int = None,
+                               user_id: Optional[int] = None,
+                               prior_tool_calls: Optional[List[str]] = None,
+                               **kwargs) -> Dict[str, Any]:
+    tool_input = tool_input or {}
+    subject = (tool_input.get('subject') or '').strip()
+    question = (tool_input.get('question') or '').strip()
+    place = (tool_input.get('jurisdiction') or '').strip()
+    if not subject:
+        return _refusal('no_subject', "No property, project or case was named.",
+                        "Nothing was looked up. Ask which property or case.")
+    focus = f"{subject} {question}".strip()
+    out: Dict[str, Any] = {'success': True, 'subject': subject, 'question': question}
+
+    # 1. the user's own documents
+    if user_id:
+        try:
+            from .my_knowledge_tools import search_my_knowledge_tool
+            mine = search_my_knowledge_tool(tool_input={'query': focus, 'limit': 6},
+                                            project_id=project_id, user_id=user_id, **kwargs)
+            out['my_documents'] = {k: mine.get(k) for k in ('passages', 'not_yet_searchable')
+                                   if mine.get(k) is not None}
+        except Exception as e:  # never let one source sink the others
+            logger.warning(f"[look_up_public_record] own-knowledge search failed: {e}")
+            out['my_documents'] = {'error': 'search_failed'}
+
+    # 2. two searches: the subject, then the question on the official site found
+    calls = list(prior_tool_calls or [])
+    found = web_search_tool(tool_input={'query': f"{subject} {place}".strip(), 'count': 8},
+                            project_id=project_id, prior_tool_calls=calls + ['web_search'], **kwargs)
+    results = list(found.get('results') or [])
+    if not found.get('success'):
+        out['search_error'] = found.get('message') or found.get('error')
+    site = next((urlsplit(r['url']).netloc for r in results
+                 if r.get('url') and _official(r['url'])), None)
+    if site and question:
+        more = web_search_tool(tool_input={'query': f"{subject} {question}", 'site': site, 'count': 8},
+                               project_id=project_id,
+                               prior_tool_calls=calls + ['web_search', 'web_search'], **kwargs)
+        seen = {r.get('url') for r in results}
+        results += [r for r in (more.get('results') or []) if r.get('url') not in seen]
+    out['search_results'] = [{'title': r.get('title'), 'url': r.get('url'), 'date': r.get('date')}
+                             for r in results]
+
+    # 3. the official pages that best match, each opening its best-matching documents
+    words = _focus_words(focus)
+
+    def _score(r):
+        hay = ((r.get('title') or '') + ' ' + (r.get('snippet') or '') + ' '
+               + unquote(urlsplit(r.get('url') or '').path)).lower()
+        return sum(1 for w in words if w in hay)
+
+    official = [r for r in results if r.get('url') and _official(r['url'])]
+    pages = sorted((r for r in official if not _FILE_LINK.search(r['url'])),
+                   key=_score, reverse=True)[:2]
+    if not pages:
+        pages = sorted((r for r in official if _FILE_LINK.search(r['url'])),
+                       key=_score, reverse=True)[:1]
+    reads = []
+    for r in pages:
+        page = read_web_page_tool(tool_input={'url': r['url'], 'focus': question or focus,
+                                              'subject': subject, 'max_chars': 8000},
+                                  project_id=project_id, prior_tool_calls=[], **kwargs)
+        page.pop('instruction', None)
+        if 'links' in page:
+            page['links'] = page['links'][:20]
+        reads.append(page)
+    out['pages_read'] = reads
+
+    out['instruction'] = (
+        "This is the research, already done: your own documents (my_documents), one search "
+        "(search_results), the official pages it found (pages_read) and, inside each page, the "
+        "listed documents that best match the question (opened_documents). Answer from these. "
+        "Cite each fact with its document and link, copied exactly. If the answer needs a listed "
+        "document that was not opened, open it with read_web_page (url from `links`, exactly) "
+        "before answering. Say a record is missing only if it is in none of the above and the "
+        "pages read were the right ones; say which you checked. A document that failed with "
+        "fetch_too_large: save it with save_web_document. A scanned document with no text: say "
+        "it could not be read, by name. " + CITE_RULE
+    )
+    return out

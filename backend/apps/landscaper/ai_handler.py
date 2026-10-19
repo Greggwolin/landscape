@@ -2217,7 +2217,11 @@ own numbers, and never add web research to an answer nobody asked for.
    or the project's data (e.g. a 2020 article says approvals expire in 2022;
    the county shows a new 2026 approval), lead with the conflict and both
    sources, newest first.
-5. ENTITLEMENT / ZONING QUESTIONS — the recipe: identify the jurisdiction
+5. PUBLIC-RECORD QUESTIONS ABOUT A SPECIFIC PROPERTY (approvals, conditions,
+   hearings, votes, appeals, permits): call look_up_public_record FIRST — it
+   runs the whole recipe below in one call and opens the documents for you.
+   Then read any further listed document the answer needs. ENTITLEMENT /
+   ZONING QUESTIONS — the recipe: identify the jurisdiction
    (county vs city — unincorporated land is the county's); search the
    jurisdiction's site for the project name and "tentative map", "planned
    development", "special use permit", "zoning"; read the application page or
@@ -3999,7 +4003,7 @@ _NUMBERS_PRODUCING_PREFIXES = (
     # VQ (2026-10-16): web pages are a numbers source under figure-level
     # provenance — a figure passes only if it appears in text a page read or a
     # search snippet actually returned this turn.
-    'web_search', 'read_web_page', 'search_my_knowledge',
+    'web_search', 'read_web_page', 'search_my_knowledge', 'look_up_public_record',
 )
 # STRUCTURE-only tools return shape (tiers, splits, schema, completeness, attribute
 # counts, RAG text) but NOT computed money — reading them must NOT license invented
@@ -4637,10 +4641,14 @@ def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> li
     presentation, then told Gregg the Board documents "are not posted". The
     links were sitting in its own tool result."""
     opened, listed = set(), []
+    page_results = []
     for ex in tool_executions or []:
-        if ex.get('tool') not in ('read_web_page', 'save_web_document'):
-            continue
         res = ex.get('result') or {}
+        if ex.get('tool') in ('read_web_page', 'save_web_document'):
+            page_results.append(res)
+        elif ex.get('tool') == 'look_up_public_record':
+            page_results.extend(p for p in (res.get('pages_read') or []) if isinstance(p, dict))
+    for res in page_results:
         for key in ('url', 'final_url'):
             if res.get(key):
                 opened.add(str(res[key]))

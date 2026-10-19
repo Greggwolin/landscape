@@ -472,3 +472,16 @@ def test_opened_documents_count_as_opened_for_the_absence_nudge():
         'opened_documents': [{'url': _LISTING[1]['url'], 'text': '...'}]}}]
     urls = [l['url'] for l in unopened_document_links(execs)]
     assert _LISTING[1]['url'] not in urls and _LISTING[0]['url'] in urls
+
+
+def test_subject_filter_ranks_the_asked_for_document_over_the_application_packet():
+    from apps.landscaper.tools.web_research_tools import pick_documents_to_open
+    listing = _LISTING + [
+        {'text': 'WTM24-001 Sierra Reflections and WSUP25-0019 Sierra Reflections Infrastructure-Updated 11/11/25',
+         'url': _SR + 'Sierra%20Reflections%20COS%20TM%20Application%20Packet.pdf'},
+        {'text': 'Board of County Commissioners', 'url': 'https://www.washoecounty.gov/other-case/BCC%20Board%20of%20County%20Commissioners%20approval.pdf'},
+    ]
+    picks = pick_documents_to_open(listing, "Board of County Commissioners appeal staff report conditions of approval",
+                                   subject="Sierra Reflections WTM24-001 WSUP25-0019")
+    assert 'Staff%20Report%20FINAL' in picks[0]['url']
+    assert all('Application%20Packet' not in p['url'] and 'other-case' not in p['url'] for p in picks)

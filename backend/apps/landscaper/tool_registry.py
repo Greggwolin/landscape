@@ -113,7 +113,7 @@ UNIVERSAL_TOOLS = [
     # Location Brief artifact (universal, works pre-project)
     "generate_location_brief",
     # Web research (VQ, 2026-10-16) — county/agency pages, news, PDFs; read-only
-    "web_search", "read_web_page", "save_web_document", "search_my_knowledge",
+    "web_search", "read_web_page", "save_web_document", "search_my_knowledge", "look_up_public_record",
     # Geocoding (FB-317) — universal, address → coordinates
     "geocode_address",
     # Rent-comp geocoding follow-through (project-scoped; pairs with generate_map_artifact comp_kind='rent')
@@ -370,6 +370,7 @@ UNASSIGNED_SAFE_TOOLS = [
     "read_web_page",
     "save_web_document",
     "search_my_knowledge",
+    "look_up_public_record",
 ]
 
 

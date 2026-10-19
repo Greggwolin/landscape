@@ -5342,6 +5342,25 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "look_up_public_record",
+        "description": (
+            "Look up the public record of a specific property, project or case — entitlements, "
+            "approvals, conditions of approval, hearings, votes, appeals, staff reports, permits. "
+            "Use it FIRST for any such question, before web_search. In one call it searches the "
+            "user's own saved documents, runs one web search, reads the official pages found and "
+            "opens the listed documents that best match the question, and returns all of it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string", "description": "The property/project name and any case numbers, e.g. 'Sierra Reflections WTM24-001 WSUP25-0019'."},
+                "jurisdiction": {"type": "string", "description": "County or city and state, e.g. 'Washoe County Nevada'."},
+                "question": {"type": "string", "description": "What to find, in the record's words, e.g. 'Board of County Commissioners appeal staff report conditions of approval'."},
+            },
+            "required": ["subject", "question"],
+        },
+    },
+    {
         "name": "save_web_document",
         "description": (
             "Download a whole public file (usually a PDF found by web_search/read_web_page) and file it in "
