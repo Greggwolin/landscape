@@ -394,3 +394,42 @@ def test_third_miss_reply_is_an_absence_claim():
     assert claims_absence_without_looking(
         "However, I was unable to locate and read the Board's actual staff report or decision "
         "documents from the March 10, 2026 hearing.")
+
+
+# ── guessed addresses are redirected to links the chat was shown (4th miss) ─
+
+_SR = "https://www.washoecounty.gov/csd/planning_and_development/applications/sierra-reflections/"
+_KNOWN = {
+    _SR + "BCC%2003-10-26%20-%20Staff%20Report%20FINAL%20-%20Sierra%20Reflections%20Appeal.pdf": "Staff Report - Sierra Reflections Appeal",
+    _SR + "BCC%2003-10-26%20-%20Attachment%20C%20-%20PC%20Staff%20Report.pdf": "Attachment C - PC Staff Report",
+    _SR + "BCC%2003-10-26%20-%20Attachment%20I%20-%20Tribal%20Conditions.pdf": "Attachment I - Tribal Conditions",
+}
+
+
+def test_guessed_staff_report_maps_to_real_link():
+    from apps.landscaper.tools.web_research_tools import closest_known_link
+    real = _SR + "BCC%2003-10-26%20-%20Staff%20Report%20FINAL%20-%20Sierra%20Reflections%20Appeal.pdf"
+    for guess in (
+        _SR + "BCC%2003-10-26%20-%20Staff%20Report%20-%20Sierra%20Reflections%20Appeal.pdf",
+        _SR + "BCC%2003-10-26%20-%20Staff%20Report%20%E2%80%93%20Sierra%20Reflections%20Appeal.pdf",
+    ):
+        assert closest_known_link(guess, _KNOWN) == real, guess
+    # Too vague to tell the Board report from the Planning Commission one: no swap.
+    assert closest_known_link(_SR + "BCC%2003-10-26%20-%20Staff%20Report.pdf", _KNOWN) != \
+        _SR + "BCC%2003-10-26%20-%20Attachment%20C%20-%20PC%20Staff%20Report.pdf"
+
+
+def test_shown_or_unrelated_addresses_are_left_alone():
+    from apps.landscaper.tools.web_research_tools import closest_known_link
+    shown = next(iter(_KNOWN))
+    assert closest_known_link(shown, _KNOWN) is None                                   # was shown
+    assert closest_known_link("https://example.com/x/Staff Report.pdf", _KNOWN) is None  # other site
+    assert closest_known_link(_SR.replace('sierra-reflections', 'other') + "Staff%20Report.pdf", _KNOWN) is None
+    assert closest_known_link(_SR + "BCC%2003-10-26%20-%20Attachment%20I%20-%20Tribal%20Conditions.pdf", {}) is None
+
+
+def test_links_remembered_per_chat():
+    from apps.landscaper.tools import web_research_tools as w
+    w._remember_links('t-test-1', [{'url': 'https://a.gov/f/x.pdf', 'text': 'X'}])
+    assert 'https://a.gov/f/x.pdf' in w._known_links('t-test-1')
+    assert w._known_links('t-test-2') == {}

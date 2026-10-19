@@ -46,6 +46,85 @@ CITE_RULE = (
 )
 
 
+# ── links this chat has actually been shown (VQ, 2026-10-19) ───────────────
+# Four misses in one afternoon came from the same habit: the model rebuilds a
+# file address from a document's title ("Staff Report - Sierra Reflections
+# Appeal.pdf") instead of copying the real one it was given ("Staff Report
+# FINAL - ..."), gets a 404, and reports the document as unavailable. Prompts
+# did not stop it. So the tool itself remembers every link a page read or a
+# search returned in this chat, and when the model asks for an address it was
+# never shown, it is given the closest real one instead.
+
+import time as _time
+from difflib import SequenceMatcher
+from urllib.parse import unquote, urlsplit
+
+_SEEN: Dict[str, Dict[str, Any]] = {}
+_SEEN_LOCK = threading.Lock()
+_SEEN_TTL = 6 * 3600
+_SEEN_MAX = 800
+
+
+def _seen_key(project_id=None, **kwargs) -> str:
+    return str(kwargs.get('thread_id') or (f"p{project_id}" if project_id else "anon"))
+
+
+def _remember_links(key: str, items) -> None:
+    now = _time.time()
+    with _SEEN_LOCK:
+        for k in [k for k, v in _SEEN.items() if now - v['t'] > _SEEN_TTL]:
+            _SEEN.pop(k, None)
+        bucket = _SEEN.setdefault(key, {'t': now, 'urls': {}})
+        bucket['t'] = now
+        for it in items or []:
+            u = isinstance(it, dict) and it.get('url')
+            if u:
+                bucket['urls'][u] = it.get('text') or it.get('title') or ''
+        if len(bucket['urls']) > _SEEN_MAX:
+            for u in list(bucket['urls'])[:len(bucket['urls']) - _SEEN_MAX]:
+                bucket['urls'].pop(u, None)
+
+
+def _norm(u: str):
+    parts = urlsplit(u)
+    path = unquote(parts.path).lower()
+    folder, _, name = path.rpartition('/')
+    return parts.netloc.lower().removeprefix('www.'), folder, name
+
+
+def closest_known_link(url: str, known: Dict[str, str], min_ratio: float = 0.85) -> Optional[str]:
+    """The real link this chat was shown that `url` was most likely meant to be.
+
+    Same site and same folder only; compared on the file name. None when the
+    address was itself shown, or nothing is close enough."""
+    if not url or url in known:
+        return None
+    host, folder, name = _norm(url)
+    if not name:
+        return None
+    scored = []
+    for u in known:
+        h, f, n = _norm(u)
+        if h != host or f != folder or not n:
+            continue
+        scored.append((SequenceMatcher(None, name, n).ratio(), u))
+    if not scored:
+        return None
+    scored.sort(reverse=True)
+    best_r, best = scored[0]
+    # Two near-equal candidates means the guess could be either document;
+    # reading the wrong one is worse than a 404, so take neither.
+    if len(scored) > 1 and best_r - scored[1][0] < 0.08:
+        return None
+    return best if best_r >= min_ratio else None
+
+
+def _known_links(key: str) -> Dict[str, str]:
+    with _SEEN_LOCK:
+        b = _SEEN.get(key)
+        return dict(b['urls']) if b else {}
+
+
 def _cap(name: str, default: int) -> int:
     try:
         return int(getattr(settings, name, default))
@@ -114,6 +193,7 @@ def web_search_tool(tool_input: Dict[str, Any] = None, project_id: int = None,
                         "guess at what it would have returned.")
 
     results = found['results']
+    _remember_links(_seen_key(project_id, **kwargs), results)
     if not results:
         return {'success': True, 'query_used': found['query_used'], 'results': [],
                 'instruction': ("The search returned nothing. Say so. You may try ONE rephrased "
@@ -142,6 +222,12 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
                         "Do not read more pages in this reply. Answer from what you have read and "
                         "offer to continue.")
     url = (tool_input.get('url') or '').strip()
+    key = _seen_key(project_id, **kwargs)
+    asked_for = url
+    corrected = closest_known_link(url, _known_links(key))
+    if corrected:
+        logger.info(f"[web_research] read_web_page: {url} was never shown; using {corrected}")
+        url = corrected
     try:
         page = fetch_page(url, max_chars=tool_input.get('max_chars') or 20000,
                           focus=tool_input.get('focus'))
@@ -168,6 +254,13 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
                 "the exact urls in its `links`."
             ),
         }
+    _remember_links(key, page.get('links') or [])
+    _remember_links(key, [{'url': page.get('final_url') or url}])
+    fix_note = (
+        f"You asked for {asked_for}, an address this chat was never given; this was read from "
+        f"{url}, the real link closest to it. Cite {url}, and copy links exactly from now on. "
+        if corrected else ""
+    )
     notes = []
     if page.get('pages_note'):
         notes.append(page['pages_note'])
@@ -177,7 +270,8 @@ def read_web_page_tool(tool_input: Dict[str, Any] = None, project_id: int = None
         'success': True,
         **page,
         'instruction': (
-            "This is the page's actual text. Quote and cite it; state only what it says. "
+            fix_note
+            + "This is the page's actual text. Quote and cite it; state only what it says. "
             + ("The page's document links are in `links` — to open one, use its url exactly; "
                "never build a file address from a title. When the question is about a document of a "
                "kind listed there (a staff report, conditions, minutes, an attachment), open those "
