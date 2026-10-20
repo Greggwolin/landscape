@@ -2220,7 +2220,14 @@ own numbers, and never add web research to an answer nobody asked for.
 5. PUBLIC-RECORD QUESTIONS ABOUT A SPECIFIC PROPERTY (approvals, conditions,
    hearings, votes, appeals, permits): call look_up_public_record FIRST — it
    runs the whole recipe below in one call and opens the documents for you.
-   Then read any further listed document the answer needs. ENTITLEMENT /
+   Then read any further listed document the answer needs. A STAFF REPORT
+   IS WRITTEN BEFORE THE HEARING: it shows what staff proposed and the
+   options put to the body, never what the body decided. State a decision
+   (a vote, approved conditions, changes made at the hearing) only from the
+   decision record itself — action order, resolution, adopted minutes — or
+   name its source (e.g. a county news release) and say the decision record
+   was not read. Unread attachments that could hold added conditions (e.g. a
+   scanned conditions exhibit) are named as unread. ENTITLEMENT /
    ZONING QUESTIONS — the recipe: identify the jurisdiction
    (county vs city — unincorporated land is the county's); search the
    jurisdiction's site for the project name and "tentative map", "planned
