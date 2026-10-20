@@ -485,3 +485,22 @@ def test_subject_filter_ranks_the_asked_for_document_over_the_application_packet
                                    subject="Sierra Reflections WTM24-001 WSUP25-0019")
     assert 'Staff%20Report%20FINAL' in picks[0]['url']
     assert all('Application%20Packet' not in p['url'] and 'other-case' not in p['url'] for p in picks)
+
+
+def test_subject_matcher_needs_the_case_number_or_the_whole_name():
+    from apps.landscaper.tools.web_research_tools import subject_matcher
+    m = subject_matcher("Sierra Reflections WTM24-001 WSUP25-0019")
+    assert m("BCC 03-10-26 - Staff Report FINAL - Sierra Reflections Appeal.pdf")
+    assert m("WTM24-001 Sierra Reflections and WSUP25-0019")
+    assert m("Item 8D - WTM24 001 staff report")
+    assert not m("Item 7A - WTM18-001 Extension of Time Sierra Vista aka Lemmon Heights Staff Report")
+    assert not m("WTM25-002 and WSUP25-0022 Silver Crossing - Staff Report")
+    assert not m("Board of County Commissioners")
+
+
+def test_plain_question_wording_still_finds_the_board_staff_report():
+    from apps.landscaper.tools.web_research_tools import pick_documents_to_open
+    for q in ("conditions of approval changed by the Board on appeal March 2026",
+              "Did the Board change any of the conditions when it approved this on appeal"):
+        picks = pick_documents_to_open(_LISTING, q, subject="Sierra Reflections WTM24-001 WSUP25-0019")
+        assert picks and 'Staff%20Report%20FINAL' in picks[0]['url'], q

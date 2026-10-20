@@ -143,6 +143,32 @@ def _focus_words(focus: Optional[str]):
     return {w for w in _re.findall(r"[a-z][a-z0-9]{2,}", (focus or "").lower()) if w not in _STOP}
 
 
+_CASE_NO = _re.compile(r"(?i)\b([a-z]{2,6})[\s-]?(\d{2,4})[\s-]?(\d{2,5})\b")
+
+
+def subject_matcher(subject: Optional[str]):
+    """A test for 'is this about the subject?' that does not fire on one shared
+    word. 'Sierra Reflections WTM24-001 WSUP25-0019' matches text containing the
+    case number WTM24-001 (spacing and dashes ignored) or the phrase 'sierra
+    reflections' — not 'Sierra Vista' or 'WTM18-001' (VQ, 2026-10-20)."""
+    if not subject:
+        return None
+    cases = {"".join(m.groups()).lower() for m in _CASE_NO.finditer(subject)}
+    name = _CASE_NO.sub(" ", subject)
+    name = " ".join(w for w in _re.findall(r"[a-z0-9']+", name.lower()) if w not in _STOP)
+
+    def _m(text: str) -> bool:
+        t = (text or "").lower()
+        squashed = _re.sub(r"[\s_\-]+", "", t)
+        if any(c in squashed for c in cases):
+            return True
+        if name and len(name.split()) >= 1:
+            flat = " ".join(_re.findall(r"[a-z0-9']+", t))
+            return name in flat
+        return False
+    return _m
+
+
 def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int = 2,
                            subject: Optional[str] = None):
     """The listed files that best match the focus: at least two focus words,
@@ -153,9 +179,14 @@ def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int =
     question alone: a case page lists every case in the district, and the
     subject's own application packet otherwise outranks the document asked for."""
     words = _focus_words(focus)
-    subj = _focus_words(subject)
+    if words & {'board', 'commissioners', 'commission'}:
+        words |= {'bcc'}          # county file names say BCC, questions say "the Board"
+    subj = subject_matcher(subject)
     if not words:
         return []
+    # With a subject the field is already narrowed to its own files, so one
+    # matching word is enough; without one, two are needed.
+    need = 1 if subj else 2
     scored = []
     for i, l in enumerate(links or []):
         u = l.get('url') or ''
@@ -163,12 +194,10 @@ def pick_documents_to_open(links, focus: Optional[str], already=(), limit: int =
             continue
         name = unquote(urlsplit(u).path.rsplit('/', 1)[-1])
         hay = (l.get('text', '') + ' ' + name).lower()
-        if subj:
-            where = (l.get('text', '') + ' ' + unquote(urlsplit(u).path)).lower().replace('-', ' ')
-            if not any(w in where for w in subj):
-                continue
+        if subj and not subj(l.get('text', '') + ' ' + unquote(urlsplit(u).path).replace('-', ' ')):
+            continue
         score = sum(1 for w in words if w in hay)
-        if score >= 2:
+        if score >= need:
             scored.append((-score, i, l))
     if not scored:
         return []
@@ -564,32 +593,74 @@ def look_up_public_record_tool(tool_input: Dict[str, Any] = None, project_id: in
     # 3. the official pages that best match, each opening its best-matching documents
     words = _focus_words(focus)
 
+    about = subject_matcher(subject)
+
     def _score(r):
         hay = ((r.get('title') or '') + ' ' + (r.get('snippet') or '') + ' '
                + unquote(urlsplit(r.get('url') or '').path)).lower()
-        return sum(1 for w in words if w in hay)
+        # A page that names the subject outranks any page that merely shares
+        # the question's words (the county's generic Planning Commission index).
+        return (1 if about and about(hay) else 0, sum(1 for w in words if w in hay))
 
     official = [r for r in results if r.get('url') and _official(r['url'])]
-    pages = sorted((r for r in official if not _FILE_LINK.search(r['url'])),
-                   key=_score, reverse=True)[:2]
-    if not pages:
-        pages = sorted((r for r in official if _FILE_LINK.search(r['url'])),
-                       key=_score, reverse=True)[:1]
-    reads = []
+    if site and about and not any(
+            about((r.get('title') or '') + ' ' + (r.get('snippet') or ''))
+            for r in official if not _FILE_LINK.search(r['url'])):
+        # No official page names the subject yet: one more try for its case page.
+        extra = web_search_tool(tool_input={'query': f"{subject} application", 'site': site, 'count': 8},
+                                project_id=project_id,
+                                prior_tool_calls=calls + ['web_search'] * 3, **kwargs)
+        seen = {r.get('url') for r in results}
+        new_rows = [r for r in (extra.get('results') or []) if r.get('url') not in seen]
+        results += new_rows
+        official += [r for r in new_rows if r.get('url') and _official(r['url'])]
+        out['search_results'] += [{'title': r.get('title'), 'url': r.get('url'), 'date': r.get('date')}
+                                  for r in new_rows]
+    def _junk(u: str) -> bool:
+        return 'calendar' in u.lower() or len(u) > 220
+
+    pages = sorted((r for r in official if not _FILE_LINK.search(r['url']) and not _junk(r['url'])),
+                   key=_score, reverse=True)[:4]
+    reads, all_links = [], []
     for r in pages:
         page = read_web_page_tool(tool_input={'url': r['url'], 'focus': question or focus,
-                                              'subject': subject, 'max_chars': 8000},
+                                              'subject': subject, 'max_chars': 6000,
+                                              'open_documents': False},
                                   project_id=project_id, prior_tool_calls=[], **kwargs)
         page.pop('instruction', None)
+        all_links += page.get('links') or []
         if 'links' in page:
-            page['links'] = page['links'][:20]
+            page['links'] = page['links'][:15]
         reads.append(page)
     out['pages_read'] = reads
 
+    # 4. across every page read, open the listed files that are about the
+    #    subject and best match the question — wherever they were listed.
+    key = _seen_key(project_id, **kwargs)
+    uniq, seen_u = [], set()
+    for l in all_links:
+        if l.get('url') and l['url'] not in seen_u:
+            seen_u.add(l['url']); uniq.append(l)
+    official_files = [{'url': r['url'], 'text': r.get('title') or ''} for r in official
+                      if _FILE_LINK.search(r['url']) and r['url'] not in seen_u]
+    picks = pick_documents_to_open(uniq + official_files, question or focus, subject=subject)
+    opened = []
+    for l in picks:
+        item = {'title': l.get('text'), 'url': l['url']}
+        try:
+            doc = fetch_page(l['url'], max_chars=12000, focus=question or focus)
+            item.update(text=doc['text'], truncated=doc.get('truncated'), pages_note=doc.get('pages_note'))
+        except WebResearchError as e:
+            item.update(error=e.code, message=e.message)
+        opened.append(item)
+    _remember_links(key, uniq + official_files)
+    out['opened_documents'] = opened
+
     out['instruction'] = (
-        "This is the research, already done: your own documents (my_documents), one search "
-        "(search_results), the official pages it found (pages_read) and, inside each page, the "
-        "listed documents that best match the question (opened_documents). Answer from these. "
+        "This is the research, already done: your own documents (my_documents), the searches "
+        "(search_results), the official pages they found (pages_read, each with its `links`) and "
+        "the listed documents about this subject that best match the question, opened for you "
+        "(opened_documents). Answer from these. "
         "Cite each fact with its document and link, copied exactly. If the answer needs a listed "
         "document that was not opened, open it with read_web_page (url from `links`, exactly) "
         "before answering. Say a record is missing only if it is in none of the above and the "

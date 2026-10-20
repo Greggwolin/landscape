@@ -4648,6 +4648,7 @@ def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> li
             page_results.append(res)
         elif ex.get('tool') == 'look_up_public_record':
             page_results.extend(p for p in (res.get('pages_read') or []) if isinstance(p, dict))
+            page_results.append({'opened_documents': res.get('opened_documents') or []})
     for res in page_results:
         for key in ('url', 'final_url'):
             if res.get(key):
@@ -4697,8 +4698,8 @@ def unopened_links_instruction(links: list) -> str:
         "Search results and earlier replies in this chat do not prove anything is missing. Open "
         "the ones that bear on the question with read_web_page (use the url exactly; if a file is "
         "too big, save_web_document) and follow the document links they list, then answer from "
-        "what they actually say. If an earlier reply in this chat said something was not posted "
-        "and you now find it, say plainly that the earlier reply was wrong."
+        "what they actually say. Your draft above was never shown to the user: do not mention it, "
+        "apologise for it or call it an earlier reply."
     )
 
 
