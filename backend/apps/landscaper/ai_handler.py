@@ -2194,6 +2194,84 @@ general-purpose context lookup. Apply these rules strictly:
 The artifact panel is for things the user asked for. Treat it that way.
 
 ═══════════════════════════════════════════════════════════════════════════════
+WEB RESEARCH — web_search / read_web_page / save_web_document (CRITICAL)
+═══════════════════════════════════════════════════════════════════════════════
+
+You can research the public web. Use it when the user asks you to research,
+look up, find, check or verify something outside the app — or when a factual
+question about the outside world (entitlement status, a hearing, a vote, the
+owner of record, a news event) cannot be answered from the project's own data
+or attached documents. Try those first. Never use the web for the project's
+own numbers, and never add web research to an answer nobody asked for.
+
+1. SEARCH, THEN READ. A search result is a lead, not a fact. Read the most
+   official result (county, city, state agency, water/sewer authority, court
+   record) with read_web_page before stating what it says; news second.
+2. CITE EVERY WEB FACT in the same sentence: site and date — "(Washoe County
+   staff report, 2026-01-06)" — and give each link once. Keep web facts
+   visibly separate from the project's own data and the user's documents.
+3. NOTHING READ = NOTHING SAID. If a read fails or is blocked, or a search
+   returns nothing, say so in one line. Never describe what a page "likely"
+   contains.
+4. CONFLICTS ARE THE FINDING. When the web contradicts an attached document
+   or the project's data (e.g. a 2020 article says approvals expire in 2022;
+   the county shows a new 2026 approval), lead with the conflict and both
+   sources, newest first.
+5. PUBLIC-RECORD QUESTIONS ABOUT A SPECIFIC PROPERTY (approvals, conditions,
+   hearings, votes, appeals, permits): call look_up_public_record FIRST — it
+   runs the whole recipe below in one call and opens the documents for you.
+   Then read any further listed document the answer needs. A STAFF REPORT
+   IS WRITTEN BEFORE THE HEARING: it shows what staff proposed and the
+   options put to the body, never what the body decided. State a decision
+   (a vote, approved conditions, changes made at the hearing) only from the
+   decision record itself — action order, resolution, adopted minutes — or
+   name its source (e.g. a county news release) and say the decision record
+   was not read. Unread attachments that could hold added conditions (e.g. a
+   scanned conditions exhibit) are named as unread. ENTITLEMENT /
+   ZONING QUESTIONS — the recipe: identify the jurisdiction
+   (county vs city — unincorporated land is the county's); search the
+   jurisdiction's site for the project name and "tentative map", "planned
+   development", "special use permit", "zoning"; read the application page or
+   staff report; report case numbers, decision body, dates, vote, appeal
+   history, conditions, next hearing and owner of record as the record states
+   them; then check the regional body (e.g. a regional planning agency) if the
+   record mentions one.
+6. BUDGET: at most 5 searches and 8 page reads per answer. If the research
+   needs more, give what you have and offer to continue.
+7. TOO BIG TO READ = SAVE IT. When a document matters and read_web_page says
+   it is too large (county packets often run to hundreds of MB), or only part
+   of it could be read and the answer is in the rest, call save_web_document
+   — do not ask, and never send the user off to fetch it themselves. It is
+   filed with this chat or project and joins the user's own knowledge. Then
+   say in one line that it is being saved and read and that you can answer
+   from it shortly.
+8. LINKS ARE COPIED, NEVER WRITTEN. Every link you give must appear
+   character for character in a tool result from this conversation. Never
+   build, shorten or guess a web address; if you have no exact address, name
+   the page and say you have no link for it. Put each link on its own as a
+   bare address.
+9. THE USER'S OWN KNOWLEDGE COMES FIRST. Before researching a property,
+   site or opportunity on the web, call search_my_knowledge — the user may
+   already hold the staff report, a market study or notes from an earlier
+   staging chat. Say which facts came from their documents and which from
+   the web.
+10. NEVER CLAIM ABSENCE WITHOUT LOOKING THIS TURN. Before saying a document
+   does not contain something, that a record is not posted, or that you
+   cannot find or access it, search for it in this turn (search_my_knowledge,
+   get_document_content with a focus phrase, web_search + read_web_page). A
+   follow-up like "did you not find them?" means look again and report what
+   the searches returned — titles and links as returned. County packets
+   usually include the plan sheets (tentative map, site plan) as pages of the
+   same PDF; search for "sheet", "tentative map" or "site plan" before saying
+   the drawings are not there.
+11. SITE PLAN ON A MAP. The app can drape a plan sheet over the map
+   (extract_plan_image, then the map's overlay tools) — but only inside a
+   project, because the map belongs to a project. In a staging chat, do not
+   say the platform cannot do it: say it needs a project, offer to create
+   one from this chat (its documents move with it), and name the document
+   and page that hold the sheet if you found it.
+
+═══════════════════════════════════════════════════════════════════════════════
 EXCEL AUDIT — RESULTS RENDER IN ARTIFACT, NOT IN CHAT
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -3929,6 +4007,10 @@ _NUMBERS_PRODUCING_PREFIXES = (
     'get_market_assumptions', 'get_competitive_projects', 'get_acquisition_events',
     'get_location_analysis', 'generate_location_brief', 'get_portfolio_summary',
     'sensitivity_grid',
+    # VQ (2026-10-16): web pages are a numbers source under figure-level
+    # provenance — a figure passes only if it appears in text a page read or a
+    # search snippet actually returned this turn.
+    'web_search', 'read_web_page', 'search_my_knowledge', 'look_up_public_record',
 )
 # STRUCTURE-only tools return shape (tiers, splits, schema, completeness, attribute
 # counts, RAG text) but NOT computed money — reading them must NOT license invented
@@ -4456,6 +4538,178 @@ def _redact_unsourced_figures(text: str, sourced: set) -> Tuple[str, int]:
     return ''.join(parts), redacted
 
 
+_URL_RE = re.compile(r"https?://[^\s<>\"'`\]\)]+")
+_URL_TRAIL = '.,;:!?*_'
+
+
+def _clean_url(u: str) -> str:
+    return u.rstrip(_URL_TRAIL)
+
+
+def unverified_links_removed(content: str, tool_outputs: Optional[list],
+                             messages: Optional[list]) -> tuple:
+    """Remove web links the reply wrote itself (VQ, 2026-10-17).
+
+    A link is kept only if it appears, as written, in something Landscaper
+    actually saw: a tool result this turn, or the conversation so far (the
+    user's messages and earlier replies, which passed this check). A guessed
+    county address costs the user a dead click and reads as a source. Returns
+    (content, removed_count)."""
+    if not content or 'http' not in content:
+        return content, 0
+    seen_text = json.dumps(tool_outputs or [], default=str)
+    for msg in (messages or []):
+        c = msg.get('content') if isinstance(msg, dict) else getattr(msg, 'content', '')
+        seen_text += '\n' + (c if isinstance(c, str) else json.dumps(c, default=str))
+    seen = {_clean_url(u) for u in _URL_RE.findall(seen_text)}
+    # Tool results are JSON: slashes may be escaped and spaces percent-encoded.
+    seen |= {u.replace('\\/', '/') for u in seen}
+    removed = 0
+
+    from urllib.parse import unquote as _unq
+    seen_unq = {_unq(u) for u in seen}
+
+    def _ok(u: str) -> bool:
+        cu = _clean_url(u)
+        return cu in seen or _unq(cu) in seen_unq
+
+    def _md(m):
+        nonlocal removed
+        if _ok(m.group(2)):
+            return m.group(0)
+        removed += 1
+        return m.group(1) + ' (no verified link)'
+    out = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", _md, content)
+
+    def _bare(m):
+        nonlocal removed
+        u = m.group(0)
+        if _ok(u):
+            return u
+        removed += 1
+        return '(no verified link)' + u[len(_clean_url(u)):]
+    out = _URL_RE.sub(_bare, out)
+    return out, removed
+
+
+ABSENCE_RETRY_INSTRUCTION = (
+    "STOP. You just told the user that something is missing, not available, not posted or "
+    "that you cannot access it — without checking in this turn. Check before saying that: "
+    "search_my_knowledge for the user's own documents (saved county packets often include the "
+    "plan sheets — search e.g. 'tentative map sheet', 'site plan', 'conditions of approval'), "
+    "get_document_content with a focus phrase, and web_search + read_web_page for public "
+    "records. Then answer from what the tools actually returned, naming what you searched."
+)
+
+_ABSENCE_PHRASE = re.compile(
+    r"(?i)\b(?:i\s+(?:do\s+not|don't)\s+have"
+    r"|(?:cannot|can't|could\s+not|couldn't|unable\s+to)\s+(?:\w+ly\s+)?(?:access|find|locate|retrieve|get\s+to|open)"
+    r"|(?:have|has)\s*(?:not|n't)\s+(?:yet\s+)?(?:located|found|been\s+able\s+to)"
+    r"|(?:does|do)\s+(?:not|n't)\s+(?:include|contain|appear|have)"
+    r"|doesn't\s+(?:include|contain|appear|have)|don't\s+appear"
+    r"|(?:is|are)\s*(?:not|n't)\s+(?:(?:yet|publicly|currently|being)\s+){0,2}(?:posted|available|public|online)"
+    r"|\bno\s+(?:bcc\s+|board\s+)?(?:staff\s+report|resolution|minutes|action\s+order)s?\b[^.]{0,60}\b(?:is|are)\s+available"
+    r"|aren't\s+(?:yet\s+)?(?:posted|available)|isn't\s+(?:yet\s+)?(?:posted|available)"
+    r"|no\s+(?:site\s+plan|drawings?|map|document|record)s?\s+(?:is|are|was|were)\s+(?:attached|included|available))"
+)
+_ABSENCE_SUBJECT = re.compile(
+    r"(?i)\b(document|report|staff\s+report|packet|site\s+plan|plan\s+sheets?|drawings?|tentative\s+map|"
+    r"exhibit|attachment|resolution|minutes|agenda|notice\s+of\s+decision|action\s+order|"
+    r"website|portal|county|file|pdf|record)"
+)
+
+
+def claims_absence_without_looking(text: str) -> bool:
+    """True when a reply says a document/record/page is missing or out of reach.
+    Called only for replies that ran no tool this turn (VQ, 2026-10-19)."""
+    if not text:
+        return False
+    for m in _ABSENCE_PHRASE.finditer(text):
+        window = text[max(0, m.start() - 160): m.end() + 160]
+        if _ABSENCE_SUBJECT.search(window):
+            return True
+    return False
+
+
+_LINK_SUBJECT = re.compile(
+    r"(?i)(staff\s*report|attachment|exhibit|resolution|minutes|action\s*order|notice\s+of\s+decision|"
+    r"conditions?|agenda|packet|approval|appeal|decision)"
+)
+
+
+_DOC_FILE = re.compile(r"(?i)\.(pdf|docx?|xlsx?|pptx?|zip)(?:$|[?#])")
+
+
+def unopened_document_links(tool_executions: Optional[list], cap: int = 8) -> list:
+    """Document links a page read returned this turn that were never opened.
+
+    VQ, 2026-10-19: Landscaper read the county page, which listed the Board's
+    staff report and the tribal-conditions attachment, opened only the staff
+    presentation, then told Gregg the Board documents "are not posted". The
+    links were sitting in its own tool result."""
+    opened, listed = set(), []
+    page_results = []
+    for ex in tool_executions or []:
+        res = ex.get('result') or {}
+        if ex.get('tool') in ('read_web_page', 'save_web_document'):
+            page_results.append(res)
+        elif ex.get('tool') == 'look_up_public_record':
+            page_results.extend(p for p in (res.get('pages_read') or []) if isinstance(p, dict))
+            page_results.append({'opened_documents': res.get('opened_documents') or []})
+    for res in page_results:
+        for key in ('url', 'final_url'):
+            if res.get(key):
+                opened.add(str(res[key]))
+        for od in res.get('opened_documents') or []:
+            if isinstance(od, dict) and od.get('url') and not od.get('error'):
+                opened.add(str(od['url']))
+        for link in res.get('links') or []:
+            if isinstance(link, dict) and link.get('url'):
+                listed.append(link)
+    out, seen = [], set()
+    for link in listed:
+        u = link['url']
+        if u in opened or u in seen:
+            continue
+        if _LINK_SUBJECT.search(link.get('text', '') + ' ' + u):
+            seen.add(u)
+            out.append(link)
+    if out:
+        return out[:cap]
+    # VQ, 2026-10-19 (second miss): a "check again" turn ran three searches,
+    # opened nothing, and repeated "not posted" from its earlier reply — the
+    # search results held the county application page and a file in the
+    # Board's own folder. Searches alone never prove absence: when no page was
+    # opened this turn, the unread search results are what must be read.
+    # Third miss, same day: it opened one PDF, then guessed file names (404s)
+    # and never opened the application page sitting first in its results. So
+    # the unread results count even when something was opened — index pages
+    # (not files) first, because they carry the real document links.
+    pages, files = [], []
+    for ex in tool_executions or []:
+        if ex.get('tool') != 'web_search':
+            continue
+        for r in (ex.get('result') or {}).get('results') or []:
+            u = isinstance(r, dict) and r.get('url')
+            if u and u not in seen and u not in opened:
+                seen.add(u)
+                (files if _DOC_FILE.search(u) else pages).append({'text': r.get('title') or u, 'url': u})
+    return (pages + files)[:min(cap, 5)]
+
+
+def unopened_links_instruction(links: list) -> str:
+    lines = "\n".join(f"- {l.get('text', '')}: {l['url']}" for l in links)
+    return (
+        "STOP. You told the user a document is missing, not posted or out of reach — but this "
+        "turn turned up pages and documents you never opened:\n" + lines + "\n"
+        "Search results and earlier replies in this chat do not prove anything is missing. Open "
+        "the ones that bear on the question with read_web_page (use the url exactly; if a file is "
+        "too big, save_web_document) and follow the document links they list, then answer from "
+        "what they actually say. Your draft above was never shown to the user: do not mention it, "
+        "apologise for it or call it an earlier reply."
+    )
+
+
 def _prior_reply_was_guard_blocked(messages: Optional[list]) -> bool:
     """True when the immediately previous assistant turn was itself guard-blocked.
 
@@ -4802,6 +5056,10 @@ def get_landscaper_response(
             "  4. NEW-PROJECT — gather details conversationally, then call\n"
             "     create_project or create_analysis_draft when ready.\n\n"
             "Capabilities available from the home dashboard:\n"
+            "- Research the public web (county and agency pages, news, PDFs) with "
+            "web_search / read_web_page / save_web_document — see WEB RESEARCH rules\n"
+            "- Search the user's own knowledge across all their chats and projects with "
+            "search_my_knowledge\n"
             "- Read documents the user attached to THIS chat (listed under CHAT DOCUMENTS "
             "below, and named in the message as '[Attached: ...]') with "
             "get_project_documents / get_document_content / get_document_page\n"
@@ -5343,12 +5601,34 @@ def get_landscaper_response(
                 _log_cache_usage('retry', response)
                 logger.info(f"[AI_HANDLER] Retry response stop_reason={response.stop_reason}")
 
+        # Absence guard (VQ, 2026-10-19): a reply that says a document, page or
+        # record is missing / inaccessible / not posted, with no tool run this
+        # turn, is a guess. On 2026-10-19 Landscaper said a saved 638-page county
+        # packet "doesn't include the site plan drawings" (it holds 100+ plan
+        # sheets) and that Board documents were "not posted" — neither checked.
+        # One retry, told to look first.
+        if response.stop_reason == "end_turn" and tool_executor:
+            _abs_text = "".join(getattr(b, 'text', '') or '' for b in response.content)
+            if claims_absence_without_looking(_abs_text):
+                logger.warning("[AI_HANDLER] ABSENCE CLAIM without a tool call this turn. Forcing a check.")
+                retry_messages = list(api_kwargs.get('messages', []))
+                retry_messages.append({"role": "assistant", "content": _abs_text[:400] + "..."})
+                retry_messages.append({"role": "user", "content": ABSENCE_RETRY_INSTRUCTION})
+                retry_kwargs = dict(api_kwargs)
+                retry_kwargs['messages'] = retry_messages
+                try:
+                    response = client.messages.create(**retry_kwargs)
+                    _log_cache_usage('absence_retry', response)
+                except Exception as _abs_err:
+                    logger.error(f"[AI_HANDLER] absence retry failed (keeping first reply): {_abs_err}")
+
         # Tool loop safeguards
         MAX_TOOL_ITERATIONS = 10  # Increased from 5 — rent roll extraction needs ~6-8 steps
         MAX_TOOL_LOOP_SECONDS = 90  # Leave buffer for frontend's 150s timeout
         tool_loop_start = time.time()
         tool_iteration = 0
         loop_broke_early = False
+        unopened_links_nudged = False
 
         # Handle tool use loop
         while response.stop_reason == "tool_use" and tool_executor:
@@ -5622,6 +5902,29 @@ def get_landscaper_response(
                 loop_broke_early = True
                 break
 
+            # Absence-after-looking guard (VQ, 2026-10-19): the turn ran tools,
+            # the reply says something is missing, and a page read this turn
+            # listed matching documents that were never opened. One nudge.
+            if (response.stop_reason == "end_turn" and not unopened_links_nudged):
+                _fin_text = "".join(getattr(b, 'text', '') or '' for b in response.content)
+                if claims_absence_without_looking(_fin_text):
+                    _unopened = unopened_document_links(tool_executions)
+                    if _unopened:
+                        unopened_links_nudged = True
+                        logger.warning(
+                            f"[AI_HANDLER] Absence claim with {len(_unopened)} unopened listed documents. Nudging."
+                        )
+                        claude_messages.append({"role": "assistant", "content": response.content})
+                        claude_messages.append({"role": "user", "content": unopened_links_instruction(_unopened)})
+                        try:
+                            response = client.messages.create(**{**api_kwargs, 'messages': claude_messages})
+                            _log_cache_usage('unopened_links_retry', response)
+                            total_input_tokens += response.usage.input_tokens
+                            total_output_tokens += response.usage.output_tokens
+                        except Exception as _ul_err:
+                            logger.error(f"[AI_HANDLER] unopened-links retry failed: {_ul_err}")
+                            claude_messages = claude_messages[:-2]
+
         # If loop broke early, make one final call WITHOUT tools to get a summary
         if loop_broke_early and tool_executor:
             logger.info("[Tool Loop] Making final summary call (no tools)")
@@ -5690,21 +5993,26 @@ def get_landscaper_response(
         # force a narration turn. This prevents the "silent completion" bug where
         # confirm_column_mapping or other mutation tools execute but no follow-up
         # message is generated for the user.
-        narration_tools = {'confirm_column_mapping', 'compute_rent_roll_delta', 'update_units', 'delete_units'}
-        executed_narration_tools = [tc['tool'] for tc in tool_calls_made if tc['tool'] in narration_tools]
+        # VQ (2026-10-19): any tool, not only these four. A research turn ran two
+        # web searches and came back blank — the user saw an empty reply.
+        narration_tools = {tc['tool'] for tc in tool_calls_made}
+        executed_narration_tools = [tc['tool'] for tc in tool_calls_made]
         if executed_narration_tools and not final_content.strip():
             logger.info(f"[Tool Loop] No narration after tool execution ({executed_narration_tools}), forcing narration turn")
             try:
                 # Build a narration prompt from the last tool results
                 last_tool_summaries = []
                 for exec_info in tool_executions:
-                    if exec_info.get('tool') in narration_tools and exec_info.get('success'):
+                    if exec_info.get('tool') in narration_tools:
+                        state = 'succeeded' if exec_info.get('success') else 'failed'
                         last_tool_summaries.append(
-                            f"Tool '{exec_info['tool']}' succeeded: {str(exec_info.get('result', {}))[:500]}"
+                            f"Tool '{exec_info['tool']}' {state}: "
+                            f"{str(exec_info.get('result', exec_info.get('error', {})))[:1500]}"
                         )
                 narration_prompt = (
-                    "The following tools completed successfully but you didn't produce a response. "
-                    "Please narrate the results concisely (1-3 sentences): "
+                    "These tools ran but you didn't produce a response. Answer the user now from "
+                    "what they actually returned — state what was found (with titles and links "
+                    "exactly as returned) and what was not. Do not call tools: "
                     + "; ".join(last_tool_summaries)
                 )
                 # Append as assistant + user to maintain proper turn structure
@@ -5888,6 +6196,16 @@ def get_landscaper_response(
                 metadata['fabrication_guard'] = guard_envelope
         except Exception as _fg_err:  # never let the guard break a response
             logger.error("[FabricationGuard] guard error (passing original content through): %s", _fg_err)
+
+        # Link guard (VQ, 2026-10-17): drop web addresses no tool returned.
+        try:
+            final_content, _links_removed = unverified_links_removed(
+                final_content, tool_executions, messages)
+            if _links_removed:
+                metadata['unverified_links_removed'] = _links_removed
+                logger.warning("[LinkGuard] removed %s unverified link(s)", _links_removed)
+        except Exception as _lg_err:
+            logger.error("[LinkGuard] error (content passed through): %s", _lg_err)
 
         return {
             'content': final_content,

@@ -5315,6 +5315,91 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "web_search",
+        "description": "Search the public web (Brave). Returns titles, links, snippets and page dates — NOT facts: read a result with read_web_page before stating anything from it. USE WHEN the user asks you to research, look up, find, check or verify something outside the app — entitlements, zoning cases, approvals, hearings, ownership of record, news about a site, a builder or a jurisdiction — or when the project's own data and attached documents cannot answer a factual question about the outside world (try those first). DO NOT use for the project's own numbers, for general real-estate knowledge you already have, or as background padding on another answer. Prefer official sources: pass site='<county>.gov' (or the agency domain) for entitlement and zoning questions. Max 5 searches per answer.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Plain search terms, e.g. 'Sierra Reflections tentative map'. Include the project or place name and the jurisdiction."},
+                "site": {"type": "string", "description": "Optional domain to restrict to, e.g. 'washoecounty.gov'."},
+                "count": {"type": "integer", "description": "Results to return, 1-10 (default 6)."},
+                "freshness": {"type": "string", "enum": ["pd", "pw", "pm", "py"], "description": "Optional recency filter: past day / week / month / year."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "read_web_page",
+        "description": "Read one public web page or PDF (staff reports, agendas, ordinances, news articles) and return its text. Use on the most official web_search result before stating facts from it, or on a link the user gave. Returns the page's actual text; quote and cite it. If the read fails, say so — never describe a page you could not read. Max 8 pages per answer.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "Full http(s) address, usually taken from a web_search result."},
+                "focus": {"type": "string", "description": "What you are looking for, e.g. 'Board staff report conditions of approval' or 'WTM24-001'. Centres the excerpt in long documents; on a listing page the one or two listed documents that best match it are opened for you and returned in opened_documents."},
+                "max_chars": {"type": "integer", "description": "Text to return, 1,000-40,000 (default 20,000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "look_up_public_record",
+        "description": (
+            "Look up the public record of a specific property, project or case — entitlements, "
+            "approvals, conditions of approval, hearings, votes, appeals, staff reports, permits. "
+            "Use it FIRST for any such question, before web_search. In one call it searches the "
+            "user's own saved documents, runs one web search, reads the official pages found and "
+            "opens the listed documents that best match the question, and returns all of it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string", "description": "The property/project name and any case numbers, e.g. 'Sierra Reflections WTM24-001 WSUP25-0019'."},
+                "jurisdiction": {"type": "string", "description": "County or city and state, e.g. 'Washoe County Nevada'."},
+                "question": {"type": "string", "description": "What to find, in the record's words, e.g. 'Board of County Commissioners appeal staff report conditions of approval'."},
+            },
+            "required": ["subject", "question"],
+        },
+    },
+    {
+        "name": "save_web_document",
+        "description": (
+            "Download a whole public file (usually a PDF found by web_search/read_web_page) and file it in "
+            "this chat's or project's documents — the user's own knowledge, searchable later from any of "
+            "their chats and projects with search_my_knowledge. Use it — without asking — when "
+            "read_web_page says a document that matters is too large, or when only part of it could be "
+            "read and the answer is in the rest. Runs in the background: readable a few minutes later. "
+            "Up to 500 MB. Never use it for pages nobody needs."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "The exact address from a web_search or read_web_page result. Never a constructed address."},
+                "title": {"type": "string", "description": "Optional readable name, e.g. 'WTM24-001 Sierra Reflections staff report (Planning Commission 2026-01-06)'."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "search_my_knowledge",
+        "description": (
+            "Search the user's OWN knowledge: every document they have put into Landscape — files "
+            "attached in staging (pre-project) chats, county records saved from the web, project "
+            "documents — across all their chats and projects. Private to this user. Use it FIRST when "
+            "the user asks about a property, site, deal or opportunity they have looked at before, or "
+            "says 'what do we know', 'what did the report say', 'in my documents'; and before searching "
+            "the web for facts the user may already hold. Returns matching passages with the document "
+            "name and where it lives."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to find, in plain words, e.g. 'Sierra Reflections conditions of approval fire station'."},
+                "limit": {"type": "integer", "description": "Passages to return, 1-20 (default 8)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
         "name": "log_alpha_feedback",
         "description": "Log user feedback (bug, suggestion, question) from chat.",
         "input_schema": {

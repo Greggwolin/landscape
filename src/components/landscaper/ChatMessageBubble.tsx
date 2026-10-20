@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
 import MediaSummaryCard from './MediaSummaryCard';
-import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
+import { processLandscaperResponse, splitLinks } from '@/utils/formatLandscaperResponse';
 import { ArtifactCardInline } from '@/components/wrapper/ArtifactCardInline';
 
 /**
@@ -109,7 +109,25 @@ export function ChatMessageBubble({
           color: isUser ? 'var(--cui-primary-text)' : 'var(--cui-body-color)',
         }}
       >
-        <div style={{ whiteSpace: 'pre-wrap' }}>{displayContent}</div>
+        <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+          {isUser
+            ? displayContent
+            : splitLinks(displayContent).map((seg, i) =>
+                seg.href ? (
+                  <a
+                    key={i}
+                    href={seg.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--cui-link-color, var(--cui-primary))', textDecoration: 'underline' }}
+                  >
+                    {seg.text}
+                  </a>
+                ) : (
+                  <React.Fragment key={i}>{seg.text}</React.Fragment>
+                ),
+              )}
+        </div>
 
         {!isUser && message.metadata?.sources && message.metadata.sources.length > 0 && (
           <div className="mt-3 border-top pt-2" style={{ borderColor: 'var(--cui-border-color)' }}>
