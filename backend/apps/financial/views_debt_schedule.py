@@ -97,6 +97,8 @@ class DebtScheduleView(APIView):
                     'peak_balance': result.peak_balance,
                     'peak_balance_pct': result.peak_balance_pct,
                     'iterations_to_converge': result.iterations_to_converge,
+                    'converged': result.converged,
+                    'reserve_residual': round(result.reserve_residual, 2),
                 },
                 'periods': [
                     {
