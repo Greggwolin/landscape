@@ -44,7 +44,7 @@ describe('createFolderConfig analysis-type visibility', () => {
   });
 });
 
-describe('land Feasibility folder after the placeholder subtabs were removed (#LS-1021-05/06)', () => {
+describe('land Feasibility folder after the placeholder subtabs were removed (#LS-1021-05/09)', () => {
   it('exposes only Cash Flow — no Returns or Sensitivity "Coming Soon" tabs', () => {
     const feasibility = createFolderConfig('LAND').folders.find((f) => f.id === 'feasibility');
     expect(feasibility).toBeDefined();

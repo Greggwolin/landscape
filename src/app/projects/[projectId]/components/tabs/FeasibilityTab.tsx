@@ -9,7 +9,7 @@
  *
  * The 'returns' and 'sensitivity' subtabs were "Coming Soon" placeholders from
  * January 2026 and never gained content; removed 2026-10-21 (ARGUS parity
- * re-audit, #LS-1021-05/06, Gregg's decision PX-Q2 = 2b). Returns live on the
+ * re-audit, #LS-1021-05/09, Gregg's decision PX-Q2 = 2b). Returns live on the
  * Cash Flow screen and in the Landscaper tools.
  *
  * @version 2.1

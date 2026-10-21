@@ -52,7 +52,7 @@ describe('resolveScreenIntent — clean nav phrases short-circuit to a screen', 
     });
   });
 
-  it('no longer routes "go to sensitivity" / "show me returns" to a screen — those placeholders are gone (#LS-1021-05/06)', () => {
+  it('no longer routes "go to sensitivity" / "show me returns" to a screen — those placeholders are gone (#LS-1021-05/09)', () => {
     expect(resolveScreenIntent('go to sensitivity', landFolders)).toBeNull();
     expect(resolveScreenIntent('show me returns', landFolders)).toBeNull();
   });

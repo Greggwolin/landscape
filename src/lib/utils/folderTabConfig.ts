@@ -350,7 +350,7 @@ export function createFolderConfig(
           )
         : [
             // 'returns' and 'sensitivity' were Coming-Soon placeholders since
-            // 2026-01; removed 2026-10-21 (#LS-1021-05/06, decision PX-Q2 2b).
+            // 2026-01; removed 2026-10-21 (#LS-1021-05/09, decision PX-Q2 2b).
             { id: 'cashflow', label: 'Cash Flow' },
           ],
     },
