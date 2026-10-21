@@ -44,12 +44,17 @@ describe('resolveScreenIntent — clean nav phrases short-circuit to a screen', 
     });
   });
 
-  it('matches a sub-tab via the live label (exact match) — "go to sensitivity"', () => {
-    expect(resolveScreenIntent('go to sensitivity', landFolders)).toEqual({
+  it('matches a sub-tab via the live label (exact match) — "go to cash flow"', () => {
+    expect(resolveScreenIntent('go to cash flow', landFolders)).toEqual({
       folder: 'feasibility',
-      tab: 'sensitivity',
-      label: 'Sensitivity',
+      tab: 'cashflow',
+      label: 'Cash Flow',
     });
+  });
+
+  it('no longer routes "go to sensitivity" / "show me returns" to a screen — those placeholders are gone (#LS-1021-05/06)', () => {
+    expect(resolveScreenIntent('go to sensitivity', landFolders)).toBeNull();
+    expect(resolveScreenIntent('show me returns', landFolders)).toBeNull();
   });
 });
 

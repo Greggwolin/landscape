@@ -43,3 +43,16 @@ describe('createFolderConfig analysis-type visibility', () => {
     expect(folderIds).toContain('operations');
   });
 });
+
+describe('land Feasibility folder after the placeholder subtabs were removed (#LS-1021-05/06)', () => {
+  it('exposes only Cash Flow — no Returns or Sensitivity "Coming Soon" tabs', () => {
+    const feasibility = createFolderConfig('LAND').folders.find((f) => f.id === 'feasibility');
+    expect(feasibility).toBeDefined();
+    expect(feasibility!.subTabs.map((s) => s.id)).toEqual(['cashflow']);
+  });
+
+  it('still defaults the Feasibility folder to cashflow (QV14 regression guard)', () => {
+    const feasibility = createFolderConfig('LAND').folders.find((f) => f.id === 'feasibility');
+    expect(feasibility!.subTabs[0].id).toBe('cashflow');
+  });
+});

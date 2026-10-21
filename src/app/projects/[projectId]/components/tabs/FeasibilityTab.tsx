@@ -6,11 +6,14 @@
  *
  * Subtabs (controlled by folder tabs Row 2):
  * - cashflow: Cash Flow / DCF Analysis
- * - returns: Returns Analysis (Coming Soon)
- * - sensitivity: Sensitivity Analysis (Coming Soon)
  *
- * @version 2.0
- * @updated 2026-01-23 - Converted to controlled component
+ * The 'returns' and 'sensitivity' subtabs were "Coming Soon" placeholders from
+ * January 2026 and never gained content; removed 2026-10-21 (ARGUS parity
+ * re-audit, #LS-1021-05/06, Gregg's decision PX-Q2 = 2b). Returns live on the
+ * Cash Flow screen and in the Landscaper tools.
+ *
+ * @version 2.1
+ * @updated 2026-10-21 - Dropped the two placeholder subtabs
  */
 
 'use client';
@@ -118,50 +121,6 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
                 onSummaryChange={handleSummaryChange}
               />
             </div>
-          </div>
-        );
-
-      case 'returns':
-        return (
-          <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="mb-0">Returns Analysis</h4>
-              <ExportButton tabName="Feasibility-Returns" projectId={projectId.toString()} />
-            </div>
-            <CCard>
-              <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📈</div>
-                <h5 className="mb-2">Returns Analysis</h5>
-                <p className="mb-1" style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
-                  IRR, NPV, and equity multiple calculations
-                </p>
-                <p className="mb-0" style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
-                  Coming Soon
-                </p>
-              </CCardBody>
-            </CCard>
-          </div>
-        );
-
-      case 'sensitivity':
-        return (
-          <div>
-            <div className="d-flex justify-content-between align-items-center mb-4">
-              <h4 className="mb-0">Sensitivity Analysis</h4>
-              <ExportButton tabName="Feasibility-Sensitivity" projectId={projectId.toString()} />
-            </div>
-            <CCard>
-              <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📐</div>
-                <h5 className="mb-2">Sensitivity Analysis</h5>
-                <p className="mb-1" style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
-                  Analyze how changes in key assumptions affect project returns
-                </p>
-                <p className="mb-0" style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
-                  Coming Soon
-                </p>
-              </CCardBody>
-            </CCard>
           </div>
         );
 
