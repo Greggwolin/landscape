@@ -4,13 +4,19 @@
  * Displays the three approaches to value: Sales Comparison, Cost, Income.
  * Fully controlled component - activeTab is managed by parent via URL params.
  *
- * For NNN SLB projects (detected via property_subtype), the Income Approach
- * tab renders NNNIncomeApproach with Level 3 sub-sub tabs, and Reconciliation
- * renders NNNReconciliation. Cost Approach shows "Not Applicable" empty state.
+ * For NNN SLB projects (detected via property_subtype), Cost Approach shows a
+ * "Not Applicable" empty state, and Income Approach + Reconciliation show a
+ * "not built yet" empty state. The NNN screens that used to render there
+ * (NNNIncomeApproach / NNNReconciliation, under components/valuation/nnn/)
+ * are mock-ups driven entirely by nnnMockData — hardcoded lease, rent and
+ * value figures that belong to no project — and were being shown as if they
+ * were this project's valuation. Hidden 2026-10-21 (ARGUS parity re-audit
+ * §2.3, #LS-1021-06; Gregg's decision PX-Q1 = 1a). The detection and the
+ * mock-up files are kept for the eventual real build.
  *
- * @version 2.2
+ * @version 2.3
  * @created 2026-01-23
- * @updated 2026-02-23 - Added NNN SLB Income Approach + Reconciliation routing
+ * @updated 2026-10-21 - NNN mock screens hidden behind an honest empty state
  */
 
 'use client';
@@ -25,8 +31,37 @@ import { IncomeApproachContent } from './IncomeApproachContent';
 import { ReconciliationPanel } from '../../valuation/components/ReconciliationPanel';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 import { isNNNProject } from '@/components/valuation/nnn/nnnDetection';
-import NNNIncomeApproach from '@/components/valuation/nnn/NNNIncomeApproach';
-import NNNReconciliation from '@/components/valuation/nnn/NNNReconciliation';
+
+/**
+ * NNN Income Approach / Reconciliation empty state — the real screens are not
+ * built. Replaces the mock-data screens hidden 2026-10-21 (#LS-1021-06).
+ */
+export function NNNNotBuiltEmpty({ title }: { title: string }) {
+  return (
+    <div style={{ padding: '20px 24px', maxWidth: 1060 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--cui-body-color)', marginBottom: 18 }}>
+        {title}
+      </div>
+      <div style={{
+        backgroundColor: 'var(--cui-card-bg)',
+        border: '1px solid var(--cui-border-color)',
+        borderRadius: 7,
+        textAlign: 'center',
+        padding: '52px 20px',
+        color: 'var(--cui-secondary-color)',
+      }}>
+        <div style={{ fontSize: 36, marginBottom: 14, opacity: 0.2 }}>◌</div>
+        <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--cui-body-color)' }}>
+          NNN sale-leaseback {title.toLowerCase()} is not built yet
+        </div>
+        <div style={{ fontSize: 12, maxWidth: 420, margin: '0 auto', lineHeight: 1.65 }}>
+          This screen previously showed sample figures that did not come from this project.
+          They have been removed. Ask Landscaper for the figures it can compute from your data.
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * NNN Cost Approach empty state — "Not Applicable" for NNN SLB
@@ -202,7 +237,7 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
 
       {normalizedTab === 'income' && (
         isNNN ? (
-          <NNNIncomeApproach projectId={projectId} project={project} />
+          <NNNNotBuiltEmpty title="Income Approach" />
         ) : (
           <IncomeApproachContent
             projectId={projectId}
@@ -215,7 +250,7 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
 
       {normalizedTab === 'reconciliation' && (
         isNNN ? (
-          <NNNReconciliation />
+          <NNNNotBuiltEmpty title="Reconciliation" />
         ) : (
           <ReconciliationPanel
             projectId={projectId}
