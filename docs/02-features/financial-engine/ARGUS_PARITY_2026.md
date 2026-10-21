@@ -114,7 +114,7 @@ and tests were excluded from every count.
 |---|---|---|---|
 | Residual Land Value solving | ABSENT, worse than absence | **ABSENT, unchanged** — see §4.2 | |
 | Profit on Cost / GDV / NDV | "ABSENT — nothing computes them" | **PARTIAL — and July overstated the absence.** `land_dev_cashflow_service.py` computes `totalGrossRevenue` (GDV-equivalent), `totalNetRevenue` (NDV-equivalent), `grossProfit` and `grossMargin` = profit ÷ *net revenue* (`:2209-2210`, `:2266-2267`) — and did at the July commit (`b970985:2087`). Still absent: **profit ÷ cost** as a reported ratio (one division away from numbers the engine already holds), and **development yield**. | code read at both commits |
-| Four-window absorption + deposit-date price locking | ABSENT | **ABSENT.** Landscape dates each parcel's bulk sale individually (`custom_sale_date` / sale period) and escalates price from project start (`_calculate_parcel_sale`, `:1114-1196`). That is the right model for Gregg's vocabulary — parcels are one-time bulk sales to builders, not takedowns — so the ARGUS window model is a scope question, not a defect. Option deposits exist for lotbank products (`_build_lotbank_sections`, `:1849`). | code read |
+| Four-window absorption + deposit-date price locking | ABSENT | **ABSENT — kept on the gap list (Gregg 3b, 2026-10-21).** Landscape dates each parcel's bulk sale individually (`custom_sale_date` / sale period) and escalates price from project start (`_calculate_parcel_sale`, `:1114-1196`); parcels are one-time bulk sales to builders, not takedowns, so today's model fits today's deals. Gregg chose to keep the ARGUS window model on the list rather than retire it — it would matter if Landscape ever underwrites a builder's own sell-out to end buyers. Option deposits exist for lotbank products (`_build_lotbank_sections`, `:1849`). | code read |
 | Infrastructure cost apportionment | ABSENT | **ABSENT** | 0 files match `apportion` |
 | Monte Carlo (EstateMaster) | ABSENT, docs advertise it | **ABSENT** — model classes only (`financial_engine/models.py` `VariableDistribution`, `MonteCarloResult`), no function. The engine's own `__init__.py:13`, `config.py:42-44` (10,000 default simulations) and README all reference a `core/monte_carlo.py` / `MonteCarloAnalyzer` that does not exist. | grep `def .*monte` → 0; `find -iname "*monte*"` → nothing |
 | Construction interest circularity | PRESENT, better conditioned than ARGUS | **PRESENT** — with §2.8 still attached | §2.8 run |
@@ -175,7 +175,7 @@ not re-run.
 | Developer | Profit on Cost | partial — profit computed, ratio reported on revenue not cost | yes (margin shown), no (on-cost not shown) | `:2210` | verified |
 | Developer | Development Yield | absent | — | 0 matches | verified |
 | Developer | Dated IRR (XIRR) on the land cash flow | present — new since July | yes — Feasibility→Cash Flow summary; Landscaper | `_calculate_dated_irr` #319 | verified |
-| Developer | Four-window absorption, deposit-date price lock | absent — by scope (bulk parcel sales model) | — | §3.3 | verified |
+| Developer | Four-window absorption, deposit-date price lock | absent — on the gap list by Gregg's call (3b) | — | §3.3 | verified |
 | Developer | Infrastructure cost apportionment | absent | — | 0 matches | verified |
 | Developer | Construction loan / interest-reserve circularity | present — §2.8 attached | yes — Capital→Debt; land financing section; capitalization artifact. Iteration count not displayed | engine run | verified |
 | Developer | Phase-by-phase financing | partial — loans attach to divisions (`_fetch_phase_division_mapping`) | partial | code read | inferred |
@@ -220,8 +220,8 @@ engine commit since July added correctness to an existing copy rather than retir
 ---
 
 ## 8. Deliberate non-goals — **[July text, re-verified]**
-UK/AU conventions, hotel, multi-currency, the 56-report catalog. **Add:** ARGUS Developer's four-window
-unit absorption — Landscape's parcel bulk-sale model is a deliberate fit to how Gregg's deals work.
+UK/AU conventions, hotel, multi-currency, the 56-report catalog. **Not added:** this pass proposed
+ARGUS Developer's four-window unit absorption as a non-goal; Gregg declined (3b, 2026-10-21) — it stays a gap.
 
 ---
 
