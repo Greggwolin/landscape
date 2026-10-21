@@ -2,7 +2,7 @@
 
 **CRE & land-development return calculations in Python (numpy-financial, pandas, scipy).**
 
-> **Rewritten 2026-10-21** (ARGUS parity re-audit, #LS-1021-08). The previous
+> **Rewritten 2026-10-21** (ARGUS parity re-audit, #LS-1021-07). The previous
 > README described a command-line tool, a FastAPI server, a Monte Carlo module, a
 > sensitivity module and a TypeScript-parity test suite. None of those exist in
 > this repository and most never did; `cli.py` was deleted on 2026-07-14 (CU6).
@@ -94,7 +94,7 @@ irr = metrics.calculate_irr(
 ```
 
 Note that the backend has several other IRR solvers besides this one; the
-consolidation plan is tracked under #LS-1021-10 in the ARGUS parity audit
+consolidation plan is tracked under #LS-1021-08 in the ARGUS parity audit
 (`docs/02-features/financial-engine/ARGUS_PARITY_2026.md`, §7).
 
 ## Setup and tests

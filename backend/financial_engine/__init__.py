@@ -11,7 +11,7 @@ Main modules (every one listed here exists and imports — a test checks):
 - waterfall: Multi-tier distribution waterfalls (engine, formulas, irr, runtime)
 
 Not here: Monte Carlo and a sensitivity module were listed from 2025-10 to
-2026-10-21 but never written (ARGUS parity re-audit 2026-10-21, #LS-1021-08).
+2026-10-21 but never written (ARGUS parity re-audit 2026-10-21, #LS-1021-07).
 Sensitivity on the product side is the what-if tooling in apps/landscaper.
 
 Example usage:

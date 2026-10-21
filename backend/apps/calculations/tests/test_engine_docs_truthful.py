@@ -1,6 +1,6 @@
 """
 The financial engine's own description matches what exists on disk
-(ARGUS parity re-audit 2026-10-21, §2.9 — #LS-1021-08).
+(ARGUS parity re-audit 2026-10-21, §2.9 — #LS-1021-07).
 
 From 2025-10 to 2026-10-21 the package docstring, the settings, the data models
 and the service README all described a Monte Carlo module (plus a sensitivity
