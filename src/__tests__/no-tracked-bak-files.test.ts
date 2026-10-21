@@ -1,6 +1,6 @@
 /**
  * No `.bak` snapshot sits beside a live source file
- * (ARGUS parity re-audit 2026-10-21, §2.10 — #LS-1021-09).
+ * (ARGUS parity re-audit 2026-10-21, §2.10 — #LS-1021-10).
  *
  * 416 `.bak` copies were committed in one sweep (ca4dbc2, 2026-09-13) and lived
  * next to the real files for five weeks — 349 of them stale pre-edit versions of
@@ -29,7 +29,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-describe('.bak files (#LS-1021-09)', () => {
+describe('.bak files (#LS-1021-10)', () => {
   test('none under src/, backend/, services/ or the repo root', () => {
     const found = ['src', 'backend', 'services']
       .map((d) => path.join(ROOT, d))
