@@ -255,3 +255,8 @@ backups/
 
 # Rendered engine-check pages (regenerated on demand, carry live data)
 backend/notebooks/engine_checks/output/
+
+# Editor/sweep backup copies — never tracked. 416 `.bak` snapshots landed in one
+# commit (ca4dbc2, 2026-09-13) and sat beside live files for five weeks; removed
+# 2026-10-21 (#LS-1021-10). The pre-edit versions remain in history at ca4dbc2.
+*.bak
