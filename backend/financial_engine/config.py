@@ -39,14 +39,6 @@ class Settings(BaseSettings):
         0.000001, description="Convergence tolerance for IRR", ge=0.0
     )
 
-    # Monte Carlo settings
-    mc_default_simulations: int = Field(
-        10000, description="Default number of Monte Carlo simulations", ge=100
-    )
-    mc_random_seed: Optional[int] = Field(
-        None, description="Random seed for reproducibility (None = random)"
-    )
-
     # Logging
     log_level: str = Field("INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR)")
 

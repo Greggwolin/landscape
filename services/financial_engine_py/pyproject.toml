@@ -33,8 +33,8 @@ ipython = "^8.12.0"            # Interactive shell for debugging
 [tool.poetry.extras]
 api = ["fastapi", "uvicorn"]   # Install with: poetry install -E api
 
-[tool.poetry.scripts]
-fin-calc = "financial_engine.cli:main"
+# No console script: financial_engine/cli.py was deleted 2026-07-14 (CU6) and
+# the former `fin-calc` entry pointed at it (fixed 2026-10-21, #LS-1021-08).
 
 [tool.black]
 line-length = 100
