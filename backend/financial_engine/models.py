@@ -267,49 +267,6 @@ class TornadoResult(BaseModel):
 
 
 # ============================================================================
-# Monte Carlo
-# ============================================================================
-
-class DistributionType(str, Enum):
-    """Statistical distribution types"""
-    NORMAL = "normal"
-    TRIANGULAR = "triangular"
-    UNIFORM = "uniform"
-    LOGNORMAL = "lognormal"
-
-
-class VariableDistribution(BaseModel):
-    """Variable distribution for Monte Carlo"""
-    variable_name: str
-    distribution_type: DistributionType
-    # Parameters vary by distribution
-    mean: Optional[float] = None
-    std: Optional[float] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    mode: Optional[float] = None  # For triangular
-
-
-class MonteCarloResult(BaseModel):
-    """Monte Carlo simulation results"""
-    num_simulations: int
-    mean_irr: float
-    median_irr: float
-    std_dev: float
-    coefficient_of_variation: float
-
-    # Percentiles
-    p10_irr: float
-    p25_irr: float
-    p75_irr: float
-    p90_irr: float
-
-    # Probability analysis
-    probability_irr_above_target: Optional[float] = None
-    target_irr: Optional[float] = None
-
-
-# ============================================================================
 # Waterfall Distribution
 # ============================================================================
 

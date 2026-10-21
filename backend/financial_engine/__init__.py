@@ -4,13 +4,15 @@ Landscape Financial Calculation Engine
 Production-grade CRE & Land Development financial calculations using
 NumPy, Pandas, and SciPy for ARGUS-equivalent analytics.
 
-Main modules:
+Main modules (every one listed here exists and imports — a test checks):
 - core.metrics: Investment return calculations (IRR, NPV, DSCR, etc.)
 - core.cashflow: Cash flow projections with lease modeling
 - core.leases: Lease escalations, recoveries, percentage rent
-- core.waterfall: Multi-tier distribution waterfalls
-- core.sensitivity: Sensitivity analysis and scenario modeling
-- core.monte_carlo: Monte Carlo simulations
+- waterfall: Multi-tier distribution waterfalls (engine, formulas, irr, runtime)
+
+Not here: Monte Carlo and a sensitivity module were listed from 2025-10 to
+2026-10-21 but never written (ARGUS parity re-audit 2026-10-21, #LS-1021-07).
+Sensitivity on the product side is the what-if tooling in apps/landscaper.
 
 Example usage:
     >>> from financial_engine.core.metrics import InvestmentMetrics
