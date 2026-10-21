@@ -1,4 +1,4 @@
-# IRR solver consolidation — plan (#LS-1021-10)
+# IRR solver consolidation — plan (#LS-1021-08)
 
 **Written:** 2026-10-21 (chat PX), from the ARGUS parity re-audit of the same day
 (`ARGUS_PARITY_2026.md` §7). **Status:** plan only — no code in this document's PR.
