@@ -11,7 +11,7 @@
  * are mock-ups driven entirely by nnnMockData — hardcoded lease, rent and
  * value figures that belong to no project — and were being shown as if they
  * were this project's valuation. Hidden 2026-10-21 (ARGUS parity re-audit
- * §2.3, #LS-1021-07; Gregg's decision PX-Q1 = 1a). The detection and the
+ * §2.3, #LS-1021-06; Gregg's decision PX-Q1 = 1a). The detection and the
  * mock-up files are kept for the eventual real build.
  *
  * @version 2.3
@@ -34,7 +34,7 @@ import { isNNNProject } from '@/components/valuation/nnn/nnnDetection';
 
 /**
  * NNN Income Approach / Reconciliation empty state — the real screens are not
- * built. Replaces the mock-data screens hidden 2026-10-21 (#LS-1021-07).
+ * built. Replaces the mock-data screens hidden 2026-10-21 (#LS-1021-06).
  */
 export function NNNNotBuiltEmpty({ title }: { title: string }) {
   return (

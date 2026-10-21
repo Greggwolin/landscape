@@ -1,6 +1,6 @@
 /**
  * The NNN sale-leaseback mock screens are not reachable from the app
- * (ARGUS parity re-audit 2026-10-21, §2.3 — #LS-1021-07, decision PX-Q1 = 1a).
+ * (ARGUS parity re-audit 2026-10-21, §2.3 — #LS-1021-06, decision PX-Q1 = 1a).
  *
  * NNNIncomeApproach / NNNReconciliation and their panels render figures from
  * nnnMockData.ts — hardcoded lease, rent and value numbers that belong to no
@@ -32,7 +32,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const MOCK_BACKED = /valuation\/nnn\/(NNNIncomeApproach|NNNReconciliation|nnnMockData|SubSubTabBar|panels\/)/;
 
-describe('NNN mock screens are hidden (#LS-1021-07)', () => {
+describe('NNN mock screens are hidden (#LS-1021-06)', () => {
   const importers = walk(SRC)
     .filter((f) => !f.startsWith(NNN_DIR))
     .filter((f) => f !== __filename)
