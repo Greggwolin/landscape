@@ -53,8 +53,8 @@ const SCREEN_ALIASES: Record<string, [string, string?]> = {
   // Feasibility (land)
   'cash flow': ['feasibility', 'cashflow'],
   'cashflow': ['feasibility', 'cashflow'],
-  'returns': ['feasibility', 'returns'],
-  'sensitivity': ['feasibility', 'sensitivity'],
+  // 'returns' / 'sensitivity' aliases removed 2026-10-21 with their placeholder
+  // subtabs (#LS-1021-05/09); those asks now reach the model, which has tools.
   'feasibility': ['feasibility', undefined],
   // Valuation (income)
   'valuation': ['valuation', undefined],
