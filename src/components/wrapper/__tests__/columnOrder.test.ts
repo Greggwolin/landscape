@@ -12,8 +12,8 @@ import { insertAtCanonicalPosition, withExtraColumns } from '../columnOrder';
 
 /* schedule_view_spec.py `columns`, in order. */
 const CANONICAL = [
-  { key: 'category' },
   { key: 'stage' },
+  { key: 'category' },
   { key: 'description' },
   { key: 'uom' },
   { key: 'rate' },
@@ -28,14 +28,14 @@ const RUNGS: Record<string, string[]> = {
   summary: ['group', 'amount', 'pct'],
   standard: ['category', 'description', 'uom', 'rate', 'amount'],
   detail: ['description', 'uom', 'rate', 'amount', 'start', 'duration'],
-  all: ['category', 'stage', 'description', 'uom', 'rate', 'amount',
+  all: ['stage', 'category', 'description', 'uom', 'rate', 'amount',
     'start', 'duration', 'notes'],
 };
 
-describe('stage lands between category and description', () => {
-  it('inserts before description on the standard rung', () => {
+describe('stage lands before category (Gregg, 2026-10-23)', () => {
+  it('inserts before category on the standard rung', () => {
     expect(withExtraColumns(RUNGS.standard, ['stage'], CANONICAL)).toEqual([
-      'category', 'stage', 'description', 'uom', 'rate', 'amount',
+      'stage', 'category', 'description', 'uom', 'rate', 'amount',
     ]);
   });
 
@@ -69,7 +69,7 @@ describe('notes lands after duration, not before it', () => {
 describe('both chips on at once', () => {
   it('lands each in canonical order regardless of selection order', () => {
     const expected = [
-      'category', 'stage', 'description', 'uom', 'rate', 'amount', 'notes',
+      'stage', 'category', 'description', 'uom', 'rate', 'amount', 'notes',
     ];
     expect(withExtraColumns(RUNGS.standard, ['stage', 'notes'], CANONICAL)).toEqual(expected);
     expect(withExtraColumns(RUNGS.standard, ['notes', 'stage'], CANONICAL)).toEqual(expected);

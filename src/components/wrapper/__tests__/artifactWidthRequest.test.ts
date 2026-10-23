@@ -9,7 +9,7 @@ const RUNGS: Record<string, string[]> = {
   standard: ['category', 'description', 'uom', 'rate', 'amount'],
   detail: ['description', 'uom', 'rate', 'amount', 'start', 'duration'],
   all: [
-    'division', 'category', 'stage', 'description', 'uom', 'rate', 'amount',
+    'division', 'stage', 'category', 'description', 'uom', 'rate', 'amount',
     'start', 'duration', 'start_date', 'end_date', 'timing_method',
     'curve_profile', 'curve_steepness', 'vendor', 'notes',
   ],
