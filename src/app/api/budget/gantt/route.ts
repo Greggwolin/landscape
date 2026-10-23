@@ -52,6 +52,14 @@ export async function GET(request: NextRequest) {
         fb.project_id::integer as project_id,
         fb.division_id,
         fb.category_id::integer as category_id,
+        fb.category_l1_id::integer AS category_l1_id,
+        fb.category_l2_id::integer AS category_l2_id,
+        fb.category_l3_id::integer AS category_l3_id,
+        fb.category_l4_id::integer AS category_l4_id,
+        c1.category_name AS category_l1_name,
+        c2.category_name AS category_l2_name,
+        c3.category_name AS category_l3_name,
+        c4.category_name AS category_l4_name,
         fb.qty,
         fb.rate,
         fb.amount,
@@ -70,6 +78,10 @@ export async function GET(request: NextRequest) {
         uc.category_name AS category_name
       FROM landscape.core_fin_fact_budget fb
       LEFT JOIN landscape.core_unit_cost_category uc ON fb.category_id = uc.category_id
+      LEFT JOIN landscape.core_unit_cost_category c1 ON fb.category_l1_id = c1.category_id
+      LEFT JOIN landscape.core_unit_cost_category c2 ON fb.category_l2_id = c2.category_id
+      LEFT JOIN landscape.core_unit_cost_category c3 ON fb.category_l3_id = c3.category_id
+      LEFT JOIN landscape.core_unit_cost_category c4 ON fb.category_l4_id = c4.category_id
       WHERE fb.project_id = ${projectId}
       ORDER BY fb.division_id NULLS LAST, fb.fact_id
     `;
