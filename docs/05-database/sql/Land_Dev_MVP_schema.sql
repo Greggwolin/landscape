@@ -1,3 +1,13 @@
+-- SUPERSEDED DESIGN REFERENCE — NOT A RUNNABLE MIGRATION
+-- The per-period tbl_absorption_schedule design below is not the implemented
+-- schema. Use migrations/002_dependencies_revenue_finance.sql (Section 2) for
+-- the authoritative revenue-stream definition: start_period,
+-- periods_to_complete, units_per_period, total_units, and scenario_name.
+-- Later additions are in migrations/20260226_absorption_schedule_confidence.sql;
+-- dependency-view corrections are in migrations/002a_fix_dependency_views.sql.
+-- Follow the ordered migration history; do not create or replace tables from
+-- this historical proposal. See LS-0910-39 (KR52, 2026-10-23).
+--
 -- ============================================================================
 -- LAND DEVELOPMENT MVP SCHEMA - Revenue & Finance Tables
 -- ============================================================================
