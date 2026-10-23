@@ -96,12 +96,32 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
     if entry is None or artifact.project_id is None or artifact.is_archived:
         return artifact
 
-    params_key, current_version, rebuild = entry
-    stored = (artifact.params_json or {}).get(params_key) or {}
+    params_key, current_version, rebuild, data_fingerprint = entry
+    params = artifact.params_json or {}
+    stored = params.get(params_key) or {}
     if not isinstance(stored, dict):
         return artifact
     # A spec with no version predates the stamp and is by definition behind.
-    if stored.get('spec_version', 0) >= current_version():
+    spec_stale = stored.get('spec_version', 0) < current_version()
+
+    # DATA CHANGED ELSEWHERE (#LS-1023-02, 2026-10-23). The artifact is a
+    # snapshot; an edit made on a screen (the budget form, the grid) writes
+    # the rows and never touches the snapshot, so the artifact went on showing
+    # the old lines. The budget table keeps no reliable modified time, so the
+    # comparison is a fingerprint of the rows themselves, taken at build time
+    # and checked on every open. One small query per open; a rebuild only when
+    # the rows actually differ.
+    fingerprint = None
+    if data_fingerprint is not None:
+        try:
+            fingerprint = data_fingerprint(int(artifact.project_id))
+        except Exception:  # noqa: BLE001 — fail open, as below
+            fingerprint = None
+    data_stale = fingerprint is not None and fingerprint != params.get(
+        _DATA_FINGERPRINT_KEY
+    )
+
+    if not (spec_stale or data_stale):
         return artifact
 
     try:
@@ -114,7 +134,15 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
         )
         return artifact
 
-    return Artifact.objects.filter(pk=artifact.pk).first() or artifact
+    refreshed = Artifact.objects.filter(pk=artifact.pk).first() or artifact
+    if fingerprint is not None:
+        # Stamp the fingerprint the rebuild was made from, as a sibling key so
+        # the builder's own params refresh never wipes it.
+        merged = dict(refreshed.params_json or {})
+        merged[_DATA_FINGERPRINT_KEY] = fingerprint
+        Artifact.objects.filter(pk=refreshed.pk).update(params_json=merged)
+        refreshed.params_json = merged
+    return refreshed
 
 
 def _rebuild_budget_view_spec(artifact: Artifact) -> None:
@@ -154,17 +182,55 @@ def _budget_view_spec_version() -> int:
     return BUDGET_VIEW_SPEC_VERSION
 
 
-# tool_name → (params key holding the spec, current-version fn, rebuild fn).
+# tool_name → (params key holding the spec, current-version fn, rebuild fn,
+#              data-fingerprint fn or None).
 #
 # One line per deterministic schedule. Budget is the only one carrying a
 # versioned view specification today; sales, cash flow, capitalization and rent
 # roll join here as each grows one, and until then they are correctly absent —
 # an entry with no version to compare would rebuild on every single read.
+_DATA_FINGERPRINT_KEY = 'source_data_fingerprint'
+
+
+def _budget_data_fingerprint(project_id: int) -> str | None:
+    """md5 over every budget row of the project plus the categories they name.
+
+    Any change a screen can make — a description, a category, a quantity, a
+    line added or deleted, a category renamed — changes the text of a row, so
+    it changes the fingerprint. Ordered, so the same rows always hash alike.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT md5(
+                coalesce((SELECT string_agg(b::text, '|' ORDER BY b.fact_id)
+                            FROM landscape.core_fin_fact_budget b
+                           WHERE b.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(c::text, '|' ORDER BY c.category_id)
+                            FROM landscape.core_unit_cost_category c
+                           WHERE c.category_id IN (
+                                 SELECT unnest(ARRAY[x.category_id, x.category_l1_id,
+                                                     x.category_l2_id, x.category_l3_id,
+                                                     x.category_l4_id])
+                                   FROM landscape.core_fin_fact_budget x
+                                  WHERE x.project_id = %s)), '')
+            )
+            """,
+            [project_id, project_id],
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
 _VIEW_SPEC_BUILDERS = {
     'get_budget_schedule': (
         'budget_view_config',
         _budget_view_spec_version,
         _rebuild_budget_view_spec,
+        _budget_data_fingerprint,
     ),
 }
 
