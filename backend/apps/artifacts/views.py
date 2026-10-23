@@ -228,11 +228,15 @@ _DATA_FINGERPRINT_KEY = 'source_data_fingerprint'
 
 
 def _budget_data_fingerprint(project_id: int) -> str | None:
-    """md5 over every budget row of the project plus the categories they name.
+    """md5 over the project's budget rows plus the whole category list.
 
     Any change a screen can make — a description, a category, a quantity, a
-    line added or deleted, a category renamed — changes the text of a row, so
-    it changes the fingerprint. Ordered, so the same rows always hash alike.
+    line added or deleted — changes the text of a row. The category list and
+    its stage links are included whole, not just the categories the rows use,
+    because the artifact also carries the dropdown lists: a category added,
+    renamed or retired in Admin must reach them (Codex review, round 3) — and
+    so do the unit list and the project's level names, which it also carries.
+    Ordered, so the same rows always hash alike. A few hundred small rows.
     """
     from django.db import connection
 
@@ -245,16 +249,27 @@ def _budget_data_fingerprint(project_id: int) -> str | None:
                            WHERE b.project_id = %s), '')
                 || '#' ||
                 coalesce((SELECT string_agg(c::text, '|' ORDER BY c.category_id)
-                            FROM landscape.core_unit_cost_category c
-                           WHERE c.category_id IN (
-                                 SELECT unnest(ARRAY[x.category_id, x.category_l1_id,
-                                                     x.category_l2_id, x.category_l3_id,
-                                                     x.category_l4_id])
-                                   FROM landscape.core_fin_fact_budget x
-                                  WHERE x.project_id = %s)), '')
+                            FROM landscape.core_unit_cost_category c), '')
+                || '#' ||
+                coalesce((SELECT string_agg(s::text, '|'
+                                            ORDER BY s.category_id, s.activity)
+                            FROM landscape.core_category_lifecycle_stages s), '')
+                || '#' ||
+                -- the other lists and labels the view carries: units of
+                -- measure, the project's levels and their names
+                coalesce((SELECT string_agg(m::text, '|' ORDER BY m::text)
+                            FROM landscape.tbl_measures m), '')
+                || '#' ||
+                coalesce((SELECT string_agg(d::text, '|' ORDER BY d.division_id)
+                            FROM landscape.tbl_division d
+                           WHERE d.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(pc::text, '|')
+                            FROM landscape.tbl_project_config pc
+                           WHERE pc.project_id = %s), '')
             )
             """,
-            [project_id, project_id],
+            [project_id, project_id, project_id],
         )
         row = cur.fetchone()
     return row[0] if row else None
