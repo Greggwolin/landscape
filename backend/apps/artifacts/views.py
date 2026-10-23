@@ -151,7 +151,20 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
     # stamping it would mark stale contents as current for good. If the build
     # landed on a different artifact (this one was renamed — a variant under
     # Rule 5), stamp this one too so opening it does not spawn copy after copy.
-    built = isinstance(result, dict) and bool(result.get('success'))
+    built = (
+        isinstance(result, dict)
+        and bool(result.get('success'))
+        # The panel shows the view config; if it failed to rebuild, the old
+        # one was kept and the figures on screen are still the stale ones.
+        and result.get('view_config_built', True)
+        # Landed on this artifact, or created a fresh copy because this one is
+        # a renamed variant. A dedup hit on some OTHER artifact left this one
+        # untouched, so it must stay retryable.
+        and (
+            str(result.get('artifact_id')) == str(artifact.artifact_id)
+            or not result.get('dedup_hit')
+        )
+    )
     if fingerprint is not None and built:
         try:
             merged = dict(refreshed.params_json or {})

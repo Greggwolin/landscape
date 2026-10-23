@@ -163,3 +163,20 @@ def test_stamp_failure_fails_open(harness, monkeypatch):
     monkeypatch.setattr(rows, 'filter', filter_then_fail_update)
     out = views._rebuild_if_view_spec_stale(art)
     assert out is art and calls['rebuild'] == 1
+
+
+def test_dedup_hit_on_another_artifact_stays_retryable(harness):
+    art, calls, state = harness
+    state['fingerprint'] = 'fp-2'
+    state['result'] = {'success': True, 'artifact_id': 999, 'dedup_hit': True}
+    out = views._rebuild_if_view_spec_stale(art)
+    assert out.params_json[views._DATA_FINGERPRINT_KEY] == 'fp-1'
+
+
+def test_view_config_not_rebuilt_is_not_stamped(harness):
+    art, calls, state = harness
+    state['fingerprint'] = 'fp-2'
+    state['result'] = {'success': True, 'artifact_id': 178, 'dedup_hit': True,
+                       'view_config_built': False}
+    out = views._rebuild_if_view_spec_stale(art)
+    assert out.params_json[views._DATA_FINGERPRINT_KEY] == 'fp-1'

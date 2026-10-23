@@ -524,7 +524,7 @@ def create_budget_artifact(
         params['budget_view_config'] = view_config
 
     try:
-        return create_artifact_record(
+        result = create_artifact_record(
             title=title,
             schema=schema,
             edit_target={'modal_name': 'budget'},
@@ -539,3 +539,8 @@ def create_budget_artifact(
     except Exception as exc:  # noqa: BLE001
         logger.exception('budget_artifact_builder: create_artifact_record failed')
         return {'success': False, 'error': f'artifact creation failed: {exc}'}
+    # Tell a caller that rebuilds on open (artifacts/views.py) whether the
+    # view the panel actually shows was rebuilt, or the old one kept (#LS-1023-02).
+    if isinstance(result, dict):
+        result['view_config_built'] = bool(view_config)
+    return result
