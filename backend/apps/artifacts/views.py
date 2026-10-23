@@ -124,10 +124,11 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
     if not (spec_stale or data_stale):
         return artifact
 
-    if data_stale and not spec_stale:
+    if spec_stale or data_stale:
         # An artifact the user has annotated is a kept snapshot (Rule 5,
         # _is_variant_of): a rebuild would not touch it and would only spawn a
-        # fresh copy on every open. Leave it exactly as it is.
+        # fresh copy on every open — for a data change or a spec bump alike
+        # (Codex round 4). Leave it exactly as it is.
         try:
             from .services import _has_user_annotations
             if _has_user_annotations(artifact.artifact_id):
@@ -267,9 +268,30 @@ def _budget_data_fingerprint(project_id: int) -> str | None:
                 coalesce((SELECT string_agg(pc::text, '|')
                             FROM landscape.tbl_project_config pc
                            WHERE pc.project_id = %s), '')
+                || '#' ||
+                -- and the rest of what the builders read (Codex round 4):
+                -- lot counts for per-lot figures, the project's dates and
+                -- settings, the escalation sets and their steps
+                coalesce((SELECT string_agg(pa::text, '|' ORDER BY pa.parcel_id)
+                            FROM landscape.tbl_parcel pa
+                           WHERE pa.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(p::text, '|')
+                            FROM landscape.tbl_project p
+                           WHERE p.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(ps::text, '|' ORDER BY ps::text)
+                            FROM landscape.tbl_project_settings ps
+                           WHERE ps.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(g::text, '|' ORDER BY g::text)
+                            FROM landscape.core_fin_growth_rate_sets g), '')
+                || '#' ||
+                coalesce((SELECT string_agg(st::text, '|' ORDER BY st::text)
+                            FROM landscape.core_fin_growth_rate_steps st), '')
             )
             """,
-            [project_id, project_id, project_id],
+            [project_id] * 6,
         )
         row = cur.fetchone()
     return row[0] if row else None

@@ -180,3 +180,11 @@ def test_view_config_not_rebuilt_is_not_stamped(harness):
                        'view_config_built': False}
     out = views._rebuild_if_view_spec_stale(art)
     assert out.params_json[views._DATA_FINGERPRINT_KEY] == 'fp-1'
+
+
+def test_annotated_artifact_skips_spec_bump_too(harness):
+    art, calls, state = harness
+    state['spec_version'] = 6
+    state['annotated'] = True
+    assert views._rebuild_if_view_spec_stale(art) is art
+    assert calls['rebuild'] == 0
