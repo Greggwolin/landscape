@@ -141,6 +141,7 @@ export default function BudgetItemModalV2({
     error: stageError,
     getCategoriesByStage,
     getChildren,
+    getCategoryById,
   } = useUnitCostCategoriesForBudget();
 
   // Get L1 categories for the selected lifecycle stage
@@ -313,6 +314,7 @@ export default function BudgetItemModalV2({
     if (!open) return;
 
     if (mode === 'edit' && initialItem) {
+      setSelectedActivity(initialItem.activity ?? '');
       setContainerId(initialItem.division_id ?? null);
       setProjectScopeSelected(initialItem.division_id === null);
       setCategoryL1Id(initialItem.category_l1_id || null);
@@ -344,6 +346,7 @@ export default function BudgetItemModalV2({
       setMilestoneId(initialItem.milestone_id ? initialItem.milestone_id.toString() : '');
       setCashFlowStartFlag(Boolean(initialItem.cf_start_flag));
     } else if (mode === 'create') {
+      setSelectedActivity(initialFormValues?.activity ?? '');
       const shouldSelectProjectScope =
         initialFormValues !== undefined &&
         Object.prototype.hasOwnProperty.call(initialFormValues, 'division_id') &&
@@ -460,6 +463,7 @@ export default function BudgetItemModalV2({
         category_l2_id: categoryL2Id,
         category_l3_id: categoryL3Id,
         category_l4_id: categoryL4Id,
+        activity: selectedActivity || null,
         vendor_name: vendorName || null,
         notes: itemDescription,
         qty: parseFloat(quantity) || null,
@@ -556,6 +560,9 @@ export default function BudgetItemModalV2({
                 required
               >
                 <option value="">-- Select Stage --</option>
+                {selectedActivity && !stageOptions.some(stage => stage.id === selectedActivity) && (
+                  <option value={selectedActivity}>{selectedActivity}</option>
+                )}
                 {stageOptions.map((stage) => (
                   <option key={stage.id} value={stage.id}>
                     {stage.name}
@@ -584,6 +591,11 @@ export default function BudgetItemModalV2({
                 required
               >
                 <option value="">-- Select Category --</option>
+                {categoryL1Id && !level1Options.some(category => category.category_id === categoryL1Id) && (
+                  <option value={categoryL1Id}>
+                    {getCategoryById(categoryL1Id)?.category_name ?? initialItem?.category_l1_name ?? `Category ${categoryL1Id}`}
+                  </option>
+                )}
                 {level1Options.map((category) => (
                   <option key={category.category_id} value={category.category_id}>
                     {category.name}
