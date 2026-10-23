@@ -38,7 +38,9 @@ class _Rows:
 @pytest.fixture
 def harness(monkeypatch):
     calls = {'rebuild': 0}
-    state = {'fingerprint': 'fp-1', 'spec_version': 5}
+    state = {'fingerprint': 'fp-1', 'spec_version': 5,
+             'result': {'success': True, 'artifact_id': 178},
+             'annotated': False}
 
     art = SimpleNamespace(
         pk=178, artifact_id=178, project_id=9, is_archived=False,
@@ -51,6 +53,11 @@ def harness(monkeypatch):
 
     def rebuild(a):
         calls['rebuild'] += 1
+        return state['result']
+
+    from apps.artifacts import services
+    monkeypatch.setattr(services, '_has_user_annotations',
+                        lambda artifact_id: state['annotated'])
 
     monkeypatch.setattr(views, '_VIEW_SPEC_BUILDERS', {
         'get_budget_schedule': (
@@ -108,3 +115,51 @@ def test_fingerprint_failure_fails_open(harness, monkeypatch):
                         entry[:3] + (boom,))
     assert views._rebuild_if_view_spec_stale(art) is art
     assert calls['rebuild'] == 0
+
+
+def test_empty_or_failed_rebuild_is_not_stamped_and_retries(harness):
+    # Codex review 2026-10-23: a "nothing to render" or failed build must not
+    # mark stale contents as current.
+    art, calls, state = harness
+    state['fingerprint'] = 'fp-2'
+    for result in (None, {'success': False, 'error': 'x'}):
+        state['result'] = result
+        out = views._rebuild_if_view_spec_stale(art)
+        assert out.params_json[views._DATA_FINGERPRINT_KEY] == 'fp-1'
+    assert calls['rebuild'] == 2
+
+
+def test_annotated_artifact_is_left_alone(harness):
+    art, calls, state = harness
+    state['fingerprint'] = 'fp-2'
+    state['annotated'] = True
+    assert views._rebuild_if_view_spec_stale(art) is art
+    assert calls['rebuild'] == 0
+
+
+def test_build_landing_on_another_artifact_stamps_this_one_once(harness):
+    art, calls, state = harness
+    state['fingerprint'] = 'fp-2'
+    state['result'] = {'success': True, 'artifact_id': 999}
+    out = views._rebuild_if_view_spec_stale(art)
+    views._rebuild_if_view_spec_stale(out)
+    assert calls['rebuild'] == 1
+
+
+def test_stamp_failure_fails_open(harness, monkeypatch):
+    art, calls, state = harness
+    state['fingerprint'] = 'fp-2'
+    rows = views.Artifact.objects
+    real_filter = rows.filter
+
+    def filter_then_fail_update(pk):
+        qs = real_filter(pk)
+
+        def bad_update(**kw):
+            raise RuntimeError('db timeout')
+        qs.update = bad_update
+        return qs
+
+    monkeypatch.setattr(rows, 'filter', filter_then_fail_update)
+    out = views._rebuild_if_view_spec_stale(art)
+    assert out is art and calls['rebuild'] == 1

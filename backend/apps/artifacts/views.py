@@ -124,8 +124,19 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
     if not (spec_stale or data_stale):
         return artifact
 
+    if data_stale and not spec_stale:
+        # An artifact the user has annotated is a kept snapshot (Rule 5,
+        # _is_variant_of): a rebuild would not touch it and would only spawn a
+        # fresh copy on every open. Leave it exactly as it is.
+        try:
+            from .services import _has_user_annotations
+            if _has_user_annotations(artifact.artifact_id):
+                return artifact
+        except Exception:  # noqa: BLE001
+            return artifact
+
     try:
-        rebuild(artifact)
+        result = rebuild(artifact)
     except Exception:  # noqa: BLE001
         import logging as _logging
         _logging.getLogger(__name__).exception(
@@ -135,17 +146,28 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
         return artifact
 
     refreshed = Artifact.objects.filter(pk=artifact.pk).first() or artifact
-    if fingerprint is not None:
-        # Stamp the fingerprint the rebuild was made from, as a sibling key so
-        # the builder's own params refresh never wipes it.
-        merged = dict(refreshed.params_json or {})
-        merged[_DATA_FINGERPRINT_KEY] = fingerprint
-        Artifact.objects.filter(pk=refreshed.pk).update(params_json=merged)
-        refreshed.params_json = merged
+    # Stamp the fingerprint only when the rebuild actually produced an
+    # artifact. A "nothing to render" or failed build must stay retryable;
+    # stamping it would mark stale contents as current for good. If the build
+    # landed on a different artifact (this one was renamed — a variant under
+    # Rule 5), stamp this one too so opening it does not spawn copy after copy.
+    built = isinstance(result, dict) and bool(result.get('success'))
+    if fingerprint is not None and built:
+        try:
+            merged = dict(refreshed.params_json or {})
+            merged[_DATA_FINGERPRINT_KEY] = fingerprint
+            Artifact.objects.filter(pk=refreshed.pk).update(params_json=merged)
+            refreshed.params_json = merged
+        except Exception:  # noqa: BLE001 — fail open: serve what we have
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                'artifact %s: could not stamp data fingerprint',
+                artifact.artifact_id,
+            )
     return refreshed
 
 
-def _rebuild_budget_view_spec(artifact: Artifact) -> None:
+def _rebuild_budget_view_spec(artifact: Artifact) -> dict | None:
     """Re-run the budget builder for this artifact's project.
 
     Deliberately the SAME entry point the tool uses, not a private shortcut:
@@ -161,8 +183,8 @@ def _rebuild_budget_view_spec(artifact: Artifact) -> None:
     if not data.get('records'):
         # No lines left to render. Leave the artifact exactly as it is rather
         # than replacing a readable snapshot with an empty one.
-        return
-    create_budget_artifact(
+        return None
+    return create_budget_artifact(
         project_id=int(artifact.project_id),
         project_name=data['project_name'],
         records=data['records'],
