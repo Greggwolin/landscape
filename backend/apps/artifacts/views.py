@@ -96,16 +96,48 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
     if entry is None or artifact.project_id is None or artifact.is_archived:
         return artifact
 
-    params_key, current_version, rebuild = entry
-    stored = (artifact.params_json or {}).get(params_key) or {}
+    params_key, current_version, rebuild, data_fingerprint = entry
+    params = artifact.params_json or {}
+    stored = params.get(params_key) or {}
     if not isinstance(stored, dict):
         return artifact
     # A spec with no version predates the stamp and is by definition behind.
-    if stored.get('spec_version', 0) >= current_version():
+    spec_stale = stored.get('spec_version', 0) < current_version()
+
+    # DATA CHANGED ELSEWHERE (#LS-1023-02, 2026-10-23). The artifact is a
+    # snapshot; an edit made on a screen (the budget form, the grid) writes
+    # the rows and never touches the snapshot, so the artifact went on showing
+    # the old lines. The budget table keeps no reliable modified time, so the
+    # comparison is a fingerprint of the rows themselves, taken at build time
+    # and checked on every open. One small query per open; a rebuild only when
+    # the rows actually differ.
+    fingerprint = None
+    if data_fingerprint is not None:
+        try:
+            fingerprint = data_fingerprint(int(artifact.project_id))
+        except Exception:  # noqa: BLE001 — fail open, as below
+            fingerprint = None
+    data_stale = fingerprint is not None and fingerprint != params.get(
+        _DATA_FINGERPRINT_KEY
+    )
+
+    if not (spec_stale or data_stale):
         return artifact
 
+    if spec_stale or data_stale:
+        # An artifact the user has annotated is a kept snapshot (Rule 5,
+        # _is_variant_of): a rebuild would not touch it and would only spawn a
+        # fresh copy on every open — for a data change or a spec bump alike
+        # (Codex round 4). Leave it exactly as it is.
+        try:
+            from .services import _has_user_annotations
+            if _has_user_annotations(artifact.artifact_id):
+                return artifact
+        except Exception:  # noqa: BLE001
+            return artifact
+
     try:
-        rebuild(artifact)
+        result = rebuild(artifact)
     except Exception:  # noqa: BLE001
         import logging as _logging
         _logging.getLogger(__name__).exception(
@@ -114,10 +146,42 @@ def _rebuild_if_view_spec_stale(artifact: Artifact) -> Artifact:
         )
         return artifact
 
-    return Artifact.objects.filter(pk=artifact.pk).first() or artifact
+    refreshed = Artifact.objects.filter(pk=artifact.pk).first() or artifact
+    # Stamp the fingerprint only when the rebuild actually produced an
+    # artifact. A "nothing to render" or failed build must stay retryable;
+    # stamping it would mark stale contents as current for good. If the build
+    # landed on a different artifact (this one was renamed — a variant under
+    # Rule 5), stamp this one too so opening it does not spawn copy after copy.
+    built = (
+        isinstance(result, dict)
+        and bool(result.get('success'))
+        # The panel shows the view config; if it failed to rebuild, the old
+        # one was kept and the figures on screen are still the stale ones.
+        and result.get('view_config_built', True)
+        # Landed on this artifact, or created a fresh copy because this one is
+        # a renamed variant. A dedup hit on some OTHER artifact left this one
+        # untouched, so it must stay retryable.
+        and (
+            str(result.get('artifact_id')) == str(artifact.artifact_id)
+            or not result.get('dedup_hit')
+        )
+    )
+    if fingerprint is not None and built:
+        try:
+            merged = dict(refreshed.params_json or {})
+            merged[_DATA_FINGERPRINT_KEY] = fingerprint
+            Artifact.objects.filter(pk=refreshed.pk).update(params_json=merged)
+            refreshed.params_json = merged
+        except Exception:  # noqa: BLE001 — fail open: serve what we have
+            import logging as _logging
+            _logging.getLogger(__name__).exception(
+                'artifact %s: could not stamp data fingerprint',
+                artifact.artifact_id,
+            )
+    return refreshed
 
 
-def _rebuild_budget_view_spec(artifact: Artifact) -> None:
+def _rebuild_budget_view_spec(artifact: Artifact) -> dict | None:
     """Re-run the budget builder for this artifact's project.
 
     Deliberately the SAME entry point the tool uses, not a private shortcut:
@@ -133,8 +197,8 @@ def _rebuild_budget_view_spec(artifact: Artifact) -> None:
     if not data.get('records'):
         # No lines left to render. Leave the artifact exactly as it is rather
         # than replacing a readable snapshot with an empty one.
-        return
-    create_budget_artifact(
+        return None
+    return create_budget_artifact(
         project_id=int(artifact.project_id),
         project_name=data['project_name'],
         records=data['records'],
@@ -154,17 +218,91 @@ def _budget_view_spec_version() -> int:
     return BUDGET_VIEW_SPEC_VERSION
 
 
-# tool_name → (params key holding the spec, current-version fn, rebuild fn).
+# tool_name → (params key holding the spec, current-version fn, rebuild fn,
+#              data-fingerprint fn or None).
 #
 # One line per deterministic schedule. Budget is the only one carrying a
 # versioned view specification today; sales, cash flow, capitalization and rent
 # roll join here as each grows one, and until then they are correctly absent —
 # an entry with no version to compare would rebuild on every single read.
+_DATA_FINGERPRINT_KEY = 'source_data_fingerprint'
+
+
+def _budget_data_fingerprint(project_id: int) -> str | None:
+    """md5 over the project's budget rows plus the whole category list.
+
+    Any change a screen can make — a description, a category, a quantity, a
+    line added or deleted — changes the text of a row. The category list and
+    its stage links are included whole, not just the categories the rows use,
+    because the artifact also carries the dropdown lists: a category added,
+    renamed or retired in Admin must reach them (Codex review, round 3) — and
+    so do the unit list and the project's level names, which it also carries.
+    Ordered, so the same rows always hash alike. A few hundred small rows.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT md5(
+                coalesce((SELECT string_agg(b::text, '|' ORDER BY b.fact_id)
+                            FROM landscape.core_fin_fact_budget b
+                           WHERE b.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(c::text, '|' ORDER BY c.category_id)
+                            FROM landscape.core_unit_cost_category c), '')
+                || '#' ||
+                coalesce((SELECT string_agg(s::text, '|'
+                                            ORDER BY s.category_id, s.activity)
+                            FROM landscape.core_category_lifecycle_stages s), '')
+                || '#' ||
+                -- the other lists and labels the view carries: units of
+                -- measure, the project's levels and their names
+                coalesce((SELECT string_agg(m::text, '|' ORDER BY m::text)
+                            FROM landscape.tbl_measures m), '')
+                || '#' ||
+                coalesce((SELECT string_agg(d::text, '|' ORDER BY d.division_id)
+                            FROM landscape.tbl_division d
+                           WHERE d.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(pc::text, '|')
+                            FROM landscape.tbl_project_config pc
+                           WHERE pc.project_id = %s), '')
+                || '#' ||
+                -- and the rest of what the builders read (Codex round 4):
+                -- lot counts for per-lot figures, the project's dates and
+                -- settings, the escalation sets and their steps
+                coalesce((SELECT string_agg(pa::text, '|' ORDER BY pa.parcel_id)
+                            FROM landscape.tbl_parcel pa
+                           WHERE pa.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(p::text, '|')
+                            FROM landscape.tbl_project p
+                           WHERE p.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(ps::text, '|' ORDER BY ps::text)
+                            FROM landscape.tbl_project_settings ps
+                           WHERE ps.project_id = %s), '')
+                || '#' ||
+                coalesce((SELECT string_agg(g::text, '|' ORDER BY g::text)
+                            FROM landscape.core_fin_growth_rate_sets g), '')
+                || '#' ||
+                coalesce((SELECT string_agg(st::text, '|' ORDER BY st::text)
+                            FROM landscape.core_fin_growth_rate_steps st), '')
+            )
+            """,
+            [project_id] * 6,
+        )
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
 _VIEW_SPEC_BUILDERS = {
     'get_budget_schedule': (
         'budget_view_config',
         _budget_view_spec_version,
         _rebuild_budget_view_spec,
+        _budget_data_fingerprint,
     ),
 }
 

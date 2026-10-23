@@ -127,7 +127,9 @@ RUNGS = ('summary', 'standard', 'detail', 'all')
 #       carry something. The database column stays; only the schedule stops
 #       offering it. Restoring it means re-adding the column, the rung entry,
 #       the chip and the cell together, and giving it something that reads it.
-BUDGET_VIEW_SPEC_VERSION = 5
+#   6 — Stage column before Category (2026-10-23, Gregg: "the stage col should
+#       be before the category col"). Categories are children of a stage.
+BUDGET_VIEW_SPEC_VERSION = 6
 
 
 def _period_zero(project_id: int):
@@ -515,8 +517,6 @@ def build_budget_view_config(
     # earns its place when it VARIES across the visible rows; anything constant
     # becomes part of the title instead).
     columns = [
-        {'key': 'category', 'label': 'Category', 'align': 'left',
-         'kind': 'picklist', 'options': picklists.get('category') or []},
         # Stage options are VALID_ACTIVITIES -- the writer's allowlist -- plus
         # any value the visible rows actually hold. Until 2026-09-30 some live
         # lines carried 'Development', which the writer rejects; appending it as a
@@ -524,6 +524,10 @@ def build_budget_view_config(
         # of a blank dropdown that silently rewrites it on the next save.
         {'key': 'stage', 'label': 'Stage', 'align': 'left',
          'kind': 'picklist', 'options': _stage_options(picklists, records)},
+        # Stage before category (Gregg, 2026-10-23): a category is a child of
+        # its stage, so the stage reads first.
+        {'key': 'category', 'label': 'Category', 'align': 'left',
+         'kind': 'picklist', 'options': picklists.get('category') or []},
         {'key': 'description', 'label': 'Description', 'align': 'left', 'kind': 'text'},
         {'key': 'uom', 'label': 'UOM', 'align': 'center',
          'kind': 'picklist', 'options': picklists.get('uom') or []},
@@ -561,7 +565,7 @@ def build_budget_view_config(
         # scheduling refinements. Escalation stays out: the per-line control is
         # being replaced by a single budget-level rate, and putting it on screen
         # now would teach a gesture that is about to be withdrawn.
-        'all': ['division', 'category', 'stage', 'description', 'uom', 'rate',
+        'all': ['division', 'stage', 'category', 'description', 'uom', 'rate',
                 'amount', 'start', 'duration', 'start_date', 'end_date',
                 'timing_method', 'curve_profile', 'curve_steepness',
                 'vendor', 'notes'],
