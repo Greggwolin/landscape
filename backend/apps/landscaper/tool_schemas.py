@@ -2034,7 +2034,17 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "update_budget_item",
-        "description": "Create or update a budget line item.",
+        "description": (
+            "Create or update ONE budget line item (one fact_id per call). When the user "
+            "names a group of lines (\"all the Phase 4.2 improvements\"), first list the "
+            "lines with get_budget_items, then call this once for EVERY matching line, and "
+            "name each line you changed in your reply. TIMING: pass the calendar date the "
+            "user gave as start_date (YYYY-MM-DD) and do NOT work out a period number "
+            "yourself — the server converts dates to periods, keeps start/end dates and "
+            "periods in step, and returns them in timing_saved; report those values. An "
+            "open budget table refreshes itself after a successful write; never say a table "
+            "or artifact changed unless this call returned success."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {

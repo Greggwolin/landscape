@@ -193,6 +193,17 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
   const handleToolResult = useCallback(
     (toolName: string, result: Record<string, unknown>) => {
+      // A Landscaper write changed project data → refetch every open artifact.
+      // The detail fetch is where a stored schedule (budget, sales, …) notices
+      // its rows changed and rebuilds itself; without this the open table kept
+      // showing the old figures until it was closed and reopened, while the
+      // chat said it had updated (2026-11-03, Phase 4.2 start dates).
+      if (
+        result.success === true &&
+        (result.action === 'updated' || result.action === 'created' || result.action === 'deleted')
+      ) {
+        qc.invalidateQueries({ queryKey: ['artifacts', 'detail'] });
+      }
       // LF-USERDASH-0514 Phase 3: route the user's browser on navigate
       // tool results. navigate_to_project / navigate_to_dashboard both
       // return { action: 'navigate', target_url: '/w/...' }. The /w/ layout

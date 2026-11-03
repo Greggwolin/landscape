@@ -8386,6 +8386,95 @@ BUDGET_ITEM_COLUMNS = [
 ]
 
 
+def _budget_month_period(d, analysis_start) -> int:
+    """Period number of the month holding ``d``. Period 1 is the analysis-start
+    month — the same convention the land cash flow and the budget table use."""
+    return (d.year - analysis_start.year) * 12 + (d.month - analysis_start.month) + 1
+
+
+def _budget_period_month(period: int, analysis_start):
+    """First day of the month that period ``period`` covers."""
+    from dateutil.relativedelta import relativedelta
+    first = analysis_start.replace(day=1)
+    return first + relativedelta(months=int(period) - 1)
+
+
+def _parse_budget_date(value):
+    from datetime import date, datetime
+    if value is None or isinstance(value, date):
+        return value
+    text = str(value).strip().split('T')[0]
+    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f'Could not read the date "{value}". Use YYYY-MM-DD.')
+
+
+def _reconcile_budget_timing(updates: Dict[str, Any], existing: Dict[str, Any],
+                             analysis_start) -> Dict[str, Any]:
+    """Keep a line's dates and period numbers saying the same thing.
+
+    The cash flow schedules a line by its period numbers; the budget table
+    shows a typed start date in preference to the period. Landscaper used to
+    write whichever it was given — and work out the period itself, wrongly
+    (2026-11-03: "start 1/1/2033" stored period 96, which is Dec 2033, beside a
+    typed 2033-01-01, so the table would read right and the money land eleven
+    months late). Here the server does the conversion: a date given wins and
+    the period is derived from it; a period given rewrites the date to match.
+    Returns the updates with start/end period and date all filled in, or the
+    updates unchanged when no timing field was touched.
+    """
+    timing_keys = {'start_date', 'end_date', 'start_period', 'periods_to_complete', 'end_period'}
+    if not timing_keys & set(updates):
+        return updates
+    out = dict(updates)
+    if analysis_start is None:
+        if 'start_date' in out or 'end_date' in out:
+            raise ValueError(
+                'This project has no analysis start date, so a calendar date cannot '
+                'be placed on its schedule. Set the analysis start date first.')
+        return out
+
+    start_p = existing.get('start_period')
+    if 'start_date' in out:
+        start_p = _budget_month_period(_parse_budget_date(out['start_date']), analysis_start)
+    elif 'start_period' in out:
+        start_p = int(out['start_period'])
+    if start_p is not None and int(start_p) < 1:
+        raise ValueError('That start falls before the project\'s analysis start date.')
+
+    duration = existing.get('periods_to_complete')
+    if 'periods_to_complete' in out:
+        duration = int(out['periods_to_complete'])
+    elif 'end_date' in out and start_p is not None:
+        duration = _budget_month_period(_parse_budget_date(out['end_date']), analysis_start) - int(start_p) + 1
+    elif 'end_period' in out and start_p is not None:
+        duration = int(out['end_period']) - int(start_p) + 1
+    if duration is not None and int(duration) < 1:
+        raise ValueError('That end falls before the start.')
+
+    if start_p is not None:
+        from dateutil.relativedelta import relativedelta
+        out['start_period'] = int(start_p)
+        out['start_date'] = _budget_period_month(start_p, analysis_start)
+        if duration is not None:
+            out['periods_to_complete'] = int(duration)
+            out['end_period'] = int(start_p) + int(duration) - 1
+            out['end_date'] = (_budget_period_month(out['end_period'], analysis_start)
+                               + relativedelta(months=1, days=-1))
+    return out
+
+
+def _budget_analysis_start(cursor, project_id: int):
+    cursor.execute(
+        "SELECT analysis_start_date FROM landscape.tbl_project WHERE project_id = %s",
+        [project_id])
+    row = cursor.fetchone()
+    return row[0] if row else None
+
+
 def _log_budget_activity(project_id: int, table: str, action: str, count: int, reason: str):
     """Log budget-related activity."""
     try:
@@ -9840,14 +9929,34 @@ def handle_update_budget_item(
                 if not updates:
                     return {'success': False, 'error': 'No valid fields to update'}
 
+                # Scoped to this project: a fact_id from another project is
+                # "not found", never silently edited.
+                cursor.execute("""
+                    SELECT start_period, periods_to_complete
+                    FROM landscape.core_fin_fact_budget
+                    WHERE fact_id = %s AND project_id = %s
+                """, [fact_id, project_id])
+                current = cursor.fetchone()
+                if not current:
+                    return {'success': False, 'error': f'Budget item {fact_id} not found in this project'}
+                try:
+                    updates = _reconcile_budget_timing(
+                        updates,
+                        {'start_period': current[0], 'periods_to_complete': current[1]},
+                        _budget_analysis_start(cursor, project_id))
+                except ValueError as exc:
+                    return {'success': False, 'error': str(exc)}
+
                 set_parts = [f"{k} = %s" for k in updates.keys()]
-                values = list(updates.values()) + [fact_id]
+                values = list(updates.values()) + [fact_id, project_id]
 
                 cursor.execute(f"""
                     UPDATE landscape.core_fin_fact_budget
                     SET {', '.join(set_parts)}
-                    WHERE fact_id = %s
-                    RETURNING fact_id, category_id, amount
+                    WHERE fact_id = %s AND project_id = %s
+                    RETURNING fact_id, category_id, amount,
+                              start_period, periods_to_complete, end_period,
+                              start_date, end_date
                 """, values)
 
                 row = cursor.fetchone()
@@ -9862,7 +9971,16 @@ def handle_update_budget_item(
                     'fact_id': row[0],
                     'category_id': row[1],
                     'amount': float(row[2]) if row[2] else None,
-                    'fields_updated': list(updates.keys())
+                    'fields_updated': list(updates.keys()),
+                    # What was actually stored — report THESE, not your own
+                    # arithmetic. Period 1 is the analysis-start month.
+                    'timing_saved': {
+                        'start_period': row[3],
+                        'periods_to_complete': row[4],
+                        'end_period': row[5],
+                        'start_date': row[6].isoformat() if row[6] else None,
+                        'end_date': row[7].isoformat() if row[7] else None,
+                    },
                 }
 
             else:
@@ -9897,6 +10015,11 @@ def handle_update_budget_item(
                 for col in BUDGET_ITEM_COLUMNS:
                     if col in tool_input and tool_input[col] is not None:
                         fields[col] = tool_input[col]
+                try:
+                    fields = _reconcile_budget_timing(
+                        fields, {}, _budget_analysis_start(cursor, project_id))
+                except ValueError as exc:
+                    return {'success': False, 'error': str(exc)}
 
                 col_names = list(fields.keys())
                 placeholders = ', '.join(['%s'] * len(col_names))
