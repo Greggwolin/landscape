@@ -13,6 +13,8 @@ The system prompt includes ALL available project data so Landscaper
 can answer questions about both structured data AND documents.
 """
 import json
+import datetime as _dt
+import uuid as _uuid
 import logging
 import os
 import re
@@ -30,6 +32,12 @@ class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
+        # Dates/UUIDs from raw SQL rows (2026-11-03: a dated budget line broke
+        # every chat with "Object of type date is not JSON serializable").
+        if isinstance(obj, (_dt.date, _dt.time)):
+            return obj.isoformat()
+        if isinstance(obj, _uuid.UUID):
+            return str(obj)
         return super().default(obj)
 
 from .rag_retrieval import retrieve_rag_context, get_conversation_context, RAGContext
@@ -466,7 +474,7 @@ If per-unit or per-SF amounts are listed, include per_unit and per_sf."""
                                 tool_results.append({
                                     "type": "tool_result",
                                     "tool_use_id": tool_use_id,
-                                    "content": json.dumps(tool_result),
+                                    "content": json.dumps(tool_result, cls=DecimalEncoder),
                                     "is_error": True,
                                 })
                                 continue
@@ -1108,7 +1116,7 @@ def save_chat_message(
             project_id,
             role,
             content,
-            json.dumps(metadata) if metadata else None,
+            json.dumps(metadata, cls=DecimalEncoder) if metadata else None,
             user_id
         ])
 

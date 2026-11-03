@@ -5,6 +5,8 @@ Persists shadow contexts (active what-if sessions) as JSON in tbl_scenario_log.
 Each chat thread has at most one active_shadow row at a time.
 """
 import json
+import datetime as _dt
+import uuid as _uuid
 import logging
 from decimal import Decimal
 from typing import Dict, Any, Optional
@@ -20,6 +22,12 @@ class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
+        # Dates/UUIDs from raw SQL rows (2026-11-03: a dated budget line broke
+        # every chat with "Object of type date is not JSON serializable").
+        if isinstance(obj, (_dt.date, _dt.time)):
+            return obj.isoformat()
+        if isinstance(obj, _uuid.UUID):
+            return str(obj)
         return super().default(obj)
 
 

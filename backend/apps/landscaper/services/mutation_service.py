@@ -12,6 +12,8 @@ This implements Level 2 autonomy: Landscaper proposes, user confirms.
 import contextvars
 import uuid
 import json
+import datetime as _dt
+import uuid as _uuid
 import logging
 from contextlib import contextmanager
 from typing import Dict, Any, List, Optional
@@ -35,9 +37,16 @@ def _normalize_unit_type(raw: str) -> str:
 
 class DecimalEncoder(json.JSONEncoder):
     """Handle Decimal serialization for JSONB."""
+    # Dates too: a budget line with a typed start/end date put a date object
+    # into the stored tool results and every Peoria chat failed with "Object
+    # of type date is not JSON serializable" (2026-11-03).
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
+        if isinstance(obj, (_dt.date, _dt.time)):  # datetime is a date
+            return obj.isoformat()
+        if isinstance(obj, _uuid.UUID):
+            return str(obj)
         return super().default(obj)
 
 

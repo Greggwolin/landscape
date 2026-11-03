@@ -8931,6 +8931,9 @@ def handle_get_budget_items(
                 for key in ['qty', 'rate', 'amount', 'contingency_pct', 'escalation_rate']:
                     if record.get(key) is not None:
                         record[key] = float(record[key])
+                for key in ('start_date', 'end_date'):
+                    if hasattr(record.get(key), 'isoformat'):
+                        record[key] = record[key].isoformat()
                 records.append(record)
 
             # Calculate summary

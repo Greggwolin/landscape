@@ -27,9 +27,17 @@ from django.db import connection
 
 
 def _sanitize_for_json(obj):
-    """Recursively convert Decimal values to float for JSON serialization."""
+    """Recursively convert Decimal values to float — and dates/UUIDs to
+    strings — for JSON serialization. A tool result carrying a date (a dated
+    budget line, 2026-11-03) otherwise broke saving the reply."""
     if isinstance(obj, Decimal):
         return float(obj)
+    import datetime as _dt
+    import uuid as _uuid
+    if isinstance(obj, (_dt.date, _dt.time)):
+        return obj.isoformat()
+    if isinstance(obj, _uuid.UUID):
+        return str(obj)
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):

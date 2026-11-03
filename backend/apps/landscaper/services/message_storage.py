@@ -8,6 +8,8 @@ Key features:
 - Raw SQL for consistency with existing codebase patterns
 """
 import json
+import datetime as _dt
+import uuid as _uuid
 import uuid
 from decimal import Decimal
 from typing import List, Dict, Any, Optional, Tuple
@@ -17,9 +19,16 @@ from django.db import connection, transaction
 
 class DecimalEncoder(json.JSONEncoder):
     """JSON encoder that handles Decimal types from PostgreSQL."""
+    # Dates too: a budget line with a typed start/end date put a date object
+    # into the stored tool results and every Peoria chat failed with "Object
+    # of type date is not JSON serializable" (2026-11-03).
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
+        if isinstance(obj, (_dt.date, _dt.time)):  # datetime is a date
+            return obj.isoformat()
+        if isinstance(obj, _uuid.UUID):
+            return str(obj)
         return super().default(obj)
 
 

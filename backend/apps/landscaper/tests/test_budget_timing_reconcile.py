@@ -56,3 +56,15 @@ def test_before_analysis_start_is_refused():
 def test_no_analysis_start_refuses_a_date():
     with pytest.raises(ValueError):
         _reconcile_budget_timing({'start_date': '2033-01-01'}, {}, None)
+
+
+def test_dated_tool_results_serialize():
+    """A dated budget row must not break saving the chat reply (2026-11-03)."""
+    import json
+    from datetime import datetime
+    from decimal import Decimal
+    from apps.landscaper.ai_handler import _sanitize_for_json
+    from apps.landscaper.services.message_storage import DecimalEncoder
+    row = {'start_date': date(2033, 1, 1), 'at': datetime(2033, 1, 1, 9), 'amount': Decimal('1.5')}
+    assert json.loads(json.dumps(_sanitize_for_json(row)))['start_date'] == '2033-01-01'
+    assert json.loads(json.dumps(row, cls=DecimalEncoder))['amount'] == 1.5
