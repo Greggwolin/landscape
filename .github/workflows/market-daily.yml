@@ -11,7 +11,7 @@
 # A re-read of an unchanged month writes nothing new; a changed figure is kept in
 # public.market_data_revision by trigger (migration 20260929_market_data_revisions_and_geo_codes).
 #
-# CADENCE: 13:15 UTC = 06:15 Phoenix, after the early-morning releases (FRED posts the
+# CADENCE: 13:47 UTC = 06:47 Phoenix, after the early-morning releases (FRED posts the
 # overnight SOFR and prime rate by then; BLS/Census 08:30 ET releases land the next run).
 # Skips the 16th, when the monthly deep pass runs.
 
@@ -19,12 +19,7 @@ name: Daily Market Refresh
 
 on:
   schedule:
-    - cron: '15 13 1-15,17-31 * *'   # daily 06:15 Phoenix, except the 16th (monthly deep pass)
-  # The branch-scoped push trigger that proved this workflow runs has done its
-  # job and is gone (2026-08-26). It existed because `workflow_dispatch` cannot
-  # be fired until the workflow sits on the default branch, so there was no
-  # other way to watch a real run before merging. It has run green; keeping it
-  # would mean every future push to that branch re-ran a monthly job.
+    - cron: '47 13 1-15,17-31 * *'   # daily 06:47 Phoenix, except the 16th (monthly deep pass)
   workflow_dispatch:
     inputs:
       geo_id:
