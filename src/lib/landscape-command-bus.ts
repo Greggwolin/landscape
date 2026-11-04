@@ -106,6 +106,18 @@ export interface LandscapeCommandPayloadMap {
     folder: string;
     tab?: string;
   };
+
+  /**
+   * Put a request to Landscaper in the open chat, as if the user had typed it.
+   *
+   * Emitter: the upload staging tray, when a cost estimate finishes uploading
+   * (2026-09-29 — an estimate's unit prices should be read and checked against
+   * the cost library without the user having to ask).
+   * Subscriber: CenterChatPanel. No-op where no chat panel is mounted.
+   */
+  ask_landscaper: {
+    message: string;
+  };
 }
 
 export type LandscapeCommand = keyof LandscapeCommandPayloadMap;
