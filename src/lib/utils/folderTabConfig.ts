@@ -328,7 +328,7 @@ export function createFolderConfig(
 
     // ========================================
     // Position 4: Feasibility (Land) / Valuation (Income)
-    // Land: feasibility, cashflow, returns, sensitivity - two-line label
+    // Land: cashflow only (returns/sensitivity placeholders removed 2026-10-21) - two-line label
     // Income: sales-comparison, cost, income (matches ValuationTab's internal tabs)
     // ========================================
     {
@@ -349,9 +349,9 @@ export function createFolderConfig(
             analysisPurpose
           )
         : [
+            // 'returns' and 'sensitivity' were Coming-Soon placeholders since
+            // 2026-01; removed 2026-10-21 (#LS-1021-05/09, decision PX-Q2 2b).
             { id: 'cashflow', label: 'Cash Flow' },
-            { id: 'returns', label: 'Returns' },
-            { id: 'sensitivity', label: 'Sensitivity' },
           ],
     },
 
@@ -540,8 +540,8 @@ export function getDefaultSubTabId(
     return 'sales-comparison';
   }
   if (folderId === 'feasibility') {
-    // Land's Feasibility/Valuation folder has no 'feasibility' page; its pages
-    // are cashflow, returns, sensitivity. Defaulting to 'feasibility' made every
+    // Land's Feasibility/Valuation folder has no 'feasibility' page; its only
+    // page is cashflow. Defaulting to 'feasibility' made every
     // folder-only navigation (the Screens dropdown) fail validation and do
     // nothing (2026-10-01, QV14).
     return 'cashflow';
