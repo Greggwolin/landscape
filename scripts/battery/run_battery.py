@@ -120,6 +120,14 @@ def load_questions(path: Path) -> list[dict[str, Any]]:
 
 def source_refusal_string() -> str:
     tree = ast.parse(AI_HANDLER_PATH.read_text(encoding="utf-8"))
+    # Resolve only module-level literal assignments. Importing the handler would
+    # initialise Django/services; evaluating arbitrary source could execute code.
+    constants: dict[str, ast.expr] = {}
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                if isinstance(target, ast.Name):
+                    constants[target.id] = statement.value
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
             continue
@@ -129,7 +137,12 @@ def source_refusal_string() -> str:
             continue
         for key, value in zip(node.value.keys, node.value.values):
             if isinstance(key, ast.Constant) and key.value == "suggested_user_question":
-                extracted = ast.literal_eval(value)
+                if isinstance(value, ast.Name):
+                    value = constants.get(value.id)
+                try:
+                    extracted = ast.literal_eval(value)
+                except (ValueError, TypeError):
+                    continue
                 if isinstance(extracted, str) and extracted.strip():
                     return extracted
     raise BatteryError(f"Could not source fabrication refusal string from {AI_HANDLER_PATH}")
