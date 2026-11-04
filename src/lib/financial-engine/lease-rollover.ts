@@ -75,12 +75,20 @@ export function generateRolloverDecision(
   expirationPeriod: number,
   forceDecision?: 'RENEWAL' | 'RELEASE'
 ): RolloverDecision {
-  // Determine renewal vs re-lease
+  // Determine renewal vs re-lease.
+  //
+  // ARGUS parity re-audit 2026-10-21, §2.4 (#LS-1021-04): this used to be
+  // `Math.random() < renewal_probability` — an unseeded dice roll, so the same
+  // inputs produced different cash flows on every run. The decision is now the
+  // expected case: renew when the renewal probability is at least one half,
+  // otherwise re-lease. Probability-WEIGHTED costs (ARGUS's market-leasing
+  // blend) live in calculateExpectedRolloverCost() below; callers that want the
+  // blend use that, callers that want a single scenario pass forceDecision.
   const isRenewal = forceDecision === 'RENEWAL'
     ? true
     : forceDecision === 'RELEASE'
     ? false
-    : Math.random() < assumptions.renewal_probability;
+    : assumptions.renewal_probability >= 0.5;
 
   // Calculate market rent at expiration (with growth)
   const yearsToExpiration = expirationPeriod / 12;
