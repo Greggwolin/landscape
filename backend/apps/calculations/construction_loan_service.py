@@ -189,6 +189,8 @@ class ConstructionLoanService:
             'peak_balance': round(result.peak_balance, 2),
             'peak_balance_pct': round(result.peak_balance_pct * 100, 2),
             'convergence_iterations': result.iterations_to_converge,
+            'converged': result.converged,
+            'reserve_residual': round(result.reserve_residual, 2),
         }
 
         return {

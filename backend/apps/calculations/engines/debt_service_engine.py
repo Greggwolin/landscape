@@ -87,6 +87,14 @@ class RevolverResult:
     maturity_shortfall: float = 0.0
     total_parcels: int = 0
     total_parcels_released: int = 0
+    # ARGUS parity re-audit 2026-10-21 §2.8 (#LS-1021-03). The reserve solve is
+    # capped at MAX_ITERATIONS; before this flag the result read the same whether
+    # the solve settled on the last pass or ran out, and when it ran out the
+    # commitment had been built on the PREVIOUS pass's reserve, so commitment and
+    # reserve did not tie. `converged` says which happened; `reserve_residual` is
+    # the last |new − previous| step (0.0 when converged within tolerance).
+    converged: bool = True
+    reserve_residual: float = 0.0
 
 
 @dataclass
@@ -133,9 +141,8 @@ class DebtServiceEngine:
                 f"draw_trigger_type '{params.draw_trigger_type}' not supported. Use COST_INCURRED."
             )
 
-        commitment, interest_reserve, origination_fee, iterations = self._iterate_reserve_and_fee(
-            params,
-            period_data,
+        commitment, interest_reserve, origination_fee, iterations, converged, residual = (
+            self._iterate_reserve_and_fee(params, period_data)
         )
 
         periods = self._generate_revolver_schedule(
@@ -178,6 +185,8 @@ class DebtServiceEngine:
             maturity_shortfall=maturity_shortfall,
             total_parcels=total_parcels,
             total_parcels_released=total_released,
+            converged=converged,
+            reserve_residual=residual,
         )
 
     def calculate_term(
@@ -305,7 +314,7 @@ class DebtServiceEngine:
         self,
         params: RevolverLoanParams,
         period_data: List[PeriodCosts],
-    ) -> Tuple[float, float, float, int]:
+    ) -> Tuple[float, float, float, int, bool, float]:
         """
         Iterative convergence for interest reserve and origination fee.
 
@@ -326,7 +335,14 @@ class DebtServiceEngine:
             reserve = total_interest / (1 - cushion)
                     = total_interest / (2 - inflator)
 
-        Returns: (commitment_amount, interest_reserve, origination_fee, iterations)
+        Returns: (commitment_amount, interest_reserve, origination_fee, iterations,
+                  converged, reserve_residual)
+
+        If the cap is reached without convergence, the commitment and fee are
+        still recomputed from the FINAL reserve so the three figures tie, and
+        `converged` is False with the last step size in `reserve_residual`
+        (#LS-1021-03). Before this, an exhausted loop handed back a commitment
+        built on the previous pass's reserve, silently.
         """
         base_costs = sum(p.total_costs for p in period_data)
         ltc = params.loan_to_cost_pct
@@ -340,6 +356,8 @@ class DebtServiceEngine:
         prev_reserve = 0.0
         commitment = 0.0
         iterations = 0
+        converged = False
+        residual = 0.0
 
         for iteration in range(self.MAX_ITERATIONS):
             iterations = iteration + 1
@@ -357,16 +375,21 @@ class DebtServiceEngine:
             total_interest = sum(p.accrued_interest for p in schedule)
 
             new_reserve = total_interest * effective_multiplier
-
-            if abs(new_reserve - prev_reserve) < self.CONVERGENCE_TOLERANCE:
-                prev_reserve = new_reserve
-                commitment = (base_costs + params.closing_costs + prev_reserve) * ltc / denom
-                origination_fee = commitment * fee_pct
-                break
-
+            residual = abs(new_reserve - prev_reserve)
             prev_reserve = new_reserve
 
-        return commitment, prev_reserve, origination_fee, iterations
+            if residual < self.CONVERGENCE_TOLERANCE:
+                converged = True
+                break
+
+        # Whether the loop settled or ran out, the commitment and fee are
+        # rebuilt from the reserve actually being returned, so the three figures
+        # always tie. An exhausted loop used to return the commitment from the
+        # previous pass beside the newer reserve (#LS-1021-03).
+        commitment = (base_costs + params.closing_costs + prev_reserve) * ltc / denom
+        origination_fee = commitment * fee_pct
+
+        return commitment, prev_reserve, origination_fee, iterations, converged, (0.0 if converged else residual)
 
     def _generate_revolver_schedule(
         self,

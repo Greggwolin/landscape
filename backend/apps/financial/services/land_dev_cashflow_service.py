@@ -1527,14 +1527,22 @@ class LandDevCashFlowService:
                     })
                 total_amount += amount
 
+            # #LS-1021-03: say so on the line when the reserve solve ran out of
+            # passes instead of settling — the figures still tie, but they are
+            # the capped result, not a converged one.
+            description = loan.loan_name
+            if not revolver_result.converged:
+                description = f"{loan.loan_name} (reserve solve did not settle)"
             line_items.append({
                 'lineId': f"financing-loan-{loan.loan_id}",
                 'category': 'financing',
                 'subcategory': 'Debt Service',
-                'description': loan.loan_name,
+                'description': description,
                 'periods': period_amounts,
                 'total': total_amount,
                 'sourceType': 'debt',
+                'solveConverged': revolver_result.converged,
+                'solveIterations': revolver_result.iterations_to_converge,
             })
 
         for loan in term_loans:

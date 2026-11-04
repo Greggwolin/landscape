@@ -166,6 +166,7 @@ class LoanSizingService:
                 "calculation_basis": {
                     "method": "REVOLVER_ITERATIVE",
                     "iterations": result.iterations_to_converge,
+                    "converged": result.converged,
                     "peak_balance": round(result.peak_balance, 2),
                     "inflator": float(getattr(loan, "interest_reserve_inflator", 1.0) or 1.0),
                 },
