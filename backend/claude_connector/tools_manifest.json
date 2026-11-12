@@ -1,0 +1,503 @@
+{
+ "tools": [
+  {
+   "name": "list_projects_summary",
+   "title": "List projects summary",
+   "description": "Lists the Landscape projects this user owns, with their project numbers. Call this first when the user has not said which deal. List all active projects with key metrics (name, type, location, price, units/sf/acres, doc count). Works without project context.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "property_type": {
+      "type": "string",
+      "description": "Filter by project type code (LAND, MF, OFF, etc.)"
+     },
+     "limit": {
+      "type": "integer",
+      "description": "Max projects to return (default 50)"
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "List projects summary",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_deal_summary",
+   "title": "Get deal summary",
+   "description": "Comprehensive project snapshot in one call: property basics, financials, debt, valuation, development budget total, absorption summary, headline returns (unlevered project-level IRR / equity multiple / NPV, basis-labeled), and data summary. Replaces 6-8 sequential reads. Use this for any 'give me a briefing / catch me up / where do we stand' ask covering budget, absorption, and/or returns together — every figure it returns is tool-sourced. The returns block is the UNLEVERED project-level basis (before financing); the levered/equity waterfall IRR is a different figure. For budget line-item detail call get_budget_items; the budget here is the aggregate total only.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Get deal summary",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "calculate_project_metrics",
+   "title": "Calculate project metrics",
+   "description": "Runs Landscape's engine for headline returns (IRR, equity multiple, NPV). The basis of each figure is labelled in the result. Trigger financial engine to compute IRR, NPV, budget variance, and investment metrics for a project.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Calculate project metrics",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "calculate_cash_flow",
+   "title": "Calculate cash flow",
+   "description": "Runs Landscape's engine for the cash flow schedule. Use detail_level 'summary' unless the user asks for annual or monthly periods. Generate period-by-period cash flow schedule. Routes to LandDev or IncomeProperty service based on project type.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "detail_level": {
+      "type": "string",
+      "enum": [
+       "summary",
+       "annual",
+       "monthly"
+      ],
+      "description": "Level of detail (default: annual)"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    },
+    "required": []
+   },
+   "annotations": {
+    "title": "Calculate cash flow",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_budget_rollup",
+   "title": "Get budget rollup",
+   "description": "Get a project-scoped budget rollup: names, row counts, summed amounts, percent of total, top-two concentration and grand total. Two groupings. group_by='category' (the default) rolls up by cost category -- 'break down the budget', 'budget by category', 'biggest budget categories', 'cost buckets'. group_by='level' with level 1, 2 or 3 rolls up by the project's OWN hierarchy levels (whatever it calls them -- village / phase / parcel on a land deal) -- 'budget by phase', 'cost by village', 'what is parcel 1.201 carrying', or any report variant grouped by where the money sits rather than what it buys. A level rollup rolls deeper lines UP: a line assigned to one parcel is counted inside its phase, so the phase totals are complete. A line sitting ABOVE the requested level keeps its own row and is flagged above_level -- say so rather than folding it into a member below it. Only state percentage shares returned by this tool. For raw individual line items, call get_budget_items.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "group_by": {
+      "type": "string",
+      "enum": [
+       "category",
+       "level"
+      ],
+      "description": "What to group by. Defaults to category."
+     },
+     "level": {
+      "type": "integer",
+      "enum": [
+       1,
+       2,
+       3
+      ],
+      "description": "Which hierarchy level to roll up to when group_by='level'. 1 is the project's top level, 3 the deepest. Defaults to 2. The response carries level_label, the project's own name for it."
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get budget rollup",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_budget_items",
+   "title": "Get budget items",
+   "description": "Development budget line items: description, category, quantity, rate, amount and timing. For totals by category use get_budget_rollup. Get budget line items with optional filters.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "category_id": {
+      "type": "integer"
+     },
+     "limit": {
+      "type": "integer"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get budget items",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_areas",
+   "title": "Get areas",
+   "description": "The areas (top level of the land plan) in the project. Get area (level 1) containers for this project.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "area_id": {
+      "type": "integer"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get areas",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_phases",
+   "title": "Get phases",
+   "description": "The phases in the project, optionally within one area. Get phase (level 2) containers for this project.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "phase_id": {
+      "type": "integer"
+     },
+     "area_id": {
+      "type": "integer"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get phases",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_parcels",
+   "title": "Get parcels",
+   "description": "The parcels in the project with land use, product, acreage and unit counts; optionally within one phase or area. Get parcel (level 3) containers for this project.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "parcel_id": {
+      "type": "integer"
+     },
+     "phase_id": {
+      "type": "integer"
+     },
+     "area_id": {
+      "type": "integer"
+     },
+     "limit": {
+      "type": "integer"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get parcels",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_lots",
+   "title": "Get lots",
+   "description": "Retrieve lot records for the project. Supports parcel, parcel lot_type_id, and status filtering.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "parcel_id": {
+      "type": "integer"
+     },
+     "lot_type_id": {
+      "type": "integer"
+     },
+     "status": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get lots",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_absorption_schedule",
+   "title": "Get absorption schedule",
+   "description": "Absorption schedule rows: how many units are assumed to sell in each period, by phase, parcel or scenario. Get lot/unit absorption schedule.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "absorption_id": {
+      "type": "integer"
+     },
+     "phase_id": {
+      "type": "integer"
+     },
+     "parcel_id": {
+      "type": "integer"
+     },
+     "scenario": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get absorption schedule",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_parcel_sale_assumptions",
+   "title": "Get parcel sale assumptions",
+   "description": "Retrieve sale assumptions for one or all parcels in a project. Returns per-parcel lot pricing, price escalation, closing costs, commission rates, and transaction cost assumptions.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "parcel_id": {
+      "type": "integer",
+      "description": "Specific parcel ID. Omit to get assumptions for all parcels in the project."
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get parcel sale assumptions",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_parcel_sale_events",
+   "title": "Get parcel sale events",
+   "description": "Recorded parcel sale events (bulk sales of finished parcels): buyer, status, dates and price. Get planned parcel sale events.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "sale_event_id": {
+      "type": "integer"
+     },
+     "parcel_id": {
+      "type": "integer"
+     },
+     "phase_id": {
+      "type": "integer"
+     },
+     "status": {
+      "type": "string"
+     },
+     "buyer": {
+      "type": "string"
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get parcel sale events",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_loans",
+   "title": "Get loans",
+   "description": "The loans on the project and their terms. Get loan/debt structure for this project.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get loans",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_project_documents",
+   "title": "Get project documents",
+   "description": "List all uploaded documents for this project. Soft-deleted documents are always excluded. Omit status_filter (or pass 'all') unless you specifically need one status — there is NO 'active' status in the data; 'active' is accepted only as a synonym for 'all'.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "status_filter": {
+      "type": "string",
+      "enum": [
+       "all",
+       "active",
+       "draft",
+       "processing",
+       "indexed",
+       "pending",
+       "completed",
+       "failed"
+      ],
+      "description": "Default 'all'. 'all'/'active' = every live document. Document statuses: 'draft' (uploaded, not indexed), 'processing', 'indexed'. Extraction statuses: 'pending', 'completed', 'failed'. An unrecognized value returns ALL live documents plus a 'filter_ignored' note — an empty list therefore means the project genuinely has no documents, never a bad filter."
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get project documents",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "get_document_content",
+   "title": "Get document content",
+   "description": "The text of one project document. Find the document with get_project_documents first. Get extracted text content from a document.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "doc_id": {
+      "type": "integer"
+     },
+     "doc_type": {
+      "type": "string"
+     },
+     "doc_name": {
+      "type": "string"
+     },
+     "max_length": {
+      "type": "integer"
+     },
+     "focus": {
+      "type": "string",
+      "enum": [
+       "rental_comps",
+       "operating_expenses",
+       "rent_roll"
+      ]
+     },
+     "project_id": {
+      "type": "integer",
+      "description": "Landscape project number (from list_projects_summary)."
+     }
+    }
+   },
+   "annotations": {
+    "title": "Get document content",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  },
+  {
+   "name": "search_my_knowledge",
+   "title": "Search my knowledge",
+   "description": "Search the user's OWN knowledge: every document they have put into Landscape — files attached in staging (pre-project) chats, county records saved from the web, project documents — across all their chats and projects. Private to this user. Use it FIRST when the user asks about a property, site, deal or opportunity they have looked at before, or says 'what do we know', 'what did the report say', 'in my documents'; and before searching the web for facts the user may already hold. Returns matching passages with the document name and where it lives.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string",
+      "description": "What to find, in plain words, e.g. 'Sierra Reflections conditions of approval fire station'."
+     },
+     "limit": {
+      "type": "integer",
+      "description": "Passages to return, 1-20 (default 8)."
+     }
+    },
+    "required": [
+     "query"
+    ]
+   },
+   "annotations": {
+    "title": "Search my knowledge",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": false
+   }
+  }
+ ]
+}

@@ -38,6 +38,7 @@ import datetime as _dt
 import json
 import os
 import sys
+import threading
 import time
 from decimal import Decimal
 from pathlib import Path
@@ -49,6 +50,8 @@ KNOWN_PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 DEFAULT_PROTOCOL = "2025-06-18"
 MAX_RESULT_CHARS = 80_000
 MAX_LOGGED_CHARS = 400_000
+BACKEND_WAIT_SECONDS = 180
+MANIFEST_PATH = Path(__file__).resolve().parent / "tools_manifest.json"
 
 INSTRUCTIONS = (
     "Landscape is a real-estate underwriting system of record. These tools read "
@@ -188,13 +191,66 @@ class DjangoBackend:
         )
 
 
+class LazyBackend:
+    """
+    Loads the real backend on a background thread so the handshake is instant.
+
+    Measured 2026-11-11/12: Django plus the tool registry take 17 s to import
+    from a shell and 53 s when the Claude app starts the server. The app gives
+    a connector far less than that to answer `initialize`, and marked this one
+    failed. Nothing in `initialize` or `tools/list` needs Django (the tool list
+    is served from tools_manifest.json), so only a tool call waits.
+    """
+
+    def __init__(self, factory):
+        self._ready = threading.Event()
+        self._backend: Any = None
+        self._error: Optional[BaseException] = None
+        self._thread = threading.Thread(target=self._load, args=(factory,),
+                                        name="landscape-backend", daemon=True)
+        self._thread.start()
+
+    def _load(self, factory) -> None:
+        started = time.time()
+        try:
+            self._backend = factory()
+            print(f"[landscape-connector] backend loaded in {time.time() - started:.1f}s",
+                  file=sys.stderr)
+        except BaseException as exc:  # surfaced on the first call
+            self._error = exc
+            print(f"[landscape-connector] backend failed to load: {exc!r}", file=sys.stderr)
+        finally:
+            self._ready.set()
+
+    def _get(self) -> Any:
+        if not self._ready.wait(BACKEND_WAIT_SECONDS):
+            raise RuntimeError("Landscape is still starting. Try again in a minute.")
+        if self._error is not None:
+            raise RuntimeError(f"Landscape could not start: {self._error!r}")
+        return self._backend
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get(), name)
+
+
+def load_manifest(path: Path = MANIFEST_PATH) -> Optional[List[Dict[str, Any]]]:
+    try:
+        tools = json.loads(path.read_text(encoding="utf-8"))["tools"]
+    except (OSError, ValueError, KeyError):
+        return None
+    # The manifest is a convenience, never an authority: anything off the pilot
+    # list is dropped here, and every call is re-checked against the registry.
+    return [t for t in tools if t.get("name") in PILOT_TOOLS]
+
+
 class Connector:
     def __init__(self, backend: Any, default_project_id: Optional[int] = None,
-                 log_path: Optional[Path] = None):
+                 log_path: Optional[Path] = None,
+                 manifest: Optional[List[Dict[str, Any]]] = None):
         self.backend = backend
         self.default_project_id = default_project_id
         self.log_path = log_path
-        self._tools_cache: Optional[List[Dict[str, Any]]] = None
+        self._tools_cache: Optional[List[Dict[str, Any]]] = manifest
 
     # -- tool catalogue ----------------------------------------------------
 
@@ -270,7 +326,16 @@ class Connector:
         return {"success": False, "error": code, "message": message}
 
     def _run(self, name: str, args: Dict[str, Any]):
-        if name not in PILOT_TOOLS or name not in self.exposed_names():
+        try:
+            return self._run_checked(name, args)
+        except Exception as exc:  # backend still starting, or failed to start
+            return self._refuse("landscape_unavailable", str(exc)), True, None
+
+    def _run_checked(self, name: str, args: Dict[str, Any]):
+        if name not in PILOT_TOOLS:
+            return self._refuse("tool_not_available",
+                                f"'{name}' is not part of the Landscape pilot connector."), True, None
+        if name not in self.exposed_names():
             return self._refuse("tool_not_available",
                                 f"'{name}' is not part of the Landscape pilot connector."), True, None
         if self.backend.is_mutation(name):
@@ -441,12 +506,30 @@ def main() -> int:
         return 2
     log_path = Path(os.environ.get("LANDSCAPE_MCP_LOG")
                     or Path.home() / "Library" / "Logs" / "LandscapeConnector" / "calls.jsonl")
-    backend = DjangoBackend(user_id)
-    connector = Connector(backend,
-                          default_project_id=_int_env("LANDSCAPE_MCP_DEFAULT_PROJECT_ID"),
-                          log_path=log_path)
-    print(f"[landscape-connector] ready: user {user_id}, "
-          f"{len(connector.exposed_names())} tools, log {log_path}", file=sys.stderr)
+    default_project_id = _int_env("LANDSCAPE_MCP_DEFAULT_PROJECT_ID")
+
+    if "--write-manifest" in sys.argv:
+        # Regenerate tools_manifest.json from the live registry. Run after any
+        # change to PILOT_TOOLS or to the schemas of the tools on it.
+        connector = Connector(DjangoBackend(user_id), default_project_id=None)
+        MANIFEST_PATH.write_text(
+            json.dumps({"tools": connector.tools()}, indent=1, ensure_ascii=False) + "\n",
+            encoding="utf-8")
+        print(f"[landscape-connector] wrote {len(connector.tools())} tools to {MANIFEST_PATH}",
+              file=sys.stderr)
+        return 0
+
+    manifest = load_manifest()
+    if manifest is None:
+        # No manifest: fall back to loading Django before answering anything.
+        backend: Any = DjangoBackend(user_id)
+    else:
+        backend = LazyBackend(lambda: DjangoBackend(user_id))
+    connector = Connector(backend, default_project_id=default_project_id,
+                          log_path=log_path, manifest=manifest)
+    print(f"[landscape-connector] listening: user {user_id}, "
+          f"{'manifest' if manifest is not None else 'live'} tool list, log {log_path}",
+          file=sys.stderr)
     reader = open(0, "r", encoding="utf-8", closefd=False)
     connector.serve(reader, protocol_out)
     return 0

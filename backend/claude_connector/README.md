@@ -45,7 +45,7 @@ Claude Desktop entry (`claude_desktop_config.json` → `mcpServers`):
 
     "landscape": {
       "command": "/Users/5150east/landscape/backend/venv/bin/python",
-      "args": ["/Users/5150east/Documents/landscape-wt-mcp/backend/claude_connector/server.py"],
+      "args": ["/Users/5150east/landscape-wt-mcp/backend/claude_connector/server.py"],
       "env": {"LANDSCAPE_MCP_USER_ID": "4", "LANDSCAPE_MCP_DEFAULT_PROJECT_ID": "9"}
     }
 

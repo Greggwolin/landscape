@@ -181,3 +181,55 @@ def test_serve_reads_lines_and_survives_garbage():
     c.serve(reader, writer)
     lines = [json.loads(l) for l in writer.getvalue().splitlines()]
     assert lines[0]["error"]["code"] == -32700 and lines[1] == {"jsonrpc": "2.0", "id": 7, "result": {}}
+
+
+def test_handshake_and_tool_list_do_not_wait_for_a_slow_backend():
+    import threading, time
+    from claude_connector.server import LazyBackend
+
+    release = threading.Event()
+
+    def slow_factory():
+        release.wait(5)
+        return FakeBackend()
+
+    manifest = [{"name": "get_deal_summary", "description": "d",
+                 "inputSchema": {"type": "object", "properties": {}}}]
+    c = Connector(LazyBackend(slow_factory), default_project_id=9, manifest=manifest)
+    started = time.time()
+    assert rpc(c, "initialize", {"protocolVersion": "2025-06-18"})["result"]["serverInfo"]
+    assert [t["name"] for t in rpc(c, "tools/list")["result"]["tools"]] == ["get_deal_summary"]
+    assert time.time() - started < 1.0          # answered while the backend is still loading
+    release.set()
+    payload, is_error = call(c, "get_deal_summary")   # a call waits, then runs
+    assert not is_error and payload["total_budget"] == "40212345.67"
+
+
+def test_backend_that_fails_to_start_is_reported_not_raised():
+    from claude_connector.server import LazyBackend
+
+    def broken():
+        raise RuntimeError("no database")
+
+    c = Connector(LazyBackend(broken), default_project_id=9, manifest=[])
+    payload, is_error = call(c, "get_deal_summary")
+    assert is_error and payload["error"] == "landscape_unavailable"
+    assert "no database" in payload["message"]
+
+
+def test_manifest_cannot_smuggle_in_a_tool_outside_the_pilot_list(tmp_path):
+    from claude_connector.server import load_manifest
+
+    path = tmp_path / "m.json"
+    path.write_text(json.dumps({"tools": [{"name": "get_deal_summary"}, {"name": "update_parcel"}]}))
+    assert [t["name"] for t in load_manifest(path)] == ["get_deal_summary"]
+    assert load_manifest(tmp_path / "missing.json") is None
+
+
+def test_shipped_manifest_matches_the_pilot_list():
+    from claude_connector.server import load_manifest, MANIFEST_PATH
+
+    tools = load_manifest()
+    assert tools is not None, f"{MANIFEST_PATH} is missing — run server.py --write-manifest"
+    assert {t["name"] for t in tools} == set(PILOT_TOOLS)
+    assert all(t["annotations"]["readOnlyHint"] is True for t in tools)
