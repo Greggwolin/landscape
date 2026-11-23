@@ -26,7 +26,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db import connection
 
-from .mf_rent_base import unit_potential_rent
+from .mf_rent_base import is_management_fee_row, management_fee_sql_predicate, unit_potential_rent
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
@@ -67,22 +67,19 @@ RENT_PREMIUM_NOT_SET_REASON = (
 # This filter is the same rule the Direct Cap view applies, expressed in SQL, so
 # the two tiles read the same base. is_management_expense_row() is the Python
 # twin, kept beside it so a test can pin the two to the same definition.
-MANAGEMENT_EXPENSE_CATEGORIES = ('management_fee', 'management fee')
-MANAGEMENT_PARENT_CATEGORY = 'management'
+# Decision 10a (Gregg, 2026-11-23) narrowed this: only the management FEE line
+# is excluded. Other costs filed under the Management parent (an on-site
+# manager, payroll, administrative) stay in base opex. The rule and its SQL
+# twin live in mf_rent_base so the Direct Cap view applies the identical test.
 _NON_MANAGEMENT_OPEX_FILTER = """
-                  AND NOT (
-                        LOWER(COALESCE(expense_category, '')) IN ('management_fee', 'management fee')
-                     OR COALESCE(parent_category, '') = 'management'
-                  )"""
+                  AND NOT (""" + management_fee_sql_predicate('expense_category') + """)"""
 
 
-def is_management_expense_row(expense_category: Optional[str], parent_category: Optional[str]) -> bool:
-    """True for the rows the Direct Cap view treats as the management category
-    (views_income_approach.py: ``is_mgmt``). The DCF base-opex query excludes
-    exactly these rows; see _NON_MANAGEMENT_OPEX_FILTER."""
-    cat = (expense_category or '').lower()
-    parent = parent_category or ''
-    return cat in MANAGEMENT_EXPENSE_CATEGORIES or parent == MANAGEMENT_PARENT_CATEGORY
+def is_management_expense_row(expense_category: Optional[str], parent_category: Optional[str] = None) -> bool:
+    """True for the statement line the computed fee replaces. Kept under its
+    original name for callers; the parent category is no longer consulted
+    (decision 10a) — see mf_rent_base.is_management_fee_row."""
+    return is_management_fee_row(expense_category)
 
 
 def terminal_management_fee(terminal_egi: float, management_fee_pct: float) -> float:
@@ -437,9 +434,10 @@ class DCFCalculationService:
             # a T-12 and a pro-forma sums BOTH statements into base_opex.
             # NULL rows are legacy/untagged and always count as part of the
             # active statement (same pattern as year1_noi_calculator).
-            # Management-category rows are excluded: the fee is computed below
-            # as EGI × pct, and counting the statement's own management line as
-            # well paid it twice (#LS-1021-01; same rule as the Direct Cap view).
+            # The statement's management FEE line is excluded: the fee is
+            # computed below as EGI × pct, and counting the statement's own
+            # fee as well paid it twice (#LS-1021-01). Other management costs
+            # stay (decision 10a). Same rule as the Direct Cap view.
             cursor.execute("""
                 SELECT COALESCE(SUM(annual_amount), 0) as total_opex
                 FROM landscape.tbl_operating_expenses

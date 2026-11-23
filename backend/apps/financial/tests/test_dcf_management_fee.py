@@ -27,6 +27,7 @@ import inspect
 import pytest
 
 from apps.financial.services import dcf_calculation_service as svc
+from apps.financial.services import mf_rent_base
 from apps.financial.services.dcf_calculation_service import (
     _NON_MANAGEMENT_OPEX_FILTER,
     is_management_expense_row,
@@ -34,31 +35,39 @@ from apps.financial.services.dcf_calculation_service import (
 )
 
 
-# ── 1. Management rows are excluded by the same rule the Direct Cap view uses ──
+# ── 1. Only the management FEE line is replaced (decision 10a) ──────────────
 
 @pytest.mark.parametrize('category, parent, expected', [
     ('management_fee', None, True),
-    ('Management Fee', None, True),           # case-insensitive, as the view's .lower()
-    ('MANAGEMENT_FEE', 'administrative', True),
-    ('asset_management', 'management', True),  # any row under the management parent
-    ('payroll', 'management', True),
+    ('Management Fee', 'management', True),
+    ('Management Fee (3%)', 'management', True),   # Chadron Terrace's label
+    ('MANAGEMENT_FEE', 'administrative', True),    # the name decides, not the parent
+    ('Mgmt Fee', None, True),
+    ('Off-Site Management', 'management', True),   # the management company's charge
+    ('management_offsite', 'management', True),
+    ('On-Site Management', 'management', False),   # staff — stays an expense
+    ('Payroll', 'management', False),              # filed under Management, not the fee
+    ('Administrative', 'management', False),
+    ('asset_management', 'management', False),
+    ('Manager Rent Credit', 'administrative', False),
     ('property_taxes', 'taxes_insurance', False),
-    ('management_software', 'administrative', False),  # not the fee, not the parent
+    ('management_software', 'administrative', False),
     (None, None, False),
     ('', '', False),
 ])
-def test_python_twin_matches_direct_cap_rule(category, parent, expected):
+def test_fee_rule(category, parent, expected):
     assert is_management_expense_row(category, parent) is expected
+    assert mf_rent_base.is_management_fee_row(category) is expected
 
 
-def test_sql_filter_names_the_same_categories_as_the_python_twin():
-    # The two definitions must not drift: every literal the Python rule uses
-    # appears in the SQL, and nothing else is matched.
-    for cat in svc.MANAGEMENT_EXPENSE_CATEGORIES:
-        assert f"'{cat}'" in _NON_MANAGEMENT_OPEX_FILTER
-    assert f"= '{svc.MANAGEMENT_PARENT_CATEGORY}'" in _NON_MANAGEMENT_OPEX_FILTER
-    assert 'LOWER(COALESCE(expense_category' in _NON_MANAGEMENT_OPEX_FILTER
+def test_sql_filter_and_python_rule_share_one_pattern():
+    # The two definitions cannot drift: the SQL is built from the same pattern
+    # the Python regex compiles, over the same normalisation.
+    assert mf_rent_base.MANAGEMENT_FEE_PATTERN in _NON_MANAGEMENT_OPEX_FILTER
+    assert "REGEXP_REPLACE(LOWER(COALESCE(expense_category, '')), '[^a-z]+', ' ', 'g')" in _NON_MANAGEMENT_OPEX_FILTER
     assert 'AND NOT (' in _NON_MANAGEMENT_OPEX_FILTER
+    assert 'parent_category' not in _NON_MANAGEMENT_OPEX_FILTER
+    assert '%' not in _NON_MANAGEMENT_OPEX_FILTER   # safe beside %s parameters
 
 
 def test_base_opex_query_carries_the_filter():
@@ -69,13 +78,11 @@ def test_base_opex_query_carries_the_filter():
     assert '_NON_MANAGEMENT_OPEX_FILTER' in source
 
 
-def test_direct_cap_view_still_uses_the_rule_we_mirror():
-    # If views_income_approach changes its definition, this test says so and
-    # the two must be re-aligned together.
+def test_direct_cap_view_uses_the_same_rule():
     from apps.financial import views_income_approach
-    source = inspect.getsource(views_income_approach)
-    assert "('management_fee', 'management fee')" in source
-    assert "parent_cat == 'management'" in source
+    source = inspect.getsource(views_income_approach._get_income_approach_data)
+    assert 'is_mgmt = is_management_fee_row(cat)' in source
+    assert "parent_cat == 'management'" not in source
 
 
 # ── 2. Terminal fee follows terminal income ─────────────────────────────────

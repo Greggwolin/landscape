@@ -20,7 +20,8 @@ No Django model imports — these take a DB-API cursor so they can be called fro
 a service, a view or a test without pulling the app registry in.
 """
 
-from typing import Any, Dict
+import re
+from typing import Any, Dict, Optional
 
 
 # A unit's market rent: its own figure when it has one, otherwise its unit
@@ -99,3 +100,47 @@ def active_opex_discriminator(cursor, project_id: int) -> str:
     """, [project_id])
     row = cursor.fetchone()
     return row[0] if row and row[0] else 'default'
+
+
+# ── Which statement lines the computed management fee replaces ──────────────
+#
+# Decision 10a (Gregg, 2026-11-23). The projections compute the management fee
+# as fee % × income. The statement's own fee line therefore has to come OUT of
+# base expenses, or the fee is paid twice (#LS-1021-01). The first version of
+# that fix removed every row filed under the Management parent — which also
+# dropped an on-site manager, payroll and administrative costs that happened to
+# be filed there (Lynn Villa: 140,831 of non-fee cost; Vincent Village: 23,000),
+# overstating NOI. Only the FEE is replaced; other management costs stay.
+#
+# A row is the fee when its name says so: "management fee" in any spelling
+# ("Management Fee (3%)", "management_fee", "Mgmt Fee"), or off-site management
+# ("Off-Site Management", "management_offsite") — the management company's
+# charge under its other common label. "On-Site Management" is staff, not the
+# fee, and stays an expense. The parent category is deliberately not consulted.
+#
+# One pattern, used by Python (is_management_fee_row) and by SQL
+# (management_fee_sql_predicate) over the same normalisation — lower-case,
+# every run of non-letters collapsed to one space — so the two cannot drift.
+MANAGEMENT_FEE_PATTERN = (
+    r'(management|mgmt) fee'
+    r'|off ?site (management|mgmt)'
+    r'|(management|mgmt) off ?site'
+)
+_MANAGEMENT_FEE_RE = re.compile(MANAGEMENT_FEE_PATTERN)
+
+
+def normalise_expense_name(name: Optional[str]) -> str:
+    return re.sub(r'[^a-z]+', ' ', (name or '').lower()).strip()
+
+
+def is_management_fee_row(expense_category: Optional[str]) -> bool:
+    """True when the statement line is the management fee (decision 10a)."""
+    return bool(_MANAGEMENT_FEE_RE.search(normalise_expense_name(expense_category)))
+
+
+def management_fee_sql_predicate(column: str = 'expense_category') -> str:
+    """SQL twin of is_management_fee_row() for the given column expression."""
+    return (
+        f"TRIM(REGEXP_REPLACE(LOWER(COALESCE({column}, '')), '[^a-z]+', ' ', 'g'))"
+        f" ~ '{MANAGEMENT_FEE_PATTERN}'"
+    )
