@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db import connection
+
+from .mf_rent_base import unit_potential_rent
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
@@ -411,14 +413,13 @@ class DCFCalculationService:
                     unit_count = int(ut_row[0])
                     total_sf = float(ut_row[1])
 
-            # Get current annual rent (in-place rents)
-            cursor.execute("""
-                SELECT COALESCE(SUM(current_rent), 0) * 12 as annual_rent
-                FROM landscape.tbl_multifamily_unit
-                WHERE project_id = %s
-            """, [self.project_id])
-            rent_row = cursor.fetchone()
-            current_annual_rent = float(rent_row[0]) if rent_row else 0
+            # Get current annual rent (in-place rents). A vacant unit counts
+            # at market rent — decision 7a, #LS-1123-04: it used to count as
+            # zero and then have the vacancy allowance taken off as well. The
+            # rule lives in mf_rent_base so the Direct Cap view reads the same
+            # figure.
+            rent_base = unit_potential_rent(cursor, self.project_id)
+            current_annual_rent = rent_base['annual_potential_rent']
 
             # Fallback to unit types (floor plan matrix)
             if current_annual_rent == 0:
@@ -474,6 +475,7 @@ class DCFCalculationService:
             'total_sf': total_sf,
             'current_annual_rent': current_annual_rent,
             'base_opex': base_opex,
+            'rent_base': rent_base,
         }
 
     def calculate(self) -> Dict[str, Any]:

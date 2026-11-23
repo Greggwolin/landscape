@@ -255,7 +255,7 @@ class IncomeApproachDataService:
                 SELECT assumption_key, assumption_value
                 FROM landscape.tbl_project_assumption
                 WHERE project_id = %s
-                  AND assumption_key IN ('management_fee_pct', 'replacement_reserve_pct', 'capex_per_unit')
+                  AND assumption_key IN ('management_fee_pct', 'replacement_reserve_pct', 'capex_per_unit', 'other_income')
             """, [self.project_id])
             assumption_rows = cursor.fetchall()
 
@@ -278,6 +278,11 @@ class IncomeApproachDataService:
                     result['replacement_reserves_per_unit'] = self._decimal_to_float(
                         value, self.DEFAULTS['replacement_reserves_per_unit']
                     )
+                elif key == 'other_income':
+                    # #LS-1123-02: save_assumption() has always written this
+                    # key, but it was never read back, so a saved other-income
+                    # figure had no effect on the DCF or the Direct Cap tiles.
+                    result['other_income'] = self._decimal_to_float(value, self.DEFAULTS['other_income'])
 
             # Also check tbl_loan for replacement reserves (if table exists)
             try:

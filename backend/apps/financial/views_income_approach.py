@@ -30,6 +30,7 @@ from typing import Dict, Optional, Any
 from apps.projects.models import Project
 from .models_valuation import IncomeApproach
 from .services.income_approach_service import IncomeApproachDataService
+from .services.mf_rent_base import active_opex_discriminator, unit_potential_rent
 
 
 def decimal_or_zero(value: Any) -> Decimal:
@@ -138,6 +139,13 @@ def _get_income_approach_data(project_id: int) -> dict:
         rent_row = cursor.fetchone()
 
         t12_gpr = decimal_or_zero(rent_row[0]) if rent_row else Decimal('0')
+        # Decision 7a / #LS-1123-04: a vacant unit counts at market rent in the
+        # in-place basis, the same figure the DCF tile reads (mf_rent_base).
+        # Only applied when the rent roll has unit rows; the unit-type fallback
+        # below is untouched.
+        rent_base = unit_potential_rent(cursor, project_id)
+        if rent_base['unit_rows'] > 0:
+            t12_gpr = decimal_or_zero(rent_base['annual_potential_rent'])
         forward_gpr = decimal_or_zero(rent_row[1]) if rent_row else Decimal('0')
 
         # If no units, try unit types table (floor plan matrix)
@@ -192,6 +200,11 @@ def _get_income_approach_data(project_id: int) -> dict:
         # =====================================================================
         # OPERATING EXPENSES
         # =====================================================================
+        # #LS-1123-01: filtered to the project's ACTIVE statement, the same
+        # rule the DCF tile applies. Without it a project carrying a T-12 and a
+        # pro-forma had both summed into this tile's expenses. NULL rows are
+        # legacy/untagged and always count.
+        opex_discriminator = active_opex_discriminator(cursor, project_id)
         cursor.execute("""
             SELECT
                 oe.expense_category,
@@ -200,9 +213,10 @@ def _get_income_approach_data(project_id: int) -> dict:
                 COALESCE(oe.parent_category, 'unclassified') as parent_category
             FROM landscape.tbl_operating_expenses oe
             WHERE oe.project_id = %s
+              AND (oe.statement_discriminator = %s OR oe.statement_discriminator IS NULL)
             GROUP BY oe.expense_category, oe.expense_type, oe.parent_category
             ORDER BY oe.parent_category, oe.expense_category
-        """, [project_id])
+        """, [project_id, opex_discriminator])
         opex_rows = cursor.fetchall()
 
         # Label formatting: snake_case → Title Case
