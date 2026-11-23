@@ -61,7 +61,7 @@ No ARGUS model was run. These are Landscape-before against Landscape-after.
   106: -11,229. The Direct Cap market tile (computed fee) ties to the DCF wherever
   in-place and market rent are the same basis.
 - **Torrance carries two fee-type lines** (`management_fee` 50,919 and
-  `management_offsite` 32,461). Both are treated as the fee; together they are 8.7% of
+  `management_offsite` 32,461). Both are treated as the fee; together they are 8.3% of
   income, which is high for a single fee. If the off-site line is something else, the
   statement needs relabelling — the rule goes by name.
 - **Other entry points are untouched** and still disagree with both: the Landscaper
