@@ -142,3 +142,45 @@ def test_other_income_stays_zero_when_nothing_is_saved(monkeypatch):
 def test_other_income_key_is_in_the_query():
     src = inspect.getsource(IncomeApproachDataService.get_operating_assumptions)
     assert "'other_income')" in src
+
+
+# ── decision 11c: flag a different other-income figure, never substitute it ──
+
+class _SeqCursor(FakeCursor):
+    """fetchall() returns the assumption rows; each fetchone() pops the next
+    canned single row (project record, then tbl_loan)."""
+
+    def __init__(self, assumption_rows, single_rows):
+        super().__init__(assumption_rows)
+        self._singles = list(single_rows)
+
+    def fetchone(self):
+        return self._singles.pop(0) if self._singles else None
+
+
+def _operating_with_record(monkeypatch, assumption_rows, record_value):
+    from apps.financial.services import income_approach_service as mod
+
+    class FakeConnection:
+        def cursor(self_inner):
+            return _SeqCursor(assumption_rows, [(record_value,), None])
+
+    monkeypatch.setattr(mod, 'connection', FakeConnection())
+    return IncomeApproachDataService(17).get_operating_assumptions()
+
+
+def test_record_figure_is_flagged_and_not_used(monkeypatch):
+    out = _operating_with_record(monkeypatch, [('other_income', '0')], 61513)
+    assert out['other_income'] == 0          # the analysis figure is untouched
+    assert out['other_income_on_record'] == 61513.0
+    assert out['other_income_differs'] is True
+
+
+def test_no_flag_when_the_two_agree(monkeypatch):
+    out = _operating_with_record(monkeypatch, [('other_income', '61513')], 61513)
+    assert out['other_income_differs'] is False
+
+
+def test_no_flag_when_the_record_is_empty_or_zero(monkeypatch):
+    assert _operating_with_record(monkeypatch, [], None)['other_income_differs'] is False
+    assert _operating_with_record(monkeypatch, [], 0)['other_income_differs'] is False

@@ -105,6 +105,10 @@ export interface IncomeApproachAssumptions {
   // Income - These are EDITABLE (Income Approach specific)
   stabilized_vacancy_rate: number; // Editable - for Stabilized scenario only
   other_income: number;           // Editable - other income assumption
+  // Decision 11c: the project record's own other-income figure, and whether it
+  // differs from the one this analysis uses. Informational; never substituted.
+  other_income_on_record?: number | null;
+  other_income_differs?: boolean;
   income_growth_rate: number;     // Editable - for DCF projection
 
   // Expenses - READ-ONLY (pulled from Operations Tab)

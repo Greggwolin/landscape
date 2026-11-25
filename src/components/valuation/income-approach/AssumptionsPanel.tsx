@@ -211,6 +211,21 @@ export function AssumptionsPanel({
               />
             </AssumptionRow>
 
+            {assumptions.other_income_differs &&
+              assumptions.other_income_on_record != null && (
+                <div
+                  style={{
+                    color: 'var(--cui-warning)',
+                    fontSize: '0.8125rem',
+                    padding: '0 0.5rem 0.25rem',
+                  }}
+                >
+                  The project record shows other income of $
+                  {Math.round(assumptions.other_income_on_record).toLocaleString('en-US')}.
+                  This analysis uses the figure above.
+                </div>
+              )}
+
             <AssumptionRow>
               <PercentInput
                 label="Income Growth Rate"
