@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db import connection
+
+from .mf_rent_base import is_management_fee_row, management_fee_sql_predicate, unit_potential_rent
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
@@ -53,6 +55,44 @@ EXIT_NOT_MEANINGFUL_REASON = 'Terminal NOI is negative — reversion floored at 
 RENT_PREMIUM_NOT_SET_REASON = (
     'Post-renovation rent premium is not set — no rent lift assumed'
 )
+
+
+# ARGUS parity re-audit 2026-10-21, §2.5 (#LS-1021-01). The management fee is a
+# COMPUTED line in this model — EGI × management_fee_pct, added to opex every
+# period. The base-opex query used to sum EVERY tbl_operating_expenses row for
+# the active statement, management-category rows included, so a project whose
+# statement carried a management line paid the fee twice. views_income_approach
+# (the Direct Cap tile on the same page) removes the management category before
+# adding its own computed line; the DCF tile did not, and the two disagreed.
+# This filter is the same rule the Direct Cap view applies, expressed in SQL, so
+# the two tiles read the same base. is_management_expense_row() is the Python
+# twin, kept beside it so a test can pin the two to the same definition.
+# Decision 10a (Gregg, 2026-11-23) narrowed this: only the management FEE line
+# is excluded. Other costs filed under the Management parent (an on-site
+# manager, payroll, administrative) stay in base opex. The rule and its SQL
+# twin live in mf_rent_base so the Direct Cap view applies the identical test.
+_NON_MANAGEMENT_OPEX_FILTER = """
+                  AND NOT (""" + management_fee_sql_predicate('expense_category') + """)"""
+
+
+def is_management_expense_row(expense_category: Optional[str], parent_category: Optional[str] = None) -> bool:
+    """True for the statement line the computed fee replaces. Kept under its
+    original name for callers; the parent category is no longer consulted
+    (decision 10a) — see mf_rent_base.is_management_fee_row."""
+    return is_management_fee_row(expense_category)
+
+
+def terminal_management_fee(terminal_egi: float, management_fee_pct: float) -> float:
+    """Terminal-year management fee, recomputed as fee % × terminal EGI.
+
+    ARGUS parity re-audit 2026-10-21, §2.6 (#LS-1021-02). The fee used to be
+    carried into the terminal year by growing Year N's fee at the EXPENSE growth
+    rate. The fee is a percentage of income, so whenever income growth and
+    expense growth differ the carried figure was not pct × terminal EGI and the
+    exit value — roughly half of present value — was off by the difference.
+    Both the annual and the monthly path call this.
+    """
+    return float(terminal_egi) * float(management_fee_pct)
 
 
 def _exit_value_or_floor(terminal_noi: float, cap_rate: float) -> tuple:
@@ -370,14 +410,13 @@ class DCFCalculationService:
                     unit_count = int(ut_row[0])
                     total_sf = float(ut_row[1])
 
-            # Get current annual rent (in-place rents)
-            cursor.execute("""
-                SELECT COALESCE(SUM(current_rent), 0) * 12 as annual_rent
-                FROM landscape.tbl_multifamily_unit
-                WHERE project_id = %s
-            """, [self.project_id])
-            rent_row = cursor.fetchone()
-            current_annual_rent = float(rent_row[0]) if rent_row else 0
+            # Get current annual rent (in-place rents). A vacant unit counts
+            # at market rent — decision 7a, #LS-1123-04: it used to count as
+            # zero and then have the vacancy allowance taken off as well. The
+            # rule lives in mf_rent_base so the Direct Cap view reads the same
+            # figure.
+            rent_base = unit_potential_rent(cursor, self.project_id)
+            current_annual_rent = rent_base['annual_potential_rent']
 
             # Fallback to unit types (floor plan matrix)
             if current_annual_rent == 0:
@@ -395,12 +434,16 @@ class DCFCalculationService:
             # a T-12 and a pro-forma sums BOTH statements into base_opex.
             # NULL rows are legacy/untagged and always count as part of the
             # active statement (same pattern as year1_noi_calculator).
+            # The statement's management FEE line is excluded: the fee is
+            # computed below as EGI × pct, and counting the statement's own
+            # fee as well paid it twice (#LS-1021-01). Other management costs
+            # stay (decision 10a). Same rule as the Direct Cap view.
             cursor.execute("""
                 SELECT COALESCE(SUM(annual_amount), 0) as total_opex
                 FROM landscape.tbl_operating_expenses
                 WHERE project_id = %s
                   AND (statement_discriminator = %s OR statement_discriminator IS NULL)
-            """, [self.project_id, discriminator])
+            """ + _NON_MANAGEMENT_OPEX_FILTER, [self.project_id, discriminator])
             opex_row = cursor.fetchone()
             base_opex = float(opex_row[0]) if opex_row else 0
 
@@ -430,6 +473,7 @@ class DCFCalculationService:
             'total_sf': total_sf,
             'current_annual_rent': current_annual_rent,
             'base_opex': base_opex,
+            'rent_base': rent_base,
         }
 
     def calculate(self) -> Dict[str, Any]:
@@ -528,7 +572,9 @@ class DCFCalculationService:
         terminal_egi = last_year['egi'] * (1 + income_growth_rate)
 
         terminal_base_opex = last_year['base_opex'] * (1 + expense_growth_rate)
-        terminal_mgmt_fee = last_year['management_fee'] * (1 + expense_growth_rate)
+        # Fee is % of income, so it follows terminal EGI, not the expense growth
+        # rate (#LS-1021-02).
+        terminal_mgmt_fee = terminal_management_fee(terminal_egi, management_fee_pct)
         terminal_reserves = last_year['replacement_reserves']  # Fixed per-unit, no growth
         terminal_total_opex = terminal_base_opex + terminal_mgmt_fee + terminal_reserves
 
@@ -942,7 +988,9 @@ class DCFCalculationService:
 
         # Expense components grow at expense growth rate
         terminal_base_opex = year_n_base_opex * (1 + expense_growth_rate)
-        terminal_mgmt_fee = year_n_mgmt_fee * (1 + expense_growth_rate)
+        # Fee is % of income, so it follows terminal EGI, not the expense growth
+        # rate (#LS-1021-02).
+        terminal_mgmt_fee = terminal_management_fee(terminal_egi, management_fee_pct)
         terminal_reserves = year_n_reserves  # Reserves don't grow (per-unit fixed)
         terminal_total_opex = terminal_base_opex + terminal_mgmt_fee + terminal_reserves
 

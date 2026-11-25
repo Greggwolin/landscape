@@ -255,7 +255,7 @@ class IncomeApproachDataService:
                 SELECT assumption_key, assumption_value
                 FROM landscape.tbl_project_assumption
                 WHERE project_id = %s
-                  AND assumption_key IN ('management_fee_pct', 'replacement_reserve_pct', 'capex_per_unit')
+                  AND assumption_key IN ('management_fee_pct', 'replacement_reserve_pct', 'capex_per_unit', 'other_income')
             """, [self.project_id])
             assumption_rows = cursor.fetchall()
 
@@ -278,6 +278,34 @@ class IncomeApproachDataService:
                     result['replacement_reserves_per_unit'] = self._decimal_to_float(
                         value, self.DEFAULTS['replacement_reserves_per_unit']
                     )
+                elif key == 'other_income':
+                    # #LS-1123-02: save_assumption() has always written this
+                    # key, but it was never read back, so a saved other-income
+                    # figure had no effect on the DCF or the Direct Cap tiles.
+                    result['other_income'] = self._decimal_to_float(value, self.DEFAULTS['other_income'])
+
+            # Decision 11c (Gregg, 2026-11-25): the project record carries its
+            # own other-income figure (tbl_project.current_other_income — what
+            # the reports read). The analysis keeps using the saved assumption
+            # above; when the record shows a different, non-zero figure we say
+            # so rather than silently picking one. Nothing is substituted.
+            result['other_income_on_record'] = None
+            result['other_income_differs'] = False
+            try:
+                cursor.execute("""
+                    SELECT current_other_income
+                    FROM landscape.tbl_project
+                    WHERE project_id = %s
+                """, [self.project_id])
+                record_row = cursor.fetchone()
+                if record_row and record_row[0] is not None:
+                    on_record = self._decimal_to_float(record_row[0], 0.0)
+                    result['other_income_on_record'] = on_record
+                    result['other_income_differs'] = bool(
+                        on_record > 0 and abs(on_record - float(result['other_income'])) > 0.005
+                    )
+            except Exception:
+                pass
 
             # Also check tbl_loan for replacement reserves (if table exists)
             try:

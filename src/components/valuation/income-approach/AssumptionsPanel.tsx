@@ -13,7 +13,10 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import type { AssumptionsPanelProps } from '@/types/income-approach';
+import type {
+  AssumptionsPanelProps,
+  OtherIncomeRecordNote,
+} from '@/types/income-approach';
 import { formatCurrency } from '@/types/income-approach';
 
 // Chevron icon component
@@ -210,6 +213,8 @@ export function AssumptionsPanel({
                 onChange={(v) => onAssumptionChange('other_income', v)}
               />
             </AssumptionRow>
+
+            <OtherIncomeRecordFlag note={assumptions as OtherIncomeRecordNote} />
 
             <AssumptionRow>
               <PercentInput
@@ -876,6 +881,29 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/**
+ * Decision 11c: says, under Other Income, that the project record carries a
+ * different figure. The analysis keeps using the figure the user sees above.
+ */
+function OtherIncomeRecordFlag({ note }: { note: OtherIncomeRecordNote }) {
+  if (!note.other_income_differs || note.other_income_on_record == null) {
+    return null;
+  }
+  return (
+    <div
+      style={{
+        color: 'var(--cui-warning)',
+        fontSize: '0.8125rem',
+        padding: '0 0.5rem 0.25rem',
+      }}
+    >
+      The project record shows other income of $
+      {Math.round(note.other_income_on_record).toLocaleString('en-US')}. This
+      analysis uses the figure above.
     </div>
   );
 }

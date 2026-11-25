@@ -30,6 +30,11 @@ from typing import Dict, Optional, Any
 from apps.projects.models import Project
 from .models_valuation import IncomeApproach
 from .services.income_approach_service import IncomeApproachDataService
+from .services.mf_rent_base import (
+    active_opex_discriminator,
+    is_management_fee_row,
+    unit_potential_rent,
+)
 
 
 def decimal_or_zero(value: Any) -> Decimal:
@@ -138,6 +143,13 @@ def _get_income_approach_data(project_id: int) -> dict:
         rent_row = cursor.fetchone()
 
         t12_gpr = decimal_or_zero(rent_row[0]) if rent_row else Decimal('0')
+        # Decision 7a / #LS-1123-04: a vacant unit counts at market rent in the
+        # in-place basis, the same figure the DCF tile reads (mf_rent_base).
+        # Only applied when the rent roll has unit rows; the unit-type fallback
+        # below is untouched.
+        rent_base = unit_potential_rent(cursor, project_id)
+        if rent_base['unit_rows'] > 0:
+            t12_gpr = decimal_or_zero(rent_base['annual_potential_rent'])
         forward_gpr = decimal_or_zero(rent_row[1]) if rent_row else Decimal('0')
 
         # If no units, try unit types table (floor plan matrix)
@@ -192,6 +204,11 @@ def _get_income_approach_data(project_id: int) -> dict:
         # =====================================================================
         # OPERATING EXPENSES
         # =====================================================================
+        # #LS-1123-01: filtered to the project's ACTIVE statement, the same
+        # rule the DCF tile applies. Without it a project carrying a T-12 and a
+        # pro-forma had both summed into this tile's expenses. NULL rows are
+        # legacy/untagged and always count.
+        opex_discriminator = active_opex_discriminator(cursor, project_id)
         cursor.execute("""
             SELECT
                 oe.expense_category,
@@ -200,9 +217,10 @@ def _get_income_approach_data(project_id: int) -> dict:
                 COALESCE(oe.parent_category, 'unclassified') as parent_category
             FROM landscape.tbl_operating_expenses oe
             WHERE oe.project_id = %s
+              AND (oe.statement_discriminator = %s OR oe.statement_discriminator IS NULL)
             GROUP BY oe.expense_category, oe.expense_type, oe.parent_category
             ORDER BY oe.parent_category, oe.expense_category
-        """, [project_id])
+        """, [project_id, opex_discriminator])
         opex_rows = cursor.fetchall()
 
         # Label formatting: snake_case → Title Case
@@ -229,23 +247,26 @@ def _get_income_approach_data(project_id: int) -> dict:
         opex_items = []
         total_opex = Decimal('0')
         extracted_mgmt_fee = Decimal('0')
-        total_mgmt_category = Decimal('0')  # All management-category expenses
+        total_mgmt_category = Decimal('0')  # The management fee line(s) only
         # Group by parent_category for hierarchical display
         grouped_opex: dict = {}
         for row in opex_rows:
             amount = decimal_or_zero(row[2])
             cat = row[0] or ''
             parent_cat = row[3] or 'unclassified'
-            # Track management_fee separately so we don't double-count
-            is_mgmt = cat.lower() in ('management_fee', 'management fee') or parent_cat == 'management'
-            if cat.lower() in ('management_fee', 'management fee'):
-                extracted_mgmt_fee = amount
+            # Track the management FEE separately so we don't double-count it.
+            # Decision 10a: only the fee line is pulled out and shown as its
+            # own calculated line; other costs filed under Management (on-site
+            # manager, payroll, administrative) stay as expenses. The test is
+            # shared with the DCF tile (mf_rent_base.is_management_fee_row).
+            is_mgmt = is_management_fee_row(cat)
             if is_mgmt:
+                extracted_mgmt_fee += amount
                 total_mgmt_category += amount
             total_opex += amount
 
-            # Skip management-category items from grouped display
-            # (management fee is rendered as its own calculated line)
+            # Skip the management fee from grouped display
+            # (it is rendered as its own calculated line)
             if is_mgmt:
                 continue
 
@@ -328,8 +349,8 @@ def _get_income_approach_data(project_id: int) -> dict:
     replacement_reserves = decimal_or_zero(assumptions['replacement_reserves_per_unit']) * unit_count
     selected_cap_rate = decimal_or_zero(assumptions['selected_cap_rate'])
 
-    # Remove ALL management-category expenses from base_opex.
-    # Management fee is shown as its own calculated line in the P&L.
+    # Remove the statement's management FEE from base_opex (decision 10a:
+    # the fee only). It is shown as its own calculated line in the P&L.
     base_opex_excl_mgmt = total_opex - total_mgmt_category
 
     def calculate_noi(gpr: Decimal, vac_rate: Decimal, use_market_mgmt: bool = False) -> Dict:
