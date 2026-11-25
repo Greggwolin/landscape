@@ -96,6 +96,18 @@ export interface OperatingExpensesData {
 // ASSUMPTIONS
 // ============================================================================
 
+/**
+ * Decision 11c: the project record's own other-income figure, and whether it
+ * differs from the one this analysis uses. Read-only and informational — the
+ * server sends it alongside the assumptions and it is never substituted. Kept
+ * out of IncomeApproachAssumptions on purpose: that type is the set of fields
+ * the user can edit and save.
+ */
+export interface OtherIncomeRecordNote {
+  other_income_on_record?: number | null;
+  other_income_differs?: boolean;
+}
+
 export interface IncomeApproachAssumptions {
   // Income - These are READ-ONLY (pulled from Operations Tab)
   vacancy_rate: number;           // From Operations - physical vacancy
@@ -105,10 +117,6 @@ export interface IncomeApproachAssumptions {
   // Income - These are EDITABLE (Income Approach specific)
   stabilized_vacancy_rate: number; // Editable - for Stabilized scenario only
   other_income: number;           // Editable - other income assumption
-  // Decision 11c: the project record's own other-income figure, and whether it
-  // differs from the one this analysis uses. Informational; never substituted.
-  other_income_on_record?: number | null;
-  other_income_differs?: boolean;
   income_growth_rate: number;     // Editable - for DCF projection
 
   // Expenses - READ-ONLY (pulled from Operations Tab)
