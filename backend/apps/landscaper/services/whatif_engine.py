@@ -606,11 +606,12 @@ class WhatIfEngine:
         # 'total_opex' is kept as the key name; it now holds base expenses, and
         # the fee and reserves are computed in _compute_income_metrics.
         from apps.financial.services.dcf_calculation_service import DCFCalculationService
-        base = DCFCalculationService(self.project_id)._get_base_data()
-        result['annual_rental_income'] = float(base['current_annual_rent'])
-        result['total_opex'] = float(base['base_opex'])
-        if base.get('unit_count'):
-            result.setdefault('tbl_project', {})['total_units'] = int(base['unit_count'])
+        operating_inputs = DCFCalculationService(self.project_id).operating_inputs()
+        result['operating_inputs'] = operating_inputs
+        result['annual_rental_income'] = float(operating_inputs['current_annual_rent'])
+        result['total_opex'] = float(operating_inputs['base_opex'])
+        if operating_inputs.get('unit_count'):
+            result.setdefault('tbl_project', {})['total_units'] = int(operating_inputs['unit_count'])
 
         return result
 
@@ -1411,19 +1412,27 @@ class WhatIfEngine:
         # One statement of the operating arithmetic, shared with the DCF tile
         # (#LS-1123-08). Credit loss, other income, the management fee and
         # reserves were missing from this projection before.
-        from apps.financial.services.mf_rent_base import annual_operating_line
-        operating_inputs = {
-            'current_annual_rent': float(annual_rent or 0),
-            'base_opex': float(total_opex or 0),
-            'unit_count': int(total_units or 0),
-            'income_growth_rate': float(income_growth),
-            'expense_growth_rate': float(expense_growth),
-            'vacancy_rate': float(vacancy),
-            'credit_loss_rate': float(income_a.get('credit_loss_rate', 0.01)),
-            'other_income': float(income_a.get('other_income', 0) or 0),
-            'management_fee_pct': float(income_a.get('management_fee_pct', 0.03)),
-            'replacement_reserves_per_unit': float(income_a.get('replacement_reserves_per_unit', 300)),
-        }
+        from apps.financial.services.mf_rent_base import (
+            OPERATING_INPUT_KEYS,
+            annual_operating_line,
+        )
+        # Start from the project's own ten inputs (loaded with the baseline),
+        # then lay the patched assumptions over them: an override written to
+        # income_assumptions, annual_rental_income or total_opex wins. No
+        # figure is supplied here — a missing input is an error, not a default.
+        operating_inputs = dict(assumptions.get('operating_inputs') or {})
+        operating_inputs['current_annual_rent'] = float(annual_rent or 0)
+        operating_inputs['base_opex'] = float(total_opex or 0)
+        operating_inputs['unit_count'] = int(total_units or 0)
+        for key in OPERATING_INPUT_KEYS:
+            if income_a.get(key) is not None:
+                operating_inputs[key] = float(income_a[key])
+        operating_inputs['vacancy_rate'] = float(vacancy)
+        operating_inputs['income_growth_rate'] = float(income_growth)
+        operating_inputs['expense_growth_rate'] = float(expense_growth)
+        missing = [k for k in OPERATING_INPUT_KEYS if k not in operating_inputs]
+        if missing:
+            raise ValueError(f"what-if is missing operating inputs: {', '.join(missing)}")
 
         # Year 1 calculations
         year1 = annual_operating_line(year=1, **operating_inputs)

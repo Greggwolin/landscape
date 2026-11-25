@@ -181,7 +181,7 @@ def test_whatif_vacancy_override_still_moves_the_answer():
 
 def test_whatif_reads_rent_and_expenses_from_the_dcf_base():
     src = inspect.getsource(whatif_engine.WhatIfEngine._load_income_property_assumptions)
-    assert '_get_base_data()' in src
+    assert 'operating_inputs()' in src
     assert 'SUM(current_rent)' not in src
     assert 'FROM landscape.tbl_operating_expenses' not in src
 
@@ -209,3 +209,14 @@ def test_report_calculator_ties_when_handed_the_inputs(monkeypatch):
     assert float(out['noi']) == pytest.approx(line['noi'], abs=0.01)
     assert float(out['gross_scheduled_rent']) == pytest.approx(line['gpr'])
     assert float(out['effective_gross_income']) == pytest.approx(line['egi'])
+
+
+def test_whatif_supplies_no_figure_of_its_own():
+    # A missing input is an error, never a default the user did not choose.
+    with pytest.raises(ValueError, match='missing operating inputs'):
+        WhatIfEngine._compute_income_metrics(None, {
+            'income_assumptions': {'hold_period_years': 5},
+            'tbl_project': {'total_units': 10},
+            'annual_rental_income': 100_000.0,
+            'total_opex': 30_000.0,
+        })
