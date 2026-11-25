@@ -598,23 +598,19 @@ class WhatIfEngine:
                     'gross_sf': float(row[1]) if row[1] else 0.0,
                 }
 
-            # Current rental income
-            cursor.execute("""
-                SELECT COALESCE(SUM(current_rent), 0) * 12 as annual_rent
-                FROM landscape.tbl_multifamily_unit
-                WHERE project_id = %s
-            """, [self.project_id])
-            row = cursor.fetchone()
-            result['annual_rental_income'] = float(row[0]) if row and row[0] else 0.0
-
-            # Operating expenses
-            cursor.execute("""
-                SELECT COALESCE(SUM(annual_amount), 0) as total_opex
-                FROM landscape.tbl_operating_expenses
-                WHERE project_id = %s
-            """, [self.project_id])
-            row = cursor.fetchone()
-            result['total_opex'] = float(row[0]) if row and row[0] else 0.0
+        # #LS-1123-08 — one projection. Rent and expenses come from the same
+        # base the DCF tile reads: potential rent with vacant units at market
+        # (decision 7a), expenses for the ACTIVE statement only and without the
+        # management fee line (decision 10a). This used to be a plain sum of
+        # current rents and a sum of every expense row on every statement.
+        # 'total_opex' is kept as the key name; it now holds base expenses, and
+        # the fee and reserves are computed in _compute_income_metrics.
+        from apps.financial.services.dcf_calculation_service import DCFCalculationService
+        base = DCFCalculationService(self.project_id)._get_base_data()
+        result['annual_rental_income'] = float(base['current_annual_rent'])
+        result['total_opex'] = float(base['base_opex'])
+        if base.get('unit_count'):
+            result.setdefault('tbl_project', {})['total_units'] = int(base['unit_count'])
 
         return result
 
@@ -1405,25 +1401,47 @@ class WhatIfEngine:
         discount_rate = income_a.get('discount_rate', 0.085)
         terminal_cap = income_a.get('terminal_cap_rate', 0.06)
         selling_costs = income_a.get('selling_costs_pct', 0.02)
-        vacancy = income_a.get('physical_vacancy_pct', 0.05)
+        # A what-if override of vacancy is written to 'physical_vacancy_pct'
+        # (see _apply_single_override); the project's own figure arrives as
+        # 'vacancy_rate'. The override wins when present.
+        vacancy = income_a.get('physical_vacancy_pct', income_a.get('vacancy_rate', 0.05))
         income_growth = income_a.get('income_growth_rate', 0.03)
         expense_growth = income_a.get('expense_growth_rate', 0.03)
 
+        # One statement of the operating arithmetic, shared with the DCF tile
+        # (#LS-1123-08). Credit loss, other income, the management fee and
+        # reserves were missing from this projection before.
+        from apps.financial.services.mf_rent_base import annual_operating_line
+        operating_inputs = {
+            'current_annual_rent': float(annual_rent or 0),
+            'base_opex': float(total_opex or 0),
+            'unit_count': int(total_units or 0),
+            'income_growth_rate': float(income_growth),
+            'expense_growth_rate': float(expense_growth),
+            'vacancy_rate': float(vacancy),
+            'credit_loss_rate': float(income_a.get('credit_loss_rate', 0.01)),
+            'other_income': float(income_a.get('other_income', 0) or 0),
+            'management_fee_pct': float(income_a.get('management_fee_pct', 0.03)),
+            'replacement_reserves_per_unit': float(income_a.get('replacement_reserves_per_unit', 300)),
+        }
+
         # Year 1 calculations
-        egi = annual_rent * (1 - vacancy)
-        noi_year1 = egi - total_opex
+        year1 = annual_operating_line(year=1, **operating_inputs)
+        egi = year1['egi']
+        noi_year1 = year1['noi']
+        total_opex = year1['total_opex']
 
         # Build multi-year NOI projection
-        noi_series = []
-        for year in range(hold_period):
-            year_rent = annual_rent * ((1 + income_growth) ** year)
-            year_egi = year_rent * (1 - vacancy)
-            year_opex = total_opex * ((1 + expense_growth) ** year)
-            year_noi = year_egi - year_opex
-            noi_series.append(year_noi)
+        noi_series = [
+            annual_operating_line(year=year + 1, **operating_inputs)['noi']
+            for year in range(hold_period)
+        ]
 
-        # Terminal value
-        terminal_noi = noi_series[-1] * (1 + income_growth) if noi_series else 0
+        # Terminal value: the year after the hold, from the same line
+        terminal_noi = (
+            annual_operating_line(year=hold_period + 1, **operating_inputs)['noi']
+            if noi_series else 0
+        )
         exit_value = terminal_noi / terminal_cap if terminal_cap > 0 else 0
         net_reversion = exit_value * (1 - selling_costs)
 

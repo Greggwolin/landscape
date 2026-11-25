@@ -34,6 +34,8 @@ except ImportError:
 
 from django.db import connection
 
+from apps.financial.services.mf_rent_base import annual_operating_line
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,12 +160,6 @@ class MultifamilyCashFlowAdapter:
                 """, [self.project_id])
                 units = cursor.fetchone()
 
-            # For MF projects, use industry average opex estimate based on unit count
-            # ~$5,500/unit/year covers: payroll, utilities, R&M, insurance, taxes, admin
-            unit_count_for_opex = mf_prop[0] if mf_prop and mf_prop[0] else (units[0] if units else 0)
-            estimated_opex = unit_count_for_opex * 5500
-            opex = (estimated_opex,)
-
             # Load loan (PERMANENT type preferred). Dead-status loans are
             # excluded so a paid-off/cancelled loan can never be picked as the
             # project's debt — see DEAD_LOAN_STATUSES in financial.models_debt.
@@ -215,15 +211,9 @@ class MultifamilyCashFlowAdapter:
             proj_price_row = cursor.fetchone()
 
         # Calculate derived values
-        unit_count = int(units[0] or 0) if units else 0
-        if mf_prop and mf_prop[0]:
-            unit_count = int(mf_prop[0])
-
         total_sf = int(units[2] or 0) if units else 0
         if mf_prop and mf_prop[1]:
             total_sf = int(mf_prop[1])
-
-        annual_gpr = Decimal(str(units[1] or 0)) if units else Decimal('0')
 
         # Purchase price: prefer tbl_property_acquisition.purchase_price,
         # then tbl_multifamily_property.acquisition_price, then
@@ -247,11 +237,6 @@ class MultifamilyCashFlowAdapter:
         # Exit cap rate: from tbl_property_acquisition, default 5.5%
         exit_cap = Decimal(str(acq_row[3])) if acq_row and acq_row[3] else Decimal('0.055')
 
-        # Vacancy
-        vacancy_pct = Decimal('0.05')  # 5% default
-        if mf_prop and mf_prop[3]:
-            vacancy_pct = (Decimal('100') - Decimal(str(mf_prop[3]))) / 100
-
         loan_amount = Decimal(str(debt[0] or 0)) if debt else Decimal('0')
         interest_rate = Decimal(str(debt[1] or 6.5)) / 100 if debt else Decimal('0.065')
         amort_years = int(debt[2] or 30) if debt else 30
@@ -259,21 +244,35 @@ class MultifamilyCashFlowAdapter:
 
         equity = purchase_price * (1 + closing_pct) - loan_amount
 
+        # #LS-1123-08 — one projection. The operating side (rent, vacancy,
+        # credit loss, other income, expenses, management fee, reserves, growth)
+        # is NOT loaded here any more. It used to be: market rent as the
+        # starting rent, an invented $5,500 a unit of expenses, a hard-coded 2%
+        # credit loss, 3% fee and $300 reserves, and growth rates divided by 100
+        # a second time (#LS-1123-03). Those ten figures now come from the same
+        # place the DCF tile reads them, so this adapter and that tile cannot
+        # give different Year-1 NOIs for one property. Acquisition, hold period,
+        # exit cap and debt are still this adapter's own.
+        from apps.financial.services.dcf_calculation_service import DCFCalculationService
+        self.operating_inputs = DCFCalculationService(self.project_id).operating_inputs()
+        op = self.operating_inputs
+        unit_count = int(op['unit_count'])
+
         self.assumptions = MultifamilyAssumptions(
             project_id=self.project_id,
             analysis_start_date=proj[1] or date.today(),
             hold_period_months=hold_months,
             unit_count=unit_count,
             total_sf=total_sf,
-            gross_potential_rent_annual=annual_gpr,
-            vacancy_pct=vacancy_pct,
-            credit_loss_pct=Decimal('0.02'),  # 2% default
-            other_income_annual=Decimal('0'),
+            gross_potential_rent_annual=Decimal(str(op['current_annual_rent'])),
+            vacancy_pct=Decimal(str(op['vacancy_rate'])),
+            credit_loss_pct=Decimal(str(op['credit_loss_rate'])),
+            other_income_annual=Decimal(str(op['other_income'])),
             rent_growth_rate_set_id=growth_sets.get('revenue'),
-            total_opex_annual=Decimal(str(opex[0] or 0)) if opex else Decimal('0'),
-            management_fee_pct=Decimal('0.03'),  # 3% default
+            total_opex_annual=Decimal(str(op['base_opex'])),
+            management_fee_pct=Decimal(str(op['management_fee_pct'])),
             expense_growth_rate_set_id=growth_sets.get('cost'),
-            reserves_per_unit=Decimal('300'),  # $300/unit default
+            reserves_per_unit=Decimal(str(op['replacement_reserves_per_unit'])),
             purchase_price=purchase_price,
             closing_costs_pct=closing_pct,
             exit_cap_rate=exit_cap,
@@ -398,34 +397,32 @@ class MultifamilyCashFlowAdapter:
         unlevered_cfs.append(-total_investment)
         levered_cfs.append(-float(a.equity_amount))
 
-        # Operating periods
+        # Operating periods. Each year's figures come from the shared operating
+        # line (mf_rent_base.annual_operating_line) spread evenly over its
+        # twelve months — the same line the DCF tile shows (#LS-1123-08).
+        op = getattr(self, 'operating_inputs', None)
+        if op is None:
+            from apps.financial.services.dcf_calculation_service import DCFCalculationService
+            op = self.operating_inputs = DCFCalculationService(self.project_id).operating_inputs()
+        lines: Dict[int, Dict[str, float]] = {}
+
+        def line_for(year_number: int) -> Dict[str, float]:
+            if year_number not in lines:
+                lines[year_number] = annual_operating_line(year=year_number, **op)
+            return lines[year_number]
+
         for month in range(1, a.hold_period_months + 1):
             year = (month - 1) // 12
+            line = line_for(year + 1)
 
-            # Get growth rates from database
-            rent_growth = float(self.get_growth_rate(a.rent_growth_rate_set_id, year + 1))
-            expense_growth = float(self.get_growth_rate(a.expense_growth_rate_set_id, year + 1))
-
-            # Revenue (monthly)
-            growth_factor = (1 + rent_growth) ** year
-            monthly_gpr = float(a.gross_potential_rent_annual / 12) * growth_factor
-            vacancy_loss = monthly_gpr * float(a.vacancy_pct)
-            credit_loss = (monthly_gpr - vacancy_loss) * float(a.credit_loss_pct)
-            net_rental = monthly_gpr - vacancy_loss - credit_loss
-            other_income = float(a.other_income_annual / 12) * growth_factor
-            egi = net_rental + other_income
+            egi = line['egi'] / 12
             egi_by_period.append(egi)
 
-            # Expenses (monthly)
-            exp_growth_factor = (1 + expense_growth) ** year
-            monthly_opex = float(a.total_opex_annual / 12) * exp_growth_factor
-            mgmt_fee = egi * float(a.management_fee_pct)
-            reserves = float(a.reserves_per_unit * a.unit_count) / 12
-            total_expenses = monthly_opex + mgmt_fee + reserves
+            total_expenses = line['total_opex'] / 12
             opex_by_period.append(total_expenses)
 
             # NOI
-            noi = egi - total_expenses
+            noi = line['noi'] / 12
             noi_by_period.append(noi)
 
             # Debt service
@@ -438,8 +435,8 @@ class MultifamilyCashFlowAdapter:
 
             # Disposition in final period
             if month == a.hold_period_months:
-                # Terminal NOI (next year projection)
-                terminal_noi = noi * 12 * (1 + rent_growth)
+                # Terminal NOI: the year after the hold, from the same line.
+                terminal_noi = line_for(year + 2)['noi']
                 gross_sale = terminal_noi / float(a.exit_cap_rate)
                 sale_costs = gross_sale * float(a.disposition_costs_pct)
                 net_sale = gross_sale - sale_costs

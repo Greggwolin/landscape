@@ -144,3 +144,76 @@ def management_fee_sql_predicate(column: str = 'expense_category') -> str:
         f"TRIM(REGEXP_REPLACE(LOWER(COALESCE({column}, '')), '[^a-z]+', ' ', 'g'))"
         f" ~ '{MANAGEMENT_FEE_PATTERN}'"
     )
+
+
+# ── One projection (Stage 1b, #LS-1123-08) ──────────────────────────────────
+#
+# The DCF service, the Landscaper cash-flow adapter, the what-if engine and the
+# report calculator each carried their own copy of "rent, less vacancy, less
+# expenses" — with different starting rents, different expense bases and, in
+# the adapter, invented defaults ($5,500 a unit of expenses, 2% credit loss).
+# On Chadron Terrace they returned four different Year-1 NOIs for one property.
+# This is the single statement of that arithmetic; all four call it.
+
+OPERATING_INPUT_KEYS = (
+    'current_annual_rent',
+    'base_opex',
+    'unit_count',
+    'income_growth_rate',
+    'expense_growth_rate',
+    'vacancy_rate',
+    'credit_loss_rate',
+    'other_income',
+    'management_fee_pct',
+    'replacement_reserves_per_unit',
+)
+
+
+def annual_operating_line(
+    *,
+    year: int,
+    current_annual_rent: float,
+    base_opex: float,
+    unit_count: int,
+    income_growth_rate: float,
+    expense_growth_rate: float,
+    vacancy_rate: float,
+    credit_loss_rate: float,
+    other_income: float,
+    management_fee_pct: float,
+    replacement_reserves_per_unit: float,
+) -> Dict[str, float]:
+    """One year of the operating statement, unrounded.
+
+    Year 1 is the base year (no growth applied); year N grows rent at
+    ``income_growth_rate`` and base expenses at ``expense_growth_rate``,
+    compounded N-1 times. Vacancy and credit loss are each a share of potential
+    rent. Other income and replacement reserves are held flat. The management
+    fee is ``management_fee_pct`` of effective gross income — so ``base_opex``
+    must already exclude the statement's own fee line (decision 10a).
+
+    This is exactly the arithmetic DCFCalculationService.calculate() has always
+    used; it was lifted here unchanged so the other entry points can share it.
+    """
+    gpr = float(current_annual_rent) * (1 + float(income_growth_rate)) ** (year - 1)
+    vacancy_loss = gpr * float(vacancy_rate)
+    credit_loss = gpr * float(credit_loss_rate)
+    egi = gpr - vacancy_loss - credit_loss + float(other_income)
+
+    opex = float(base_opex) * (1 + float(expense_growth_rate)) ** (year - 1)
+    management_fee = egi * float(management_fee_pct)
+    replacement_reserves = float(replacement_reserves_per_unit) * unit_count
+    total_opex = opex + management_fee + replacement_reserves
+
+    return {
+        'gpr': gpr,
+        'vacancy_loss': vacancy_loss,
+        'credit_loss': credit_loss,
+        'other_income': float(other_income),
+        'egi': egi,
+        'base_opex': opex,
+        'management_fee': management_fee,
+        'replacement_reserves': replacement_reserves,
+        'total_opex': total_opex,
+        'noi': egi - total_opex,
+    }

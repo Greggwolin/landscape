@@ -26,7 +26,12 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db import connection
 
-from .mf_rent_base import is_management_fee_row, management_fee_sql_predicate, unit_potential_rent
+from .mf_rent_base import (
+    annual_operating_line,
+    is_management_fee_row,
+    management_fee_sql_predicate,
+    unit_potential_rent,
+)
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
@@ -476,6 +481,36 @@ class DCFCalculationService:
             'rent_base': rent_base,
         }
 
+    def operating_inputs(
+        self,
+        assumptions: Optional[Dict[str, Any]] = None,
+        base_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """The inputs to mf_rent_base.annual_operating_line for this project.
+
+        The rent roll and statement base (potential rent with vacant units at
+        market, base expenses without the fee line, unit count) joined to the
+        project's operating assumptions. Every multifamily entry point reads
+        its Year-N operating figures from these same ten numbers (#LS-1123-08).
+        Defaults are the ones calculate() has always applied.
+        """
+        if assumptions is None:
+            assumptions = self.data_service.get_all_assumptions()
+        if base_data is None:
+            base_data = self._get_base_data()
+        return {
+            'current_annual_rent': base_data['current_annual_rent'],
+            'base_opex': base_data['base_opex'],
+            'unit_count': base_data['unit_count'],
+            'income_growth_rate': float(assumptions.get('income_growth_rate', 0.03)),
+            'expense_growth_rate': float(assumptions.get('expense_growth_rate', 0.03)),
+            'vacancy_rate': float(assumptions.get('vacancy_rate', 0.05)),
+            'credit_loss_rate': float(assumptions.get('credit_loss_rate', 0.01)),
+            'other_income': float(assumptions.get('other_income', 0)),
+            'management_fee_pct': float(assumptions.get('management_fee_pct', 0.03)),
+            'replacement_reserves_per_unit': float(assumptions.get('replacement_reserves_per_unit', 300)),
+        }
+
     def calculate(self) -> Dict[str, Any]:
         """
         Calculate full DCF analysis.
@@ -515,24 +550,24 @@ class DCFCalculationService:
         projections = []
         noi_series = []
 
+        operating_inputs = self.operating_inputs(assumptions, base_data)
+
         for year in range(1, hold_period + 1):
-            # Revenue grows from Year 1 base
-            # Year 1 = current rent, Year 2 = current * (1+g), etc.
-            growth_factor = (1 + income_growth_rate) ** (year - 1)
-            gpr = current_annual_rent * growth_factor
+            # One statement of the operating arithmetic, shared with the
+            # Landscaper cash-flow adapter, the what-if engine and the report
+            # calculator (#LS-1123-08). Year 1 = current rent, Year 2 =
+            # current * (1+g), etc.
+            line = annual_operating_line(year=year, **operating_inputs)
+            gpr = line['gpr']
+            vacancy_loss = line['vacancy_loss']
+            credit_loss = line['credit_loss']
+            egi = line['egi']
+            opex = line['base_opex']
+            management_fee = line['management_fee']
+            replacement_reserves = line['replacement_reserves']
+            total_opex = line['total_opex']
 
-            vacancy_loss = gpr * vacancy_rate
-            credit_loss = gpr * credit_loss_rate
-            egi = gpr - vacancy_loss - credit_loss + other_income
-
-            # Expenses grow similarly
-            expense_growth_factor = (1 + expense_growth_rate) ** (year - 1)
-            opex = base_opex * expense_growth_factor
-            management_fee = egi * management_fee_pct
-            replacement_reserves = replacement_reserves_per_unit * unit_count
-            total_opex = opex + management_fee + replacement_reserves
-
-            noi = egi - total_opex
+            noi = line['noi']
             noi_series.append(noi)
 
             # PV factor for discounting

@@ -160,7 +160,8 @@ class MultifamilyCalculator:
         self,
         scenario: str = 'current',
         vacancy_rate: Decimal = Decimal('0.03'),
-        credit_loss_rate: Decimal = Decimal('0.00')
+        credit_loss_rate: Decimal = Decimal('0.00'),
+        year: int = 1,
     ) -> Dict:
         """
         Calculate Effective Gross Income.
@@ -183,6 +184,25 @@ class MultifamilyCalculator:
                 'effective_gross_income': Decimal
             }
         """
+        if scenario == 'current':
+            # #LS-1123-08 — one projection. The in-place statement is the
+            # shared operating line the DCF tile shows, not a second
+            # calculation with its own rent basis and a caller-supplied
+            # vacancy rate. vacancy_rate / credit_loss_rate arguments are
+            # ignored for this scenario: the project's own assumptions apply.
+            line, inputs = self._current_line(year)
+            return {
+                'gross_scheduled_rent': self._dec(line['gpr']),
+                'vacancy_loss': self._dec(line['vacancy_loss']),
+                'credit_loss': self._dec(line['credit_loss']),
+                'effective_rental_income': self._dec(line['gpr'] - line['vacancy_loss']),  # Before credit loss
+                'other_income': self._dec(line['other_income']),
+                'other_income_available': line['other_income'] > 0,
+                'effective_gross_income': self._dec(line['egi']),
+                'vacancy_rate': self._dec(inputs['vacancy_rate']),
+                'credit_loss_rate': self._dec(inputs['credit_loss_rate']),
+            }
+
         gsr_data = self.calculate_gsr(scenario)
         annual_gsr = gsr_data['annual_gsr']
 
@@ -206,6 +226,80 @@ class MultifamilyCalculator:
             'effective_gross_income': egi,
             'vacancy_rate': vacancy_rate,
             'credit_loss_rate': credit_loss_rate
+        }
+
+    @staticmethod
+    def _dec(value) -> Decimal:
+        return Decimal(str(round(float(value), 2)))
+
+    def _current_line(self, year: int = 1):
+        """(operating line, inputs) for the in-place scenario — the same ten
+        inputs and the same arithmetic as the DCF tile (#LS-1123-08)."""
+        from apps.financial.services.dcf_calculation_service import DCFCalculationService
+        from apps.financial.services.mf_rent_base import annual_operating_line
+
+        if not hasattr(self, '_operating_inputs'):
+            self._operating_inputs = DCFCalculationService(self.project_id).operating_inputs()
+        inputs = self._operating_inputs
+        return annual_operating_line(year=year, **inputs), inputs
+
+    def _current_opex(self, year: int = 1) -> Dict:
+        """Expenses for the in-place scenario, by category, tying to the shared
+        operating line: the active statement's lines except its management fee
+        (decision 10a), grown at the project's expense growth rate, then the
+        computed management fee and replacement reserves as their own lines."""
+        from django.db import connection
+        from apps.financial.services.mf_rent_base import (
+            active_opex_discriminator,
+            management_fee_sql_predicate,
+        )
+
+        line, inputs = self._current_line(year)
+        growth = (1 + float(inputs['expense_growth_rate'])) ** (year - 1)
+
+        with connection.cursor() as cursor:
+            discriminator = active_opex_discriminator(cursor, self.project_id)
+            cursor.execute("""
+                SELECT oe.expense_category, COALESCE(SUM(oe.annual_amount), 0)
+                FROM landscape.tbl_operating_expenses oe
+                WHERE oe.project_id = %s
+                  AND (oe.statement_discriminator = %s OR oe.statement_discriminator IS NULL)
+                  AND NOT (""" + management_fee_sql_predicate('oe.expense_category') + """)
+                GROUP BY oe.expense_category
+                ORDER BY oe.expense_category
+            """, [self.project_id, discriminator])
+            rows = cursor.fetchall()
+
+        expenses_by_category = {}
+        line_items = []
+        for category, base_amount in rows:
+            amount = self._dec(float(base_amount) * growth)
+            expenses_by_category[category] = amount
+            line_items.append({
+                'category': category,
+                'account_name': category,
+                'annual_amount': amount,
+                'base_amount': self._dec(base_amount),
+                'escalation_rate': self._dec(inputs['expense_growth_rate']),
+            })
+        for label, key in (('Management Fee (computed)', 'management_fee'),
+                           ('Replacement Reserves', 'replacement_reserves')):
+            amount = self._dec(line[key])
+            expenses_by_category[label] = amount
+            line_items.append({
+                'category': label,
+                'account_name': label,
+                'annual_amount': amount,
+                'base_amount': amount,
+                'escalation_rate': Decimal('0.00'),
+            })
+
+        return {
+            # The total is the line's, so NOI ties to the DCF tile exactly even
+            # where the statement has no rows and the base came from a fallback.
+            'total_opex': self._dec(line['total_opex']),
+            'expenses_by_category': expenses_by_category,
+            'line_items': line_items,
         }
 
     def _active_opex_discriminator(self, override: Optional[str] = None) -> str:
@@ -315,10 +409,16 @@ class MultifamilyCalculator:
                 'noi_margin': Decimal  # NOI / EGI
             }
         """
-        egi_data = self.calculate_egi(scenario, vacancy_rate)
+        egi_data = self.calculate_egi(scenario, vacancy_rate, year=year)
         egi = egi_data['effective_gross_income']
 
-        opex_data = self.calculate_opex(year, statement_discriminator)
+        if scenario == 'current' and statement_discriminator is None:
+            # #LS-1123-08: expenses from the same line — the active statement's
+            # lines without its management fee, plus the computed fee and
+            # reserves — so this NOI is the DCF tile's NOI.
+            opex_data = self._current_opex(year)
+        else:
+            opex_data = self.calculate_opex(year, statement_discriminator)
         total_opex = opex_data['total_opex']
 
         noi = egi - total_opex
